@@ -32,6 +32,7 @@ license-platform-v2/
 backend/frontend_dist/
 backend/clawmemory_core/.cargo/
 *.zip
+scripts/
 
 # Compiled Cython outputs (keep .pyx source)
 app/core/*.so
