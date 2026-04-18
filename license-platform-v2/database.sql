@@ -147,7 +147,7 @@ CREATE TABLE `settings` (
 
 -- 插入默认价格方案
 INSERT INTO `settings` (`key`, `value`, `description`, `updated_at`) VALUES
-('pricing_tiers', '{"oss":{"name":"OSS","max_devices":1,"price":0,"features":[]},"pro":{"name":"Pro","max_devices":3,"price":29,"features":["graph","backup","decay","routing","conflict"]},"enterprise":{"name":"Enterprise","max_devices":10,"price":99,"features":["graph","backup","decay","routing","conflict","api","sso","audit","timetravel","offline"]}}', '价格方案配置', NOW()),
+('pricing_tiers', '{"oss":{"name":"OSS 免费版","max_devices":1,"price":0,"features":[]},"pro":{"name":"Pro 专业版","max_devices":3,"price":29,"features":["ai_extract","auto_graph","unlimited_graph","auto_decay","decay_report","prune_suggest","reinforce","conflict_scan","conflict_merge","smart_router","token_stats","wiki"]},"enterprise":{"name":"Enterprise 企业版","max_devices":10,"price":99,"features":["ai_extract","auto_graph","unlimited_graph","auto_decay","decay_report","prune_suggest","reinforce","conflict_scan","conflict_merge","smart_router","token_stats","wiki","api_access","sso","audit_log","time_travel","offline_mode"]}}', '价格方案配置 v3.0', NOW()),
 ('payment_method', 'manual', '支付方式: manual(手动)/alipay(支付宝)/wechat(微信)', NOW()),
 ('alipay_app_id', '', '支付宝App ID', NOW()),
 ('alipay_private_key', '', '支付宝应用私钥', NOW()),

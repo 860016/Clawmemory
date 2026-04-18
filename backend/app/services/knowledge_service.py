@@ -64,17 +64,9 @@ class KnowledgeService:
         return True
 
     # Graph data for visualization
-<<<<<<< HEAD
-    def get_graph_data(self, user_id: int) -> dict:
-        entities = self.list_entities(user_id)
-        relations = self.list_relations(user_id)
-        nodes = [{"id": e.id, "name": e.name, "type": e.entity_type} for e in entities]
-        edges = [{"source_id": r.source_id, "target_id": r.target_id, "relation_type": r.relation_type} for r in relations]
-=======
     def get_graph_data(self) -> dict:
         entities = self.list_entities()
         relations = self.list_relations()
         nodes = [{"id": e.id, "name": e.name, "type": e.entity_type, "description": e.description} for e in entities]
         edges = [{"source_id": r.source_id, "target_id": r.target_id, "relation_type": r.relation_type, "description": r.description} for r in relations]
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
         return {"nodes": nodes, "edges": edges}

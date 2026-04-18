@@ -77,6 +77,7 @@ function matchRoute(string $uri, string $method): void
             switch ($path) {
                 case 'activate': ApiController::activate(); break;
                 case 'verify': ApiController::verify(); break;
+                case 'check-feature': ApiController::checkFeature(); break;
                 case 'heartbeat': ApiController::heartbeat(); break;
                 case 'ping': ApiController::ping(); break;
                 default: jsonError('Not Found', 404); break;

@@ -32,33 +32,15 @@ try:
 except ImportError:
     USING_RUST = False
 
-<<<<<<< HEAD
     # 2. 纯 Python 兜底 — 最低安全 (仅开发环境/OSS 免费版)
     # 注意：此模式不包含完整的安全保护，仅保证基本功能可用
     # 发布时必须安装 clawmemory_core (Rust) wheel
-    import hashlib, os as _os
+    import hashlib, os as _os, math, time as _time, re
 
     _features: set = set()
     _tier: str = "oss"
     # 使用 salted hash 防止简单篡改（非安全级别，仅增加门槛）
     _license_hash: str = ""
-=======
-    # 2. 尝试 Cython (.so/.pyd) — 中等安全
-    try:
-        from app.core.feature_gate import check_feature, set_license, get_tier, reset as _reset
-        # Cython Pro modules
-        from app.core.memory_decay import calculate_decay, should_prune, reinforce, decay_memory, decay_batch, get_decay_stats
-        from app.core.conflict_resolver import detect_conflict, resolve_conflict, scan_for_conflicts, get_conflict_summary
-        from app.core.token_router import estimate_complexity, route_model, get_routing_stats
-        _CORE_ENGINE = "cython"
-        USING_CYTHON = True
-        logger.info("Core engine: Cython — moderate security")
-    except ImportError:
-        USING_CYTHON = False
-
-        # 3. 纯 Python 兜底 — 最低安全 (仅开发环境)
-        import hashlib, os as _os, math, time as _time, re
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
 
     def check_feature(f: str) -> bool:
         return f in _features
@@ -88,115 +70,102 @@ except ImportError:
         expected = hashlib.sha256(raw.encode()).hexdigest()[:16]
         return _license_hash == expected
 
-<<<<<<< HEAD
+    # --- Memory Decay (Python fallback) ---
+    _HALF_LIFE_DEFAULT = 30 * 24 * 3600
+    _MIN_IMPORTANCE = 0.05
+
+    def calculate_decay(importance: float, age_seconds: float, half_life: float = _HALF_LIFE_DEFAULT) -> float:
+        if half_life <= 0:
+            return importance
+        return max(importance * (2.0 ** (-age_seconds / half_life)), 0.0)
+
+    def should_prune(importance: float) -> bool:
+        return importance < _MIN_IMPORTANCE
+
+    def reinforce(importance: float, factor: float = 1.5) -> float:
+        reinforced = importance + (1.0 - importance) * (1.0 - math.exp(-0.5 * factor * importance))
+        return min(reinforced, 1.0)
+
+    def decay_memory(memory_id: int, current_importance: float, last_accessed_at: float, now: float = 0.0, half_life: float = _HALF_LIFE_DEFAULT) -> dict:
+        if now == 0.0:
+            now = _time.time()
+        age_seconds = max(now - last_accessed_at, 0.0)
+        new_importance = calculate_decay(current_importance, age_seconds, half_life)
+        return {"memory_id": memory_id, "new_importance": round(new_importance, 6), "should_prune": new_importance < _MIN_IMPORTANCE, "age_seconds": age_seconds}
+
+    def decay_batch(memories: list, now: float = 0.0, half_life: float = _HALF_LIFE_DEFAULT) -> list:
+        return [decay_memory(m["id"], m["importance"], m["last_accessed_at"], now, half_life) for m in memories]
+
+    def get_decay_stats(memories: list, now: float = 0.0) -> dict:
+        if not memories:
+            return {"total": 0, "prune_candidates": 0, "avg_importance": 0.0, "decayed_count": 0}
+        if now == 0.0:
+            now = _time.time()
+        total = len(memories)
+        prune_candidates = sum(1 for m in memories if calculate_decay(m.get("importance", 0.5), max(now - m.get("last_accessed_at", 0), 0)) < _MIN_IMPORTANCE)
+        decayed_count = sum(1 for m in memories if calculate_decay(m.get("importance", 0.5), max(now - m.get("last_accessed_at", 0), 0)) < m.get("importance", 0.5) - 0.01)
+        importance_sum = sum(calculate_decay(m.get("importance", 0.5), max(now - m.get("last_accessed_at", 0), 0)) for m in memories)
+        return {"total": total, "prune_candidates": prune_candidates, "avg_importance": round(importance_sum / total, 4), "decayed_count": decayed_count}
+
+    # --- Conflict Resolver (Python fallback) ---
+    _SAFETY_KEYS = ["password", "secret", "api_key", "token", "permission", "access"]
+
+    def detect_conflict(memory_a: dict, memory_b: dict):
+        key_a, key_b = memory_a.get("key", ""), memory_b.get("key", "")
+        if key_a != key_b and not (key_a.lower().replace('_', ' ').replace('-', ' ') in key_b.lower().replace('_', ' ').replace('-', ' ') or key_b.lower().replace('_', ' ').replace('-', ' ') in key_a.lower().replace('_', ' ').replace('-', ' ')):
+            return None
+        val_a, val_b = str(memory_a.get("value", "")), str(memory_b.get("value", ""))
+        if val_a.strip().lower() == val_b.strip().lower():
+            return None
+        severity = "high" if any(sk in key_a.lower() for sk in _SAFETY_KEYS) else "medium" if re.search(r'\d{4}-\d{2}-\d{2}', val_a) and re.search(r'\d{4}-\d{2}-\d{2}', val_b) else "low"
+        return {"memory_a_id": memory_a.get("id"), "memory_b_id": memory_b.get("id"), "key": key_a, "value_a": val_a, "value_b": val_b, "severity": severity, "layer_a": memory_a.get("layer", ""), "layer_b": memory_b.get("layer", ""), "source_a": memory_a.get("source", ""), "source_b": memory_b.get("source", "")}
+
+    def resolve_conflict(conflict: dict, strategy: str = None) -> dict:
+        if strategy is None:
+            severity = conflict.get("severity", "low")
+            strategy = "flag_for_review" if severity == "high" else "merge" if severity == "low" else "flag_for_review"
+        return {"conflict": conflict, "strategy": strategy, "winner": "both" if strategy == "merge" else None, "action": "merge" if strategy == "merge" else strategy}
+
+    def scan_for_conflicts(memories: list) -> list:
+        by_key = {}
+        for m in memories:
+            k = m.get("key", "")
+            if k:
+                by_key.setdefault(k, []).append(m)
+        conflicts = []
+        for group in by_key.values():
+            for i in range(len(group)):
+                for j in range(i + 1, len(group)):
+                    c = detect_conflict(group[i], group[j])
+                    if c:
+                        conflicts.append(c)
+        return conflicts
+
+    def get_conflict_summary(conflicts: list) -> dict:
+        by_sev = {"low": 0, "medium": 0, "high": 0}
+        for c in conflicts:
+            by_sev[c.get("severity", "low")] += 1
+        return {"total": len(conflicts), "by_severity": by_sev, "auto_resolvable": sum(1 for c in conflicts if c.get("severity") == "low"), "needs_review": sum(1 for c in conflicts if c.get("severity") != "low")}
+
+    # --- Token Router (Python fallback) ---
+    def estimate_complexity(message: str, context_length: int = 0, has_code: bool = False, has_reasoning: bool = False) -> float:
+        score = min(math.log1p(len(message)) / math.log1p(4000), 1.0) * 0.25
+        score += min(context_length / 50.0, 1.0) * 0.2
+        if has_code or any(ind in message for ind in ["```", "def ", "class ", "import "]):
+            score += 0.25
+        if has_reasoning or any(kw in message.lower() for kw in ["分析", "解释", "why", "how", "compare", "evaluate"]):
+            score += 0.3
+        return min(score, 1.0)
+
+    def route_model(message: str, available_models: list, context_length: int = 0, user_tier: str = "oss", budget_remaining: float = None) -> dict:
+        complexity = estimate_complexity(message, context_length)
+        return {"selected_model": available_models[0] if available_models else None, "complexity": round(complexity, 4), "routing_reason": "complexity_based", "estimated_cost": 0.0, "estimated_tokens": 0}
+
+    def get_routing_stats(routing_history: list) -> dict:
+        return {"total": len(routing_history), "distribution": {}, "avg_complexity": 0.0, "total_cost": 0.0}
+
     _CORE_ENGINE = "python"
     logger.warning("Core engine: Pure Python — LOW security, install clawmemory-core wheel for Rust protection")
-=======
-        def _verify_integrity() -> bool:
-            global _license_hash
-            if not _license_hash:
-                return _tier == "oss"
-            raw = f"{_tier}|{','.join(sorted(_features))}"
-            expected = hashlib.sha256(raw.encode()).hexdigest()[:16]
-            return _license_hash == expected
-
-        # --- Memory Decay (Python fallback) ---
-        _HALF_LIFE_DEFAULT = 30 * 24 * 3600
-        _MIN_IMPORTANCE = 0.05
-
-        def calculate_decay(importance: float, age_seconds: float, half_life: float = _HALF_LIFE_DEFAULT) -> float:
-            if half_life <= 0:
-                return importance
-            return max(importance * (2.0 ** (-age_seconds / half_life)), 0.0)
-
-        def should_prune(importance: float) -> bool:
-            return importance < _MIN_IMPORTANCE
-
-        def reinforce(importance: float, factor: float = 1.5) -> float:
-            reinforced = importance + (1.0 - importance) * (1.0 - math.exp(-0.5 * factor * importance))
-            return min(reinforced, 1.0)
-
-        def decay_memory(memory_id: int, current_importance: float, last_accessed_at: float, now: float = 0.0, half_life: float = _HALF_LIFE_DEFAULT) -> dict:
-            if now == 0.0:
-                now = _time.time()
-            age_seconds = max(now - last_accessed_at, 0.0)
-            new_importance = calculate_decay(current_importance, age_seconds, half_life)
-            return {"memory_id": memory_id, "new_importance": round(new_importance, 6), "should_prune": new_importance < _MIN_IMPORTANCE, "age_seconds": age_seconds}
-
-        def decay_batch(memories: list, now: float = 0.0, half_life: float = _HALF_LIFE_DEFAULT) -> list:
-            return [decay_memory(m["id"], m["importance"], m["last_accessed_at"], now, half_life) for m in memories]
-
-        def get_decay_stats(memories: list, now: float = 0.0) -> dict:
-            if not memories:
-                return {"total": 0, "prune_candidates": 0, "avg_importance": 0.0, "decayed_count": 0}
-            if now == 0.0:
-                now = _time.time()
-            total = len(memories)
-            prune_candidates = sum(1 for m in memories if calculate_decay(m.get("importance", 0.5), max(now - m.get("last_accessed_at", 0), 0)) < _MIN_IMPORTANCE)
-            decayed_count = sum(1 for m in memories if calculate_decay(m.get("importance", 0.5), max(now - m.get("last_accessed_at", 0), 0)) < m.get("importance", 0.5) - 0.01)
-            importance_sum = sum(calculate_decay(m.get("importance", 0.5), max(now - m.get("last_accessed_at", 0), 0)) for m in memories)
-            return {"total": total, "prune_candidates": prune_candidates, "avg_importance": round(importance_sum / total, 4), "decayed_count": decayed_count}
-
-        # --- Conflict Resolver (Python fallback) ---
-        _SAFETY_KEYS = ["password", "secret", "api_key", "token", "permission", "access"]
-
-        def detect_conflict(memory_a: dict, memory_b: dict):
-            key_a, key_b = memory_a.get("key", ""), memory_b.get("key", "")
-            if key_a != key_b and not (key_a.lower().replace('_', ' ').replace('-', ' ') in key_b.lower().replace('_', ' ').replace('-', ' ') or key_b.lower().replace('_', ' ').replace('-', ' ') in key_a.lower().replace('_', ' ').replace('-', ' ')):
-                return None
-            val_a, val_b = str(memory_a.get("value", "")), str(memory_b.get("value", ""))
-            if val_a.strip().lower() == val_b.strip().lower():
-                return None
-            severity = "high" if any(sk in key_a.lower() for sk in _SAFETY_KEYS) else "medium" if re.search(r'\d{4}-\d{2}-\d{2}', val_a) and re.search(r'\d{4}-\d{2}-\d{2}', val_b) else "low"
-            return {"memory_a_id": memory_a.get("id"), "memory_b_id": memory_b.get("id"), "key": key_a, "value_a": val_a, "value_b": val_b, "severity": severity, "layer_a": memory_a.get("layer", ""), "layer_b": memory_b.get("layer", ""), "source_a": memory_a.get("source", ""), "source_b": memory_b.get("source", "")}
-
-        def resolve_conflict(conflict: dict, strategy: str = None) -> dict:
-            if strategy is None:
-                severity = conflict.get("severity", "low")
-                strategy = "flag_for_review" if severity == "high" else "merge" if severity == "low" else "flag_for_review"
-            return {"conflict": conflict, "strategy": strategy, "winner": "both" if strategy == "merge" else None, "action": "merge" if strategy == "merge" else strategy}
-
-        def scan_for_conflicts(memories: list) -> list:
-            by_key = {}
-            for m in memories:
-                k = m.get("key", "")
-                if k:
-                    by_key.setdefault(k, []).append(m)
-            conflicts = []
-            for group in by_key.values():
-                for i in range(len(group)):
-                    for j in range(i + 1, len(group)):
-                        c = detect_conflict(group[i], group[j])
-                        if c:
-                            conflicts.append(c)
-            return conflicts
-
-        def get_conflict_summary(conflicts: list) -> dict:
-            by_sev = {"low": 0, "medium": 0, "high": 0}
-            for c in conflicts:
-                by_sev[c.get("severity", "low")] += 1
-            return {"total": len(conflicts), "by_severity": by_sev, "auto_resolvable": sum(1 for c in conflicts if c.get("severity") == "low"), "needs_review": sum(1 for c in conflicts if c.get("severity") != "low")}
-
-        # --- Token Router (Python fallback) ---
-        def estimate_complexity(message: str, context_length: int = 0, has_code: bool = False, has_reasoning: bool = False) -> float:
-            score = min(math.log1p(len(message)) / math.log1p(4000), 1.0) * 0.25
-            score += min(context_length / 50.0, 1.0) * 0.2
-            if has_code or any(ind in message for ind in ["```", "def ", "class ", "import "]):
-                score += 0.25
-            if has_reasoning or any(kw in message.lower() for kw in ["分析", "解释", "why", "how", "compare", "evaluate"]):
-                score += 0.3
-            return min(score, 1.0)
-
-        def route_model(message: str, available_models: list, context_length: int = 0, user_tier: str = "oss", budget_remaining: float = None) -> dict:
-            complexity = estimate_complexity(message, context_length)
-            return {"selected_model": available_models[0] if available_models else None, "complexity": round(complexity, 4), "routing_reason": "complexity_based", "estimated_cost": 0.0, "estimated_tokens": 0}
-
-        def get_routing_stats(routing_history: list) -> dict:
-            return {"total": len(routing_history), "distribution": {}, "avg_complexity": 0.0, "total_cost": 0.0}
-
-        _CORE_ENGINE = "python"
-        logger.warning("Core engine: Pure Python — LOW security, install clawmemory-core for protection")
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
 
 
 def verify_integrity() -> bool:
@@ -218,6 +187,36 @@ def reset():
     _reset()
 
 
+# ========== v3.0 功能定义 ==========
+PRO_FEATURES = {
+    # Memory Decay
+    "auto_decay": "自动记忆衰减",
+    "decay_report": "衰减报告",
+    "prune_suggest": "清理建议",
+    "reinforce": "记忆强化",
+    # Conflict Resolver
+    "conflict_scan": "矛盾扫描",
+    "conflict_merge": "自动合并",
+    # Token Router
+    "smart_router": "智能模型路由",
+    "token_stats": "Token 统计",
+    # AI & Graph
+    "ai_extract": "AI 智能提取",
+    "auto_graph": "自动知识图谱",
+    "unlimited_graph": "无限图谱节点",
+    # Wiki
+    "wiki": "Wiki 知识库",
+}
+
+ENTERPRISE_EXTRA_FEATURES = {
+    "api_access": "API 完整访问",
+    "sso": "SSO 单点登录",
+    "audit_log": "审计日志",
+    "time_travel": "时间回溯",
+    "offline_mode": "离线模式",
+}
+
+
 class LicenseService:
     def __init__(self, db: Session):
         self.db = db
@@ -230,11 +229,7 @@ class LicenseService:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.post(
                     f"{settings.license_server_url}/api/v1/activate",
-<<<<<<< HEAD
-                    json={"license_key": license_key, "fingerprint": self._get_fingerprint(), "version": "1.2.0"},
-=======
                     json={"license_key": license_key, "fingerprint": self._get_fingerprint(), "version": "2.0.0"},
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
                 )
                 data = resp.json()
         except Exception as e:
@@ -254,21 +249,20 @@ class LicenseService:
                 logger.warning(f"RSA verification error: {e}")
 
         tier = data.get("tier", "pro")
-        license_type = data.get("license_type", "pro_annual")
+        features = data.get("features", [])
 
-        if tier == "oss":
-            features = []
-        else:
-            features = [
-                "ai_extract", "auto_graph", "unlimited_graph",
-                "auto_decay", "decay_report", "prune_suggest", "reinforce",
-                "conflict_scan", "conflict_merge",
-                "smart_router", "token_stats",
-            ]
+        # 服务端返回的 features 优先，若无则按 tier 默认
+        if not features:
+            if tier == "oss":
+                features = []
+            elif tier == "enterprise":
+                features = list(PRO_FEATURES.keys()) + list(ENTERPRISE_EXTRA_FEATURES.keys())
+            else:
+                features = list(PRO_FEATURES.keys())
 
         license_obj = License(
             license_key=license_key,
-            tier=license_type,
+            tier=tier,
             features=json.dumps(features),
             status="active",
             rsa_signature=data.get("signature", ""),
@@ -283,7 +277,6 @@ class LicenseService:
         return {
             "valid": True,
             "tier": tier,
-            "license_type": license_type,
             "features": features,
             "expires_at": data.get("expires_at"),
         }
@@ -292,7 +285,7 @@ class LicenseService:
         lic = self.get_current_license()
         if lic:
             features = json.loads(lic.features) if lic.features else []
-            tier = "pro" if lic.tier in ("pro_annual", "pro_lifetime") else lic.tier
+            tier = lic.tier if lic.tier in ("oss", "pro", "enterprise") else "pro"
             set_license(tier, features)
 
     def _get_fingerprint(self) -> str:

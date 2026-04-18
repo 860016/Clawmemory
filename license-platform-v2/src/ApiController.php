@@ -1,7 +1,7 @@
 <?php
 /**
- * OpenClaw License Platform - API 控制器
- * 处理所有 /api/v1/* 请求
+ * ClawMemory License Platform - API 控制器
+ * v3.0 - 匹配 Rust PyO3 核心引擎 + Pro 功能
  */
 
 class ApiController
@@ -22,7 +22,7 @@ class ApiController
         $version = $input['version'] ?? '';
         $deviceName = $input['device_name'] ?? 'Unknown';
         $os = $input['os'] ?? '';
-        $customerEmail = trim($input['email'] ?? '');  // 用户绑定邮箱
+        $customerEmail = trim($input['email'] ?? '');
 
         // 查找授权码
         $license = Database::fetch(
@@ -65,21 +65,31 @@ class ApiController
             $deviceCount++;
         } else {
             Database::execute(
-                "UPDATE devices SET last_active_at = NOW(), updated_at = NOW() WHERE id = ?",
-                [$existingDevice['id']]
+                "UPDATE devices SET last_active_at = NOW(), app_version = ?, updated_at = NOW() WHERE id = ?",
+                [$version, $existingDevice['id']]
             );
         }
 
-        // 生成签名数据
+        // 获取 tier 和 features
         $tier = $license['tier'];
         $features = $license['features'] ? json_decode($license['features'], true) : [];
-        $data = json_encode([
+
+        // 如果 features 为空，按 tier 填充默认值（兼容旧数据）
+        if (empty($features)) {
+            $tiers = Settings::getPricingTiers();
+            if (isset($tiers[$tier]['features'])) {
+                $features = $tiers[$tier]['features'];
+            }
+        }
+
+        // 生成签名数据
+        $signData = json_encode([
             'tier' => $tier,
             'features' => $features ?: [],
             'expires_at' => $license['expires_at'],
         ]);
 
-        $signature = RsaSigner::sign($data);
+        $signature = RsaSigner::sign($signData);
 
         // 记录激活
         Database::insert(
@@ -87,7 +97,7 @@ class ApiController
             [$license['id'], $fingerprint, self::getClientIp()]
         );
 
-        // 绑定用户邮箱（激活时传入，用于到期提醒）
+        // 绑定用户邮箱
         if (!empty($customerEmail) && empty($license['customer_email'])) {
             Database::execute(
                 "UPDATE licenses SET customer_email = ?, updated_at = NOW() WHERE id = ? AND (customer_email IS NULL OR customer_email = '')",
@@ -101,7 +111,7 @@ class ApiController
             'features' => $features ?: [],
             'expires_at' => $license['expires_at'],
             'device_slot' => "$deviceCount/$maxDevices",
-            'signature' => base64_encode(json_encode(['data' => $data, 'signature' => $signature])),
+            'signature' => base64_encode(json_encode(['data' => $signData, 'signature' => $signature])),
         ]);
     }
 
@@ -130,12 +140,63 @@ class ApiController
         }
 
         $features = $license['features'] ? json_decode($license['features'], true) : [];
+        if (empty($features)) {
+            $tiers = Settings::getPricingTiers();
+            if (isset($tiers[$license['tier']]['features'])) {
+                $features = $tiers[$license['tier']]['features'];
+            }
+        }
 
         self::success([
             'valid' => true,
             'tier' => $license['tier'],
             'features' => $features ?: [],
             'expires_at' => $license['expires_at'],
+        ]);
+    }
+
+    /**
+     * POST /api/v1/check-feature - 检查 Pro 功能权限 (v3.0 新增)
+     */
+    public static function checkFeature(): void
+    {
+        $input = self::getInput();
+
+        if (empty($input['license_key']) || empty($input['feature'])) {
+            self::error('Missing required fields: license_key, feature', 400);
+        }
+
+        $license = Database::fetch(
+            "SELECT * FROM licenses WHERE license_key = ? AND status = 'active'",
+            [trim($input['license_key'])]
+        );
+
+        if (!$license) {
+            self::success(['allowed' => false, 'reason' => 'Invalid license']);
+            return;
+        }
+
+        if ($license['expires_at'] && strtotime($license['expires_at']) < time()) {
+            self::success(['allowed' => false, 'reason' => 'License expired']);
+            return;
+        }
+
+        $features = $license['features'] ? json_decode($license['features'], true) : [];
+        if (empty($features)) {
+            $tiers = Settings::getPricingTiers();
+            if (isset($tiers[$license['tier']]['features'])) {
+                $features = $tiers[$license['tier']]['features'];
+            }
+        }
+
+        $feature = trim($input['feature']);
+        $allowed = in_array($feature, $features);
+
+        self::success([
+            'allowed' => $allowed,
+            'feature' => $feature,
+            'tier' => $license['tier'],
+            'reason' => $allowed ? '' : "Feature '$feature' not available in {$license['tier']} tier",
         ]);
     }
 
@@ -219,7 +280,7 @@ class ApiController
     }
 
     /**
-     * GET /api/v1/public-key - 获取 RSA 公钥（供客户端安装时自动获取）
+     * GET /api/v1/public-key - 获取 RSA 公钥
      */
     public static function publicKey(): void
     {

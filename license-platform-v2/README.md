@@ -90,6 +90,7 @@ location ~ /keys/ {
 |------|------|------|
 | `/api/v1/activate` | POST | 激活授权码 |
 | `/api/v1/verify` | POST | 验证授权码 |
+| `/api/v1/check-feature` | POST | 检查 Pro 功能权限 |
 | `/api/v1/heartbeat` | POST | 心跳上报 |
 | `/api/v1/ping` | POST | 安装统计 |
 | `/api/v1/public-key` | GET | 获取 RSA 公钥 |
