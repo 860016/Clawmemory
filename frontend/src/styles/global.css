@@ -1,0 +1,106 @@
+/* ClawMemory Global Styles */
+
+:root {
+  --cm-primary: #4f6ef7;
+  --cm-primary-light: #7b93fa;
+  --cm-primary-dark: #3a54d4;
+  --cm-bg: #f5f6fa;
+  --cm-sidebar-bg: #1e1f2e;
+  --cm-sidebar-text: #a2a5b9;
+  --cm-sidebar-active: #ffffff;
+  --cm-card-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --cm-border: #e8eaf0;
+  --cm-text: #303133;
+  --cm-text-secondary: #909399;
+  --cm-radius: 10px;
+}
+
+/* Element Plus theme overrides */
+.el-button--primary {
+  --el-button-bg-color: var(--cm-primary);
+  --el-button-border-color: var(--cm-primary);
+  --el-button-hover-bg-color: var(--cm-primary-light);
+  --el-button-hover-border-color: var(--cm-primary-light);
+  --el-button-active-bg-color: var(--cm-primary-dark);
+  --el-button-active-border-color: var(--cm-primary-dark);
+}
+
+.el-menu-item.is-active {
+  color: var(--cm-primary) !important;
+}
+
+/* Global smooth scrolling */
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #909399;
+}
+
+/* Card styling */
+.el-card {
+  border-radius: var(--cm-radius) !important;
+  border-color: var(--cm-border) !important;
+  box-shadow: var(--cm-card-shadow) !important;
+}
+
+/* Table header */
+.el-table th.el-table__cell {
+  background-color: #fafbfc !important;
+  color: var(--cm-text) !important;
+  font-weight: 600;
+}
+
+/* Dialog */
+.el-dialog {
+  border-radius: 14px !important;
+}
+
+/* Tag */
+.el-tag {
+  border-radius: 6px !important;
+}
+
+/* Input focus */
+.el-input__wrapper:focus-within,
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--cm-primary) inset !important;
+}
+
+/* Page transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Page layout consistency */
+.admin-view,
+.agents-view,
+.memories-view,
+.knowledge-view,
+.settings-view {
+  padding: 24px;
+}
+.settings-view {
+  max-width: 800px;
+}

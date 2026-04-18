@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Data & Keys
+data/
+*.db
+keys/*.pem
+.env
+
+# Frontend
+**/node_modules/
+**/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Rust
+target/
+backend/clawmemory_core/target/
+
+# Build artifacts
+backend/frontend_dist/
+backend/clawmemory_core/.cargo/
+*.zip
+
+# Compiled Cython outputs (keep .pyx source)
+app/core/*.so
+app/core/*.pyd
+app/core/*.c
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.log
+*.tmp

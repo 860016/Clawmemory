@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./data:/app/data
+      - ./backend/keys:/app/keys
+    environment:
+      - CLAWMEMORY_SECRET_KEY=${SECRET_KEY}
+      - CLAWMEMORY_DATA_DIR=/app/data
+      - CLAWMEMORY_LICENSE_SERVER_URL=${LICENSE_SERVER_URL:-https://auth.bestu.top}
+      - CLAWMEMORY_RSA_PUBLIC_KEY_PATH=/app/keys/public.pem
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

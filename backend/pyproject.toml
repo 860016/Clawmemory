@@ -1,0 +1,13 @@
+[project]
+<<<<<<< HEAD
+name = "openclaw-memory-web"
+version = "1.2.0"
+=======
+name = "clawmemory"
+version = "2.0.0"
+>>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

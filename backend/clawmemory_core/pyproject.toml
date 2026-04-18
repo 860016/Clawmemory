@@ -1,0 +1,17 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "clawmemory-core"
+<<<<<<< HEAD
+version = "1.2.0"
+=======
+version = "2.0.0"
+description = "ClawMemory Rust core engine — feature gate, license verification, memory decay, conflict resolution, token routing"
+>>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
