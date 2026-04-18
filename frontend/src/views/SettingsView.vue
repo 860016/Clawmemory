@@ -103,7 +103,7 @@
         <div class="card-title">◇ {{ $t('settings.system') }}</div>
         <div class="setting-item">
           <span>{{ $t('settings.version') }}</span>
-          <span class="setting-desc">2.0.0</span>
+          <span class="setting-desc">{{ appVersion }}</span>
         </div>
         <div class="setting-item">
           <span>{{ $t('settings.coreEngine') }}</span>
@@ -144,19 +144,21 @@ const newPassword = ref('')
 const settingPassword = ref(false)
 const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
+const appVersion = ref('2.1.0')
 
 const featureLabels: Record<string, string> = {
-  ai_extract: 'AI提取',
-  auto_graph: '自动图谱',
-  unlimited_graph: '无限图谱',
-  auto_decay: '自动衰减',
-  decay_report: '衰减报告',
-  prune_suggest: '修剪建议',
-  reinforce: '访问强化',
-  conflict_scan: '矛盾扫描',
-  conflict_merge: 'AI合并',
-  smart_router: '智能路由',
-  token_stats: 'Token统计',
+  ai_extract: t('settings.featAiExtract'),
+  auto_graph: t('settings.featAutoGraph'),
+  unlimited_graph: t('settings.featUnlimitedGraph'),
+  auto_decay: t('settings.featAutoDecay'),
+  decay_report: t('settings.featDecayReport'),
+  prune_suggest: t('settings.featPruneSuggest'),
+  reinforce: t('settings.featReinforce'),
+  conflict_scan: t('settings.featConflictScan'),
+  conflict_merge: t('settings.featConflictMerge'),
+  smart_router: t('settings.featSmartRouter'),
+  token_stats: t('settings.featTokenStats'),
+  wiki: t('settings.featWiki'),
 }
 
 onMounted(async () => {
@@ -176,7 +178,7 @@ async function loadInitStatus() {
 }
 
 async function loadInstallStatus() {
-  try { const { data } = await axios.get('/api/v1/install-status'); coreEngine.value = data.checks?.security_engine || 'python' } catch {}
+  try { const { data } = await axios.get('/api/v1/install-status'); coreEngine.value = data.checks?.security_engine || 'python'; if (data.version) appVersion.value = data.version } catch {}
 }
 
 async function activateLicense() {

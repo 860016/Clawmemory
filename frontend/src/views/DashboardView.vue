@@ -5,6 +5,20 @@
       <p class="page-desc">{{ $t('dashboard.subtitle') }}</p>
     </div>
 
+    <el-alert
+      v-if="!passwordSet"
+      :title="$t('dashboard.securityAlert')"
+      type="warning"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 20px"
+    >
+      <template #default>
+        <span>{{ $t('dashboard.securityAlertDesc') }}</span>
+        <el-button type="primary" size="small" text @click="$router.push('/settings')">{{ $t('dashboard.goSettings') }}</el-button>
+      </template>
+    </el-alert>
+
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon-wrap mem-icon">
@@ -112,6 +126,7 @@ const { t } = useI18n()
 const stats = ref<any>({ memoryCount: 0, entityCount: 0, relationCount: 0, wikiCount: 0, layerStats: {} })
 const recentMemories = ref<any[]>([])
 const license = ref<any>({ tier: 'oss', features: [] })
+const passwordSet = ref(true)
 
 const layerLabels: Record<string, string> = {
   preference: t('memories.preference'),
@@ -121,8 +136,15 @@ const layerLabels: Record<string, string> = {
 }
 
 onMounted(async () => {
-  await Promise.all([loadStats(), loadRecent(), loadLicense()])
+  await Promise.all([loadStats(), loadRecent(), loadLicense(), loadPasswordStatus()])
 })
+
+async function loadPasswordStatus() {
+  try {
+    const { data } = await axios.get('/api/v1/auth/init-status')
+    passwordSet.value = data.password_set
+  } catch {}
+}
 
 async function loadStats() {
   try {
