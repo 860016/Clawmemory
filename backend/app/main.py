@@ -207,7 +207,7 @@ async def install_status():
 
     return {
         "plugin": "ClawMemory",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "status": "running" if db_ok else "degraded",
         "service_url": f"http://localhost:{settings.port}",
         "security_level": security_level,
@@ -230,6 +230,76 @@ async def install_status():
         },
         "next_steps": _get_next_steps(is_licensed, frontend_ready, pubkey_exists, core_engine),
     }
+
+
+@app.get("/api/v1/stats")
+async def get_dashboard_stats():
+    """Dashboard 统计数据 — 一次返回所有统计"""
+    from app.database import SessionLocal
+    from app.models.memory import Memory
+    from app.services.license_service import current_tier, is_feature_enabled
+
+    db = SessionLocal()
+    try:
+        # 记忆总数 + 按层级统计
+        total = db.query(Memory).count()
+        layer_stats = {}
+        for layer in ['preference', 'knowledge', 'short_term', 'private']:
+            count = db.query(Memory).filter(Memory.layer == layer).count()
+            if count > 0:
+                layer_stats[layer] = count
+
+        # 实体数
+        entity_count = 0
+        try:
+            from app.models.knowledge import Entity
+            entity_count = db.query(Entity).count()
+        except Exception:
+            pass
+
+        # Wiki 页面数
+        wiki_count = 0
+        try:
+            from app.models.wiki import WikiPage
+            wiki_count = db.query(WikiPage).count()
+        except Exception:
+            pass
+
+        # 最近记忆
+        recent = db.query(Memory).order_by(Memory.updated_at.desc()).limit(5).all()
+        recent_list = [
+            {
+                "id": m.id, "key": m.key, "value": m.value,
+                "layer": m.layer, "updated_at": str(m.updated_at) if m.updated_at else None,
+            }
+            for m in recent
+        ]
+
+        # 授权信息
+        tier = current_tier()
+        license_info = {"tier": tier, "active": tier != "oss"}
+        if tier != "oss":
+            from app.models.license import License
+            lic = db.query(License).filter(License.status == "active").first()
+            if lic:
+                license_info.update({
+                    "type": lic.tier,
+                    "expires_at": str(lic.expires_at) if lic.expires_at else None,
+                    "device_slot": lic.device_slot or "",
+                })
+
+        return {
+            "memoryCount": total,
+            "entityCount": entity_count,
+            "wikiCount": wiki_count,
+            "layerStats": layer_stats,
+            "recentMemories": recent_list,
+            "license": license_info,
+            "passwordSet": bool(settings.access_password),
+            "version": "2.1.0",
+        }
+    finally:
+        db.close()
 
 
 def _get_next_steps(is_licensed: bool, frontend_ready: bool, pubkey_ok: bool, core_engine: str) -> list:

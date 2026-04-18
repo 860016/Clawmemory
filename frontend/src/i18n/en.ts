@@ -241,5 +241,10 @@ export default {
     featTokenStats: 'Token Stats',
     featWiki: 'Wiki',
     featAutoBackup: 'Auto Backup',
+    featApiAccess: 'API Access',
+    featSso: 'SSO',
+    featAuditLog: 'Audit Log',
+    featTimeTravel: 'Time Travel',
+    featOfflineMode: 'Offline Mode',
   },
 }

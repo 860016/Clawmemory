@@ -6,7 +6,7 @@
     </div>
 
     <el-alert
-      v-if="!passwordSet"
+      v-if="!stats.passwordSet"
       :title="$t('dashboard.securityAlert')"
       type="warning"
       show-icon
@@ -71,6 +71,7 @@
             </div>
             <div class="layer-count">{{ count }}</div>
           </div>
+          <div v-if="Object.keys(stats.layerStats).length === 0" class="empty-hint">{{ $t('common.noData') }}</div>
         </div>
       </div>
 
@@ -79,14 +80,14 @@
           <h3>{{ $t('dashboard.licenseStatus') }}</h3>
         </div>
         <div class="license-info">
-          <div class="license-tier" :class="license.tier">
-            <span class="tier-icon">{{ license.tier === 'oss' ? '◇' : '◆' }}</span>
-            <span>{{ license.tier === 'oss' ? $t('dashboard.freeVersion') : $t('dashboard.proVersion') }}</span>
+          <div class="license-tier" :class="stats.license.tier">
+            <span class="tier-icon">{{ stats.license.tier === 'oss' ? '◇' : '◆' }}</span>
+            <span>{{ stats.license.tier === 'oss' ? $t('dashboard.freeVersion') : $t('dashboard.proVersion') }}</span>
           </div>
-          <div v-if="license.tier !== 'oss'" class="license-detail">
-            <div v-if="license.type">{{ $t('settings.version') }}：{{ license.type === 'pro_annual' ? $t('dashboard.annual') : $t('dashboard.lifetime') }}</div>
-            <div v-if="license.expires_at">{{ $t('dashboard.expires') }}：{{ license.expires_at }}</div>
-            <div v-if="license.device_slot">{{ $t('dashboard.device') }}：{{ license.device_slot }}</div>
+          <div v-if="stats.license.active" class="license-detail">
+            <div v-if="stats.license.type">{{ $t('settings.version') }}：{{ stats.license.type === 'pro_annual' ? $t('dashboard.annual') : $t('dashboard.lifetime') }}</div>
+            <div v-if="stats.license.expires_at">{{ $t('dashboard.expires') }}：{{ stats.license.expires_at }}</div>
+            <div v-if="stats.license.device_slot">{{ $t('dashboard.device') }}：{{ stats.license.device_slot }}</div>
           </div>
           <div v-else class="upgrade-hint">
             <p>{{ $t('dashboard.upgradeHint') }}</p>
@@ -101,8 +102,8 @@
         <h3>{{ $t('dashboard.recentMemories') }}</h3>
         <el-button text type="primary" @click="$router.push('/memories')">{{ $t('dashboard.viewAll') }}</el-button>
       </div>
-      <div class="recent-memories" v-if="recentMemories.length">
-        <div class="memory-item" v-for="m in recentMemories" :key="m.id">
+      <div class="recent-memories" v-if="stats.recentMemories && stats.recentMemories.length">
+        <div class="memory-item" v-for="m in stats.recentMemories" :key="m.id">
           <div class="memory-layer-badge" :class="m.layer">{{ layerLabels[m.layer] || m.layer }}</div>
           <div class="memory-content">
             <div class="memory-key">{{ m.key }}</div>
@@ -123,10 +124,11 @@ import { Collection, Connection, Document, Star } from '@element-plus/icons-vue'
 import axios from '../api/client'
 
 const { t } = useI18n()
-const stats = ref<any>({ memoryCount: 0, entityCount: 0, relationCount: 0, wikiCount: 0, layerStats: {} })
-const recentMemories = ref<any[]>([])
-const license = ref<any>({ tier: 'oss', features: [] })
-const passwordSet = ref(true)
+const stats = ref<any>({
+  memoryCount: 0, entityCount: 0, wikiCount: 0,
+  layerStats: {}, recentMemories: [], license: { tier: 'oss', active: false },
+  passwordSet: true,
+})
 
 const layerLabels: Record<string, string> = {
   preference: t('memories.preference'),
@@ -136,50 +138,11 @@ const layerLabels: Record<string, string> = {
 }
 
 onMounted(async () => {
-  await Promise.all([loadStats(), loadRecent(), loadLicense(), loadPasswordStatus()])
+  try {
+    const { data } = await axios.get('/stats')
+    stats.value = data
+  } catch {}
 })
-
-async function loadPasswordStatus() {
-  try {
-    const { data } = await axios.get('/api/v1/auth/init-status')
-    passwordSet.value = data.password_set
-  } catch {}
-}
-
-async function loadStats() {
-  try {
-    const { data } = await axios.get('/api/v1/memories', { params: { size: 1 } })
-    const total = data.total || 0
-    const layerStats: Record<string, number> = {}
-    for (const layer of ['preference', 'knowledge', 'short_term', 'private']) {
-      const { data: ld } = await axios.get('/api/v1/memories', { params: { layer, size: 1 } })
-      if (ld.total > 0) layerStats[layer] = ld.total
-    }
-    stats.value = { memoryCount: total, entityCount: 0, relationCount: 0, wikiCount: 0, layerStats }
-  } catch {}
-  try {
-    const { data: entities } = await axios.get('/api/v1/knowledge/entities')
-    stats.value.entityCount = entities.length || 0
-  } catch {}
-  try {
-    const { data: pages } = await axios.get('/api/v1/wiki/pages')
-    stats.value.wikiCount = pages.length || 0
-  } catch {}
-}
-
-async function loadRecent() {
-  try {
-    const { data } = await axios.get('/api/v1/memories', { params: { size: 5 } })
-    recentMemories.value = data.items || []
-  } catch {}
-}
-
-async function loadLicense() {
-  try {
-    const { data } = await axios.get('/api/v1/license/info')
-    license.value = data
-  } catch {}
-}
 
 function barWidth(count: number) {
   const max = Math.max(...Object.values(stats.value.layerStats || {}).map(Number), 1)

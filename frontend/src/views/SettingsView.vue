@@ -160,6 +160,12 @@ const featureLabels: Record<string, string> = {
   token_stats: t('settings.featTokenStats'),
   wiki: t('settings.featWiki'),
   auto_backup: t('settings.featAutoBackup'),
+  // Enterprise only
+  api_access: t('settings.featApiAccess'),
+  sso: t('settings.featSso'),
+  audit_log: t('settings.featAuditLog'),
+  time_travel: t('settings.featTimeTravel'),
+  offline_mode: t('settings.featOfflineMode'),
 }
 
 onMounted(async () => {

@@ -17,7 +17,7 @@ class StatsService:
                     f"{settings.license_server_url}/api/v1/heartbeat",
                     json={
                         "license_key": license_key,
-                        "version": "2.0.0",
+                        "version": "2.1.0",
                         "os": platform.system(),
                         "memory_count": self._count_memories(db),
                     }

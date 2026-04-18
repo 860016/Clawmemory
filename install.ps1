@@ -220,8 +220,6 @@ CLAWMEMORY_PORT=$Port
 CLAWMEMORY_LICENSE_SERVER_URL=$LicenseServer
 CLAWMEMORY_RSA_PUBLIC_KEY_PATH=./keys/public.pem
 CLAWMEMORY_CORS_ORIGINS=["*"]
-CLAWMEMORY_OPENCLAW_GATEWAY_URL=$GatewayUrl
-CLAWMEMORY_OPENCLAW_API_KEY=$GatewayApiKey
 "@ | Set-Content "$InstallDir\backend\.env" -Encoding UTF8
     Write-Host "  .env 已创建" -ForegroundColor Green
 } else {

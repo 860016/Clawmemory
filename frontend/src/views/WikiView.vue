@@ -2,51 +2,101 @@
   <div class="wiki-page">
     <div class="page-header">
       <h1>{{ $t('wiki.title') }}</h1>
-      <el-button type="primary" @click="openNewPage">
-        <el-icon><Plus /></el-icon> {{ $t('wiki.addPage') }}
-      </el-button>
-    </div>
-
-    <div class="toolbar">
-      <el-input v-model="searchQuery" :placeholder="$t('wiki.searchPlaceholder')" clearable @keyup.enter="handleSearch" class="search-input">
-        <template #prefix><el-icon><Search /></el-icon></template>
-      </el-input>
-      <el-select v-model="selectedCategory" :placeholder="$t('wiki.categories')" clearable @change="loadPages" style="width: 180px">
-        <el-option :label="$t('wiki.allPages')" value="" />
-        <el-option v-for="cat in categories" :key="cat" :label="cat" :value="cat" />
-      </el-select>
-    </div>
-
-    <!-- 搜索结果 -->
-    <div v-if="searchResults.length" class="search-results">
-      <div class="section-title">{{ $t('wiki.searchResults') }} ({{ searchResults.length }})</div>
-      <div class="page-card" v-for="p in searchResults" :key="'s'+p.id" @click="viewPage(p.id)">
-        <div class="card-top">
-          <span class="category-tag" v-if="p.category">{{ p.category }}</span>
-          <span class="pin-badge" v-if="p.is_pinned">◆</span>
-        </div>
-        <div class="card-title">{{ p.title }}</div>
-        <div class="card-meta">{{ $t('wiki.lastUpdated') }}: {{ formatTime(p.updated_at) }}</div>
+      <div class="header-actions">
+        <el-button type="primary" @click="openNewPage">
+          <el-icon><Plus /></el-icon> {{ $t('wiki.addPage') }}
+        </el-button>
       </div>
     </div>
 
-    <!-- 页面列表 -->
-    <div v-else class="page-list">
-      <div class="page-card" v-for="p in pages" :key="p.id" @click="viewPage(p.id)">
-        <div class="card-top">
-          <span class="category-tag" v-if="p.category">{{ p.category }}</span>
-          <span class="pin-badge" v-if="p.is_pinned">◆ {{ $t('wiki.pinned') }}</span>
+    <div class="wiki-layout">
+      <!-- 侧边栏：分类/导航 -->
+      <div class="wiki-sidebar">
+        <el-input v-model="searchQuery" :placeholder="$t('wiki.searchPlaceholder')" clearable @keyup.enter="handleSearch" class="search-input" size="small">
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+
+        <div class="sidebar-section">
+          <div class="sidebar-title">{{ $t('wiki.categories') }}</div>
+          <div class="category-list">
+            <div class="category-item" :class="{ active: !selectedCategory }" @click="selectedCategory = ''; loadPages()">
+              {{ $t('wiki.allPages') }}
+            </div>
+            <div class="category-item" :class="{ active: selectedCategory === cat }" v-for="cat in categories" :key="cat" @click="selectedCategory = cat; loadPages()">
+              {{ cat }}
+            </div>
+          </div>
         </div>
-        <div class="card-title">{{ p.title }}</div>
-        <div class="card-tags" v-if="p.tags && p.tags.length">
-          <span class="tag" v-for="tag in p.tags" :key="tag">{{ tag }}</span>
+
+        <div class="sidebar-section" v-if="searchResults.length">
+          <div class="sidebar-title">{{ $t('wiki.searchResults') }} ({{ searchResults.length }})</div>
+          <div class="category-list">
+            <div class="category-item" v-for="p in searchResults" :key="'s'+p.id" @click="viewPage(p.id)">
+              {{ p.title }}
+            </div>
+          </div>
         </div>
-        <div class="card-meta">{{ $t('wiki.lastUpdated') }}: {{ formatTime(p.updated_at) }}</div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-title">{{ $t('wiki.pinned') }}</div>
+          <div class="category-list">
+            <div class="category-item pinned" v-for="p in pinnedPages" :key="'pin'+p.id" @click="viewPage(p.id)">
+              ◆ {{ p.title }}
+            </div>
+            <div v-if="!pinnedPages.length" class="empty-hint-small">{{ $t('common.noData') }}</div>
+          </div>
+        </div>
       </div>
-      <div v-if="!pages.length" class="empty-hint">{{ $t('common.noData') }}</div>
+
+      <!-- 主内容区 -->
+      <div class="wiki-main">
+        <!-- 页面列表模式（未选中页面时） -->
+        <div v-if="!viewingPage" class="page-grid">
+          <div class="page-card" v-for="p in pages" :key="p.id" @click="viewPage(p.id)">
+            <div class="card-top">
+              <span class="category-tag" v-if="p.category">{{ p.category }}</span>
+              <span class="pin-badge" v-if="p.is_pinned">◆ {{ $t('wiki.pinned') }}</span>
+            </div>
+            <div class="card-title">{{ p.title }}</div>
+            <div class="card-preview" v-if="p.content">{{ getPreview(p.content) }}</div>
+            <div class="card-tags" v-if="p.tags && p.tags.length">
+              <span class="tag" v-for="tag in p.tags.slice(0, 3)" :key="tag">{{ tag }}</span>
+              <span class="tag" v-if="p.tags.length > 3">+{{ p.tags.length - 3 }}</span>
+            </div>
+            <div class="card-meta">{{ formatTime(p.updated_at) }}</div>
+          </div>
+          <div v-if="!pages.length" class="empty-state">
+            <div class="empty-icon">◇</div>
+            <p>{{ $t('common.noData') }}</p>
+            <el-button type="primary" @click="openNewPage">{{ $t('wiki.addPage') }}</el-button>
+          </div>
+        </div>
+
+        <!-- 页面查看模式 -->
+        <div v-else class="page-view">
+          <div class="view-header">
+            <el-button text @click="viewingPage = null" class="back-btn">
+              <el-icon><ArrowLeft /></el-icon> {{ $t('common.back') }}
+            </el-button>
+            <div class="view-actions">
+              <el-button text type="primary" @click="editCurrentPage">{{ $t('common.edit') }}</el-button>
+              <el-button text type="danger" @click="deleteCurrentPage">{{ $t('common.delete') }}</el-button>
+            </div>
+          </div>
+          <div class="view-meta">
+            <span class="category-tag" v-if="viewingPage.category">{{ viewingPage.category }}</span>
+            <span class="view-date">{{ formatTime(viewingPage.updated_at) }}</span>
+          </div>
+          <h1 class="view-title">{{ viewingPage.title }}</h1>
+          <div class="view-tags" v-if="viewingPage.tags && viewingPage.tags.length">
+            <span class="tag" v-for="tag in viewingPage.tags" :key="tag">{{ tag }}</span>
+          </div>
+          <div class="markdown-body" v-html="renderedContent"></div>
+        </div>
+      </div>
     </div>
 
-    <!-- 编辑/查看页面 -->
+    <!-- 编辑对话框 -->
     <el-dialog v-model="showEditor" :title="isEditing ? $t('wiki.editPage') : $t('wiki.newPage')" width="800px" top="5vh" :close-on-click-modal="false">
       <el-form label-position="top">
         <div class="editor-row">
@@ -74,11 +124,8 @@
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button v-if="isEditing" type="danger" text @click="deleteCurrentPage">{{ $t('common.delete') }}</el-button>
-          <div class="footer-right">
-            <el-button @click="showEditor = false">{{ $t('common.cancel') }}</el-button>
-            <el-button type="primary" @click="savePage" :loading="saving">{{ $t('common.save') }}</el-button>
-          </div>
+          <el-button @click="showEditor = false">{{ $t('common.cancel') }}</el-button>
+          <el-button type="primary" @click="savePage" :loading="saving">{{ $t('common.save') }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -86,10 +133,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { Plus, Search, ArrowLeft } from '@element-plus/icons-vue'
+import { marked } from 'marked'
 import wikiApi from '../api/wiki'
 
 const { t } = useI18n()
@@ -102,18 +150,24 @@ const selectedCategory = ref('')
 const showEditor = ref(false)
 const isEditing = ref(false)
 const currentPageId = ref<number | null>(null)
+const viewingPage = ref<any>(null)
 const saving = ref(false)
 
 const pageForm = ref({
   title: '', content: '', category: '', tagsStr: '', parent_id: null as number | null, is_pinned: false,
 })
 
+const pinnedPages = computed(() => pages.value.filter(p => p.is_pinned))
+
+const renderedContent = computed(() => {
+  if (!viewingPage.value?.content) return ''
+  return marked(viewingPage.value.content, { breaks: true, gfm: true })
+})
+
 onMounted(() => { loadPages(); loadCategories() })
 
 async function loadPages() {
   try {
-    const params: any = {}
-    if (selectedCategory.value) params.category = selectedCategory.value
     const { data } = await wikiApi.listPages(selectedCategory.value || undefined)
     pages.value = data || []
   } catch { pages.value = [] }
@@ -152,21 +206,23 @@ function openNewPage() {
 async function viewPage(id: number) {
   try {
     const { data } = await wikiApi.getPage(id)
-    isEditing.value = true
-    currentPageId.value = id
-    pageForm.value = {
-      title: data.title,
-      content: data.content || '',
-      category: data.category || '',
-      tagsStr: (data.tags || []).join(', '),
-      parent_id: data.parent_id,
-      is_pinned: data.is_pinned,
-    }
-    await loadAllPages()
-    showEditor.value = true
+    viewingPage.value = data
   } catch (e: any) {
     ElMessage.error(t('common.failed'))
   }
+}
+
+function editCurrentPage() {
+  if (!viewingPage.value) return
+  const p = viewingPage.value
+  isEditing.value = true
+  currentPageId.value = p.id
+  pageForm.value = {
+    title: p.title, content: p.content || '', category: p.category || '',
+    tagsStr: (p.tags || []).join(', '), parent_id: p.parent_id, is_pinned: p.is_pinned,
+  }
+  loadAllPages()
+  showEditor.value = true
 }
 
 async function savePage() {
@@ -174,12 +230,10 @@ async function savePage() {
   saving.value = true
   try {
     const payload: any = {
-      title: pageForm.value.title,
-      content: pageForm.value.content,
+      title: pageForm.value.title, content: pageForm.value.content,
       category: pageForm.value.category || null,
       tags: pageForm.value.tagsStr ? pageForm.value.tagsStr.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
-      parent_id: pageForm.value.parent_id,
-      is_pinned: pageForm.value.is_pinned,
+      parent_id: pageForm.value.parent_id, is_pinned: pageForm.value.is_pinned,
     }
     if (isEditing.value && currentPageId.value) {
       await wikiApi.updatePage(currentPageId.value, payload)
@@ -190,20 +244,31 @@ async function savePage() {
     showEditor.value = false
     searchResults.value = []
     await Promise.all([loadPages(), loadCategories()])
+    // If editing the current viewed page, refresh view
+    if (viewingPage.value && currentPageId.value === viewingPage.value.id) {
+      await viewPage(viewingPage.value.id)
+    }
   } catch (e: any) { ElMessage.error(e.response?.data?.detail || t('common.failed')) }
   finally { saving.value = false }
 }
 
 async function deleteCurrentPage() {
-  if (!currentPageId.value) return
+  const id = viewingPage.value?.id
+  if (!id) return
   try {
     await ElMessageBox.confirm(t('wiki.deleteConfirm'), t('common.confirm'), { type: 'warning' })
-    await wikiApi.deletePage(currentPageId.value)
+    await wikiApi.deletePage(id)
     ElMessage.success(t('wiki.deleted'))
-    showEditor.value = false
+    viewingPage.value = null
     searchResults.value = []
     await Promise.all([loadPages(), loadCategories()])
   } catch {}
+}
+
+function getPreview(content: string) {
+  if (!content) return ''
+  const text = content.replace(/[#*`\[\]()>_-]/g, '').slice(0, 120)
+  return text.length < content.replace(/[#*`\[\]()>_-]/g, '').length ? text + '...' : text
 }
 
 function formatTime(t: string) {
@@ -214,13 +279,28 @@ function formatTime(t: string) {
 </script>
 
 <style scoped>
-.wiki-page { padding: 28px; max-width: 1200px; margin: 0 auto; }
+.wiki-page { padding: 28px; max-width: 1400px; margin: 0 auto; }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .page-header h1 { font-size: 24px; font-weight: 700; color: #e6edf3; margin: 0; }
-.toolbar { display: flex; gap: 16px; margin-bottom: 20px; }
-.search-input { width: 300px; }
-.section-title { font-size: 14px; font-weight: 600; color: #7d8590; margin-bottom: 12px; }
-.page-list, .search-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+
+/* Layout */
+.wiki-layout { display: flex; gap: 20px; }
+.wiki-sidebar { width: 220px; flex-shrink: 0; }
+.wiki-main { flex: 1; min-width: 0; }
+
+/* Sidebar */
+.search-input { margin-bottom: 16px; }
+.sidebar-section { margin-bottom: 16px; }
+.sidebar-title { font-size: 11px; font-weight: 600; color: #484f58; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.category-list { display: flex; flex-direction: column; gap: 2px; }
+.category-item { padding: 6px 10px; border-radius: 6px; font-size: 13px; color: #7d8590; cursor: pointer; transition: all 0.15s; }
+.category-item:hover { background: rgba(0,212,170,0.08); color: #e6edf3; }
+.category-item.active { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
+.category-item.pinned { color: #00d4aa; }
+.empty-hint-small { font-size: 12px; color: #484f58; padding: 4px 10px; }
+
+/* Page Grid */
+.page-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .page-card {
   background: #161b22; border: 1px solid #21262d; border-radius: 12px; padding: 16px;
   cursor: pointer; transition: all 0.2s;
@@ -230,23 +310,61 @@ function formatTime(t: string) {
 .category-tag { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: rgba(0,188,212,0.15); color: #00bcd4; }
 .pin-badge { font-size: 11px; color: #00d4aa; font-weight: 600; }
 .card-title { font-size: 16px; font-weight: 600; color: #e6edf3; margin-bottom: 6px; }
+.card-preview { font-size: 12px; color: #7d8590; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; }
 .card-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
 .tag { padding: 1px 8px; background: #21262d; border-radius: 4px; font-size: 11px; color: #7d8590; }
 .card-meta { font-size: 11px; color: #484f58; }
-.empty-hint { text-align: center; padding: 48px; color: #484f58; grid-column: 1/-1; }
 
+/* Page View */
+.page-view { background: #161b22; border: 1px solid #21262d; border-radius: 12px; padding: 24px 32px; }
+.view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.back-btn { color: #7d8590; }
+.view-actions { display: flex; gap: 4px; }
+.view-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.view-date { font-size: 12px; color: #484f58; }
+.view-title { font-size: 28px; font-weight: 700; color: #e6edf3; margin: 0 0 12px; }
+.view-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+
+/* Markdown Body */
+.markdown-body { color: #c9d1d9; line-height: 1.7; font-size: 15px; }
+.markdown-body :deep(h1) { font-size: 24px; color: #e6edf3; border-bottom: 1px solid #21262d; padding-bottom: 8px; margin-top: 24px; }
+.markdown-body :deep(h2) { font-size: 20px; color: #e6edf3; border-bottom: 1px solid #21262d; padding-bottom: 6px; margin-top: 20px; }
+.markdown-body :deep(h3) { font-size: 16px; color: #e6edf3; margin-top: 16px; }
+.markdown-body :deep(p) { margin: 8px 0; }
+.markdown-body :deep(code) { background: #21262d; padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #00d4aa; }
+.markdown-body :deep(pre) { background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0; }
+.markdown-body :deep(pre code) { background: none; padding: 0; color: #c9d1d9; }
+.markdown-body :deep(ul), .markdown-body :deep(ol) { padding-left: 24px; }
+.markdown-body :deep(li) { margin: 4px 0; }
+.markdown-body :deep(blockquote) { border-left: 3px solid #00d4aa; padding-left: 12px; color: #7d8590; margin: 12px 0; }
+.markdown-body :deep(a) { color: #00d4aa; text-decoration: none; }
+.markdown-body :deep(a:hover) { text-decoration: underline; }
+.markdown-body :deep(table) { border-collapse: collapse; width: 100%; margin: 12px 0; }
+.markdown-body :deep(th), .markdown-body :deep(td) { border: 1px solid #21262d; padding: 8px 12px; text-align: left; }
+.markdown-body :deep(th) { background: #0d1117; color: #e6edf3; font-weight: 600; }
+.markdown-body :deep(hr) { border: none; border-top: 1px solid #21262d; margin: 20px 0; }
+.markdown-body :deep(img) { max-width: 100%; border-radius: 8px; }
+
+/* Empty State */
+.empty-state { grid-column: 1/-1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; color: #484f58; }
+.empty-icon { font-size: 48px; margin-bottom: 12px; color: #00d4aa; }
+
+/* Editor */
 .editor-row { display: flex; gap: 16px; }
 .editor-title { flex: 2; }
 .editor-category { flex: 1; }
 .editor-tags { flex: 2; }
 .editor-parent { flex: 1; }
-
-.dialog-footer { display: flex; justify-content: space-between; align-items: center; width: 100%; }
-.footer-right { display: flex; gap: 8px; }
+.dialog-footer { display: flex; justify-content: flex-end; gap: 8px; width: 100%; }
 
 .wiki-editor :deep(textarea) {
   font-family: 'Cascadia Code', 'Fira Code', monospace;
   font-size: 14px;
   line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .wiki-layout { flex-direction: column; }
+  .wiki-sidebar { width: 100%; }
 }
 </style>

@@ -241,5 +241,10 @@ export default {
     featTokenStats: 'Token统计',
     featWiki: '知识库',
     featAutoBackup: '自动备份',
+    featApiAccess: 'API 完整访问',
+    featSso: 'SSO 单点登录',
+    featAuditLog: '审计日志',
+    featTimeTravel: '时间回溯',
+    featOfflineMode: '离线模式',
   },
 }

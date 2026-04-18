@@ -103,7 +103,7 @@ async function handleSetPassword() {
 }
 
 function enterWithoutPassword() {
-  localStorage.setItem('token', 'no-password')
+  localStorage.removeItem('token')
   router.push('/')
 }
 </script>
