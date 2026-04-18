@@ -26,6 +26,7 @@ keys/*.pem
 # Rust
 target/
 backend/clawmemory_core/
+license-platform-v2/
 
 # Build artifacts
 backend/frontend_dist/
