@@ -3,7 +3,7 @@
 set -e
 
 INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
-PORT=$(grep OPENCLAW_PORT "$INSTALL_DIR/backend/.env" 2>/dev/null | cut -d= -f2 || echo "8765")
+PORT=$(grep CLAWMEMORY_PORT "$INSTALL_DIR/backend/.env" 2>/dev/null | cut -d= -f2 || echo "8765")
 
 cat > /etc/systemd/system/clawmemory.service << EOF
 [Unit]

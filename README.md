@@ -79,13 +79,12 @@ bash install.sh --docker
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `OPENCLAW_SECRET_KEY` | `change-me-in-production` | JWT 密钥 (**务必修改**) |
-| `OPENCLAW_DB_PATH` | `./data/openclaw.db` | 数据库路径 |
-| `OPENCLAW_PORT` | `8765` | 监听端口 |
-| `OPENCLAW_DEBUG` | `false` | 调试模式 |
-| `OPENCLAW_LICENSE_SERVER_URL` | `https://auth.bestu.top` | 授权服务器 |
-| `OPENCLAW_OPENCLAW_GATEWAY_URL` | `http://localhost:8080` | OpenClaw Gateway 地址 |
-| `OPENCLAW_CORS_ORIGINS` | `["*"]` | CORS 来源 |
+| `CLAWMEMORY_SECRET_KEY` | `change-me-in-production` | JWT 密钥 (**务必修改**) |
+| `CLAWMEMORY_DB_PATH` | `./data/clawmemory.db` | 数据库路径 |
+| `CLAWMEMORY_PORT` | `8765` | 监听端口 |
+| `CLAWMEMORY_DEBUG` | `false` | 调试模式 |
+| `CLAWMEMORY_LICENSE_SERVER_URL` | `https://auth.bestu.top` | 授权服务器 |
+| `CLAWMEMORY_CORS_ORIGINS` | `["*"]` | CORS 来源 |
 | `DEVICE_FINGERPRINT` | (自动生成) | **Docker 必须设置**，固定设备指纹 |
 
 ---

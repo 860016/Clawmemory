@@ -65,10 +65,10 @@ services:
       - ./data:/app/data
       - ./backend/keys:/app/keys
     environment:
-      - OPENCLAW_SECRET_KEY=\${SECRET_KEY:-change-me-in-production}
-      - OPENCLAW_DATA_DIR=/app/data
-      - OPENCLAW_LICENSE_SERVER_URL=${LICENSE_SERVER}
-      - OPENCLAW_RSA_PUBLIC_KEY_PATH=/app/keys/public.pem
+      - CLAWMEMORY_SECRET_KEY=\${SECRET_KEY:-change-me-in-production}
+      - CLAWMEMORY_DATA_DIR=/app/data
+      - CLAWMEMORY_LICENSE_SERVER_URL=${LICENSE_SERVER}
+      - CLAWMEMORY_RSA_PUBLIC_KEY_PATH=/app/keys/public.pem
       - DEVICE_FINGERPRINT=\${DEVICE_FINGERPRINT:-}
     restart: unless-stopped
 EOF
@@ -194,16 +194,16 @@ PYVER=$(python3 -c "import sys; print(f'cp{sys.version_info.major}{sys.version_i
 if [ "$SYS" = "linux" ]; then
     # Linux: manylinux 格式
     if [ "$ARCH" = "aarch64" ]; then
-        WHEEL_PATTERN="clawmemory_core-2.0.0-${PYVER}-${PYVER}-manylinux*_aarch64.whl"
+        WHEEL_PATTERN="clawmemory_core-2.1.0-${PYVER}-${PYVER}-manylinux*_aarch64.whl"
     else
-        WHEEL_PATTERN="clawmemory_core-2.0.0-${PYVER}-${PYVER}-manylinux*_x86_64.whl"
+        WHEEL_PATTERN="clawmemory_core-2.1.0-${PYVER}-${PYVER}-manylinux*_x86_64.whl"
     fi
 elif [ "$SYS" = "darwin" ]; then
-    WHEEL_PATTERN="clawmemory_core-2.0.0-${PYVER}-${PYVER}-macosx*_${ARCH}.whl"
+    WHEEL_PATTERN="clawmemory_core-2.1.0-${PYVER}-${PYVER}-macosx*_${ARCH}.whl"
 elif [ "$SYS" = "windows" ]; then
-    WHEEL_PATTERN="clawmemory_core-2.0.0-${PYVER}-${PYVER}-win_${ARCH}.whl"
+    WHEEL_PATTERN="clawmemory_core-2.1.0-${PYVER}-${PYVER}-win_${ARCH}.whl"
 else
-    WHEEL_PATTERN="clawmemory_core-2.0.0-${PYVER}-${PYVER}-*.whl"
+    WHEEL_PATTERN="clawmemory_core-2.1.0-${PYVER}-${PYVER}-*.whl"
 fi
 
 WHEEL_URL="https://github.com/860016/Clawmemory/releases/latest/download/${WHEEL_PATTERN}"
@@ -313,15 +313,15 @@ if [ ! -f .env ]; then
     SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
 
     cat > .env << EOF
-OPENCLAW_SECRET_KEY=${SECRET_KEY}
-OPENCLAW_DATA_DIR=${INSTALL_DIR}/data
-OPENCLAW_DEBUG=false
-OPENCLAW_PORT=${BACKEND_PORT}
-OPENCLAW_LICENSE_SERVER_URL=${LICENSE_SERVER}
-OPENCLAW_RSA_PUBLIC_KEY_PATH=${INSTALL_DIR}/backend/keys/public.pem
-OPENCLAW_CORS_ORIGINS=["*"]
-OPENCLAW_OPENCLAW_GATEWAY_URL=${GATEWAY_URL}
-OPENCLAW_OPENCLAW_API_KEY=${GATEWAY_API_KEY}
+CLAWMEMORY_SECRET_KEY=${SECRET_KEY}
+CLAWMEMORY_DATA_DIR=${INSTALL_DIR}/data
+CLAWMEMORY_DEBUG=false
+CLAWMEMORY_PORT=${BACKEND_PORT}
+CLAWMEMORY_LICENSE_SERVER_URL=${LICENSE_SERVER}
+CLAWMEMORY_RSA_PUBLIC_KEY_PATH=${INSTALL_DIR}/backend/keys/public.pem
+CLAWMEMORY_CORS_ORIGINS=["*"]
+CLAWMEMORY_OPENCLAW_GATEWAY_URL=${GATEWAY_URL}
+CLAWMEMORY_OPENCLAW_API_KEY=${GATEWAY_API_KEY}
 EOF
     echo "  ✅ .env 已创建"
 else

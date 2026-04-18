@@ -31,7 +31,7 @@ class StatsService:
             async with httpx.AsyncClient(timeout=5) as client:
                 await client.post(
                     f"{settings.license_server_url}/api/v1/ping",
-                    json={"install_id": install_id, "version": "2.0.0", "os": platform.system()}
+                    json={"install_id": install_id, "version": "2.1.0", "os": platform.system()}
                 )
         except Exception:
             pass

@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # License
-    license_server_url: str = "https://license.yoursite.com"
+    license_server_url: str = "https://auth.bestu.top"
     rsa_public_key_path: Path = base_dir / "keys" / "public.pem"
 
     # CORS (前端预构建后同源部署，"*" 可用；开发模式需指定 localhost)

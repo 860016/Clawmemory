@@ -229,7 +229,7 @@ class LicenseService:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.post(
                     f"{settings.license_server_url}/api/v1/activate",
-                    json={"license_key": license_key, "fingerprint": self._get_fingerprint(), "version": "2.0.0"},
+                    json={"license_key": license_key, "fingerprint": self._get_fingerprint(), "version": "2.1.0"},
                 )
                 data = resp.json()
         except Exception as e:

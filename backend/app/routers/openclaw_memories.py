@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from pathlib import Path
 from app.database import get_db
 from app.middleware.auth import get_current_user
-from app.models.user import User
 from app.services.openclaw_memory_scanner import (
     scan_openclaw_memories,
     scan_agent_memories,
@@ -25,7 +24,7 @@ class ImportRequest(BaseModel):
 
 
 @router.get("/scan")
-def scan_memories(current_user: User = Depends(get_current_user)):
+def scan_memories(_=Depends(get_current_user)):
     """Scan OpenClaw memory directory and return discovered agents + file counts."""
     openclaw_dir = _detect_openclaw_dir()
     if not openclaw_dir:
@@ -52,7 +51,7 @@ def scan_memories(current_user: User = Depends(get_current_user)):
 @router.get("/scan/{agent_name}")
 def scan_agent(
     agent_name: str,
-    current_user: User = Depends(get_current_user),
+    _=Depends(get_current_user),
 ):
     """Scan a specific agent's memories and return preview (first 50)."""
     openclaw_dir = _detect_openclaw_dir()
@@ -82,7 +81,7 @@ def scan_agent(
 @router.post("/import")
 def import_memories(
     req: ImportRequest,
-    current_user: User = Depends(get_current_user),
+    _=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Import OpenClaw memories into our system."""
@@ -113,7 +112,7 @@ def import_memories(
     # Get existing keys for skip logic
     existing_keys = set()
     if req.skip_existing:
-        items, _ = svc.list_memories(current_user.id, page=1, size=10000)
+        items, _ = svc.list_memories(page=1, size=10000)
         existing_keys = {m.key for m in items}
 
     for mem in memories:
@@ -130,14 +129,13 @@ def import_memories(
                 "importance": mem.get("importance", 0.5),
                 "tags": mem.get("tags", []),
                 "source": "openclaw_import",
-                "agent_id": req.target_agent_id,
             }
-            memory = svc.create(current_user.id, data)
+            memory = svc.create(data)
 
             # Sync to ChromaDB
             try:
                 vector_service.add_memory(
-                    current_user.id,
+                    1,
                     memory.id,
                     f"{data['key']}: {data['value']}",
                     metadata={"layer": data["layer"], "source": "openclaw_import"},

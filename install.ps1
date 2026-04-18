@@ -98,7 +98,7 @@ $PlatformTag = switch ($Arch) {
     default { "win_amd64" }
 }
 
-$WheelUrl = "https://github.com/860016/Clawmemory/releases/latest/download/clawmemory_core-2.0.0-$PyVer-$PyVer-${PlatformTag}.whl"
+$WheelUrl = "https://github.com/860016/Clawmemory/releases/latest/download/clawmemory_core-2.1.0-$PyVer-$PyVer-${PlatformTag}.whl"
 
 try {
     Write-Host "  尝试下载 Rust 安全引擎 ($PlatformTag)..." -ForegroundColor Yellow
@@ -213,15 +213,15 @@ if (-not (Test-Path "$InstallDir\backend\.env")) {
     $secretKey = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 32 | ForEach-Object { [char]$_ })
     
     @"
-OPENCLAW_SECRET_KEY=$secretKey
-OPENCLAW_DATA_DIR=$InstallDir\data
-OPENCLAW_DEBUG=false
-OPENCLAW_PORT=$Port
-OPENCLAW_LICENSE_SERVER_URL=$LicenseServer
-OPENCLAW_RSA_PUBLIC_KEY_PATH=./keys/public.pem
-OPENCLAW_CORS_ORIGINS=["*"]
-OPENCLAW_OPENCLAW_GATEWAY_URL=$GatewayUrl
-OPENCLAW_OPENCLAW_API_KEY=$GatewayApiKey
+CLAWMEMORY_SECRET_KEY=$secretKey
+CLAWMEMORY_DATA_DIR=$InstallDir\data
+CLAWMEMORY_DEBUG=false
+CLAWMEMORY_PORT=$Port
+CLAWMEMORY_LICENSE_SERVER_URL=$LicenseServer
+CLAWMEMORY_RSA_PUBLIC_KEY_PATH=./keys/public.pem
+CLAWMEMORY_CORS_ORIGINS=["*"]
+CLAWMEMORY_OPENCLAW_GATEWAY_URL=$GatewayUrl
+CLAWMEMORY_OPENCLAW_API_KEY=$GatewayApiKey
 "@ | Set-Content "$InstallDir\backend\.env" -Encoding UTF8
     Write-Host "  .env 已创建" -ForegroundColor Green
 } else {

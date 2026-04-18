@@ -2,9 +2,14 @@
   <div class="memories-page">
     <div class="page-header">
       <h1>{{ $t('memories.title') }}</h1>
-      <el-button type="primary" @click="openAddDialog">
-        <el-icon><Plus /></el-icon> {{ $t('memories.addMemory') }}
-      </el-button>
+      <div class="header-actions">
+        <el-button @click="handleOpenClawScan">
+          <el-icon><Upload /></el-icon> {{ $t('memories.importOpenClaw') }}
+        </el-button>
+        <el-button type="primary" @click="openAddDialog">
+          <el-icon><Plus /></el-icon> {{ $t('memories.addMemory') }}
+        </el-button>
+      </div>
     </div>
 
     <div class="toolbar">
@@ -94,38 +99,38 @@
     </el-dialog>
 
     <!-- OpenClaw 导入对话框 -->
-    <el-dialog v-model="showImportDialog" title="从 OpenClaw 导入记忆" width="650px">
+    <el-dialog v-model="showImportDialog" :title="$t('memories.importTitle')" width="650px">
       <div v-if="!scanResult">
         <el-alert v-if="scanError" :title="scanError" type="error" show-icon :closable="false" style="margin-bottom: 16px" />
-        <p style="color: #666; margin-bottom: 16px">
-          扫描本地 OpenClaw 记忆文件（支持 v1/v2/v3 所有版本），将已有记忆导入到当前系统。
+        <p style="color: #7d8590; margin-bottom: 16px">
+          {{ $t('memories.importDesc') }}
         </p>
         <el-button type="primary" :loading="scanning" @click="handleScan">
-          {{ scanning ? '扫描中...' : '开始扫描' }}
+          {{ scanning ? $t('memories.scanning') : $t('memories.startScan') }}
         </el-button>
       </div>
       <div v-else>
-        <el-alert v-if="!scanResult.found" title="未检测到 OpenClaw 目录" type="warning" show-icon :closable="false" style="margin-bottom: 16px">
+        <el-alert v-if="!scanResult.found" :title="$t('memories.noOpenClawDir')" type="warning" show-icon :closable="false" style="margin-bottom: 16px">
           <template #default>
-            <p>请确认本机已安装 OpenClaw，且存在 <code>~/.openclaw/</code> 目录</p>
+            <p>{{ $t('memories.openClawDirHint') }}</p>
           </template>
         </el-alert>
         <template v-else>
-          <p style="margin-bottom: 12px; color: #666">
-            检测到 OpenClaw 目录：<code>{{ scanResult.openclaw_dir }}</code>
+          <p style="margin-bottom: 12px; color: #7d8590">
+            {{ $t('memories.detectedDir') }}：<code>{{ scanResult.openclaw_dir }}</code>
           </p>
           <el-table :data="scanResult.agents" stripe style="width: 100%">
-            <el-table-column prop="agent_name" label="Agent" width="150" />
-            <el-table-column prop="layout" label="版本" width="100">
+            <el-table-column prop="agent_name" :label="$t('memories.agentCol')" width="150" />
+            <el-table-column prop="layout" :label="$t('memories.versionCol')" width="100">
               <template #default="{ row }">
                 <el-tag size="small">{{ row.layout }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="files" label="记忆数" width="80" />
-            <el-table-column label="操作" width="200">
+            <el-table-column prop="files" :label="$t('memories.memoryCountCol')" width="80" />
+            <el-table-column :label="$t('common.actions')" width="200">
               <template #default="{ row }">
-                <el-button size="small" @click="handlePreview(row.agent_name)">预览</el-button>
-                <el-button size="small" type="primary" @click="handleImport(row.agent_name)">导入</el-button>
+                <el-button size="small" @click="handlePreview(row.agent_name)">{{ $t('memories.preview') }}</el-button>
+                <el-button size="small" type="primary" @click="handleImport(row.agent_name)">{{ $t('memories.importBtn') }}</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -134,15 +139,15 @@
 
       <!-- Preview panel -->
       <div v-if="previewData" style="margin-top: 16px">
-        <el-divider content-position="left">{{ previewData.agent_name }} — 共 {{ previewData.total }} 条</el-divider>
+        <el-divider content-position="left">{{ previewData.agent_name }} — {{ $t('memories.totalCount', { count: previewData.total }) }}</el-divider>
         <div style="max-height: 300px; overflow-y: auto">
           <div v-for="(mem, idx) in previewData.preview" :key="idx"
-            style="padding: 8px; border-bottom: 1px solid #f0f0f0">
+            style="padding: 8px; border-bottom: 1px solid #21262d">
             <div style="display: flex; gap: 8px; align-items: center">
               <el-tag size="small">{{ mem.layer }}</el-tag>
               <strong>{{ mem.key }}</strong>
             </div>
-            <p style="margin: 4px 0 0; color: #666; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
+            <p style="margin: 4px 0 0; color: #7d8590; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
               {{ mem.value?.substring(0, 200) }}
             </p>
           </div>
@@ -156,7 +161,7 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { Plus, Search, Upload } from '@element-plus/icons-vue'
 import axios from '../api/client'
 
 const { t } = useI18n()
@@ -170,6 +175,13 @@ const total = ref(0)
 const showAddDialog = ref(false)
 const editingMemory = ref<any>(null)
 const saving = ref(false)
+
+// OpenClaw import state
+const showImportDialog = ref(false)
+const scanning = ref(false)
+const scanResult = ref<any>(null)
+const scanError = ref('')
+const previewData = ref<any>(null)
 
 const form = ref({ layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '' })
 
@@ -192,7 +204,7 @@ async function loadMemories() {
   try {
     const params: any = { page: currentPage.value, size: pageSize }
     if (currentLayer.value) params.layer = currentLayer.value
-    const { data } = await axios.get('/api/v1/memories', { params })
+    const { data } = await axios.get('/memories', { params })
     memories.value = data.items || []
     total.value = data.total || 0
   } catch {}
@@ -201,7 +213,7 @@ async function loadMemories() {
 async function handleSearch() {
   if (!searchQuery.value) { searchResults.value = []; return }
   try {
-    const { data } = await axios.get('/api/v1/memories/search/keyword', { params: { q: searchQuery.value, limit: 20 } })
+    const { data } = await axios.get('/memories/search/keyword', { params: { q: searchQuery.value, limit: 20 } })
     searchResults.value = data || []
   } catch { searchResults.value = [] }
 }
@@ -217,8 +229,8 @@ async function saveMemory() {
   saving.value = true
   try {
     const payload: any = { layer: form.value.layer, key: form.value.key, value: form.value.value, importance: form.value.importance / 100, tags: form.value.tagsStr ? form.value.tagsStr.split(',').map((s: string) => s.trim()).filter(Boolean) : [] }
-    if (editingMemory.value) await axios.put(`/api/v1/memories/${editingMemory.value.id}`, payload)
-    else await axios.post('/api/v1/memories', payload)
+    if (editingMemory.value) await axios.put(`/memories/${editingMemory.value.id}`, payload)
+    else await axios.post('/memories', payload)
     ElMessage.success(t('common.success'))
     showAddDialog.value = false
     editingMemory.value = null
@@ -231,7 +243,7 @@ async function saveMemory() {
 async function deleteMemory(id: number) {
   try {
     await ElMessageBox.confirm(t('memories.deleteConfirm'), t('common.confirm'), { type: 'warning' })
-    await axios.delete(`/api/v1/memories/${id}`)
+    await axios.delete(`/memories/${id}`)
     ElMessage.success(t('memories.deleted'))
     searchResults.value = []
     await loadMemories()
@@ -240,9 +252,9 @@ async function deleteMemory(id: number) {
 
 function importanceClass(v: number) { return v >= 0.7 ? 'high' : v >= 0.3 ? 'medium' : 'low' }
 function truncate(str: string, len: number) { return str && str.length > len ? str.slice(0, len) + '...' : str }
-function formatTime(t: string) {
-  if (!t) return ''
-  const d = new Date(t)
+function formatTime(ts: string) {
+  if (!ts) return ''
+  const d = new Date(ts)
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
@@ -258,10 +270,10 @@ async function handleScan() {
   scanning.value = true
   scanError.value = ''
   try {
-    const resp = await memoryApi.scanOpenClaw()
-    scanResult.value = resp.data
+    const { data } = await axios.get('/openclaw-memories/scan')
+    scanResult.value = data
   } catch (e: any) {
-    scanError.value = e.response?.data?.detail || '扫描失败，请确认 OpenClaw 已安装'
+    scanError.value = e.response?.data?.detail || t('memories.scanFailed')
   } finally {
     scanning.value = false
   }
@@ -270,35 +282,34 @@ async function handleScan() {
 async function handlePreview(agentName: string) {
   previewData.value = null
   try {
-    const resp = await memoryApi.scanOpenClawAgent(agentName)
-    previewData.value = resp.data
+    const { data } = await axios.get(`/openclaw-memories/scan/${encodeURIComponent(agentName)}`)
+    previewData.value = data
   } catch {
-    ElMessage.error('预览失败')
+    ElMessage.error(t('memories.previewFailed'))
   }
 }
 
 async function handleImport(agentName: string) {
-  const targetAgentId = memoryStore.memories.length > 0 ? undefined : undefined
   try {
     await ElMessageBox.confirm(
-      `确定将 Agent "${agentName}" 的记忆导入到当前系统？`,
-      '确认导入',
+      t('memories.importConfirm', { name: agentName }),
+      t('memories.confirmImport'),
       { type: 'info' }
     )
   } catch { return }
 
   try {
-    const resp = await memoryApi.importOpenClaw({
+    const { data } = await axios.post('/openclaw-memories/import', {
       agent_name: agentName,
       skip_existing: true,
       layer: 'knowledge',
     })
-    const { imported, skipped, errors } = resp.data
-    ElMessage.success(`导入完成：${imported} 条导入，${skipped} 条跳过，${errors} 条错误`)
+    const { imported, skipped, errors } = data
+    ElMessage.success(t('memories.importDone', { imported, skipped, errors }))
     showImportDialog.value = false
-    memoryStore.fetchMemories()
+    await loadMemories()
   } catch {
-    ElMessage.error('导入失败')
+    ElMessage.error(t('memories.importFailed'))
   }
 }
 </script>
@@ -307,6 +318,7 @@ async function handleImport(agentName: string) {
 .memories-page { padding: 28px; max-width: 1200px; margin: 0 auto; }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .page-header h1 { font-size: 24px; font-weight: 700; color: #e6edf3; margin: 0; }
+.header-actions { display: flex; gap: 8px; }
 .toolbar { display: flex; gap: 16px; margin-bottom: 20px; align-items: center; }
 .search-input { width: 300px; }
 .section-title { font-size: 14px; font-weight: 600; color: #7d8590; margin-bottom: 12px; }

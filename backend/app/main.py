@@ -8,7 +8,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app.config import settings
 from app.database import init_db
 from app.services.setup_service import ensure_data_dirs
-from app.routers import auth, memories, license, backups, knowledge, file_watcher, wiki, pro_features
+from app.routers import auth, memories, license, backups, knowledge, file_watcher, wiki, pro_features, openclaw_memories
 import time
 import logging
 
@@ -138,8 +138,8 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         LicenseService(db).load_cached_license()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to load cached license: {e}")
     finally:
         db.close()
     yield
@@ -147,7 +147,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="ClawMemory",
-    version="2.0.0",
+    version="2.1.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     lifespan=lifespan,
@@ -174,11 +174,12 @@ app.include_router(knowledge.router)
 app.include_router(file_watcher.router)
 app.include_router(wiki.router)
 app.include_router(pro_features.router)
+app.include_router(openclaw_memories.router)
 
 
 @app.get("/api/v1/health")
 async def health_check():
-    return {"status": "ok", "version": "2.0.0"}
+    return {"status": "ok", "version": "2.1.0"}
 
 
 @app.get("/api/v1/install-status")
