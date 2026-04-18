@@ -1,31 +1,4 @@
 <template>
-<<<<<<< HEAD
-  <div class="login-page">
-    <div class="login-bg"></div>
-    <el-card class="login-card">
-      <div class="login-header">
-        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36">
-          <rect width="32" height="32" rx="8" fill="url(#login-grad)"/>
-          <path d="M8 22V10l8 6-8 6z" fill="white"/>
-          <path d="M16 22V10l8 6-8 6z" fill="white" opacity="0.6"/>
-          <defs><linearGradient id="login-grad" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#4f6ef7"/><stop offset="1" stop-color="#7b93fa"/></linearGradient></defs>
-        </svg>
-        <h2>ClawMemory</h2>
-        <p>OpenClaw 智能记忆管理系统</p>
-      </div>
-      <el-form :model="form" @submit.prevent="handleLogin" label-position="top">
-        <el-form-item label="账号">
-          <el-input v-model="form.username" prefix-icon="User" size="large" />
-        </el-form-item>
-        <el-form-item label="密码">
-          <el-input v-model="form.password" type="password" show-password prefix-icon="Lock" size="large" />
-        </el-form-item>
-        <el-button type="primary" native-type="submit" :loading="loading" size="large" style="width: 100%; border-radius: 10px">
-          登 录
-        </el-button>
-      </el-form>
-    </el-card>
-=======
   <div class="login-container">
     <div class="glow-orb orb-1"></div>
     <div class="glow-orb orb-2"></div>
@@ -73,7 +46,6 @@
         </el-button>
       </div>
     </div>
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
   </div>
 </template>
 
@@ -137,29 +109,6 @@ function enterWithoutPassword() {
 </script>
 
 <style scoped>
-<<<<<<< HEAD
-.login-page {
-  display: flex; justify-content: center; align-items: center; min-height: 100vh;
-  background: #f0f2f5; position: relative; overflow: hidden;
-}
-.login-bg {
-  position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-  background: radial-gradient(ellipse at 30% 50%, rgba(79,110,247,0.08) 0%, transparent 60%),
-              radial-gradient(ellipse at 70% 50%, rgba(123,147,250,0.06) 0%, transparent 60%);
-}
-.login-card {
-  width: 400px; border-radius: 16px !important; position: relative; z-index: 1;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.08) !important;
-}
-.login-header {
-  text-align: center; margin-bottom: 24px;
-}
-.login-header h2 {
-  margin: 12px 0 4px; font-size: 22px; color: #303133; font-weight: 700;
-}
-.login-header p {
-  color: #909399; font-size: 13px; margin: 0;
-=======
 .login-container {
   height: 100vh;
   display: flex;
@@ -270,6 +219,5 @@ function enterWithoutPassword() {
 .skip-btn {
   color: #7d8590;
   width: 100%;
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
 }
 </style>

@@ -1,11 +1,6 @@
 {
-<<<<<<< HEAD
-  "name": "openclaw-memory-web",
-  "version": "1.2.0",
-=======
   "name": "clawmemory",
   "version": "1.1.0",
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
   "private": true,
   "type": "module",
   "scripts": {

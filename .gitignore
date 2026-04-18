@@ -28,6 +28,9 @@ target/
 backend/clawmemory_core/
 license-platform-v2/
 
+# GitHub workflows (commercial, not public)
+.github/
+
 # Build artifacts
 backend/frontend_dist/
 backend/clawmemory_core/.cargo/

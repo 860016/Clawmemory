@@ -1,41 +1,10 @@
 <template>
-<<<<<<< HEAD
-  <div class="memories-view">
-    <div class="page-header">
-      <h2>记忆管理</h2>
-      <p class="page-desc">查看、搜索和管理 AI 的记忆数据</p>
-    </div>
-    <div class="page-toolbar">
-      <el-radio-group v-model="layerFilter" @change="handleFilter">
-        <el-radio-button label="">全部</el-radio-button>
-        <el-radio-button label="preference">偏好</el-radio-button>
-        <el-radio-button label="knowledge">知识</el-radio-button>
-        <el-radio-button label="short_term">短期</el-radio-button>
-        <el-radio-button label="private">私密</el-radio-button>
-      </el-radio-group>
-      <el-input v-model="searchQuery" placeholder="搜索记忆..." style="width: 300px" @keydown.enter="handleSearchKeyword">
-        <template #append>
-          <el-dropdown @command="handleSearchType">
-            <el-button>搜索</el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item command="keyword">关键词</el-dropdown-item>
-                <el-dropdown-item command="semantic">语义</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </template>
-      </el-input>
-      <el-button type="primary" @click="showAddDialog = true">添加记忆</el-button>
-      <el-button type="success" @click="handleOpenClawScan">从 OpenClaw 导入</el-button>
-=======
   <div class="memories-page">
     <div class="page-header">
       <h1>{{ $t('memories.title') }}</h1>
       <el-button type="primary" @click="openAddDialog">
         <el-icon><Plus /></el-icon> {{ $t('memories.addMemory') }}
       </el-button>
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
     </div>
 
     <div class="toolbar">
@@ -117,12 +86,6 @@
         <el-form-item :label="$t('memories.tags')">
           <el-input v-model="form.tagsStr" :placeholder="$t('memories.tagsPlaceholder')" />
         </el-form-item>
-<<<<<<< HEAD
-        <el-form-item label="键"><el-input v-model="editMemory.key" /></el-form-item>
-        <el-form-item label="值"><el-input v-model="editMemory.value" type="textarea" :rows="8" :autosize="{ minRows: 4, maxRows: 20 }" /></el-form-item>
-        <el-form-item label="重要性"><el-input-number v-model="editMemory.importance" :min="0" :max="1" :step="0.1" /></el-form-item>
-=======
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
       </el-form>
       <template #footer>
         <el-button @click="showAddDialog = false">{{ $t('common.cancel') }}</el-button>
@@ -191,12 +154,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-<<<<<<< HEAD
-import { useMemoryStore } from '../stores/memory'
-import { memoryApi } from '../api/memories'
-=======
 import { useI18n } from 'vue-i18n'
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import axios from '../api/client'
@@ -213,18 +171,7 @@ const showAddDialog = ref(false)
 const editingMemory = ref<any>(null)
 const saving = ref(false)
 
-<<<<<<< HEAD
-// OpenClaw import state
-const showImportDialog = ref(false)
-const scanning = ref(false)
-const scanResult = ref<any>(null)
-const scanError = ref('')
-const previewData = ref<any>(null)
-
-onMounted(() => memoryStore.fetchMemories())
-=======
 const form = ref({ layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '' })
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
 
 const layerLabels: Record<string, string> = {
   preference: t('memories.preference'),
@@ -357,37 +304,6 @@ async function handleImport(agentName: string) {
 </script>
 
 <style scoped>
-<<<<<<< HEAD
-.page-header {
-  margin-bottom: 16px;
-}
-.page-header h2 {
-  margin: 0 0 4px;
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-.page-desc {
-  margin: 0;
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-.page-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-.memories-view :deep(.el-table) {
-  border-radius: 8px;
-  overflow: hidden;
-}
-.memories-view :deep(.el-table th.el-table__cell) {
-  background: var(--el-fill-color-lighter);
-  font-weight: 600;
-}
-=======
 .memories-page { padding: 28px; max-width: 1200px; margin: 0 auto; }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .page-header h1 { font-size: 24px; font-weight: 700; color: #e6edf3; margin: 0; }
@@ -415,5 +331,4 @@ async function handleImport(agentName: string) {
 .card-meta { font-size: 11px; color: #484f58; }
 .card-actions { display: flex; gap: 4px; }
 .pagination { display: flex; justify-content: center; margin-top: 20px; }
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
 </style>

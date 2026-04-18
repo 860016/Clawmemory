@@ -1,115 +1,4 @@
 <template>
-<<<<<<< HEAD
-  <div class="dashboard-view">
-    <h2 class="page-title">控制面板</h2>
-
-    <el-row :gutter="16" class="stats-row">
-      <el-col :span="6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background: linear-gradient(135deg, #4f6ef7, #7b93fa)">
-            <el-icon :size="22"><Collection /></el-icon>
-          </div>
-          <div class="stat-info">
-            <div class="stat-value">{{ stats.memoryCount }}</div>
-            <div class="stat-label">记忆总数</div>
-          </div>
-        </div>
-      </el-col>
-      <el-col :span="6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background: linear-gradient(135deg, #67c23a, #85ce61)">
-            <el-icon :size="22"><Connection /></el-icon>
-          </div>
-          <div class="stat-info">
-            <div class="stat-value">{{ stats.entityCount }}</div>
-            <div class="stat-label">实体数</div>
-          </div>
-        </div>
-      </el-col>
-      <el-col :span="6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background: linear-gradient(135deg, #e6a23c, #f0c78a)">
-            <el-icon :size="22"><ChatDotRound /></el-icon>
-          </div>
-          <div class="stat-info">
-            <div class="stat-value">{{ stats.sessionCount }}</div>
-            <div class="stat-label">会话数</div>
-          </div>
-        </div>
-      </el-col>
-      <el-col :span="6">
-        <div class="stat-card">
-          <div class="stat-icon" style="background: linear-gradient(135deg, #f56c6c, #f89898)">
-            <el-icon :size="22"><MagicStick /></el-icon>
-          </div>
-          <div class="stat-info">
-            <div class="stat-value">{{ stats.skillCount }}</div>
-            <div class="stat-label">技能数</div>
-          </div>
-        </div>
-      </el-col>
-    </el-row>
-
-    <el-row :gutter="16" style="margin-top: 16px">
-      <el-col :span="14">
-        <el-card shadow="hover" class="section-card">
-          <template #header>
-            <div class="card-header">
-              <span>最近记忆</span>
-              <el-button text type="primary" @click="$router.push('/memories')">查看全部</el-button>
-            </div>
-          </template>
-          <el-table :data="recentMemories" size="small" stripe :show-header="true">
-            <el-table-column prop="key" label="键" show-overflow-tooltip />
-            <el-table-column prop="layer" label="层级" width="90">
-              <template #default="{ row }">
-                <el-tag size="small" :type="layerTagType(row.layer)">{{ row.layer }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="created_at" label="时间" width="160" />
-          </el-table>
-          <el-empty v-if="!recentMemories.length" description="暂无记忆" :image-size="60" />
-        </el-card>
-      </el-col>
-      <el-col :span="10">
-        <el-card shadow="hover" class="section-card">
-          <template #header>
-            <div class="card-header">
-              <span>最近会话</span>
-              <el-button text type="primary" @click="$router.push('/chat')">查看全部</el-button>
-            </div>
-          </template>
-          <div v-for="s in recentSessions" :key="s.id" class="session-item" @click="$router.push('/chat')">
-            <div class="session-title">{{ s.title || `会话 ${s.id}` }}</div>
-            <div class="session-time">{{ formatTime(s.created_at) }}</div>
-          </div>
-          <el-empty v-if="!recentSessions.length" description="暂无会话" :image-size="60" />
-        </el-card>
-
-        <el-card shadow="hover" class="section-card" style="margin-top: 16px">
-          <template #header><span>授权状态</span></template>
-          <div class="license-info">
-            <div class="license-row">
-              <span class="license-label">版本</span>
-              <el-tag :type="licenseInfo?.tier === 'oss' ? 'info' : 'success'" effect="dark" round>
-                {{ licenseInfo?.tier?.toUpperCase() || 'OSS' }}
-              </el-tag>
-            </div>
-            <div class="license-row">
-              <span class="license-label">状态</span>
-              <el-tag :type="licenseInfo?.active ? 'success' : 'warning'" effect="plain" round>
-                {{ licenseInfo?.active ? '已激活' : '未激活' }}
-              </el-tag>
-            </div>
-            <div class="license-row">
-              <span class="license-label">到期</span>
-              <span>{{ licenseInfo?.expires_at || '永久' }}</span>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
-=======
   <div class="dashboard">
     <div class="page-header">
       <h1>{{ $t('dashboard.title') }}</h1>
@@ -210,7 +99,6 @@
       </div>
       <div v-else class="empty-hint">{{ $t('common.noData') }}</div>
     </div>
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
   </div>
 </template>
 
@@ -233,42 +121,6 @@ const layerLabels: Record<string, string> = {
 }
 
 onMounted(async () => {
-<<<<<<< HEAD
-  const promises = [
-    api.get('/memories', { params: { page: 1, size: 5 } }).catch(() => ({ data: { items: [], total: 0 } })),
-    api.get('/knowledge/entities', { params: { page: 1, size: 1 } }).catch(() => ({ data: { items: [], total: 0 } })),
-    api.get('/chat/sessions', { params: { limit: 5 } }).catch(() => ({ data: [] })),
-    api.get('/skills').catch(() => ({ data: [] })),
-    api.get('/license/info').catch(() => ({ data: null })),
-  ]
-  const [memResp, entityResp, sessionResp, skillResp, licResp] = await Promise.all(promises)
-
-  stats.memoryCount = memResp.data.total ?? memResp.data.items?.length ?? 0
-  recentMemories.value = memResp.data.items ?? memResp.data ?? []
-
-  stats.entityCount = entityResp.data.total ?? entityResp.data.items?.length ?? 0
-
-  const sessions = Array.isArray(sessionResp.data) ? sessionResp.data : sessionResp.data.items ?? []
-  stats.sessionCount = sessions.length
-  recentSessions.value = sessions.slice(0, 5)
-
-  const skills = Array.isArray(skillResp.data) ? skillResp.data : skillResp.data.items ?? []
-  stats.skillCount = skills.length
-
-  licenseInfo.value = licResp.data
-  if (licResp.data) localStorage.setItem('licenseInfo', JSON.stringify(licResp.data))
-})
-
-function layerTagType(layer: string) {
-  const map: Record<string, string> = { preference: 'warning', knowledge: 'primary', short_term: 'info', private: 'danger' }
-  return map[layer] || 'info'
-}
-
-function formatTime(ts: string) {
-  if (!ts) return ''
-  const d = new Date(ts)
-  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
-=======
   await Promise.all([loadStats(), loadRecent(), loadLicense()])
 })
 
@@ -320,44 +172,10 @@ function formatTime(t: string) {
   if (!t) return ''
   const d = new Date(t)
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
 }
 </script>
 
 <style scoped>
-<<<<<<< HEAD
-.dashboard-view { padding: 24px; }
-.page-title { font-size: 20px; font-weight: 700; color: #303133; margin: 0 0 20px; }
-
-.stats-row { margin-bottom: 4px; }
-.stat-card {
-  background: #fff; border-radius: var(--cm-radius); padding: 20px;
-  display: flex; align-items: center; gap: 16px;
-  box-shadow: var(--cm-card-shadow); transition: transform 0.2s;
-}
-.stat-card:hover { transform: translateY(-2px); }
-.stat-icon {
-  width: 48px; height: 48px; border-radius: 12px; display: flex;
-  align-items: center; justify-content: center; color: #fff; flex-shrink: 0;
-}
-.stat-value { font-size: 28px; font-weight: 700; color: #303133; line-height: 1; }
-.stat-label { font-size: 13px; color: #909399; margin-top: 4px; }
-
-.section-card { border-radius: var(--cm-radius) !important; }
-.card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
-
-.session-item {
-  padding: 10px 0; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.2s;
-}
-.session-item:hover { background: #f5f7fa; margin: 0 -12px; padding: 10px 12px; border-radius: 6px; }
-.session-item:last-child { border-bottom: none; }
-.session-title { font-size: 14px; color: #303133; font-weight: 500; }
-.session-time { font-size: 12px; color: #c0c4cc; margin-top: 4px; }
-
-.license-info { display: flex; flex-direction: column; gap: 10px; }
-.license-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-.license-label { color: #909399; }
-=======
 .dashboard {
   padding: 28px;
   max-width: 1200px;
@@ -589,5 +407,4 @@ function formatTime(t: string) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .content-grid { grid-template-columns: 1fr; }
 }
->>>>>>> fb055c7 (feat: v3.0 - Wiki知识库 + 科技感UI + i18n + Rust PyO3核心 + Pro功能)
 </style>
