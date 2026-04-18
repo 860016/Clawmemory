@@ -18,7 +18,7 @@ def _build_license_info(db: Session) -> dict:
         "auto_decay", "decay_report", "prune_suggest", "reinforce",
         "conflict_scan", "conflict_merge",
         "smart_router", "token_stats",
-        "wiki",
+        "wiki", "auto_backup",
     ] if is_feature_enabled(f)]
 
     lic = db.query(License).filter(License.status == "active").first()

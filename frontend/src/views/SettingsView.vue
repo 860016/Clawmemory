@@ -159,6 +159,7 @@ const featureLabels: Record<string, string> = {
   smart_router: t('settings.featSmartRouter'),
   token_stats: t('settings.featTokenStats'),
   wiki: t('settings.featWiki'),
+  auto_backup: t('settings.featAutoBackup'),
 }
 
 onMounted(async () => {

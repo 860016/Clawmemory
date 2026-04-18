@@ -199,6 +199,7 @@ export default {
       'Memory decay analysis',
       'Conflict detection + AI merge',
       'Smart model routing',
+      'Auto backup & restore',
     ],
     lifetimeExtra: [
       'All annual features',
@@ -239,5 +240,6 @@ export default {
     featSmartRouter: 'Smart Router',
     featTokenStats: 'Token Stats',
     featWiki: 'Wiki',
+    featAutoBackup: 'Auto Backup',
   },
 }

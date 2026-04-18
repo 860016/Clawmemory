@@ -199,6 +199,7 @@ export default {
       '记忆衰减分析',
       '矛盾检测 + AI 合并建议',
       '智能模型路由',
+      '自动备份与恢复',
     ],
     lifetimeExtra: [
       '年付全部功能',
@@ -239,5 +240,6 @@ export default {
     featSmartRouter: '智能路由',
     featTokenStats: 'Token统计',
     featWiki: '知识库',
+    featAutoBackup: '自动备份',
   },
 }
