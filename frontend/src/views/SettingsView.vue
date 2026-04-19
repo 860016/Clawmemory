@@ -6,7 +6,7 @@
 
     <div class="settings-grid">
       <!-- 授权管理 -->
-      <div class="settings-card">
+      <div class="settings-card" :class="{ 'section-highlight': activeSection === 'license' }" id="settings-license">
         <div class="card-title">🔑 {{ $t('settings.license') }}</div>
         <div class="license-status" v-if="license.active">
           <div class="status-row">
@@ -69,7 +69,7 @@
       </div>
 
       <!-- 安全设置 -->
-      <div class="settings-card">
+      <div class="settings-card" :class="{ 'section-highlight': activeSection === 'security' }" id="settings-security">
         <div class="card-title">◇ {{ $t('settings.security') }}</div>
         <div class="setting-item">
           <span>{{ $t('settings.password') }}</span>
@@ -99,7 +99,7 @@
       </div>
 
       <!-- 系统信息 -->
-      <div class="settings-card">
+      <div class="settings-card" :class="{ 'section-highlight': activeSection === 'system' }" id="settings-system">
         <div class="card-title">◇ {{ $t('settings.system') }}</div>
         <div class="setting-item">
           <span>{{ $t('settings.version') }}</span>
@@ -112,34 +112,41 @@
       </div>
     </div>
 
-    <el-dialog v-model="showPasswordDialog" :title="$t('settings.setPassword')" width="400px">
+    <el-dialog v-model="showPasswordDialog" :title="passwordSet ? $t('settings.changePassword') : $t('settings.setPassword')" width="400px">
       <el-form label-position="top">
+        <el-form-item v-if="passwordSet" :label="$t('settings.oldPassword')">
+          <el-input v-model="oldPassword" type="password" show-password :placeholder="$t('settings.oldPasswordPlaceholder')" />
+        </el-form-item>
         <el-form-item :label="$t('settings.newPassword')">
           <el-input v-model="newPassword" type="password" show-password :placeholder="$t('settings.passwordMinLen')" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showPasswordDialog = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="setPassword" :loading="settingPassword">{{ $t('common.save') }}</el-button>
+        <el-button type="primary" @click="handleSetPassword" :loading="settingPassword">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from '../api/client'
 import { setLocale, getLocale } from '../i18n'
 
 const { t } = useI18n()
+const route = useRoute()
+const activeSection = ref((route.query.section as string) || '')
 const license = ref<any>({ active: false, tier: 'oss', features: [] })
 const licenseKey = ref('')
 const activating = ref(false)
 const backingUp = ref(false)
 const passwordSet = ref(false)
 const showPasswordDialog = ref(false)
+const oldPassword = ref('')
 const newPassword = ref('')
 const settingPassword = ref(false)
 const coreEngine = ref('python')
@@ -170,7 +177,26 @@ const featureLabels: Record<string, string> = {
 
 onMounted(async () => {
   await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus()])
+  if (activeSection.value) {
+    nextTick(() => scrollToSection(activeSection.value))
+  }
 })
+
+watch(() => route.query.section, (section) => {
+  if (section && typeof section === 'string') {
+    activeSection.value = section
+    nextTick(() => scrollToSection(section))
+  }
+})
+
+function scrollToSection(section: string) {
+  const el = document.getElementById(`settings-${section}`)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('section-highlight')
+    setTimeout(() => el.classList.remove('section-highlight'), 2000)
+  }
+}
 
 function changeLocale(locale: 'zh' | 'en') {
   setLocale(locale)
@@ -207,12 +233,18 @@ async function deactivateLicense() {
   } catch {}
 }
 
-async function setPassword() {
+async function handleSetPassword() {
   if (newPassword.value.length < 4) { ElMessage.warning(t('settings.passwordMinLen')); return }
   settingPassword.value = true
   try {
-    await axios.post('/auth/set-password', { password: newPassword.value })
-    ElMessage.success(t('settings.passwordSet')); showPasswordDialog.value = false; newPassword.value = ''; passwordSet.value = true
+    if (passwordSet.value) {
+      // 修改密码 — 验证旧密码
+      await axios.post('/auth/change-password', { old_password: oldPassword.value, new_password: newPassword.value })
+    } else {
+      // 首次设置密码
+      await axios.post('/auth/set-password', { password: newPassword.value })
+    }
+    ElMessage.success(t('settings.passwordSet')); showPasswordDialog.value = false; oldPassword.value = ''; newPassword.value = ''; passwordSet.value = true
   } catch (e: any) { ElMessage.error(e.response?.data?.detail || t('common.failed')) }
   finally { settingPassword.value = false }
 }
@@ -237,7 +269,8 @@ async function uploadBackup(file: File) {
 .page-header { margin-bottom: 24px; }
 .page-header h1 { font-size: 24px; font-weight: 700; color: var(--cm-text); margin: 0; }
 .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 16px; }
-.settings-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 20px; }
+.settings-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 20px; transition: border-color 0.3s, box-shadow 0.3s; }
+.settings-card.section-highlight { border-color: #10B981; box-shadow: 0 0 0 2px rgba(16,185,129,0.2); }
 .card-title { font-size: 16px; font-weight: 600; color: var(--cm-text); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--cm-border); }
 .license-status .status-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; }
 .status-label { color: var(--cm-text-muted); font-size: 13px; }

@@ -9,10 +9,10 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# ========== 加载核心模块：Rust (预编译 wheel) → 纯 Python 兜底 ==========
+# ========== 加载核心模块：C/CPython (预编译 wheel) → 纯 Python 兜底 ==========
 _CORE_ENGINE = "none"
 
-# 1. 尝试 Rust (PyO3) — 最高安全
+# 1. 尝试 C/CPython — 最高安全
 try:
     from clawmemory_core import (
         check_feature, set_license, get_tier, reset as _reset,
@@ -43,7 +43,7 @@ except ImportError:
 
     # 2. 纯 Python 兜底 — 最低安全 (仅开发环境/OSS 免费版)
     # 注意：此模式不包含完整的安全保护，仅保证基本功能可用
-    # 发布时必须安装 clawmemory_core (Rust) wheel
+    # 发布时必须安装 clawmemory_core (C) wheel
     import hashlib, os as _os, math, time as _time, re
 
     _features: set = set()
@@ -78,6 +78,17 @@ except ImportError:
         raw = f"{_tier}|{','.join(sorted(_features))}|clawmemory_v1"
         expected = hashlib.sha256(raw.encode()).hexdigest()[:16]
         return _license_hash == expected
+
+    def _rust_verify_license(license_data_b64: str, public_key_pem: str) -> bool:
+        """纯 Python fallback: 解码 base64 验证签名格式，但无法做 RSA 验证。
+        仅检查数据格式是否合法（有 data 和 signature 字段）。
+        真正的 RSA 验证需要安装 clawmemory_core C 编译版。"""
+        try:
+            raw = base64.b64decode(license_data_b64)
+            payload = json.loads(raw)
+            return bool(payload.get("data") and payload.get("signature"))
+        except Exception:
+            return False
 
     # --- Memory Decay (Python fallback) ---
     _HALF_LIFE_DEFAULT = 30 * 24 * 3600
@@ -174,7 +185,7 @@ except ImportError:
         return {"total": len(routing_history), "distribution": {}, "avg_complexity": 0.0, "total_cost": 0.0}
 
     _CORE_ENGINE = "python"
-    logger.warning("Core engine: Pure Python — LOW security, install clawmemory-core wheel for Rust protection")
+    logger.warning("Core engine: Pure Python — LOW security, install clawmemory-core wheel for C/CPython protection")
 
 
 def verify_integrity() -> bool:
@@ -249,7 +260,7 @@ class LicenseService:
             logger.warning(f"License activation rejected by server: {server_msg}")
             return {"valid": False, "message": server_msg}
 
-        # RSA 签名验证 (Rust 引擎 或 C 引擎)
+        # RSA 签名验证 (C 引擎 或纯 Python 兜底)
         # 授权平台返回 signature 字段（base64 编码的 {data, signature} JSON）
         if data.get("signature"):
             try:
@@ -257,8 +268,12 @@ class LicenseService:
                 if pubkey:
                     if not _rust_verify_license(data["signature"], pubkey):
                         return {"valid": False, "message": "RSA signature verification failed"}
+                else:
+                    logger.error("RSA public key not found, cannot verify license signature")
+                    return {"valid": False, "message": "RSA public key not configured, cannot verify license"}
             except Exception as e:
-                logger.warning(f"RSA verification error: {e}")
+                logger.error(f"RSA verification error: {e}")
+                return {"valid": False, "message": f"RSA verification error: {e}"}
 
         tier = data.get("tier", "pro")
         features = data.get("features", [])

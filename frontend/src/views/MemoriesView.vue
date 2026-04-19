@@ -158,13 +158,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Upload } from '@element-plus/icons-vue'
 import axios from '../api/client'
 
 const { t } = useI18n()
+const route = useRoute()
 const memories = ref<any[]>([])
 const searchResults = ref<any[]>([])
 const searchQuery = ref('')
@@ -192,7 +194,19 @@ const layerLabels: Record<string, string> = {
   private: t('memories.private'),
 }
 
-onMounted(() => loadMemories())
+onMounted(() => {
+  loadMemories()
+  // Handle ?import=openclaw query param
+  if (route.query.import === 'openclaw') {
+    handleOpenClawScan()
+  }
+})
+
+watch(() => route.query.import, (val) => {
+  if (val === 'openclaw') {
+    handleOpenClawScan()
+  }
+})
 
 function openAddDialog() {
   editingMemory.value = null

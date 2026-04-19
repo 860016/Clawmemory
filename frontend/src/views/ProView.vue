@@ -8,7 +8,7 @@
 
     <div class="pro-grid" v-if="isPro">
       <!-- Memory Decay -->
-      <div class="pro-card">
+      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'decay' }" id="pro-decay">
         <div class="card-header">
           <span class="card-icon">📉</span>
           <span class="card-title">{{ $t('pro.decay') }}</span>
@@ -147,7 +147,7 @@
       </div>
 
       <!-- Auto Graph -->
-      <div class="pro-card">
+      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'graph' }" id="pro-graph">
         <div class="card-header">
           <span class="card-icon">🕸️</span>
           <span class="card-title">{{ $t('pro.autoGraph') }}</span>
@@ -208,16 +208,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import axios from '../api/client'
 import proApi from '../api/pro'
 
 const { t } = useI18n()
+const route = useRoute()
 
 const isPro = ref(false)
 const loading = ref<Record<string, boolean>>({})
+const activeSection = ref((route.query.section as string) || '')
 
 // Decay
 const decayStats = ref<any>(null)
@@ -250,8 +253,28 @@ onMounted(async () => {
     loadDecayStats()
     loadTokenStats()
     loadBackupSchedule()
+    // Scroll to section from query param
+    if (activeSection.value) {
+      nextTick(() => scrollToSection(activeSection.value))
+    }
   }
 })
+
+watch(() => route.query.section, (section) => {
+  if (section && typeof section === 'string') {
+    activeSection.value = section
+    nextTick(() => scrollToSection(section))
+  }
+})
+
+function scrollToSection(section: string) {
+  const el = document.getElementById(`pro-${section}`)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('section-highlight')
+    setTimeout(() => el.classList.remove('section-highlight'), 2000)
+  }
+}
 
 async function loadDecayStats() {
   loading.value.decay = true
@@ -364,6 +387,7 @@ async function saveBackupSchedule() {
 .pro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 16px; }
 .pro-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; overflow: hidden; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
 .pro-card:hover { border-color: rgba(16,185,129,0.25); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+.pro-card.section-highlight { border-color: #10B981; box-shadow: 0 0 0 2px rgba(16,185,129,0.2); transition: all 0.3s ease; }
 .card-header { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--cm-border); }
 .card-icon { font-size: 18px; }
 .card-title { font-size: 15px; font-weight: 600; color: var(--cm-text); }

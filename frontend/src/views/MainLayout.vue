@@ -59,7 +59,7 @@
               :key="item.path"
               :to="item.path"
               class="sidebar-item"
-              :class="{ active: $route.path === item.path || (item.path !== '/' && $route.path.startsWith(item.path)) }"
+              :class="{ active: isSubNavActive(item) }"
             >
               <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
               <span>{{ $t(item.label) }}</span>
@@ -123,6 +123,14 @@ function isNavActive(path: string) {
   return route.path.startsWith(path)
 }
 
+function isSubNavActive(item: { path: string }) {
+  if (item.path.includes('?')) {
+    return route.fullPath === item.path
+  }
+  // For paths without query, match when on same route without query params
+  return route.path === item.path && !Object.keys(route.query).length
+}
+
 // Sub-navigation per main route
 const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: string; label: string; icon?: any }> }>> = {
   '/': [
@@ -147,7 +155,7 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
   ],
   '/skills': [
     { items: [
-      { path: '/skills', label: 'skills.scanSkills', icon: MagicStick },
+      { path: '/skills', label: 'skills.title', icon: MagicStick },
     ]}
   ],
   '/wiki': [

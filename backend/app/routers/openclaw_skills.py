@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.middleware.auth import get_current_user
 from app.services.openclaw_skill_scanner import (
+    scan_all_skills,
     scan_global_skills,
     scan_workspace_skills,
     get_skill_detail,
@@ -15,14 +16,7 @@ def scan_skills(
     _=Depends(get_current_user),
 ):
     """Scan both global and workspace OpenClaw skills."""
-    global_skills = scan_global_skills()
-    workspace_skills = scan_workspace_skills(workspace_path)
-    
-    return {
-        "global_skills": global_skills,
-        "workspace_skills": workspace_skills,
-        "total": len(global_skills) + len(workspace_skills),
-    }
+    return scan_all_skills(workspace_path)
 
 
 @router.get("/global")

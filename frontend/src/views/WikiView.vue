@@ -133,14 +133,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, ArrowLeft } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import wikiApi from '../api/wiki'
 
 const { t } = useI18n()
+const route = useRoute()
 const pages = ref<any[]>([])
 const allPages = ref<any[]>([])
 const categories = ref<string[]>([])
@@ -165,6 +167,13 @@ const renderedContent = computed(() => {
 })
 
 onMounted(() => { loadPages(); loadCategories() })
+
+watch(() => route.query.tab, (tab) => {
+  if (tab === 'categories') {
+    // Just highlight the categories section in sidebar - it's already visible
+    selectedCategory.value = ''
+  }
+})
 
 async function loadPages() {
   try {

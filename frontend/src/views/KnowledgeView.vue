@@ -141,13 +141,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Connection, Grid, Share } from '@element-plus/icons-vue'
 import axios from '../api/client'
 import cytoscape from 'cytoscape'
 
 const { t } = useI18n()
-const activeTab = ref('entities')
+const route = useRoute()
+const activeTab = ref((route.query.tab as string) || 'entities')
 const entities = ref<any[]>([])
 const relations = ref<any[]>([])
 const graphData = ref<{ nodes: any[]; edges: any[] }>({ nodes: [], edges: [] })
@@ -230,6 +232,12 @@ async function loadGraph() {
 
 watch(activeTab, async (val) => {
   if (val === 'graph' && graphData.value.nodes.length) { await nextTick(); renderGraph() }
+})
+
+watch(() => route.query.tab, (tab) => {
+  if (tab && ['entities', 'relations', 'graph'].includes(tab as string)) {
+    activeTab.value = tab as string
+  }
 })
 
 function renderGraph() {
