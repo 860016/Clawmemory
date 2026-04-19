@@ -51,29 +51,11 @@ def _build_license_info(db: Session) -> dict:
 
 @router.get("/status")
 def get_license_status(_=Depends(get_current_user), db: Session = Depends(get_db)):
-    from app.services.license_service import USING_RUST
-    if not USING_RUST:
-        try:
-            from app.services.license_service import verify_integrity
-            if not verify_integrity():
-                return {"active": False, "tier": "oss", "features": [], "is_valid": False}
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"License integrity check failed: {e}")
     return _build_license_info(db)
 
 
 @router.get("/info")
 def get_license_info(_=Depends(get_current_user), db: Session = Depends(get_db)):
-    from app.services.license_service import USING_RUST
-    if not USING_RUST:
-        try:
-            from app.services.license_service import verify_integrity
-            if not verify_integrity():
-                return {"active": False, "tier": "oss", "features": [], "is_valid": False}
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"License integrity check failed: {e}")
     return _build_license_info(db)
 
 

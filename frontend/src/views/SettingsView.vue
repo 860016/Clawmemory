@@ -73,7 +73,7 @@
         <div class="card-title">◇ {{ $t('settings.security') }}</div>
         <div class="setting-item">
           <span>{{ $t('settings.password') }}</span>
-          <el-button text type="primary" @click="showPasswordDialog = true">
+          <el-button size="small" @click="showPasswordDialog = true">
             {{ passwordSet ? $t('settings.changePassword') : $t('settings.setPassword') }}
           </el-button>
         </div>
@@ -88,13 +88,27 @@
         </div>
         <div class="setting-item">
           <span>{{ $t('settings.createBackup') }}</span>
-          <el-button text type="primary" @click="createBackup" :loading="backingUp">{{ $t('settings.backupNow') }}</el-button>
+          <el-button size="small" type="primary" @click="createBackup" :loading="backingUp">{{ $t('settings.backupNow') }}</el-button>
         </div>
         <div class="setting-item">
           <span>{{ $t('settings.importBackup') }}</span>
           <el-upload :show-file-list="false" :before-upload="uploadBackup" accept=".zip" action="" :auto-upload="false">
-            <el-button text type="primary">{{ $t('settings.chooseFile') }}</el-button>
+            <el-button size="small" type="warning">{{ $t('settings.chooseFile') }}</el-button>
           </el-upload>
+        </div>
+        <!-- 备份列表 -->
+        <div v-if="backups.length" class="backup-list">
+          <div class="backup-item" v-for="b in backups" :key="b.id">
+            <div class="backup-info">
+              <span class="backup-name">{{ b.filename || $t('settings.backup') + ' #' + b.id }}</span>
+              <span class="backup-meta">{{ formatBackupTime(b.created_at) }} · {{ formatSize(b.file_size) }}</span>
+            </div>
+            <div class="backup-actions">
+              <el-button text size="small" @click="downloadBackup(b.id)">⬇</el-button>
+              <el-button text size="small" @click="restoreBackup(b.id)">{{ $t('settings.restore') }}</el-button>
+              <el-button text size="small" type="danger" @click="deleteBackup(b.id)">✕</el-button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -152,6 +166,7 @@ const settingPassword = ref(false)
 const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
 const appVersion = ref('2.8.0')
+const backups = ref<any[]>([])
 
 const featureLabels: Record<string, string> = {
   ai_extract: t('settings.featAiExtract'),
@@ -176,7 +191,7 @@ const featureLabels: Record<string, string> = {
 }
 
 onMounted(async () => {
-  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus()])
+  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadBackups()])
   if (activeSection.value) {
     nextTick(() => scrollToSection(activeSection.value))
   }
@@ -212,6 +227,52 @@ async function loadInitStatus() {
 
 async function loadInstallStatus() {
   try { const { data } = await axios.get('/install-status'); coreEngine.value = data.checks?.security_engine || 'python'; if (data.version) appVersion.value = data.version } catch {}
+}
+
+async function loadBackups() {
+  try { const { data } = await axios.get('/backups'); backups.value = data || [] } catch { backups.value = [] }
+}
+
+function formatBackupTime(ts: string) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function formatSize(bytes: number) {
+  if (!bytes) return ''
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+}
+
+async function downloadBackup(id: number) {
+  try {
+    const { data } = await axios.get(`/backups/${id}/download`, { responseType: 'blob' })
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url; a.download = `backup_${id}.zip`; a.click()
+    URL.revokeObjectURL(url)
+  } catch { ElMessage.error(t('common.failed')) }
+}
+
+async function restoreBackup(id: number) {
+  try {
+    await ElMessageBox.confirm(t('settings.restoreConfirm'), t('common.confirm'), { type: 'warning' })
+    backingUp.value = true
+    await axios.post(`/backups/${id}/restore`)
+    ElMessage.success(t('settings.backupRestored'))
+    await loadBackups()
+  } catch {} finally { backingUp.value = false }
+}
+
+async function deleteBackup(id: number) {
+  try {
+    await ElMessageBox.confirm(t('settings.deleteBackupConfirm'), t('common.confirm'), { type: 'warning' })
+    await axios.delete(`/backups/${id}`)
+    ElMessage.success(t('common.success'))
+    await loadBackups()
+  } catch {}
 }
 
 async function activateLicense() {
@@ -262,7 +323,7 @@ async function handleSetPassword() {
 
 async function createBackup() {
   backingUp.value = true
-  try { await axios.post('/backups', { notes: '手动备份' }); ElMessage.success(t('settings.backupCreated')) }
+  try { await axios.post('/backups', { notes: '手动备份' }); ElMessage.success(t('settings.backupCreated')); await loadBackups() }
   catch { ElMessage.error(t('settings.backupFailed')) }
   finally { backingUp.value = false }
 }
@@ -315,5 +376,12 @@ async function uploadBackup(file: File) {
 .license-input { width: 260px; }
 .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--cm-border); font-size: 14px; color: var(--cm-text); }
 .setting-desc { color: var(--cm-text-muted); font-size: 13px; }
+.backup-list { margin-top: 12px; border-top: 1px solid var(--cm-border); padding-top: 8px; max-height: 200px; overflow-y: auto; }
+.backup-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--cm-border); }
+.backup-item:last-child { border-bottom: none; }
+.backup-info { display: flex; flex-direction: column; gap: 2px; }
+.backup-name { font-size: 13px; color: var(--cm-text); font-weight: 500; }
+.backup-meta { font-size: 11px; color: var(--cm-text-muted); }
+.backup-actions { display: flex; gap: 4px; }
 @media (max-width: 768px) { .settings-grid { grid-template-columns: 1fr; } .pricing { flex-direction: column; } }
 </style>

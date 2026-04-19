@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.middleware.auth import get_current_user
@@ -11,9 +11,13 @@ router = APIRouter(prefix="/api/v1/knowledge", tags=["knowledge"])
 
 # --- Entities ---
 @router.get("/entities")
-def list_entities(entity_type: str | None = None, _=Depends(get_current_user), db: Session = Depends(get_db)):
+def list_entities(entity_type: str | None = None, search: str | None = Query(None), _=Depends(get_current_user), db: Session = Depends(get_db)):
     svc = KnowledgeService(db)
-    return svc.list_entities(entity_type)
+    entities = svc.list_entities(entity_type)
+    if search:
+        q = search.lower()
+        entities = [e for e in entities if q in (e.name or "").lower() or q in (e.entity_type or "").lower() or q in (e.description or "").lower()]
+    return entities
 
 
 @router.post("/entities")

@@ -13,7 +13,7 @@
     </div>
 
     <div class="toolbar">
-      <el-input v-model="searchQuery" :placeholder="$t('memories.searchPlaceholder')" clearable @keyup.enter="handleSearch" class="search-input">
+      <el-input v-model="searchQuery" :placeholder="$t('memories.searchPlaceholder')" clearable @keyup.enter="handleSearch" @clear="searchResults = []" class="search-input">
         <template #prefix><el-icon><Search /></el-icon></template>
       </el-input>
       <el-radio-group v-model="currentLayer" @change="loadMemories" size="default">
@@ -234,8 +234,20 @@ async function handleSearch() {
   if (!searchQuery.value) { searchResults.value = []; return }
   try {
     const { data } = await axios.get('/memories/search/keyword', { params: { q: searchQuery.value, limit: 20 } })
-    searchResults.value = data || []
-  } catch { searchResults.value = [] }
+    // FTS5 returns {id, key, value, layer, source, rank} — normalize to match memory card format
+    searchResults.value = (data || []).map((m: any) => ({
+      ...m,
+      importance: m.importance || 0.5,
+      tags: m.tags || [],
+      updated_at: m.updated_at || new Date().toISOString(),
+    }))
+  } catch {
+    // Fallback: client-side filter
+    const q = searchQuery.value.toLowerCase()
+    searchResults.value = memories.value.filter(m =>
+      m.key?.toLowerCase().includes(q) || m.value?.toLowerCase().includes(q)
+    )
+  }
 }
 
 function editMemory(m: any) {

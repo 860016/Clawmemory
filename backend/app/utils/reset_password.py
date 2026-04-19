@@ -1,6 +1,10 @@
 """ClawMemory Password Reset Token Generator
 
 Usage:
+    # Docker 环境:
+    docker exec -it clawmemory python -m app.utils.reset_password
+
+    # 本地开发:
     cd /path/to/clawmemory/backend
     python -m app.utils.reset_password
 

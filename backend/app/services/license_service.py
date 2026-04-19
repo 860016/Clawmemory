@@ -269,7 +269,12 @@ class LicenseService:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.post(
                     f"{settings.license_server_url}/api/v1/activate",
-                    json={"license_key": license_key, "fingerprint": self._get_fingerprint(), "version": APP_VERSION},
+                    json={
+                        "license_key": license_key,
+                        "fingerprint": self._get_fingerprint(),
+                        "device_name": self._get_device_name(),
+                        "version": APP_VERSION,
+                    },
                 )
                 data = resp.json()
         except Exception as e:
@@ -353,6 +358,20 @@ class LicenseService:
             parts.insert(0, f"env:{env_fp}")
         raw = '|'.join(parts)
         return hashlib.sha256(raw.encode()).hexdigest()[:32]
+
+    def _get_device_name(self) -> str:
+        """Get a human-readable device name for the license platform"""
+        import platform, os, socket
+        # 1. Environment variable override
+        name = os.environ.get('DEVICE_NAME', '')
+        if name:
+            return name
+        # 2. Docker container name (from hostname)
+        hostname = socket.gethostname()
+        if hostname and hostname != 'localhost' and not hostname.startswith('DESKTOP'):
+            return f"{hostname} ({platform.system()})"
+        # 3. Fallback: OS + arch
+        return f"{platform.system()} {platform.machine()}"
 
     def _load_public_key(self) -> str | None:
         """加载 RSA 公钥。本地有文件则读取，否则从授权服务器获取并缓存。"""
