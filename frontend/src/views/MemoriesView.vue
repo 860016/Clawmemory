@@ -1,7 +1,7 @@
 <template>
   <div class="memories-page">
     <div class="page-header">
-      <h1>{{ $t('memories.title') }}</h1>
+      <h1>🧠 {{ $t('memories.title') }}</h1>
       <div class="header-actions">
         <el-button @click="handleOpenClawScan">
           <el-icon><Upload /></el-icon> {{ $t('memories.importOpenClaw') }}
@@ -102,7 +102,7 @@
     <el-dialog v-model="showImportDialog" :title="$t('memories.importTitle')" width="650px">
       <div v-if="!scanResult">
         <el-alert v-if="scanError" :title="scanError" type="error" show-icon :closable="false" style="margin-bottom: 16px" />
-        <p style="color: #7d8590; margin-bottom: 16px">
+        <p style="color: var(--cm-text-muted); margin-bottom: 16px">
           {{ $t('memories.importDesc') }}
         </p>
         <el-button type="primary" :loading="scanning" @click="handleScan">
@@ -116,7 +116,7 @@
           </template>
         </el-alert>
         <template v-else>
-          <p style="margin-bottom: 12px; color: #7d8590">
+          <p style="margin-bottom: 12px; color: var(--cm-text-muted)">
             {{ $t('memories.detectedDir') }}：<code>{{ scanResult.openclaw_dir }}</code>
           </p>
           <el-table :data="scanResult.agents" stripe style="width: 100%">
@@ -142,12 +142,12 @@
         <el-divider content-position="left">{{ previewData.agent_name }} — {{ $t('memories.totalCount', { count: previewData.total }) }}</el-divider>
         <div style="max-height: 300px; overflow-y: auto">
           <div v-for="(mem, idx) in previewData.preview" :key="idx"
-            style="padding: 8px; border-bottom: 1px solid #21262d">
+            style="padding: 8px; border-bottom: 1px solid var(--cm-border)">
             <div style="display: flex; gap: 8px; align-items: center">
               <el-tag size="small">{{ mem.layer }}</el-tag>
               <strong>{{ mem.key }}</strong>
             </div>
-            <p style="margin: 4px 0 0; color: #7d8590; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
+            <p style="margin: 4px 0 0; color: var(--cm-text-muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">
               {{ mem.value?.substring(0, 200) }}
             </p>
           </div>
@@ -316,15 +316,17 @@ async function handleImport(agentName: string) {
 
 <style scoped>
 .memories-page { padding: 28px; max-width: 1200px; margin: 0 auto; }
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
 .page-header h1 { font-size: 24px; font-weight: 700; color: var(--cm-text); margin: 0; }
 .header-actions { display: flex; gap: 8px; }
-.toolbar { display: flex; gap: 16px; margin-bottom: 20px; align-items: center; }
+.toolbar { display: flex; gap: 16px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
 .search-input { width: 300px; }
 .section-title { font-size: 14px; font-weight: 600; color: var(--cm-text-muted); margin-bottom: 12px; }
 .memory-list, .search-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
-.memory-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 16px; transition: border-color 0.2s; }
-.memory-card:hover { border-color: rgba(16,185,129,0.3); }
+.memory-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 16px; transition: all 0.2s ease; position: relative; overflow: hidden; }
+.memory-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--cm-primary), transparent); opacity: 0; transition: opacity 0.3s; }
+.memory-card:hover { border-color: rgba(16,185,129,0.3); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+.memory-card:hover::before { opacity: 1; }
 .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .layer-tag { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
 .layer-tag.preference { background: rgba(16,185,129,0.15); color: #10B981; }
@@ -343,4 +345,5 @@ async function handleImport(agentName: string) {
 .card-meta { font-size: 11px; color: var(--cm-text-placeholder); }
 .card-actions { display: flex; gap: 4px; }
 .pagination { display: flex; justify-content: center; margin-top: 20px; }
+@media (max-width: 768px) { .search-input { width: 100%; } .memory-list, .search-results { grid-template-columns: 1fr; } .header-actions { width: 100%; justify-content: flex-end; } }
 </style>

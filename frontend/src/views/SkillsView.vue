@@ -1,7 +1,7 @@
 <template>
   <div class="skills-page">
     <div class="page-header">
-      <h2>{{ $t('skills.title') }}</h2>
+      <h2>✨ {{ $t('skills.title') }}</h2>
       <el-button type="primary" @click="scanSkills" :loading="scanning">
         {{ scanning ? $t('skills.scanning') : $t('skills.scanSkills') }}
       </el-button>
@@ -298,5 +298,9 @@ async function showDetail(skill: any) {
   font-size: 13px;
   color: var(--cm-text-muted);
   margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  .skill-grid { grid-template-columns: 1fr; }
 }
 </style>

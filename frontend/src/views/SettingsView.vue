@@ -1,13 +1,13 @@
 <template>
   <div class="settings-page">
     <div class="page-header">
-      <h1>{{ $t('settings.title') }}</h1>
+      <h1>⚙️ {{ $t('settings.title') }}</h1>
     </div>
 
     <div class="settings-grid">
       <!-- 授权管理 -->
       <div class="settings-card">
-        <div class="card-title">◆ {{ $t('settings.license') }}</div>
+        <div class="card-title">🔑 {{ $t('settings.license') }}</div>
         <div class="license-status" v-if="license.active">
           <div class="status-row">
             <span class="status-label">{{ $t('settings.version') }}</span>
@@ -81,7 +81,7 @@
 
       <!-- 数据管理 -->
       <div class="settings-card">
-        <div class="card-title">◇ {{ $t('settings.data') }}</div>
+        <div class="card-title">💾 {{ $t('settings.data') }}</div>
         <div class="setting-item">
           <span>{{ $t('settings.dbLocation') }}</span>
           <span class="setting-desc">data/clawmemory.db</span>
@@ -144,7 +144,7 @@ const newPassword = ref('')
 const settingPassword = ref(false)
 const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
-const appVersion = ref('2.1.0')
+const appVersion = ref('2.4.0')
 
 const featureLabels: Record<string, string> = {
   ai_extract: t('settings.featAiExtract'),

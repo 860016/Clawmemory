@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy import text
 from starlette.types import ASGIApp, Receive, Scope, Send
-from app.config import settings
+from app.config import settings, APP_VERSION
 from app.database import init_db
 from app.services.setup_service import ensure_data_dirs
 from app.routers import auth, memories, license, backups, knowledge, file_watcher, wiki, pro_features, openclaw_memories, openclaw_skills
@@ -224,7 +224,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="ClawMemory",
-    version="2.3.1",
+    version=APP_VERSION,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     lifespan=lifespan,
@@ -257,7 +257,7 @@ app.include_router(openclaw_skills.router)
 
 @app.get("/api/v1/health")
 async def health_check():
-    return {"status": "ok", "version": "2.3.1"}
+    return {"status": "ok", "version": APP_VERSION}
 
 
 @app.get("/api/v1/install-status")
@@ -290,7 +290,7 @@ async def install_status():
 
     return {
         "plugin": "ClawMemory",
-        "version": "2.3.1",
+        "version": APP_VERSION,
         "status": "running" if db_ok else "degraded",
         "service_url": f"http://localhost:{settings.port}",
         "security_level": security_level,
@@ -380,7 +380,7 @@ async def get_dashboard_stats():
             "recentMemories": recent_list,
             "license": license_info,
             "passwordSet": bool(settings.access_password),
-            "version": "2.4.0",
+            "version": APP_VERSION,
         }
     finally:
         db.close()

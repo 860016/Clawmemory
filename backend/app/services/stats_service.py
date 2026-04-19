@@ -1,7 +1,7 @@
 import httpx
 import platform
 import logging
-from app.config import settings
+from app.config import settings, APP_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class StatsService:
                     f"{settings.license_server_url}/api/v1/heartbeat",
                     json={
                         "license_key": license_key,
-                        "version": "2.1.0",
+                        "version": APP_VERSION,
                         "os": platform.system(),
                         "memory_count": self._count_memories(db),
                     }
@@ -31,7 +31,7 @@ class StatsService:
             async with httpx.AsyncClient(timeout=5) as client:
                 await client.post(
                     f"{settings.license_server_url}/api/v1/ping",
-                    json={"install_id": install_id, "version": "2.1.0", "os": platform.system()}
+                    json={"install_id": install_id, "version": APP_VERSION, "os": platform.system()}
                 )
         except Exception:
             pass

@@ -14,6 +14,17 @@ def _detect_data_dir() -> Path:
     return Path(__file__).resolve().parent.parent / "data"
 
 
+def _read_version() -> str:
+    """从项目根目录 VERSION 文件读取统一版本号"""
+    version_file = Path(__file__).resolve().parent.parent.parent / "VERSION"
+    if version_file.exists():
+        return version_file.read_text().strip()
+    return "0.0.0"
+
+
+APP_VERSION = _read_version()
+
+
 class Settings(BaseSettings):
     # Paths
     base_dir: Path = Path(__file__).resolve().parent.parent

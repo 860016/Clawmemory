@@ -1,7 +1,7 @@
 <template>
   <div class="knowledge-page">
     <div class="page-header">
-      <h1>{{ $t('knowledge.title') }}</h1>
+      <h1>🕸️ {{ $t('knowledge.title') }}</h1>
       <div class="header-actions">
         <el-button @click="activeTab = 'graph'">
           <el-icon><Connection /></el-icon> {{ $t('knowledge.graphView') }}
@@ -293,10 +293,10 @@ function truncate(str: string, len: number) { return str && str.length > len ? s
 
 <style scoped>
 .knowledge-page { padding: 28px; max-width: 1200px; margin: 0 auto; }
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.page-header h1 { font-size: 24px; font-weight: 700; color: #e6edf3; margin: 0; }
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+.page-header h1 { font-size: 24px; font-weight: 700; color: var(--cm-text); margin: 0; }
 .header-actions { display: flex; gap: 8px; }
-.list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
 .search-input { width: 250px; }
 .entity-limit { font-size: 12px; color: #ffc107; font-weight: 600; }
 
@@ -342,4 +342,11 @@ function truncate(str: string, len: number) { return str && str.length > len ? s
 
 /* Other */
 .entity-actions { display: flex; gap: 4px; }
+
+@media (max-width: 768px) {
+  .search-input { width: 100%; }
+  .entity-grid { grid-template-columns: 1fr; }
+  .graph-container { min-height: 350px; }
+  .cy-container { height: 350px; }
+}
 </style>

@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard">
     <div class="page-header">
-      <h1>{{ $t('dashboard.title') }}</h1>
+      <h1>📊 {{ $t('dashboard.title') }}</h1>
       <p class="page-desc">{{ $t('dashboard.subtitle') }}</p>
     </div>
 
@@ -21,36 +21,28 @@
 
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-icon-wrap mem-icon">
-          <el-icon :size="22"><Collection /></el-icon>
-        </div>
+        <div class="stat-icon-wrap mem-icon">🧠</div>
         <div class="stat-info">
           <div class="stat-value">{{ stats.memoryCount }}</div>
           <div class="stat-label">{{ $t('dashboard.memoryCount') }}</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon-wrap entity-icon">
-          <el-icon :size="22"><Connection /></el-icon>
-        </div>
+        <div class="stat-icon-wrap entity-icon">🕸️</div>
         <div class="stat-info">
           <div class="stat-value">{{ stats.entityCount }}</div>
           <div class="stat-label">{{ $t('dashboard.entityCount') }}</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon-wrap wiki-icon">
-          <el-icon :size="22"><Document /></el-icon>
-        </div>
+        <div class="stat-icon-wrap wiki-icon">📖</div>
         <div class="stat-info">
           <div class="stat-value">{{ stats.wikiCount }}</div>
           <div class="stat-label">{{ $t('dashboard.wikiCount') }}</div>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon-wrap pref-icon">
-          <el-icon :size="22"><Star /></el-icon>
-        </div>
+        <div class="stat-icon-wrap pref-icon">⭐</div>
         <div class="stat-info">
           <div class="stat-value">{{ stats.layerStats.preference || 0 }}</div>
           <div class="stat-label">{{ $t('dashboard.preferenceCount') }}</div>
@@ -61,7 +53,7 @@
     <div class="content-grid">
       <div class="card">
         <div class="card-header">
-          <h3>{{ $t('dashboard.layerDistribution') }}</h3>
+          <h3>📊 {{ $t('dashboard.layerDistribution') }}</h3>
         </div>
         <div class="layer-bars">
           <div class="layer-bar" v-for="(count, layer) in stats.layerStats" :key="layer">
@@ -77,7 +69,7 @@
 
       <div class="card">
         <div class="card-header">
-          <h3>{{ $t('dashboard.licenseStatus') }}</h3>
+          <h3>🔑 {{ $t('dashboard.licenseStatus') }}</h3>
         </div>
         <div class="license-info">
           <div class="license-tier" :class="stats.license.tier">
@@ -100,7 +92,7 @@
 
     <div class="card">
       <div class="card-header">
-        <h3>{{ $t('dashboard.recentMemories') }}</h3>
+        <h3>🕐 {{ $t('dashboard.recentMemories') }}</h3>
         <el-button text type="primary" @click="$router.push('/memories')">{{ $t('dashboard.viewAll') }}</el-button>
       </div>
       <div class="recent-memories" v-if="stats.recentMemories && stats.recentMemories.length">
@@ -121,7 +113,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Collection, Connection, Document, Star } from '@element-plus/icons-vue'
 import axios from '../api/client'
 
 const { t } = useI18n()
@@ -198,11 +189,31 @@ function formatTime(t: string) {
   display: flex;
   align-items: center;
   gap: 16px;
-  transition: border-color 0.2s;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cm-primary), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
 }
 
 .stat-card:hover {
   border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.stat-card:hover::before {
+  opacity: 1;
 }
 
 .stat-icon-wrap {
@@ -212,12 +223,13 @@ function formatTime(t: string) {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 22px;
 }
 
-.mem-icon { background: rgba(16, 185, 129, 0.12); color: #10B981; }
-.entity-icon { background: rgba(6, 182, 212, 0.12); color: #06b6d4; }
-.wiki-icon { background: rgba(255, 193, 7, 0.12); color: #ffc107; }
-.pref-icon { background: rgba(233, 30, 99, 0.12); color: #e91e63; }
+.mem-icon { background: rgba(16, 185, 129, 0.12); }
+.entity-icon { background: rgba(6, 182, 212, 0.12); }
+.wiki-icon { background: rgba(255, 193, 7, 0.12); }
+.pref-icon { background: rgba(233, 30, 99, 0.12); }
 
 .stat-value {
   font-size: 28px;

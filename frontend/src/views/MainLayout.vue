@@ -24,7 +24,8 @@
           :class="{ active: isNavActive(item.path) }"
         >
           <el-icon><component :is="item.icon" /></el-icon>
-          <span>{{ $t(item.label) }}</span>
+          <span class="nav-emoji">{{ item.emoji }}</span>
+          <span class="nav-label">{{ $t(item.label) }}</span>
         </router-link>
       </nav>
 
@@ -108,13 +109,13 @@ onMounted(async () => {
 })
 
 const navItems = [
-  { path: '/', label: 'nav.dashboard', icon: HomeFilled },
-  { path: '/memories', label: 'nav.memories', icon: Collection },
-  { path: '/knowledge', label: 'nav.knowledge', icon: Connection },
-  { path: '/skills', label: 'nav.skills', icon: MagicStick },
-  { path: '/wiki', label: 'nav.wiki', icon: Document },
-  { path: '/pro', label: 'nav.pro', icon: Promotion },
-  { path: '/settings', label: 'nav.settings', icon: Setting },
+  { path: '/', label: 'nav.dashboard', icon: HomeFilled, emoji: '📊' },
+  { path: '/memories', label: 'nav.memories', icon: Collection, emoji: '🧠' },
+  { path: '/knowledge', label: 'nav.knowledge', icon: Connection, emoji: '🕸️' },
+  { path: '/skills', label: 'nav.skills', icon: MagicStick, emoji: '✨' },
+  { path: '/wiki', label: 'nav.wiki', icon: Document, emoji: '📖' },
+  { path: '/pro', label: 'nav.pro', icon: Promotion, emoji: '🚀' },
+  { path: '/settings', label: 'nav.settings', icon: Setting, emoji: '⚙️' },
 ]
 
 function isNavActive(path: string) {
@@ -276,6 +277,7 @@ function handleUserCommand(command: string) {
   text-decoration: none;
   transition: all 0.2s ease;
   white-space: nowrap;
+  position: relative;
 }
 .nav-item:hover {
   color: var(--cm-text);
@@ -286,6 +288,19 @@ function handleUserCommand(command: string) {
   background: rgba(var(--cm-primary-rgb), 0.1);
   font-weight: 600;
 }
+.nav-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 2px;
+  background: var(--cm-primary);
+  border-radius: 1px;
+}
+.nav-emoji { font-size: 14px; line-height: 1; }
+.nav-label { font-size: 13px; }
 
 .topbar-right {
   display: flex;
@@ -433,19 +448,21 @@ function handleUserCommand(command: string) {
     transform: translateX(0);
   }
 
-  .nav-item span {
-    display: none;
-  }
+  /* 小屏幕显示图标+emoji导航 */
   .topbar-nav {
     display: flex;
+  }
+  .nav-label {
+    display: none;
   }
   .topbar-nav .nav-item {
     padding: 8px;
   }
+  .nav-item.active::after { display: none; }
 }
 
 @media (max-width: 1024px) {
-  .nav-item span {
+  .nav-label {
     display: none;
   }
   .nav-item {

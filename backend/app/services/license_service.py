@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from app.models.license import License
-from app.config import settings
+from app.config import settings, APP_VERSION
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -245,7 +245,9 @@ class LicenseService:
             return {"valid": False, "message": f"Cannot reach license server: {e}"}
 
         if not data.get("valid"):
-            return {"valid": False, "message": data.get("message", "Invalid license")}
+            server_msg = data.get("message", "Invalid license")
+            logger.warning(f"License activation rejected by server: {server_msg}")
+            return {"valid": False, "message": server_msg}
 
         # RSA 签名验证 (Rust 引擎 或 C 引擎)
         if data.get("signed_data"):

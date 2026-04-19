@@ -1,7 +1,7 @@
 <template>
   <div class="wiki-page">
     <div class="page-header">
-      <h1>{{ $t('wiki.title') }}</h1>
+      <h1>📖 {{ $t('wiki.title') }}</h1>
       <div class="header-actions">
         <el-button type="primary" @click="openNewPage">
           <el-icon><Plus /></el-icon> {{ $t('wiki.addPage') }}
@@ -41,7 +41,7 @@
           <div class="sidebar-title">{{ $t('wiki.pinned') }}</div>
           <div class="category-list">
             <div class="category-item pinned" v-for="p in pinnedPages" :key="'pin'+p.id" @click="viewPage(p.id)">
-              ◆ {{ p.title }}
+              📌 {{ p.title }}
             </div>
             <div v-if="!pinnedPages.length" class="empty-hint-small">{{ $t('common.noData') }}</div>
           </div>
@@ -281,7 +281,7 @@ function formatTime(t: string) {
 <style scoped>
 .wiki-page { padding: 28px; max-width: 1400px; margin: 0 auto; }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.page-header h1 { font-size: 24px; font-weight: 700; color: #e6edf3; margin: 0; }
+.page-header h1 { font-size: 24px; font-weight: 700; color: var(--cm-text); margin: 0; }
 
 /* Layout */
 .wiki-layout { display: flex; gap: 20px; }
@@ -291,45 +291,45 @@ function formatTime(t: string) {
 /* Sidebar */
 .search-input { margin-bottom: 16px; }
 .sidebar-section { margin-bottom: 16px; }
-.sidebar-title { font-size: 11px; font-weight: 600; color: #484f58; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.sidebar-title { font-size: 11px; font-weight: 600; color: var(--cm-text-placeholder); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
 .category-list { display: flex; flex-direction: column; gap: 2px; }
-.category-item { padding: 6px 10px; border-radius: 6px; font-size: 13px; color: #7d8590; cursor: pointer; transition: all 0.15s; }
-.category-item:hover { background: rgba(16,185,129,0.08); color: #e6edf3; }
+.category-item { padding: 6px 10px; border-radius: 6px; font-size: 13px; color: var(--cm-text-muted); cursor: pointer; transition: all 0.15s; }
+.category-item:hover { background: rgba(16,185,129,0.08); color: var(--cm-text); }
 .category-item.active { background: rgba(16,185,129,0.15); color: #10B981; font-weight: 600; }
 .category-item.pinned { color: #10B981; }
-.empty-hint-small { font-size: 12px; color: #484f58; padding: 4px 10px; }
+.empty-hint-small { font-size: 12px; color: var(--cm-text-placeholder); padding: 4px 10px; }
 
 /* Page Grid */
 .page-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .page-card {
-  background: #161b22; border: 1px solid #21262d; border-radius: 12px; padding: 16px;
+  background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 16px;
   cursor: pointer; transition: all 0.2s;
 }
-.page-card:hover { border-color: rgba(16,185,129,0.4); transform: translateY(-2px); }
+.page-card:hover { border-color: rgba(16,185,129,0.4); transform: translateY(-2px); box-shadow: var(--cm-shadow); }
 .card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .category-tag { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: rgba(6,182,212,0.15); color: #06b6d4; }
 .pin-badge { font-size: 11px; color: #10B981; font-weight: 600; }
-.card-title { font-size: 16px; font-weight: 600; color: #e6edf3; margin-bottom: 6px; }
-.card-preview { font-size: 12px; color: #7d8590; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; }
+.card-title { font-size: 16px; font-weight: 600; color: var(--cm-text); margin-bottom: 6px; }
+.card-preview { font-size: 12px; color: var(--cm-text-muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; }
 .card-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
-.tag { padding: 1px 8px; background: #21262d; border-radius: 4px; font-size: 11px; color: #7d8590; }
-.card-meta { font-size: 11px; color: #484f58; }
+.tag { padding: 1px 8px; background: var(--cm-border); border-radius: 4px; font-size: 11px; color: var(--cm-text-muted); }
+.card-meta { font-size: 11px; color: var(--cm-text-placeholder); }
 
 /* Page View */
-.page-view { background: #161b22; border: 1px solid #21262d; border-radius: 12px; padding: 24px 32px; }
+.page-view { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 24px 32px; }
 .view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .back-btn { color: var(--cm-text-muted); }
 .view-actions { display: flex; gap: 4px; }
 .view-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.view-date { font-size: 12px; color: #484f58; }
-.view-title { font-size: 28px; font-weight: 700; color: #e6edf3; margin: 0 0 12px; }
+.view-date { font-size: 12px; color: var(--cm-text-placeholder); }
+.view-title { font-size: 28px; font-weight: 700; color: var(--cm-text); margin: 0 0 12px; }
 .view-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
 
 /* Markdown Body */
-.markdown-body { color: #c9d1d9; line-height: 1.7; font-size: 15px; }
-.markdown-body :deep(h1) { font-size: 24px; color: #e6edf3; border-bottom: 1px solid #21262d; padding-bottom: 8px; margin-top: 24px; }
-.markdown-body :deep(h2) { font-size: 20px; color: #e6edf3; border-bottom: 1px solid #21262d; padding-bottom: 6px; margin-top: 20px; }
-.markdown-body :deep(h3) { font-size: 16px; color: #e6edf3; margin-top: 16px; }
+.markdown-body { color: var(--cm-text-secondary); line-height: 1.7; font-size: 15px; }
+.markdown-body :deep(h1) { font-size: 24px; color: var(--cm-text); border-bottom: 1px solid var(--cm-border); padding-bottom: 8px; margin-top: 24px; }
+.markdown-body :deep(h2) { font-size: 20px; color: var(--cm-text); border-bottom: 1px solid var(--cm-border); padding-bottom: 6px; margin-top: 20px; }
+.markdown-body :deep(h3) { font-size: 16px; color: var(--cm-text); margin-top: 16px; }
 .markdown-body :deep(p) { margin: 8px 0; }
 .markdown-body :deep(code) { background: var(--cm-border); padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #10B981; }
 .markdown-body :deep(pre) { background: var(--cm-bg); border: 1px solid var(--cm-border); border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0; }
