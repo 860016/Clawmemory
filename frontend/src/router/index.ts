@@ -4,6 +4,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', name: 'login', component: () => import('../views/LoginView.vue') },
+    { path: '/reset-password', name: 'reset-password', component: () => import('../views/LoginView.vue') },
     {
       path: '/', component: () => import('../views/MainLayout.vue'),
       children: [
@@ -20,8 +21,8 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, _from, next) => {
-  // Always allow login page
-  if (to.name === 'login') {
+  // Always allow login and reset-password pages
+  if (to.name === 'login' || to.name === 'reset-password') {
     next()
     return
   }

@@ -6,4 +6,5 @@ export const authApi = {
   setPassword: (data: { password: string }) => axios.post('/auth/set-password', data),
   getMe: () => axios.get('/auth/me'),
   resetPassword: () => axios.post('/auth/reset-password'),
+  resetPasswordWithToken: (token: string) => axios.post('/auth/reset-password', { token }),
 }

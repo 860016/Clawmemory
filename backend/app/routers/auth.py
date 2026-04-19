@@ -42,6 +42,10 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+class ResetPasswordRequest(BaseModel):
+    token: str | None = None
+
+
 @router.get("/init-status")
 def init_status():
     """检查是否设置了访问密码"""
@@ -94,18 +98,46 @@ def change_password(req: ChangePasswordRequest, _=Depends(get_optional_user)):
 
 
 @router.post("/reset-password")
-def reset_password():
+def reset_password(req: ResetPasswordRequest | None = None):
     """Reset password by removing it from .env — for forgot password flow.
-    Only works when accessed from the server itself (no auth required).
+    Two ways to reset:
+    1. Via CLI-generated token file (no body required, legacy mode)
+    2. Via token string in request body (frontend forgot-password dialog)
     After reset, user must set a new password on next login.
-    
-    NOTE: This endpoint requires a valid reset token generated via CLI:
-      python -m app.utils.reset_password
     """
     env_path = settings.base_dir / ".env"
-    # Check for reset token file
+    # Check for reset token
     from pathlib import Path
     token_path = Path(settings.data_dir) / "reset_token.json"
+    
+    # Method 2: Token provided in request body
+    if req and req.token:
+        import json
+        from datetime import datetime, timezone
+        if not token_path.exists():
+            raise HTTPException(status_code=403, detail="No reset token found. Run 'python -m app.utils.reset_password' on the server to generate one.")
+        try:
+            token_data = json.loads(token_path.read_text())
+        except Exception:
+            raise HTTPException(status_code=403, detail="Invalid reset token file")
+        # Verify token matches
+        if token_data.get("token") != req.token:
+            raise HTTPException(status_code=403, detail="Reset token does not match. Please check and try again.")
+        # Check if token is expired
+        expires_at = datetime.fromisoformat(token_data.get("expires_at", ""))
+        if datetime.now(timezone.utc) > expires_at:
+            token_path.unlink(missing_ok=True)
+            raise HTTPException(status_code=403, detail="Reset token has expired. Generate a new one.")
+        # Token is valid — reset password
+        if env_path.exists():
+            lines = env_path.read_text().splitlines()
+            new_lines = [line for line in lines if not line.startswith("CLAWMEMORY_ACCESS_PASSWORD=")]
+            env_path.write_text("\n".join(new_lines) + "\n")
+        settings.access_password = ""
+        token_path.unlink(missing_ok=True)
+        return {"message": "Password reset successful. Please set a new password."}
+    
+    # Method 1: Legacy — token file exists (no token in body)
     if not token_path.exists():
         raise HTTPException(status_code=403, detail="No reset token found. Run 'python -m app.utils.reset_password' on the server to generate one.")
     

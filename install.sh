@@ -33,7 +33,7 @@ for arg in "$@"; do
 done
 
 echo "============================================"
-echo "  ClawMemory 安装程序 v2.5.0"
+echo "  ClawMemory 安装程序 v2.8.0"
 echo "============================================"
 echo "安装目录: $INSTALL_DIR"
 echo "后端端口: $BACKEND_PORT"

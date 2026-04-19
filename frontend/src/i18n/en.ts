@@ -50,6 +50,15 @@ export default {
     passwordReset: 'Password has been reset',
     resetSuccess: 'Password has been reset. Please set a new password.',
     resetFailed: 'Failed to reset password',
+    forgotStep1Title: 'Step 1: Generate a reset token on the server',
+    forgotStep1Desc: 'Run the following command on the server terminal where ClawMemory is installed:',
+    copy: 'Copy',
+    copied: 'Copied',
+    or: 'or',
+    forgotStep2Title: 'Step 2: Enter the reset token',
+    forgotStep2Desc: 'Paste the token shown in the terminal below, then click "Reset Password" to clear the current password:',
+    resetTokenPlaceholder: 'Paste reset token...',
+    resetTokenRequired: 'Please enter the reset token',
   },
   dashboard: {
     title: 'Dashboard',
@@ -143,6 +152,7 @@ export default {
     confirmImport: 'Confirm Import',
     importDone: 'Import done: {imported} imported, {skipped} skipped, {errors} errors',
     importFailed: 'Import failed',
+    importing: 'Importing memories, please wait...',
   },
   knowledge: {
     title: 'Knowledge Graph',

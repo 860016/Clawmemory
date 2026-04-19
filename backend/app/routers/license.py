@@ -82,7 +82,9 @@ async def activate_license(req: LicenseActivateRequest, _=Depends(get_current_us
     svc = LicenseService(db)
     result = await svc.activate(req.license_key)
     if result.get("valid"):
-        return _build_license_info(db)
+        info = _build_license_info(db)
+        info["valid"] = True
+        return info
     return result
 
 

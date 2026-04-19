@@ -151,7 +151,7 @@ const newPassword = ref('')
 const settingPassword = ref(false)
 const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
-const appVersion = ref('2.5.0')
+const appVersion = ref('2.8.0')
 
 const featureLabels: Record<string, string> = {
   ai_extract: t('settings.featAiExtract'),
@@ -219,10 +219,21 @@ async function activateLicense() {
   activating.value = true
   try {
     const { data } = await axios.post('/license/activate', { license_key: licenseKey.value })
-    if (data.valid || data.active) { ElMessage.success(t('settings.activated')); await loadLicense() }
-    else ElMessage.error(data.message || t('common.failed'))
-  } catch (e: any) { ElMessage.error(e.response?.data?.detail || t('common.failed')) }
-  finally { activating.value = false }
+    if (data.valid || data.active) {
+      ElMessage.success(t('settings.activated'))
+      licenseKey.value = ''
+      await loadLicense()
+    } else {
+      ElMessage.error(data.message || t('common.failed'))
+    }
+  } catch (e: any) {
+    const detail = e.response?.data?.detail
+    if (typeof detail === 'string') {
+      ElMessage.error(detail)
+    } else {
+      ElMessage.error(t('common.failed'))
+    }
+  } finally { activating.value = false }
 }
 
 async function deactivateLicense() {
@@ -258,8 +269,20 @@ async function createBackup() {
 
 async function uploadBackup(file: File) {
   const formData = new FormData(); formData.append('file', file)
-  try { await axios.post('/backups/upload', formData); ElMessage.success(t('settings.backupRestored')) }
-  catch { ElMessage.error(t('settings.restoreFailed')) }
+  backingUp.value = true
+  try {
+    const { data } = await axios.post('/backups/upload', formData)
+    // Upload returns the backup record — now restore it
+    if (data && data.id) {
+      await axios.post(`/backups/${data.id}/restore`)
+    }
+    ElMessage.success(t('settings.backupRestored'))
+    await loadLicense() // refresh data
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || t('settings.restoreFailed'))
+  } finally {
+    backingUp.value = false
+  }
   return false
 }
 </script>

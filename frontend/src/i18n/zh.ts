@@ -50,6 +50,15 @@ export default {
     passwordReset: '密码已重置',
     resetSuccess: '密码已重置，请设置新密码',
     resetFailed: '重置密码失败',
+    forgotStep1Title: '第 1 步：在服务器上生成重置令牌',
+    forgotStep1Desc: '在 ClawMemory 所在的服务器终端运行以下命令，生成一次性重置令牌：',
+    copy: '复制',
+    copied: '已复制',
+    or: '或',
+    forgotStep2Title: '第 2 步：输入重置令牌',
+    forgotStep2Desc: '将终端显示的令牌粘贴到下方，点击"重置密码"即可清除当前密码：',
+    resetTokenPlaceholder: '粘贴重置令牌...',
+    resetTokenRequired: '请输入重置令牌',
   },
   dashboard: {
     title: '仪表盘',
@@ -143,6 +152,7 @@ export default {
     confirmImport: '确认导入',
     importDone: '导入完成：{imported} 条导入，{skipped} 条跳过，{errors} 条错误',
     importFailed: '导入失败',
+    importing: '正在导入记忆，请稍候...',
   },
   knowledge: {
     title: '知识图谱',

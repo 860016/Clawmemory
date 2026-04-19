@@ -138,7 +138,12 @@
       </div>
 
       <!-- Preview panel -->
-      <div v-if="previewData" style="margin-top: 16px">
+      <!-- Import loading overlay -->
+      <div v-if="importing" class="import-loading">
+        <el-icon class="loading-spin" :size="32" color="#10B981"><Loading /></el-icon>
+        <p style="margin-top: 12px; color: var(--cm-text-muted); font-size: 14px">{{ $t('memories.importing') }}</p>
+      </div>
+      <div v-else-if="previewData" style="margin-top: 16px">
         <el-divider content-position="left">{{ previewData.agent_name }} — {{ $t('memories.totalCount', { count: previewData.total }) }}</el-divider>
         <div style="max-height: 300px; overflow-y: auto">
           <div v-for="(mem, idx) in previewData.preview" :key="idx"
@@ -162,7 +167,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Upload } from '@element-plus/icons-vue'
+import { Plus, Search, Upload, Loading } from '@element-plus/icons-vue'
 import axios from '../api/client'
 
 const { t } = useI18n()
@@ -184,6 +189,7 @@ const scanning = ref(false)
 const scanResult = ref<any>(null)
 const scanError = ref('')
 const previewData = ref<any>(null)
+const importing = ref(false)
 
 const form = ref({ layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '' })
 
@@ -312,6 +318,7 @@ async function handleImport(agentName: string) {
     )
   } catch { return }
 
+  importing.value = true
   try {
     const { data } = await axios.post('/openclaw-memories/import', {
       agent_name: agentName,
@@ -324,6 +331,8 @@ async function handleImport(agentName: string) {
     await loadMemories()
   } catch {
     ElMessage.error(t('memories.importFailed'))
+  } finally {
+    importing.value = false
   }
 }
 </script>
@@ -359,5 +368,8 @@ async function handleImport(agentName: string) {
 .card-meta { font-size: 11px; color: var(--cm-text-placeholder); }
 .card-actions { display: flex; gap: 4px; }
 .pagination { display: flex; justify-content: center; margin-top: 20px; }
+.import-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 0; }
+.loading-spin { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @media (max-width: 768px) { .search-input { width: 100%; } .memory-list, .search-results { grid-template-columns: 1fr; } .header-actions { width: 100%; justify-content: flex-end; } }
 </style>
