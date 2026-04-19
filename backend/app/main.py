@@ -341,6 +341,14 @@ async def get_dashboard_stats():
         except Exception:
             pass
 
+        # 关系数
+        relation_count = 0
+        try:
+            from app.models.knowledge import Relation
+            relation_count = db.query(Relation).count()
+        except Exception:
+            pass
+
         # Wiki 页面数
         wiki_count = 0
         try:
@@ -375,12 +383,118 @@ async def get_dashboard_stats():
         return {
             "memoryCount": total,
             "entityCount": entity_count,
+            "relationCount": relation_count,
             "wikiCount": wiki_count,
             "layerStats": layer_stats,
             "recentMemories": recent_list,
             "license": license_info,
             "passwordSet": bool(settings.access_password),
             "version": APP_VERSION,
+        }
+    finally:
+        db.close()
+
+
+@app.get("/api/v1/stats/usage")
+async def get_usage_stats(days: int = 30):
+    """详细使用统计 — 趋势图、来源分布、重要度分布、Token 估算、访问排行"""
+    from app.database import SessionLocal
+    from app.models.memory import Memory
+    from sqlalchemy import func as sa_func
+    from datetime import datetime, timedelta
+
+    db = SessionLocal()
+    try:
+        now = datetime.utcnow()
+        start_date = now - timedelta(days=days)
+
+        # 1. 每日新增趋势
+        daily_trend = []
+        for i in range(days):
+            day = start_date + timedelta(days=i)
+            day_end = day + timedelta(days=1)
+            count = db.query(Memory).filter(
+                Memory.created_at >= day,
+                Memory.created_at < day_end,
+            ).count()
+            daily_trend.append({"date": day.strftime("%Y-%m-%d"), "count": count})
+
+        # 2. 来源分布
+        source_dist = {}
+        for m in db.query(Memory.source, sa_func.count(Memory.id)).group_by(Memory.source).all():
+            source_dist[m[0] or "manual"] = m[1]
+
+        # 3. 重要度分布
+        importance_buckets = {"high": 0, "medium": 0, "low": 0}
+        for m in db.query(Memory.importance).all():
+            imp = m[0] or 0.5
+            if imp >= 0.7:
+                importance_buckets["high"] += 1
+            elif imp >= 0.3:
+                importance_buckets["medium"] += 1
+            else:
+                importance_buckets["low"] += 1
+
+        # 4. Token 估算（按层级）
+        memories = db.query(Memory).all()
+        layer_tokens = {}
+        total_tokens = 0
+        for m in memories:
+            tokens = len((m.key + " " + m.value).split())
+            layer_tokens.setdefault(m.layer, 0)
+            layer_tokens[m.layer] += tokens
+            total_tokens += tokens
+
+        # 5. 访问排行 Top 10
+        top_accessed = db.query(Memory).filter(
+            Memory.access_count > 0,
+        ).order_by(Memory.access_count.desc()).limit(10).all()
+        top_accessed_list = [
+            {"id": m.id, "key": m.key, "access_count": m.access_count, "layer": m.layer}
+            for m in top_accessed
+        ]
+
+        # 6. 记忆总 Token 按日累积趋势
+        daily_token_trend = []
+        cumulative = 0
+        for day_data in daily_trend:
+            day = datetime.strptime(day_data["date"], "%Y-%m-%d")
+            day_end = day + timedelta(days=1)
+            day_memories = db.query(Memory).filter(
+                Memory.created_at >= day,
+                Memory.created_at < day_end,
+            ).all()
+            day_tokens = sum(len((m.key + " " + m.value).split()) for m in day_memories)
+            cumulative += day_tokens
+            daily_token_trend.append({"date": day_data["date"], "tokens": day_tokens, "cumulative": cumulative})
+
+        # 7. 操作计数（按来源和类型统计次数）
+        operation_counts = {}
+        operation_counts["manual"] = db.query(Memory).filter(Memory.source == "manual").count()
+        operation_counts["import"] = db.query(Memory).filter(Memory.source == "import").count()
+        operation_counts["auto"] = db.query(Memory).filter(Memory.source == "auto").count()
+
+        # 8. 实体类型分布
+        entity_type_dist = {}
+        try:
+            from app.models.knowledge import Entity
+            for row in db.query(Entity.entity_type, sa_func.count(Entity.id)).group_by(Entity.entity_type).all():
+                entity_type_dist[row[0] or "other"] = row[1]
+        except Exception:
+            pass
+
+        return {
+            "dailyTrend": daily_trend,
+            "dailyTokenTrend": daily_token_trend,
+            "sourceDistribution": source_dist,
+            "importanceDistribution": importance_buckets,
+            "tokenByLayer": layer_tokens,
+            "totalEstimatedTokens": total_tokens,
+            "topAccessed": top_accessed_list,
+            "operationCounts": operation_counts,
+            "entityTypeDistribution": entity_type_dist,
+            "totalMemories": len(memories),
+            "days": days,
         }
     finally:
         db.close()
