@@ -112,7 +112,6 @@ const navItems = [
   { path: '/', label: 'nav.dashboard', icon: HomeFilled, emoji: '📊' },
   { path: '/memories', label: 'nav.memories', icon: Collection, emoji: '🧠' },
   { path: '/knowledge', label: 'nav.knowledge', icon: Connection, emoji: '🕸️' },
-  { path: '/skills', label: 'nav.skills', icon: MagicStick, emoji: '✨' },
   { path: '/wiki', label: 'nav.wiki', icon: Document, emoji: '📖' },
   { path: '/pro', label: 'nav.pro', icon: Promotion, emoji: '🚀' },
   { path: '/settings', label: 'nav.settings', icon: Setting, emoji: '⚙️' },
@@ -137,13 +136,13 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
     { items: [
       { path: '/', label: 'nav.overview', icon: HomeFilled },
       { path: '/?tab=stats', label: 'nav.stats', icon: DataAnalysis },
+      { path: '/?tab=skills', label: 'nav.skills', icon: MagicStick },
     ]}
   ],
   '/memories': [
     { items: [
       { path: '/memories', label: 'memories.all', icon: Collection },
       { path: '/memories?import=openclaw', label: 'memories.importOpenClaw', icon: Upload },
-      { path: '/memories?tab=skills', label: 'nav.skills', icon: MagicStick },
     ]}
   ],
   '/knowledge': [
@@ -151,11 +150,6 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
       { path: '/knowledge?tab=entities', label: 'knowledge.entities', icon: Grid },
       { path: '/knowledge?tab=relations', label: 'knowledge.relations', icon: Share },
       { path: '/knowledge?tab=graph', label: 'knowledge.graphView', icon: Connection },
-    ]}
-  ],
-  '/skills': [
-    { items: [
-      { path: '/skills', label: 'skills.title', icon: MagicStick },
     ]}
   ],
   '/wiki': [

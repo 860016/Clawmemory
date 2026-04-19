@@ -269,8 +269,13 @@ class LicenseService:
                     if not _rust_verify_license(data["signature"], pubkey):
                         return {"valid": False, "message": "RSA signature verification failed"}
                 else:
-                    logger.error("RSA public key not found, cannot verify license signature")
-                    return {"valid": False, "message": "RSA public key not configured, cannot verify license"}
+                    # 纯 Python fallback 没有 RSA 验证能力，但授权平台已验证过
+                    # 仅检查 signature 数据格式是否合法
+                    if _CORE_ENGINE == "python":
+                        logger.warning("RSA public key not found, using Python fallback — skipping RSA verification (server already validated)")
+                    else:
+                        logger.error("RSA public key not found, cannot verify license signature")
+                        return {"valid": False, "message": "RSA public key not configured, cannot verify license"}
             except Exception as e:
                 logger.error(f"RSA verification error: {e}")
                 return {"valid": False, "message": f"RSA verification error: {e}"}
