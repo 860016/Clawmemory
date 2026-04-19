@@ -22,20 +22,36 @@ def write_version(ver: str):
     print(f"[OK] VERSION -> {ver}")
 
 
-def sync_pyproject(ver: str):
-    path = ROOT / "backend" / "pyproject.toml"
+def _sync_file(path: Path, pattern: str, replacement: str, label: str):
+    """Generic file sync: replace pattern with replacement, report result."""
+    if not path.exists():
+        print(f"[SKIP] {label} not found")
+        return
     content = path.read_text(encoding=ENC)
-    content = re.sub(r'version\s*=\s*"[^"]*"', f'version = "{ver}"', content, count=1)
-    path.write_text(content, encoding=ENC)
-    print(f"[OK] backend/pyproject.toml -> {ver}")
+    new_content = re.sub(pattern, replacement, content, count=1)
+    if new_content == content:
+        print(f"[SKIP] {label} — version already up to date or pattern not found")
+        return
+    path.write_text(new_content, encoding=ENC)
+    print(f"[OK] {label}")
+
+
+def sync_pyproject(ver: str):
+    _sync_file(
+        ROOT / "backend" / "pyproject.toml",
+        r'version\s*=\s*"[^"]*"',
+        f'version = "{ver}"',
+        f"backend/pyproject.toml -> {ver}",
+    )
 
 
 def sync_package_json(ver: str):
-    path = ROOT / "frontend" / "package.json"
-    content = path.read_text(encoding=ENC)
-    content = re.sub(r'"version"\s*:\s*"[^"]*"', f'"version": "{ver}"', content, count=1)
-    path.write_text(content, encoding=ENC)
-    print(f"[OK] frontend/package.json -> {ver}")
+    _sync_file(
+        ROOT / "frontend" / "package.json",
+        r'"version"\s*:\s*"[^"]*"',
+        f'"version": "{ver}"',
+        f"frontend/package.json -> {ver}",
+    )
 
 
 def sync_package_lock(ver: str):
@@ -44,23 +60,55 @@ def sync_package_lock(ver: str):
         print("[SKIP] frontend/package-lock.json not found")
         return
     content = path.read_text(encoding=ENC)
-    # Update the top-level version
-    content = re.sub(r'"version"\s*:\s*"\d+\.\d+\.\d+[^"]*"',
-                     f'"version": "{ver}"', content, count=1)
-    path.write_text(content, encoding=ENC)
-    print(f"[OK] frontend/package-lock.json -> {ver}")
+    new_content = content
+
+    # 1. Replace top-level "version": "X.Y.Z" (right after "name": "clawmemory")
+    new_content = re.sub(
+        r'("name":\s*"clawmemory",\s*\n\s*"version":\s*)"\d+\.\d+\.\d+[^"]*"',
+        rf'\1"{ver}"',
+        new_content, count=1
+    )
+
+    # 2. Replace packages."".version — the root package entry
+    #    Pattern: "": { "name": "clawmemory", ... "version": "X.Y.Z"
+    new_content = re.sub(
+        r'("":\s*\{\s*\n\s*"name":\s*"clawmemory",\s*\n\s*"version":\s*)"\d+\.\d+\.\d+[^"]*"',
+        rf'\1"{ver}"',
+        new_content, count=1
+    )
+
+    if new_content != content:
+        path.write_text(new_content, encoding=ENC)
+        print(f"[OK] frontend/package-lock.json -> {ver}")
+    else:
+        print(f"[SKIP] frontend/package-lock.json — already up to date")
 
 
 def sync_settings_view(ver: str):
-    path = ROOT / "frontend" / "src" / "views" / "SettingsView.vue"
-    if not path.exists():
-        print("[SKIP] frontend/src/views/SettingsView.vue not found")
-        return
-    content = path.read_text(encoding=ENC)
-    content = re.sub(r"appVersion\s*=\s*ref\(['\"][^'\"]*['\"]\)",
-                     f"appVersion = ref('{ver}')", content)
-    path.write_text(content, encoding=ENC)
-    print(f"[OK] frontend/src/views/SettingsView.vue -> {ver}")
+    _sync_file(
+        ROOT / "frontend" / "src" / "views" / "SettingsView.vue",
+        r"appVersion\s*=\s*ref\(['\"][^'\"]*['\"]\)",
+        f"appVersion = ref('{ver}')",
+        f"frontend/src/views/SettingsView.vue -> {ver}",
+    )
+
+
+def sync_install_sh(ver: str):
+    _sync_file(
+        ROOT / "install.sh",
+        r"v\d+\.\d+\.\d+",
+        f"v{ver}",
+        f"install.sh -> v{ver}",
+    )
+
+
+def sync_install_ps1(ver: str):
+    _sync_file(
+        ROOT / "install.ps1",
+        r"v\d+\.\d+\.\d+",
+        f"v{ver}",
+        f"install.ps1 -> v{ver}",
+    )
 
 
 def main():
@@ -81,6 +129,8 @@ def main():
     sync_package_json(ver)
     sync_package_lock(ver)
     sync_settings_view(ver)
+    sync_install_sh(ver)
+    sync_install_ps1(ver)
 
     print(f"\n[DONE] All components synced to v{ver}")
     print("\nAuto-read from VERSION (no sync needed):")
