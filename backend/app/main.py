@@ -280,7 +280,12 @@ async def install_status():
     core_engine = get_core_engine()
 
     # 安全等级评估
-    security_level = "high" if core_engine == "rust" else "low"
+    if core_engine == "rust":
+        security_level = "high"
+    elif core_engine == "c":
+        security_level = "high"
+    else:
+        security_level = "low"
 
     return {
         "plugin": "ClawMemory",
@@ -301,6 +306,7 @@ async def install_status():
                 "level": security_level,
                 "description": {
                     "rust": "Rust (PyO3) — 最高安全，RSA 硬验证",
+                    "c": "C/CPython + OpenSSL — 高安全，RSA 硬验证",
                     "python": "纯 Python — 低安全，仅 OSS 免费版",
                 }.get(core_engine, "unknown"),
             },
@@ -382,7 +388,7 @@ async def get_dashboard_stats():
 def _get_next_steps(is_licensed: bool, frontend_ready: bool, pubkey_ok: bool, core_engine: str) -> list:
     steps = []
     if core_engine == "python":
-        steps.append("⚠️ 安全引擎为纯 Python 模式，授权保护较弱。建议安装 Rust 编译环境")
+        steps.append("⚠️ 安全引擎为纯 Python 模式，授权保护较弱。建议安装 clawmemory-core (C/Rust 编译版)")
     if not pubkey_ok:
         steps.append("⚠️ RSA 公钥缺失，无法验证授权签名。请确保授权服务器可访问或手动放置 backend/keys/public.pem")
     if not is_licensed:

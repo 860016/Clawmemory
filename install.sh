@@ -207,11 +207,11 @@ else
 fi
 
 WHEEL_URL="https://github.com/860016/Clawmemory/releases/latest/download/${WHEEL_PATTERN}"
-echo "  尝试下载 Rust 安全引擎: ${WHEEL_PATTERN}"
+echo "  尝试下载安全引擎: ${WHEEL_PATTERN}"
 if curl -sfL "$WHEEL_URL" -o /tmp/clawmemory_core.whl 2>/dev/null; then
     if pip install /tmp/clawmemory_core.whl -q 2>/dev/null; then
-        echo "  ✅ Rust 安全引擎已安装 (预编译wheel)"
-        CORE_ENGINE="rust"
+        echo "  ✅ 安全引擎已安装 (预编译wheel)"
+        CORE_ENGINE="c"
     else
         echo "  ⚠️  wheel 下载成功但安装失败（架构/版本不匹配）"
     fi
@@ -220,8 +220,34 @@ else
     echo "  ⚠️  未找到匹配的预编译 wheel"
 fi
 
-# 方案2: 本地编译 Rust (需要 rustc，仅开发者使用)
-if [ "$CORE_ENGINE" = "python" ] && [ -d "$INSTALL_DIR/backend/clawmemory_core/src" ] && command -v rustc &>/dev/null; then
+# 方案2: 本地编译 C 扩展 (需要 gcc + libssl-dev)
+if [ "$CORE_ENGINE" = "python" ] && [ -f "$INSTALL_DIR/backend/clawmemory_core/setup.py" ]; then
+    echo "  尝试本地编译 C 安全引擎..."
+    # 安装 OpenSSL 开发库
+    if command -v apt-get &>/dev/null; then
+        apt-get install -y libssl-dev 2>/dev/null || true
+    elif command -v yum &>/dev/null; then
+        yum install -y openssl-devel 2>/dev/null || true
+    elif command -v apk &>/dev/null; then
+        apk add openssl-dev 2>/dev/null || true
+    elif command -v brew &>/dev/null; then
+        brew install openssl 2>/dev/null || true
+    fi
+    cd "$INSTALL_DIR/backend/clawmemory_core"
+    if python3 setup.py build_ext --inplace 2>&1; then
+        if python3 -c "import clawmemory_core" 2>/dev/null; then
+            echo "  ✅ C 安全引擎已编译安装 (OpenSSL RSA 验证)"
+            CORE_ENGINE="c"
+        else
+            echo "  ⚠️  C 编译完成但导入失败"
+        fi
+    else
+        echo "  ⚠️  C 编译失败（可能缺少编译器或 OpenSSL 开发库）"
+    fi
+fi
+
+# 方案3: 本地编译 Rust (备选，需要 rustc + maturin)
+if [ "$CORE_ENGINE" = "python" ] && [ -d "$INSTALL_DIR/backend/clawmemory_core/src" ] && [ -f "$INSTALL_DIR/backend/clawmemory_core/Cargo.toml" ] && command -v rustc &>/dev/null; then
     echo "  尝试本地编译 Rust 引擎..."
     if command -v maturin &>/dev/null || pip install maturin -q 2>/dev/null; then
         cd "$INSTALL_DIR/backend/clawmemory_core"
@@ -234,28 +260,9 @@ if [ "$CORE_ENGINE" = "python" ] && [ -d "$INSTALL_DIR/backend/clawmemory_core/s
     fi
 fi
 
-# 方案3: Cython 编译 (.pyx → .so，需要 C 编译器)
-if [ "$CORE_ENGINE" = "python" ] && [ -f "$INSTALL_DIR/backend/setup_cython.py" ] && command -v gcc &>/dev/null; then
-    echo "  尝试 Cython 编译安全引擎..."
-    if pip install cython -q 2>/dev/null; then
-        cd "$INSTALL_DIR/backend"
-        if python3 setup_cython.py build_ext --inplace 2>&1; then
-            # 验证是否生成了 .so 文件
-            if find app/core -name "*.so" -o -name "*.pyd" 2>/dev/null | head -1 | grep -q .; then
-                echo "  ✅ Cython 安全引擎已编译 (中等安全)"
-                CORE_ENGINE="cython"
-            else
-                echo "  ⚠️  Cython 编译完成但未生成 .so 文件"
-            fi
-        else
-            echo "  ⚠️  Cython 编译失败"
-        fi
-    fi
-fi
-
 if [ "$CORE_ENGINE" = "python" ]; then
     echo "  ⚠️  使用纯 Python 模式（安全性较低）"
-    echo "  ⚠️  建议安装 clawmemory-core Rust wheel 以获得 RSA 硬验证保护"
+    echo "  ⚠️  建议安装 clawmemory-core (C/Rust 编译版) 以获得 RSA 硬验证保护"
 fi
 
 # 配置环境变量

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # ========== 加载核心模块：Rust (预编译 wheel) → 纯 Python 兜底 ==========
 _CORE_ENGINE = "none"
 
-# 1. 尝试 Rust (PyO3) — 唯一正式安全引擎
+# 1. 尝试 Rust (PyO3) — 最高安全
 try:
     from clawmemory_core import (
         check_feature, set_license, get_tier, reset as _reset,
@@ -26,9 +26,15 @@ try:
         # Pro: token router
         estimate_complexity, route_model, get_routing_stats,
     )
-    _CORE_ENGINE = "rust"
-    USING_RUST = True
-    logger.info("Core engine: Rust (PyO3) — maximum security")
+    _build = get_build_info()
+    if "c-cpython" in _build:
+        _CORE_ENGINE = "c"
+        USING_RUST = False
+        logger.info("Core engine: C/CPython — high security, OpenSSL RSA verification")
+    else:
+        _CORE_ENGINE = "rust"
+        USING_RUST = True
+        logger.info("Core engine: Rust (PyO3) — maximum security")
 except ImportError:
     USING_RUST = False
 
