@@ -238,7 +238,7 @@ class LicenseService:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.post(
                     f"{settings.license_server_url}/api/v1/activate",
-                    json={"license_key": license_key, "fingerprint": self._get_fingerprint(), "version": "2.4.0"},
+                    json={"license_key": license_key, "fingerprint": self._get_fingerprint(), "version": APP_VERSION},
                 )
                 data = resp.json()
         except Exception as e:
@@ -250,11 +250,12 @@ class LicenseService:
             return {"valid": False, "message": server_msg}
 
         # RSA 签名验证 (Rust 引擎 或 C 引擎)
-        if data.get("signed_data"):
+        # 授权平台返回 signature 字段（base64 编码的 {data, signature} JSON）
+        if data.get("signature"):
             try:
                 pubkey = self._load_public_key()
                 if pubkey:
-                    if not _rust_verify_license(data["signed_data"], pubkey):
+                    if not _rust_verify_license(data["signature"], pubkey):
                         return {"valid": False, "message": "RSA signature verification failed"}
             except Exception as e:
                 logger.warning(f"RSA verification error: {e}")
