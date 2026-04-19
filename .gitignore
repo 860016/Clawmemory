@@ -30,7 +30,6 @@ license-platform-v2/
 clawmemory-core-repo/
 
 # Build artifacts
-backend/frontend_dist/
 backend/clawmemory_core/.cargo/
 *.zip
 scripts/
