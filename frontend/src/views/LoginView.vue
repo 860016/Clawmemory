@@ -73,7 +73,7 @@ const resetMessage = ref('')
 
 onMounted(async () => {
   try {
-    const { data } = await axios.get('/api/v1/auth/init-status')
+    const { data } = await axios.get('/auth/init-status')
     passwordSet.value = data.password_set
   } catch {
     passwordSet.value = false
@@ -84,7 +84,7 @@ async function handleLogin() {
   if (!password.value) return
   loading.value = true
   try {
-    const { data } = await axios.post('/api/v1/auth/login', { password: password.value })
+    const { data } = await axios.post('/auth/login', { password: password.value })
     localStorage.setItem('token', data.access_token)
     router.push('/')
   } catch (e: any) {

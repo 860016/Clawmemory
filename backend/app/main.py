@@ -224,7 +224,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="ClawMemory",
-    version="2.2.0",
+    version="2.3.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     lifespan=lifespan,
@@ -257,7 +257,7 @@ app.include_router(openclaw_skills.router)
 
 @app.get("/api/v1/health")
 async def health_check():
-    return {"status": "ok", "version": "2.2.0"}
+    return {"status": "ok", "version": "2.3.0"}
 
 
 @app.get("/api/v1/install-status")
