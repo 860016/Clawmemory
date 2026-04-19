@@ -80,14 +80,34 @@ except ImportError:
         return _license_hash == expected
 
     def _rust_verify_license(license_data_b64: str, public_key_pem: str) -> bool:
-        """纯 Python fallback: 解码 base64 验证签名格式，但无法做 RSA 验证。
-        仅检查数据格式是否合法（有 data 和 signature 字段）。
-        真正的 RSA 验证需要安装 clawmemory_core C 编译版。"""
+        """纯 Python fallback: 用 cryptography 库做真正的 RSA-SHA256 签名验证。
+        安全性与 C 引擎版本等价（依赖 cryptography 的 OpenSSL 后端）。"""
         try:
+            from cryptography.hazmat.primitives import hashes, serialization
+            from cryptography.hazmat.primitives.asymmetric import padding
+            from cryptography.exceptions import InvalidSignature
+
             raw = base64.b64decode(license_data_b64)
             payload = json.loads(raw)
-            return bool(payload.get("data") and payload.get("signature"))
-        except Exception:
+            data_str = payload.get("data", "")
+            signature_b64 = payload.get("signature", "")
+            if not data_str or not signature_b64:
+                return False
+
+            signature = base64.b64decode(signature_b64)
+            public_key = serialization.load_pem_public_key(public_key_pem.encode())
+            public_key.verify(
+                signature,
+                data_str.encode(),
+                padding.PKCS1v15(),
+                hashes.SHA256(),
+            )
+            return True
+        except InvalidSignature:
+            logger.warning("Python RSA fallback: signature verification FAILED")
+            return False
+        except Exception as e:
+            logger.error(f"Python RSA fallback verification error: {e}")
             return False
 
     # --- Memory Decay (Python fallback) ---
@@ -260,22 +280,16 @@ class LicenseService:
             logger.warning(f"License activation rejected by server: {server_msg}")
             return {"valid": False, "message": server_msg}
 
-        # RSA 签名验证 (C 引擎 或纯 Python 兜底)
+        # RSA 签名验证 — 必须通过，任何模式都不能跳过
         # 授权平台返回 signature 字段（base64 编码的 {data, signature} JSON）
         if data.get("signature"):
             try:
                 pubkey = self._load_public_key()
-                if pubkey:
-                    if not _rust_verify_license(data["signature"], pubkey):
-                        return {"valid": False, "message": "RSA signature verification failed"}
-                else:
-                    # 纯 Python fallback 没有 RSA 验证能力，但授权平台已验证过
-                    # 仅检查 signature 数据格式是否合法
-                    if _CORE_ENGINE == "python":
-                        logger.warning("RSA public key not found, using Python fallback — skipping RSA verification (server already validated)")
-                    else:
-                        logger.error("RSA public key not found, cannot verify license signature")
-                        return {"valid": False, "message": "RSA public key not configured, cannot verify license"}
+                if not pubkey:
+                    logger.error("RSA public key not available (local file missing and server fetch failed)")
+                    return {"valid": False, "message": "RSA public key not available, cannot verify license signature. Please check network connection."}
+                if not _rust_verify_license(data["signature"], pubkey):
+                    return {"valid": False, "message": "RSA signature verification failed — license may be forged"}
             except Exception as e:
                 logger.error(f"RSA verification error: {e}")
                 return {"valid": False, "message": f"RSA verification error: {e}"}
@@ -341,9 +355,39 @@ class LicenseService:
         return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
     def _load_public_key(self) -> str | None:
+        """加载 RSA 公钥。本地有文件则读取，否则从授权服务器获取并缓存。"""
         path = settings.rsa_public_key_path
         if path.exists():
-            return path.read_text()
+            content = path.read_text().strip()
+            if content.startswith("-----BEGIN PUBLIC KEY-----"):
+                return content
+
+        # 本地没有 → 从授权服务器获取
+        try:
+            import httpx as _httpx
+            resp = _httpx.get(f"{settings.license_server_url}/api/v1/public-key", timeout=10)
+            if resp.status_code == 200:
+                pubkey = resp.text.strip()
+                if pubkey.startswith("-----BEGIN PUBLIC KEY-----"):
+                    # 缓存到本地
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(pubkey)
+                    logger.info("RSA public key fetched from license server and cached locally")
+                    return pubkey
+                # 也许返回的是 JSON 格式
+                try:
+                    data = resp.json()
+                    pk = data.get("public_key", "")
+                    if pk and pk.startswith("-----BEGIN PUBLIC KEY-----"):
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        path.write_text(pk)
+                        logger.info("RSA public key fetched from license server (JSON) and cached locally")
+                        return pk
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.warning(f"Failed to fetch public key from server: {e}")
+
         return None
 
 
