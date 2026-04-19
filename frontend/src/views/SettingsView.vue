@@ -169,7 +169,7 @@ const newPassword = ref('')
 const settingPassword = ref(false)
 const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
-const appVersion = ref('2.8.1')
+const appVersion = ref('2.8.2')
 const backups = ref<any[]>([])
 
 const featureLabels: Record<string, string> = {
