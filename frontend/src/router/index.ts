@@ -10,6 +10,7 @@ const router = createRouter({
         { path: '', name: 'dashboard', component: () => import('../views/DashboardView.vue') },
         { path: 'memories', name: 'memories', component: () => import('../views/MemoriesView.vue') },
         { path: 'knowledge', name: 'knowledge', component: () => import('../views/KnowledgeView.vue') },
+        { path: 'skills', name: 'skills', component: () => import('../views/SkillsView.vue') },
         { path: 'wiki', name: 'wiki', component: () => import('../views/WikiView.vue') },
         { path: 'pro', name: 'pro', component: () => import('../views/ProView.vue') },
         { path: 'settings', name: 'settings', component: () => import('../views/SettingsView.vue') },

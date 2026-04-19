@@ -111,6 +111,7 @@ const navItems = [
   { path: '/', label: 'nav.dashboard', icon: HomeFilled },
   { path: '/memories', label: 'nav.memories', icon: Collection },
   { path: '/knowledge', label: 'nav.knowledge', icon: Connection },
+  { path: '/skills', label: 'nav.skills', icon: MagicStick },
   { path: '/wiki', label: 'nav.wiki', icon: Document },
   { path: '/pro', label: 'nav.pro', icon: Promotion },
   { path: '/settings', label: 'nav.settings', icon: Setting },
@@ -141,6 +142,11 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
       { path: '/knowledge?tab=entities', label: 'knowledge.entities', icon: Grid },
       { path: '/knowledge?tab=relations', label: 'knowledge.relations', icon: Share },
       { path: '/knowledge?tab=graph', label: 'knowledge.graphView', icon: Connection },
+    ]}
+  ],
+  '/skills': [
+    { items: [
+      { path: '/skills', label: 'skills.scanSkills', icon: MagicStick },
     ]}
   ],
   '/wiki': [

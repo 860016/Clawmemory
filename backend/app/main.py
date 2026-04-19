@@ -380,7 +380,7 @@ async def get_dashboard_stats():
             "recentMemories": recent_list,
             "license": license_info,
             "passwordSet": bool(settings.access_password),
-            "version": "2.3.1",
+            "version": "2.4.0",
         }
     finally:
         db.close()
