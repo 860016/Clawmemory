@@ -177,22 +177,22 @@ function changeLocale(locale: string) {
 }
 
 async function loadLicense() {
-  try { const { data } = await axios.get('/api/v1/license/info'); license.value = data } catch {}
+  try { const { data } = await axios.get('/license/info'); license.value = data } catch {}
 }
 
 async function loadInitStatus() {
-  try { const { data } = await axios.get('/api/v1/auth/init-status'); passwordSet.value = data.password_set } catch {}
+  try { const { data } = await axios.get('/auth/init-status'); passwordSet.value = data.password_set } catch {}
 }
 
 async function loadInstallStatus() {
-  try { const { data } = await axios.get('/api/v1/install-status'); coreEngine.value = data.checks?.security_engine || 'python'; if (data.version) appVersion.value = data.version } catch {}
+  try { const { data } = await axios.get('/install-status'); coreEngine.value = data.checks?.security_engine || 'python'; if (data.version) appVersion.value = data.version } catch {}
 }
 
 async function activateLicense() {
   if (!licenseKey.value) return
   activating.value = true
   try {
-    const { data } = await axios.post('/api/v1/license/activate', { license_key: licenseKey.value })
+    const { data } = await axios.post('/license/activate', { license_key: licenseKey.value })
     if (data.valid || data.active) { ElMessage.success(t('settings.activated')); await loadLicense() }
     else ElMessage.error(data.message || t('common.failed'))
   } catch (e: any) { ElMessage.error(e.response?.data?.detail || t('common.failed')) }
@@ -202,7 +202,7 @@ async function activateLicense() {
 async function deactivateLicense() {
   try {
     await ElMessageBox.confirm(t('settings.cancelConfirm'), t('common.confirm'), { type: 'warning' })
-    await axios.post('/api/v1/license/deactivate')
+    await axios.post('/license/deactivate')
     ElMessage.success(t('settings.canceled')); await loadLicense()
   } catch {}
 }
@@ -211,7 +211,7 @@ async function setPassword() {
   if (newPassword.value.length < 4) { ElMessage.warning(t('settings.passwordMinLen')); return }
   settingPassword.value = true
   try {
-    await axios.post('/api/v1/auth/set-password', { password: newPassword.value })
+    await axios.post('/auth/set-password', { password: newPassword.value })
     ElMessage.success(t('settings.passwordSet')); showPasswordDialog.value = false; newPassword.value = ''; passwordSet.value = true
   } catch (e: any) { ElMessage.error(e.response?.data?.detail || t('common.failed')) }
   finally { settingPassword.value = false }
@@ -219,14 +219,14 @@ async function setPassword() {
 
 async function createBackup() {
   backingUp.value = true
-  try { await axios.post('/api/v1/backups', { notes: '手动备份' }); ElMessage.success(t('settings.backupCreated')) }
+  try { await axios.post('/backups', { notes: '手动备份' }); ElMessage.success(t('settings.backupCreated')) }
   catch { ElMessage.error(t('settings.backupFailed')) }
   finally { backingUp.value = false }
 }
 
 async function uploadBackup(file: File) {
   const formData = new FormData(); formData.append('file', file)
-  try { await axios.post('/api/v1/backups/upload', formData); ElMessage.success(t('settings.backupRestored')) }
+  try { await axios.post('/backups/upload', formData); ElMessage.success(t('settings.backupRestored')) }
   catch { ElMessage.error(t('settings.restoreFailed')) }
   return false
 }

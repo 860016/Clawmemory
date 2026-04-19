@@ -92,7 +92,7 @@ async function handleSetPassword() {
   }
   loading.value = true
   try {
-    const { data } = await axios.post('/api/v1/auth/set-password', { password: password.value })
+    const { data } = await axios.post('/auth/set-password', { password: password.value })
     localStorage.setItem('token', data.access_token)
     router.push('/')
   } catch (e: any) {
