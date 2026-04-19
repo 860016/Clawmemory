@@ -235,29 +235,29 @@ async function uploadBackup(file: File) {
 <style scoped>
 .settings-page { padding: 28px; max-width: 1000px; margin: 0 auto; }
 .page-header { margin-bottom: 24px; }
-.page-header h1 { font-size: 24px; font-weight: 700; color: #e6edf3; margin: 0; }
+.page-header h1 { font-size: 24px; font-weight: 700; color: var(--cm-text); margin: 0; }
 .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 16px; }
-.settings-card { background: #161b22; border: 1px solid #21262d; border-radius: 12px; padding: 20px; }
-.card-title { font-size: 16px; font-weight: 600; color: #e6edf3; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #21262d; }
+.settings-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 20px; }
+.card-title { font-size: 16px; font-weight: 600; color: var(--cm-text); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--cm-border); }
 .license-status .status-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; }
-.status-label { color: #7d8590; font-size: 13px; }
-.status-value { font-size: 13px; color: #e6edf3; }
-.status-value.pro { color: #00d4aa; font-weight: 600; }
+.status-label { color: var(--cm-text-muted); font-size: 13px; }
+.status-value { font-size: 13px; color: var(--cm-text); }
+.status-value.pro { color: #10B981; font-weight: 600; }
 .feature-tags { display: flex; flex-wrap: wrap; gap: 4px; max-width: 280px; justify-content: flex-end; }
-.ftag { padding: 1px 8px; background: rgba(0,212,170,0.12); color: #00d4aa; border-radius: 4px; font-size: 11px; }
+.ftag { padding: 1px 8px; background: rgba(16,185,129,0.12); color: #10B981; border-radius: 4px; font-size: 11px; }
 .license-free { text-align: center; }
-.free-badge { font-size: 18px; font-weight: 600; color: #7d8590; margin-bottom: 8px; }
-.free-desc { color: #7d8590; font-size: 13px; margin-bottom: 16px; }
+.free-badge { font-size: 18px; font-weight: 600; color: var(--cm-text-muted); margin-bottom: 8px; }
+.free-desc { color: var(--cm-text-muted); font-size: 13px; margin-bottom: 16px; }
 .pricing { display: flex; gap: 12px; margin-bottom: 16px; }
-.price-card { flex: 1; background: #0d1117; border: 1px solid #21262d; border-radius: 10px; padding: 16px; position: relative; }
-.price-card.featured { border-color: rgba(0,212,170,0.4); background: rgba(0,212,170,0.04); }
-.price-badge { position: absolute; top: -8px; right: 12px; background: #00d4aa; color: #0d1117; font-size: 10px; padding: 2px 8px; border-radius: 8px; font-weight: 600; }
-.price-name { font-size: 14px; font-weight: 600; color: #e6edf3; margin-bottom: 4px; }
-.price-amount { font-size: 24px; font-weight: 700; color: #00d4aa; }
-.price-features { list-style: none; padding: 0; margin: 8px 0 0; font-size: 12px; color: #7d8590; line-height: 1.8; text-align: left; }
+.price-card { flex: 1; background: var(--cm-bg); border: 1px solid var(--cm-border); border-radius: 10px; padding: 16px; position: relative; }
+.price-card.featured { border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.04); }
+.price-badge { position: absolute; top: -8px; right: 12px; background: #10B981; color: var(--cm-bg); font-size: 10px; padding: 2px 8px; border-radius: 8px; font-weight: 600; }
+.price-name { font-size: 14px; font-weight: 600; color: var(--cm-text); margin-bottom: 4px; }
+.price-amount { font-size: 24px; font-weight: 700; color: #10B981; }
+.price-features { list-style: none; padding: 0; margin: 8px 0 0; font-size: 12px; color: var(--cm-text-muted); line-height: 1.8; text-align: left; }
 .activate-section { display: flex; gap: 8px; justify-content: center; }
 .license-input { width: 260px; }
-.setting-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #21262d; font-size: 14px; color: #e6edf3; }
-.setting-desc { color: #7d8590; font-size: 13px; }
+.setting-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--cm-border); font-size: 14px; color: var(--cm-text); }
+.setting-desc { color: var(--cm-text-muted); font-size: 13px; }
 @media (max-width: 768px) { .settings-grid { grid-template-columns: 1fr; } .pricing { flex-direction: column; } }
 </style>

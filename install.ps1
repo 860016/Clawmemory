@@ -98,7 +98,7 @@ $PlatformTag = switch ($Arch) {
     default { "win_amd64" }
 }
 
-$WheelUrl = "https://github.com/860016/Clawmemory/releases/latest/download/clawmemory_core-2.2.0-$PyVer-$PyVer-${PlatformTag}.whl"
+$WheelUrl = "https://github.com/860016/Clawmemory/releases/latest/download/clawmemory_core-2.3.0-$PyVer-$PyVer-${PlatformTag}.whl"
 
 try {
     Write-Host "  尝试下载 Rust 安全引擎 ($PlatformTag)..." -ForegroundColor Yellow

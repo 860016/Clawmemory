@@ -173,12 +173,12 @@ function formatTime(t: string) {
 .page-header h1 {
   font-size: 24px;
   font-weight: 700;
-  color: #e6edf3;
+  color: var(--cm-text);
   margin: 0;
 }
 
 .page-desc {
-  color: #7d8590;
+  color: var(--cm-text-muted);
   font-size: 14px;
   margin-top: 4px;
 }
@@ -191,8 +191,8 @@ function formatTime(t: string) {
 }
 
 .stat-card {
-  background: #161b22;
-  border: 1px solid #21262d;
+  background: var(--cm-bg-secondary);
+  border: 1px solid var(--cm-border);
   border-radius: 12px;
   padding: 20px;
   display: flex;
@@ -202,7 +202,7 @@ function formatTime(t: string) {
 }
 
 .stat-card:hover {
-  border-color: rgba(0, 212, 170, 0.3);
+  border-color: rgba(16, 185, 129, 0.3);
 }
 
 .stat-icon-wrap {
@@ -214,20 +214,20 @@ function formatTime(t: string) {
   justify-content: center;
 }
 
-.mem-icon { background: rgba(0, 212, 170, 0.12); color: #00d4aa; }
-.entity-icon { background: rgba(0, 188, 212, 0.12); color: #00bcd4; }
+.mem-icon { background: rgba(16, 185, 129, 0.12); color: #10B981; }
+.entity-icon { background: rgba(6, 182, 212, 0.12); color: #06b6d4; }
 .wiki-icon { background: rgba(255, 193, 7, 0.12); color: #ffc107; }
 .pref-icon { background: rgba(233, 30, 99, 0.12); color: #e91e63; }
 
 .stat-value {
   font-size: 28px;
   font-weight: 700;
-  color: #e6edf3;
+  color: var(--cm-text);
 }
 
 .stat-label {
   font-size: 13px;
-  color: #7d8590;
+  color: var(--cm-text-muted);
   margin-top: 2px;
 }
 
@@ -239,8 +239,8 @@ function formatTime(t: string) {
 }
 
 .card {
-  background: #161b22;
-  border: 1px solid #21262d;
+  background: var(--cm-bg-secondary);
+  border: 1px solid var(--cm-border);
   border-radius: 12px;
   padding: 20px;
 }
@@ -255,7 +255,7 @@ function formatTime(t: string) {
 .card-header h3 {
   margin: 0;
   font-size: 15px;
-  color: #e6edf3;
+  color: var(--cm-text);
   font-weight: 600;
 }
 
@@ -274,14 +274,14 @@ function formatTime(t: string) {
 .layer-label {
   width: 56px;
   font-size: 13px;
-  color: #7d8590;
+  color: var(--cm-text-muted);
   text-align: right;
 }
 
 .layer-track {
   flex: 1;
   height: 6px;
-  background: #21262d;
+  background: var(--cm-border);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -292,15 +292,15 @@ function formatTime(t: string) {
   transition: width 0.6s ease;
 }
 
-.layer-fill.preference { background: #00d4aa; }
-.layer-fill.knowledge { background: #00bcd4; }
+.layer-fill.preference { background: #10B981; }
+.layer-fill.knowledge { background: #06b6d4; }
 .layer-fill.short_term { background: #ffc107; }
 .layer-fill.private { background: #e91e63; }
 
 .layer-count {
   width: 32px;
   font-size: 13px;
-  color: #7d8590;
+  color: var(--cm-text-muted);
 }
 
 .license-tier {
@@ -312,19 +312,19 @@ function formatTime(t: string) {
   margin-bottom: 12px;
 }
 
-.license-tier.oss { color: #7d8590; }
-.license-tier.pro { color: #00d4aa; }
+.license-tier.oss { color: var(--cm-text-muted); }
+.license-tier.pro { color: #10B981; }
 
 .license-detail {
   font-size: 13px;
-  color: #7d8590;
+  color: var(--cm-text-muted);
   line-height: 1.8;
 }
 
 .upgrade-hint {
   margin-top: 8px;
   font-size: 13px;
-  color: #7d8590;
+  color: var(--cm-text-muted);
 }
 
 .upgrade-hint p { margin: 0 0 8px; }
@@ -341,8 +341,8 @@ function formatTime(t: string) {
   gap: 12px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: #0d1117;
-  border: 1px solid #21262d;
+  background: var(--cm-bg);
+  border: 1px solid var(--cm-border);
 }
 
 .memory-layer-badge {
@@ -353,8 +353,8 @@ function formatTime(t: string) {
   white-space: nowrap;
 }
 
-.memory-layer-badge.preference { background: rgba(0,212,170,0.15); color: #00d4aa; }
-.memory-layer-badge.knowledge { background: rgba(0,188,212,0.15); color: #00bcd4; }
+.memory-layer-badge.preference { background: rgba(16,185,129,0.15); color: #10B981; }
+.memory-layer-badge.knowledge { background: rgba(6,182,212,0.15); color: #06b6d4; }
 .memory-layer-badge.short_term { background: rgba(255,193,7,0.15); color: #ffc107; }
 .memory-layer-badge.private { background: rgba(233,30,99,0.15); color: #e91e63; }
 
@@ -366,12 +366,12 @@ function formatTime(t: string) {
 .memory-key {
   font-size: 14px;
   font-weight: 600;
-  color: #e6edf3;
+  color: var(--cm-text);
 }
 
 .memory-value {
   font-size: 12px;
-  color: #7d8590;
+  color: var(--cm-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -379,14 +379,14 @@ function formatTime(t: string) {
 
 .memory-time {
   font-size: 12px;
-  color: #484f58;
+  color: var(--cm-text-placeholder);
   white-space: nowrap;
 }
 
 .empty-hint {
   text-align: center;
   padding: 32px;
-  color: #484f58;
+  color: var(--cm-text-placeholder);
 }
 
 @media (max-width: 768px) {

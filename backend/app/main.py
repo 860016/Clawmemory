@@ -8,7 +8,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app.config import settings
 from app.database import init_db
 from app.services.setup_service import ensure_data_dirs
-from app.routers import auth, memories, license, backups, knowledge, file_watcher, wiki, pro_features, openclaw_memories
+from app.routers import auth, memories, license, backups, knowledge, file_watcher, wiki, pro_features, openclaw_memories, openclaw_skills
 import asyncio
 import time
 import logging
@@ -252,6 +252,7 @@ app.include_router(file_watcher.router)
 app.include_router(wiki.router)
 app.include_router(pro_features.router)
 app.include_router(openclaw_memories.router)
+app.include_router(openclaw_skills.router)
 
 
 @app.get("/api/v1/health")
@@ -379,7 +380,7 @@ async def get_dashboard_stats():
             "recentMemories": recent_list,
             "license": license_info,
             "passwordSet": bool(settings.access_password),
-            "version": "2.2.0",
+            "version": "2.3.0",
         }
     finally:
         db.close()

@@ -359,32 +359,32 @@ async function saveBackupSchedule() {
 <style scoped>
 .pro-page { padding: 28px; }
 .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
-.page-header h1 { font-size: 24px; font-weight: 700; color: #e6edf3; margin: 0; }
-.pro-badge { background: rgba(0,212,170,0.15); color: #00d4aa; padding: 2px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
+.page-header h1 { font-size: 24px; font-weight: 700; color: var(--cm-text); margin: 0; }
+.pro-badge { background: rgba(16,185,129,0.15); color: #10B981; padding: 2px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
 .pro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 16px; }
-.pro-card { background: #161b22; border: 1px solid #21262d; border-radius: 12px; overflow: hidden; }
-.card-header { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid #21262d; }
+.pro-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; overflow: hidden; }
+.card-header { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--cm-border); }
 .card-icon { font-size: 18px; }
-.card-title { font-size: 15px; font-weight: 600; color: #e6edf3; }
+.card-title { font-size: 15px; font-weight: 600; color: var(--cm-text); }
 .card-body { padding: 16px 18px; }
-.card-desc { color: #7d8590; font-size: 13px; margin: 0 0 12px; }
+.card-desc { color: var(--cm-text-muted); font-size: 13px; margin: 0 0 12px; }
 .card-actions { display: flex; gap: 8px; margin-top: 12px; }
 .stats-row { display: flex; gap: 20px; }
 .stat-item { display: flex; flex-direction: column; align-items: center; }
-.stat-value { font-size: 22px; font-weight: 700; color: #e6edf3; }
+.stat-value { font-size: 22px; font-weight: 700; color: var(--cm-text); }
 .stat-value.warn { color: #d29922; }
 .stat-value.danger { color: #f85149; }
-.stat-label { font-size: 11px; color: #7d8590; margin-top: 2px; }
+.stat-label { font-size: 11px; color: var(--cm-text-muted); margin-top: 2px; }
 .prune-section { margin-top: 14px; }
-.sub-title { font-size: 13px; color: #7d8590; margin-bottom: 8px; }
+.sub-title { font-size: 13px; color: var(--cm-text-muted); margin-bottom: 8px; }
 .prune-list { max-height: 150px; overflow-y: auto; }
-.prune-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12px; color: #c9d1d9; }
+.prune-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12px; color: var(--cm-text-secondary); }
 .prune-key { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prune-imp { color: #d29922; font-weight: 600; }
 .conflict-list { margin-top: 12px; }
-.conflict-item { padding: 8px 0; border-bottom: 1px solid #21262d; }
-.conflict-key { font-size: 13px; font-weight: 600; color: #e6edf3; }
-.conflict-values { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-size: 12px; color: #7d8590; }
+.conflict-item { padding: 8px 0; border-bottom: 1px solid var(--cm-border); }
+.conflict-key { font-size: 13px; font-weight: 600; color: var(--cm-text); }
+.conflict-values { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-size: 12px; color: var(--cm-text-muted); }
 .vs { color: #d29922; font-weight: 600; }
 .val-a, .val-b { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .conflict-meta { display: flex; align-items: center; gap: 8px; }
@@ -392,12 +392,12 @@ async function saveBackupSchedule() {
 .router-test .el-input { flex: 1; }
 .route-result { margin-top: 10px; font-size: 13px; color: #c9d1d9; }
 .route-model { margin-bottom: 4px; }
-.route-model strong { color: #00d4aa; }
+.route-model strong { color: #10B981; }
 .extract-result, .graph-result { display: flex; gap: 20px; margin-top: 12px; }
-.backup-schedule .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; color: #e6edf3; font-size: 14px; }
+.backup-schedule .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; color: var(--cm-text); font-size: 14px; }
 .pro-upsell { text-align: center; padding: 80px 20px; }
 .upsell-icon { font-size: 48px; margin-bottom: 16px; }
-.pro-upsell h2 { color: #e6edf3; margin: 0 0 12px; }
-.pro-upsell p { color: #7d8590; margin-bottom: 20px; }
+.pro-upsell h2 { color: var(--cm-text); margin: 0 0 12px; }
+.pro-upsell p { color: var(--cm-text-muted); margin-bottom: 20px; }
 @media (max-width: 768px) { .pro-grid { grid-template-columns: 1fr; } }
 </style>

@@ -27,6 +27,7 @@ keys/*.pem
 target/
 backend/clawmemory_core/
 license-platform-v2/
+clawmemory-core-repo/
 
 # Build artifacts
 backend/frontend_dist/

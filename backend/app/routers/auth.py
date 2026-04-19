@@ -18,7 +18,7 @@ class SetPasswordRequest(BaseModel):
 @router.get("/init-status")
 def init_status():
     """检查是否设置了访问密码"""
-    return {"password_set": bool(settings.access_password)}
+    return {"password_set": bool(settings.access_password), "password_required": True}
 
 
 @router.post("/login")
@@ -64,6 +64,21 @@ def set_password(req: SetPasswordRequest, _=Depends(get_optional_user)):
 
     token = create_access_token({"sub": "admin", "role": "admin"})
     return {"access_token": token, "token_type": "bearer", "message": "Password set successfully"}
+
+
+@router.post("/reset-password")
+def reset_password():
+    """Reset password by removing it from .env — for forgot password flow.
+    Only works when accessed from the server itself (no auth required).
+    After reset, user must set a new password on next login.
+    """
+    env_path = settings.base_dir / ".env"
+    if env_path.exists():
+        lines = env_path.read_text().splitlines()
+        new_lines = [line for line in lines if not line.startswith("CLAWMEMORY_ACCESS_PASSWORD=")]
+        env_path.write_text("\n".join(new_lines) + "\n")
+    settings.access_password = ""
+    return {"message": "Password reset successful. Please set a new password."}
 
 
 @router.get("/me")

@@ -1,65 +1,98 @@
 <template>
-  <el-container style="height: 100vh">
-    <el-aside width="220px" class="sidebar">
-      <div class="logo">
-        <div class="logo-icon-wrap">
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#00d4aa" stroke-width="2">
+  <div class="layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <!-- Top Navigation Bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger-btn" @click="sidebarCollapsed = !sidebarCollapsed">
+          <el-icon :size="20"><Fold v-if="!sidebarCollapsed" /><Expand v-else /></el-icon>
+        </button>
+        <div class="logo" @click="$router.push('/')">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="var(--cm-primary)" stroke-width="2">
             <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>
             <path d="M12 6v6l4 2"/>
           </svg>
+          <span class="logo-text">ClawMemory</span>
         </div>
-        <span class="logo-text">ClawMemory</span>
       </div>
-      <el-menu :default-active="currentRoute" router class="sidebar-menu">
-        <el-menu-item index="/">
-          <el-icon><HomeFilled /></el-icon>
-          <span>{{ $t('nav.dashboard') }}</span>
-        </el-menu-item>
-        <el-menu-item index="/memories">
-          <el-icon><Collection /></el-icon>
-          <span>{{ $t('nav.memories') }}</span>
-        </el-menu-item>
-        <el-menu-item index="/knowledge">
-          <el-icon><Connection /></el-icon>
-          <span>{{ $t('nav.knowledge') }}</span>
-        </el-menu-item>
-        <el-menu-item index="/wiki">
-          <el-icon><Document /></el-icon>
-          <span>{{ $t('nav.wiki') }}</span>
-        </el-menu-item>
-        <el-menu-item index="/pro">
-          <el-icon><Promotion /></el-icon>
-          <span>{{ $t('nav.pro') }}</span>
-        </el-menu-item>
-        <el-menu-item index="/settings">
-          <el-icon><Setting /></el-icon>
-          <span>{{ $t('nav.settings') }}</span>
-        </el-menu-item>
-      </el-menu>
-      <div class="sidebar-footer">
+
+      <nav class="topbar-nav">
+        <router-link
+          v-for="item in navItems"
+          :key="item.path"
+          :to="item.path"
+          class="nav-item"
+          :class="{ active: isNavActive(item.path) }"
+        >
+          <el-icon><component :is="item.icon" /></el-icon>
+          <span>{{ $t(item.label) }}</span>
+        </router-link>
+      </nav>
+
+      <div class="topbar-right">
+        <button class="theme-toggle" @click="themeStore.toggle()" :title="themeStore.isDark ? 'Switch to light mode' : 'Switch to dark mode'">
+          <span class="theme-icon">{{ themeStore.isDark ? '☀️' : '🌙' }}</span>
+        </button>
         <div class="tier-badge" :class="tierClass">{{ tierLabel }}</div>
-        <el-button text @click="handleLogout" class="logout-btn">
-          <el-icon><SwitchButton /></el-icon> {{ $t('common.logout') }}
-        </el-button>
+        <el-dropdown trigger="click" @command="handleUserCommand">
+          <button class="user-btn">
+            <el-icon :size="18"><User /></el-icon>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="settings">{{ $t('nav.settings') }}</el-dropdown-item>
+              <el-dropdown-item command="logout" divided>{{ $t('common.logout') }}</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
-    </el-aside>
-    <el-main class="main-content">
-      <router-view />
-    </el-main>
-  </el-container>
+    </header>
+
+    <div class="layout-body">
+      <!-- Left Sidebar -->
+      <aside class="sidebar" v-if="currentSubNav.length">
+        <div class="sidebar-inner">
+          <div class="sidebar-section" v-for="group in currentSubNav" :key="group.label">
+            <div class="sidebar-group-title" v-if="group.label">{{ $t(group.label) }}</div>
+            <router-link
+              v-for="item in group.items"
+              :key="item.path"
+              :to="item.path"
+              class="sidebar-item"
+              :class="{ active: $route.path === item.path || (item.path !== '/' && $route.path.startsWith(item.path)) }"
+            >
+              <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
+              <span>{{ $t(item.label) }}</span>
+            </router-link>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <router-view />
+      </main>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { HomeFilled, Collection, Connection, Setting, SwitchButton, Document, Promotion } from '@element-plus/icons-vue'
+import { useThemeStore } from '../stores/theme'
+import {
+  HomeFilled, Collection, Connection, Setting, Document, Promotion,
+  Fold, Expand, User, DataAnalysis, Upload, Grid, Share,
+  TrendCharts, Warning, Cpu, MagicStick, Connection as ConnectionIcon,
+  FolderOpened, Lock, Database, Monitor
+} from '@element-plus/icons-vue'
 import axios from '../api/client'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
-const currentRoute = computed(() => route.path)
+const themeStore = useThemeStore()
+const sidebarCollapsed = ref(false)
 
 const tier = ref('oss')
 const tierLabel = computed(() => tier.value === 'oss' ? t('tier.free') : t('tier.pro'))
@@ -74,105 +107,343 @@ onMounted(async () => {
   }
 })
 
-function handleLogout() {
-  localStorage.removeItem('token')
-  router.push('/login')
+const navItems = [
+  { path: '/', label: 'nav.dashboard', icon: HomeFilled },
+  { path: '/memories', label: 'nav.memories', icon: Collection },
+  { path: '/knowledge', label: 'nav.knowledge', icon: Connection },
+  { path: '/wiki', label: 'nav.wiki', icon: Document },
+  { path: '/pro', label: 'nav.pro', icon: Promotion },
+  { path: '/settings', label: 'nav.settings', icon: Setting },
+]
+
+function isNavActive(path: string) {
+  if (path === '/') return route.path === '/'
+  return route.path.startsWith(path)
+}
+
+// Sub-navigation per main route
+const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: string; label: string; icon?: any }> }>> = {
+  '/': [
+    { items: [
+      { path: '/', label: 'nav.overview', icon: HomeFilled },
+      { path: '/?tab=stats', label: 'nav.stats', icon: DataAnalysis },
+    ]}
+  ],
+  '/memories': [
+    { items: [
+      { path: '/memories', label: 'memories.all', icon: Collection },
+      { path: '/memories?import=openclaw', label: 'memories.importOpenClaw', icon: Upload },
+      { path: '/memories?tab=skills', label: 'nav.skills', icon: MagicStick },
+    ]}
+  ],
+  '/knowledge': [
+    { items: [
+      { path: '/knowledge?tab=entities', label: 'knowledge.entities', icon: Grid },
+      { path: '/knowledge?tab=relations', label: 'knowledge.relations', icon: Share },
+      { path: '/knowledge?tab=graph', label: 'knowledge.graphView', icon: Connection },
+    ]}
+  ],
+  '/wiki': [
+    { items: [
+      { path: '/wiki', label: 'wiki.allPages', icon: Document },
+      { path: '/wiki?tab=categories', label: 'wiki.categories', icon: FolderOpened },
+    ]}
+  ],
+  '/pro': [
+    { items: [
+      { path: '/pro?section=decay', label: 'pro.decay', icon: TrendCharts },
+      { path: '/pro?section=conflicts', label: 'pro.conflicts', icon: Warning },
+      { path: '/pro?section=router', label: 'pro.tokenRouter', icon: Cpu },
+      { path: '/pro?section=extract', label: 'pro.aiExtract', icon: MagicStick },
+      { path: '/pro?section=graph', label: 'pro.autoGraph', icon: ConnectionIcon },
+      { path: '/pro?section=backup', label: 'pro.autoBackup', icon: Database },
+    ]}
+  ],
+  '/settings': [
+    { items: [
+      { path: '/settings?section=license', label: 'settings.license', icon: Promotion },
+      { path: '/settings?section=security', label: 'settings.security', icon: Lock },
+      { path: '/settings?section=data', label: 'settings.data', icon: Database },
+      { path: '/settings?section=system', label: 'settings.system', icon: Monitor },
+    ]}
+  ],
+}
+
+const currentSubNav = computed(() => {
+  const path = '/' + (route.path.split('/')[1] || '')
+  return subNavMap[path] || []
+})
+
+function handleUserCommand(command: string) {
+  if (command === 'logout') {
+    localStorage.removeItem('token')
+    router.push('/login')
+  } else if (command === 'settings') {
+    router.push('/settings')
+  }
 }
 </script>
 
 <style scoped>
-.sidebar {
-  background: #0d1117;
-  border-right: 1px solid rgba(0, 212, 170, 0.1);
+.layout {
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  background: var(--cm-bg);
+  color: var(--cm-text);
+}
+
+/* ===== Top Bar ===== */
+.topbar {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--cm-bg-secondary);
+  border-bottom: 1px solid var(--cm-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  gap: 16px;
+  backdrop-filter: blur(12px);
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.hamburger-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--cm-text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+.hamburger-btn:hover {
+  background: rgba(var(--cm-primary-rgb), 0.1);
+  color: var(--cm-primary);
 }
 
 .logo {
-  padding: 20px 16px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  border-bottom: 1px solid rgba(0, 212, 170, 0.1);
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 0.2s;
 }
-
-.logo-icon-wrap {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 212, 170, 0.1);
-  border-radius: 10px;
+.logo:hover {
+  background: rgba(var(--cm-primary-rgb), 0.06);
 }
 
 .logo-text {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
-  color: #e6edf3;
-  letter-spacing: 0.5px;
+  color: var(--cm-text);
+  letter-spacing: 0.3px;
 }
 
-.sidebar-menu {
-  border-right: none;
-  background: transparent;
-  --el-menu-item-height: 46px;
+.topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  justify-content: center;
 }
 
-.sidebar-menu .el-menu-item {
-  color: #7d8590;
-  margin: 3px 8px;
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cm-text-muted);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.nav-item:hover {
+  color: var(--cm-text);
+  background: rgba(var(--cm-primary-rgb), 0.06);
+}
+.nav-item.active {
+  color: var(--cm-primary);
+  background: rgba(var(--cm-primary-rgb), 0.1);
+  font-weight: 600;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--cm-border);
+  cursor: pointer;
+  padding: 5px 8px;
   border-radius: 8px;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
 }
-
-.sidebar-menu .el-menu-item:hover {
-  background: rgba(0, 212, 170, 0.08);
-  color: #e6edf3;
+.theme-toggle:hover {
+  border-color: var(--cm-primary);
+  background: rgba(var(--cm-primary-rgb), 0.06);
 }
-
-.sidebar-menu .el-menu-item.is-active {
-  background: rgba(0, 212, 170, 0.15);
-  color: #00d4aa;
-}
-
-.sidebar-footer {
-  margin-top: auto;
-  padding: 16px;
-  border-top: 1px solid rgba(0, 212, 170, 0.1);
-  text-align: center;
+.theme-icon {
+  font-size: 16px;
+  line-height: 1;
 }
 
 .tier-badge {
-  display: inline-block;
-  padding: 4px 14px;
-  border-radius: 12px;
-  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 11px;
   font-weight: 600;
+}
+.tier-free {
+  background: rgba(var(--cm-primary-rgb), 0.08);
+  color: var(--cm-text-muted);
+}
+.tier-pro {
+  background: rgba(var(--cm-primary-rgb), 0.15);
+  color: var(--cm-primary);
+}
+
+.user-btn {
+  background: none;
+  border: 1px solid var(--cm-border);
+  cursor: pointer;
+  padding: 5px 8px;
+  border-radius: 8px;
+  color: var(--cm-text-muted);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+}
+.user-btn:hover {
+  border-color: var(--cm-primary);
+  color: var(--cm-primary);
+  background: rgba(var(--cm-primary-rgb), 0.06);
+}
+
+/* ===== Layout Body ===== */
+.layout-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ===== Sidebar ===== */
+.sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  background: var(--cm-bg-secondary);
+  border-right: 1px solid var(--cm-border);
+  overflow-y: auto;
+  transition: width 0.3s ease;
+}
+
+.sidebar-inner {
+  padding: 12px 8px;
+}
+
+.sidebar-section {
   margin-bottom: 8px;
 }
 
-.tier-free {
-  background: rgba(125, 133, 144, 0.15);
-  color: #7d8590;
+.sidebar-group-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--cm-text-muted);
+  padding: 8px 12px 4px;
 }
 
-.tier-pro {
-  background: rgba(0, 212, 170, 0.15);
-  color: #00d4aa;
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--cm-text-muted);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+.sidebar-item:hover {
+  color: var(--cm-text);
+  background: rgba(var(--cm-primary-rgb), 0.06);
+}
+.sidebar-item.active {
+  color: var(--cm-primary);
+  background: rgba(var(--cm-primary-rgb), 0.1);
+  font-weight: 600;
 }
 
-.logout-btn {
-  color: #7d8590;
-  width: 100%;
-}
-
-.logout-btn:hover {
-  color: #f85149;
-}
-
+/* ===== Main Content ===== */
 .main-content {
-  padding: 0;
-  background: #0d1117;
+  flex: 1;
+  overflow-y: auto;
+  background: var(--cm-bg);
+}
+
+/* ===== Mobile Responsive ===== */
+@media (max-width: 768px) {
+  .hamburger-btn {
+    display: flex;
+  }
+
+  .topbar-nav {
+    display: none;
+  }
+
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 56px;
+    bottom: 0;
+    z-index: 90;
+    width: 220px;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    box-shadow: var(--cm-shadow-lg);
+  }
+
+  .layout:not(.sidebar-collapsed) .sidebar {
+    transform: translateX(0);
+  }
+
+  .nav-item span {
+    display: none;
+  }
+  .topbar-nav {
+    display: flex;
+  }
+  .topbar-nav .nav-item {
+    padding: 8px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .nav-item span {
+    display: none;
+  }
+  .nav-item {
+    padding: 8px 10px;
+  }
 }
 </style>

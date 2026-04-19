@@ -327,3 +327,80 @@ def scan_openclaw_memories(openclaw_dir: Path | None = None) -> list[dict]:
         })
 
     return results
+
+
+def scan_openclaw_sqlite(openclaw_dir: Path | None = None) -> dict:
+    """Scan the official OpenClaw memory database (~/.openclaw/memory/main.sqlite).
+    
+    This reads the official OpenClaw memory store which uses SQLite.
+    Returns summary + preview of memories.
+    """
+    if openclaw_dir is None:
+        openclaw_dir = _detect_openclaw_dir()
+    if openclaw_dir is None or not openclaw_dir.exists():
+        return {"found": False, "path": None}
+    
+    db_path = openclaw_dir / "memory" / "main.sqlite"
+    if not db_path.exists():
+        return {"found": False, "path": str(db_path)}
+    
+    try:
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Try to discover table structure
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [row[0] for row in cursor.fetchall()]
+        
+        memories = []
+        total = 0
+        
+        # Common OpenClaw memory table patterns
+        for table_name in ["memories", "memory", "mem", "entries"]:
+            if table_name in tables:
+                try:
+                    cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                    total = cursor.fetchone()[0]
+                    
+                    # Get column names
+                    cursor.execute(f"PRAGMA table_info({table_name})")
+                    columns = [col[1] for col in cursor.fetchall()]
+                    
+                    # Read first 50 entries
+                    cursor.execute(f"SELECT * FROM {table_name} ORDER BY rowid DESC LIMIT 50")
+                    rows = cursor.fetchall()
+                    
+                    for row in rows:
+                        item = dict(row)
+                        # Normalize key names
+                        key = item.get("key") or item.get("name") or item.get("title") or ""
+                        value = item.get("value") or item.get("content") or item.get("text") or ""
+                        layer = item.get("layer") or item.get("level") or "knowledge"
+                        
+                        memories.append({
+                            "key": str(key),
+                            "value": str(value)[:500],  # Truncate for preview
+                            "layer": layer,
+                            "importance": item.get("importance", 0.5),
+                            "tags": item.get("tags", []),
+                            "source": "openclaw_sqlite",
+                        })
+                    break  # Found and read the table
+                except Exception as e:
+                    logger.warning(f"Failed to read table {table_name}: {e}")
+                    continue
+        
+        conn.close()
+        
+        return {
+            "found": True,
+            "path": str(db_path),
+            "tables": tables,
+            "total": total,
+            "preview": memories[:50],
+        }
+    except Exception as e:
+        logger.warning(f"Failed to scan OpenClaw SQLite: {e}")
+        return {"found": False, "path": str(db_path), "error": str(e)}

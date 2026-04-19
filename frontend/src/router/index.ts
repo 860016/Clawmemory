@@ -18,11 +18,8 @@ const router = createRouter({
   ],
 })
 
-// 缓存是否需要密码
-let passwordRequired: boolean | null = null
-
 router.beforeEach(async (to, _from, next) => {
-  // 登录页始终放行
+  // Always allow login page
   if (to.name === 'login') {
     next()
     return
@@ -34,24 +31,8 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
-  // 没有 token，检查是否需要密码
-  if (passwordRequired === null) {
-    try {
-      const res = await fetch('/api/v1/auth/init-status')
-      const data = await res.json()
-      passwordRequired = data.password_set
-    } catch {
-      passwordRequired = false
-    }
-  }
-
-  if (!passwordRequired) {
-    // 不需要密码，直接放行
-    next()
-  } else {
-    // 需要密码，跳转登录
-    next({ name: 'login' })
-  }
+  // No token — always require login
+  next({ name: 'login' })
 })
 
 export default router

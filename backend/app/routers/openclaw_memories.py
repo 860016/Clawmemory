@@ -6,6 +6,7 @@ from app.middleware.auth import get_current_user
 from app.services.openclaw_memory_scanner import (
     scan_openclaw_memories,
     scan_agent_memories,
+    scan_openclaw_sqlite,
     _detect_openclaw_dir,
 )
 from app.services.memory_service import MemoryService
@@ -155,3 +156,10 @@ def import_memories(
         "errors": errors,
         "total_source": len(memories),
     }
+
+
+@router.get("/scan-sqlite")
+def scan_sqlite_memories(_=Depends(get_current_user)):
+    """Scan official OpenClaw memory SQLite database."""
+    result = scan_openclaw_sqlite()
+    return result
