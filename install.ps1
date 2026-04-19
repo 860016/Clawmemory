@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 $InstallDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  ClawMemory 安装程序 v2.8.0 (Windows)" -ForegroundColor Cyan
+Write-Host "  ClawMemory 安装程序 v2.8.1 (Windows)" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "安装目录: $InstallDir"
 Write-Host "后端端口: $Port"
