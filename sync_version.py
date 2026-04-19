@@ -10,42 +10,57 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 VERSION_FILE = ROOT / "VERSION"
+ENC = "utf-8"
 
 
 def read_version() -> str:
-    return VERSION_FILE.read_text().strip()
+    return VERSION_FILE.read_text(encoding=ENC).strip()
 
 
 def write_version(ver: str):
-    VERSION_FILE.write_text(ver + "\n")
+    VERSION_FILE.write_text(ver + "\n", encoding=ENC)
     print(f"[OK] VERSION -> {ver}")
 
 
 def sync_pyproject(ver: str):
     path = ROOT / "backend" / "pyproject.toml"
-    content = path.read_text()
+    content = path.read_text(encoding=ENC)
     content = re.sub(r'version\s*=\s*"[^"]*"', f'version = "{ver}"', content, count=1)
-    path.write_text(content)
+    path.write_text(content, encoding=ENC)
     print(f"[OK] backend/pyproject.toml -> {ver}")
 
 
 def sync_package_json(ver: str):
     path = ROOT / "frontend" / "package.json"
-    content = path.read_text()
+    content = path.read_text(encoding=ENC)
     content = re.sub(r'"version"\s*:\s*"[^"]*"', f'"version": "{ver}"', content, count=1)
-    path.write_text(content)
+    path.write_text(content, encoding=ENC)
     print(f"[OK] frontend/package.json -> {ver}")
 
 
-def sync_cargo_toml(ver: str):
-    path = ROOT / "backend" / "clawmemory_core" / "Cargo.toml"
+def sync_package_lock(ver: str):
+    path = ROOT / "frontend" / "package-lock.json"
     if not path.exists():
-        print("[SKIP] backend/clawmemory_core/Cargo.toml not found (commercial module)")
+        print("[SKIP] frontend/package-lock.json not found")
         return
-    content = path.read_text()
-    content = re.sub(r'version\s*=\s*"[^"]*"', f'version = "{ver}"', content, count=1)
-    path.write_text(content)
-    print(f"[OK] backend/clawmemory_core/Cargo.toml -> {ver}")
+    content = path.read_text(encoding=ENC)
+    # Update the top-level version
+    content = re.sub(r'"version"\s*:\s*"\d+\.\d+\.\d+[^"]*"',
+                     f'"version": "{ver}"', content, count=1)
+    path.write_text(content, encoding=ENC)
+    print(f"[OK] frontend/package-lock.json -> {ver}")
+
+
+def sync_settings_view(ver: str):
+    path = ROOT / "frontend" / "src" / "views" / "SettingsView.vue"
+    if not path.exists():
+        print("[SKIP] frontend/src/views/SettingsView.vue not found")
+        return
+    content = path.read_text(encoding=ENC)
+    content = re.sub(r"appVersion\s*=\s*ref\(['\"][^'\"]*['\"]\)",
+                     f"appVersion = ref('{ver}')", content)
+    path.write_text(content, encoding=ENC)
+    print(f"[OK] frontend/src/views/SettingsView.vue -> {ver}")
 
 
 def main():
@@ -64,7 +79,8 @@ def main():
 
     sync_pyproject(ver)
     sync_package_json(ver)
-    sync_cargo_toml(ver)
+    sync_package_lock(ver)
+    sync_settings_view(ver)
 
     print(f"\n[DONE] All components synced to v{ver}")
     print("\nAuto-read from VERSION (no sync needed):")
