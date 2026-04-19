@@ -30,7 +30,10 @@ try:
     if "c-cpython" in _build:
         _CORE_ENGINE = "c"
         USING_RUST = False
-        logger.info("Core engine: C/CPython — high security, OpenSSL RSA verification")
+        if "cng" in _build:
+            logger.info("Core engine: C/CPython + Windows CNG — high security, RSA verification")
+        else:
+            logger.info("Core engine: C/CPython + OpenSSL — high security, RSA verification")
     else:
         _CORE_ENGINE = "rust"
         USING_RUST = True

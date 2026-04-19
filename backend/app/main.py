@@ -306,7 +306,7 @@ async def install_status():
                 "level": security_level,
                 "description": {
                     "rust": "Rust (PyO3) — 最高安全，RSA 硬验证",
-                    "c": "C/CPython + OpenSSL — 高安全，RSA 硬验证",
+                    "c": "C/CPython — 高安全，RSA 硬验证",
                     "python": "纯 Python — 低安全，仅 OSS 免费版",
                 }.get(core_engine, "unknown"),
             },
