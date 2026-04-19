@@ -172,7 +172,7 @@ onMounted(async () => {
   await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus()])
 })
 
-function changeLocale(locale: string) {
+function changeLocale(locale: 'zh' | 'en') {
   setLocale(locale)
 }
 

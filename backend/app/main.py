@@ -224,7 +224,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="ClawMemory",
-    version="2.3.0",
+    version="2.3.1",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     lifespan=lifespan,
@@ -257,7 +257,7 @@ app.include_router(openclaw_skills.router)
 
 @app.get("/api/v1/health")
 async def health_check():
-    return {"status": "ok", "version": "2.3.0"}
+    return {"status": "ok", "version": "2.3.1"}
 
 
 @app.get("/api/v1/install-status")
@@ -290,7 +290,7 @@ async def install_status():
 
     return {
         "plugin": "ClawMemory",
-        "version": "2.2.0",
+        "version": "2.3.1",
         "status": "running" if db_ok else "degraded",
         "service_url": f"http://localhost:{settings.port}",
         "security_level": security_level,
@@ -380,7 +380,7 @@ async def get_dashboard_stats():
             "recentMemories": recent_list,
             "license": license_info,
             "passwordSet": bool(settings.access_password),
-            "version": "2.3.0",
+            "version": "2.3.1",
         }
     finally:
         db.close()

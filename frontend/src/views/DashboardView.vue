@@ -67,7 +67,7 @@
           <div class="layer-bar" v-for="(count, layer) in stats.layerStats" :key="layer">
             <div class="layer-label">{{ layerLabels[layer] || layer }}</div>
             <div class="layer-track">
-              <div class="layer-fill" :class="layer" :style="{ width: barWidth(count) }"></div>
+              <div class="layer-fill" :class="String(layer)" :style="{ width: barWidth(count) }"></div>
             </div>
             <div class="layer-count">{{ count }}</div>
           </div>

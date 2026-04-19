@@ -11,7 +11,7 @@ const i18n = createI18n({
 
 export default i18n
 
-export function setLocale(locale: string) {
+export function setLocale(locale: 'zh' | 'en') {
   i18n.global.locale.value = locale
   localStorage.setItem('clawmemory-locale', locale)
 }

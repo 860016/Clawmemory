@@ -84,7 +84,7 @@ import {
   HomeFilled, Collection, Connection, Setting, Document, Promotion,
   Fold, Expand, User, DataAnalysis, Upload, Grid, Share,
   TrendCharts, Warning, Cpu, MagicStick, Connection as ConnectionIcon,
-  FolderOpened, Lock, Database, Monitor
+  FolderOpened, Lock, Coin, Monitor
 } from '@element-plus/icons-vue'
 import axios from '../api/client'
 
@@ -156,14 +156,14 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
       { path: '/pro?section=router', label: 'pro.tokenRouter', icon: Cpu },
       { path: '/pro?section=extract', label: 'pro.aiExtract', icon: MagicStick },
       { path: '/pro?section=graph', label: 'pro.autoGraph', icon: ConnectionIcon },
-      { path: '/pro?section=backup', label: 'pro.autoBackup', icon: Database },
+      { path: '/pro?section=backup', label: 'pro.autoBackup', icon: Coin },
     ]}
   ],
   '/settings': [
     { items: [
       { path: '/settings?section=license', label: 'settings.license', icon: Promotion },
       { path: '/settings?section=security', label: 'settings.security', icon: Lock },
-      { path: '/settings?section=data', label: 'settings.data', icon: Database },
+      { path: '/settings?section=data', label: 'settings.data', icon: Coin },
       { path: '/settings?section=system', label: 'settings.system', icon: Monitor },
     ]}
   ],
