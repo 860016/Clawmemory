@@ -228,6 +228,7 @@ export default {
     deviceSlot: 'Device',
     features: 'Features',
     cancelLicense: 'Deactivate',
+    licenseKey: 'License Key',
     cancelConfirm: 'Deactivate license? Will downgrade to Free tier.',
     canceled: 'License deactivated',
     freeBadge: 'Free',

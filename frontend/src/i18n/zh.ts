@@ -228,6 +228,7 @@ export default {
     deviceSlot: '设备',
     features: '功能',
     cancelLicense: '取消授权',
+    licenseKey: '授权码',
     cancelConfirm: '确定取消授权？降级为免费版。',
     canceled: '已取消授权',
     freeBadge: '免费版',

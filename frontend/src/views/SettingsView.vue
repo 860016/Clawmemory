@@ -11,7 +11,11 @@
         <div class="license-status" v-if="license.active">
           <div class="status-row">
             <span class="status-label">{{ $t('settings.version') }}</span>
-            <span class="status-value pro">Pro {{ license.type === 'pro_lifetime' ? $t('settings.proLifetime') : $t('settings.proAnnual') }}</span>
+            <span class="status-value pro">{{ license.type === 'enterprise' ? 'Enterprise' : 'Pro' }}</span>
+          </div>
+          <div class="status-row" v-if="license.license_key">
+            <span class="status-label">{{ $t('settings.licenseKey') || 'License Key' }}</span>
+            <span class="status-value">{{ license.license_key }}</span>
           </div>
           <div class="status-row" v-if="license.expires_at">
             <span class="status-label">{{ $t('settings.expiresAt') }}</span>
@@ -27,7 +31,7 @@
               <span class="ftag" v-for="f in license.features" :key="f">{{ featureLabels[f] || f }}</span>
             </div>
           </div>
-          <el-button type="danger" text @click="deactivateLicense" style="margin-top: 12px">{{ $t('settings.cancelLicense') }}</el-button>
+          <el-button type="danger" plain size="small" @click="deactivateLicense" style="margin-top: 12px">{{ $t('settings.cancelLicense') }}</el-button>
         </div>
         <div v-else class="license-free">
           <div class="free-badge">{{ $t('settings.freeBadge') }}</div>

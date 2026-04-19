@@ -10,7 +10,18 @@ class StatsService:
     async def send_heartbeat(self, db, license_key: str | None = None):
         """Send heartbeat to license server"""
         if not license_key:
+            # 从本地数据库获取 license_key
+            try:
+                from app.models.license import License
+                lic = db.query(License).filter(License.status == "active").first()
+                if lic:
+                    license_key = lic.license_key
+            except Exception:
+                pass
+
+        if not license_key:
             return
+
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 await client.post(

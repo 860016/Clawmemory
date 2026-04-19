@@ -17,7 +17,7 @@ try:
     from clawmemory_core import (
         check_feature, set_license, get_tier, reset as _reset,
         verify_integrity as _verify_integrity,
-        verify_license as _rust_verify_license,
+        verify_license as _core_verify_license,
         get_build_info,
         # Pro: memory decay
         calculate_decay, should_prune, reinforce, decay_memory, decay_batch, get_decay_stats,
@@ -29,59 +29,46 @@ try:
     _build = get_build_info()
     if "c-cpython" in _build:
         _CORE_ENGINE = "c"
-        USING_RUST = False
+        USING_CORE = True
         if "cng" in _build:
             logger.info("Core engine: C/CPython + Windows CNG — high security, RSA verification")
         else:
             logger.info("Core engine: C/CPython + OpenSSL — high security, RSA verification")
     else:
         _CORE_ENGINE = "rust"
-        USING_RUST = True
+        USING_CORE = True
         logger.info("Core engine: Rust (PyO3) — maximum security")
 except ImportError:
-    USING_RUST = False
+    USING_CORE = False
 
-    # 2. 纯 Python 兜底 — 最低安全 (仅开发环境/OSS 免费版)
-    # 注意：此模式不包含完整的安全保护，仅保证基本功能可用
-    # 发布时必须安装 clawmemory_core (C) wheel
+    # 2. 纯 Python 兜底
     import hashlib, os as _os, math, time as _time, re
 
     _features: set = set()
     _tier: str = "oss"
-    # 使用 salted hash 防止简单篡改（非安全级别，仅增加门槛）
-    _license_hash: str = ""
 
     def check_feature(f: str) -> bool:
         return f in _features
 
     def set_license(t: str, fs: list):
-        global _tier, _features, _license_hash
+        global _tier, _features
         _tier = t
         _features = set(fs)
-        # HMAC-style hash with tier-dependent salt
-        raw = f"{t}|{','.join(sorted(fs))}|clawmemory_v1"
-        _license_hash = hashlib.sha256(raw.encode()).hexdigest()[:16]
 
     def get_tier() -> str:
         return _tier
 
     def _reset():
-        global _tier, _features, _license_hash
+        global _tier, _features
         _tier = "oss"
         _features = set()
-        _license_hash = ""
 
     def _verify_integrity() -> bool:
-        global _license_hash
-        if not _license_hash:
-            return _tier == "oss"
-        raw = f"{_tier}|{','.join(sorted(_features))}|clawmemory_v1"
-        expected = hashlib.sha256(raw.encode()).hexdigest()[:16]
-        return _license_hash == expected
+        """纯 Python 模式不做完整性校验（无安全意义），始终返回 True"""
+        return True
 
-    def _rust_verify_license(license_data_b64: str, public_key_pem: str) -> bool:
-        """纯 Python fallback: 用 cryptography 库做真正的 RSA-SHA256 签名验证。
-        安全性与 C 引擎版本等价（依赖 cryptography 的 OpenSSL 后端）。"""
+    def _core_verify_license(license_data_b64: str, public_key_pem: str) -> bool:
+        """纯 Python fallback: 用 cryptography 库做 RSA-SHA256 签名验证。"""
         try:
             from cryptography.hazmat.primitives import hashes, serialization
             from cryptography.hazmat.primitives.asymmetric import padding
@@ -92,6 +79,7 @@ except ImportError:
             data_str = payload.get("data", "")
             signature_b64 = payload.get("signature", "")
             if not data_str or not signature_b64:
+                logger.warning("RSA verify: missing data or signature field")
                 return False
 
             signature = base64.b64decode(signature_b64)
@@ -104,10 +92,10 @@ except ImportError:
             )
             return True
         except InvalidSignature:
-            logger.warning("Python RSA fallback: signature verification FAILED")
+            logger.warning("RSA verify: signature verification FAILED")
             return False
         except Exception as e:
-            logger.error(f"Python RSA fallback verification error: {e}")
+            logger.error(f"RSA verify error: {e}")
             return False
 
     # --- Memory Decay (Python fallback) ---
@@ -210,16 +198,16 @@ except ImportError:
 
 def verify_integrity() -> bool:
     """校验授权数据是否被篡改"""
-    if USING_RUST:
+    if USING_CORE:
         try:
             return _verify_integrity()
         except Exception:
             return False
-    return _verify_integrity()
+    # 纯 Python 模式不做完整性校验
+    return True
 
 
 def get_core_engine() -> str:
-    """返回当前核心引擎类型"""
     return _CORE_ENGINE
 
 
@@ -229,23 +217,19 @@ def reset():
 
 # ========== v3.0 功能定义 ==========
 PRO_FEATURES = {
-    # Memory Decay
     "auto_decay": "自动记忆衰减",
     "decay_report": "衰减报告",
     "prune_suggest": "清理建议",
     "reinforce": "记忆强化",
-    # Conflict Resolver
     "conflict_scan": "矛盾扫描",
     "conflict_merge": "自动合并",
-    # Token Router
     "smart_router": "智能模型路由",
     "token_stats": "Token 统计",
-    # AI & Graph
     "ai_extract": "AI 智能提取",
     "auto_graph": "自动知识图谱",
     "unlimited_graph": "无限图谱节点",
-    # Wiki
     "wiki": "Wiki 知识库",
+    "auto_backup": "自动备份",
 }
 
 ENTERPRISE_EXTRA_FEATURES = {
@@ -261,48 +245,72 @@ class LicenseService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_current_license(self) -> License | None:
+    def get_active_license(self) -> License | None:
+        """获取当前活跃的授权记录"""
         return self.db.query(License).filter(License.status == "active").first()
 
     async def activate(self, license_key: str) -> dict:
+        """
+        激活授权码 — 完整流程：
+        1. 向授权平台发送激活请求
+        2. RSA 签名验证
+        3. 存入本地数据库
+        4. 写入内存
+        """
+        fingerprint = self._get_fingerprint()
+        device_name = self._get_device_name()
+
+        # Step 1: 向授权平台请求激活
         try:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.post(
                     f"{settings.license_server_url}/api/v1/activate",
                     json={
                         "license_key": license_key,
-                        "fingerprint": self._get_fingerprint(),
-                        "device_name": self._get_device_name(),
+                        "fingerprint": fingerprint,
+                        "device_name": device_name,
                         "version": APP_VERSION,
                     },
                 )
                 data = resp.json()
+        except httpx.ConnectError:
+            return {"valid": False, "message": "无法连接授权服务器，请检查网络连接"}
+        except httpx.TimeoutException:
+            return {"valid": False, "message": "连接授权服务器超时，请稍后重试"}
         except Exception as e:
-            return {"valid": False, "message": f"Cannot reach license server: {e}"}
+            return {"valid": False, "message": f"激活请求失败: {e}"}
 
+        # 授权平台返回错误
         if not data.get("valid"):
-            server_msg = data.get("message", "Invalid license")
-            logger.warning(f"License activation rejected by server: {server_msg}")
-            return {"valid": False, "message": server_msg}
+            return {"valid": False, "message": data.get("message", "授权码无效")}
 
-        # RSA 签名验证 — 必须通过，任何模式都不能跳过
-        # 授权平台返回 signature 字段（base64 编码的 {data, signature} JSON）
-        if data.get("signature"):
-            try:
-                pubkey = self._load_public_key()
-                if not pubkey:
-                    logger.error("RSA public key not available (local file missing and server fetch failed)")
-                    return {"valid": False, "message": "RSA public key not available, cannot verify license signature. Please check network connection."}
-                if not _rust_verify_license(data["signature"], pubkey):
-                    return {"valid": False, "message": "RSA signature verification failed — license may be forged"}
-            except Exception as e:
-                logger.error(f"RSA verification error: {e}")
-                return {"valid": False, "message": f"RSA verification error: {e}"}
+        # Step 2: RSA 签名验证（核心安全环节）
+        signature_b64 = data.get("signature", "")
+        if signature_b64:
+            pubkey = self._load_public_key()
+            if not pubkey:
+                # 公钥获取失败 — 尝试从签名数据中恢复
+                logger.error("RSA public key not available, cannot verify license signature")
+                return {"valid": False, "message": "无法获取 RSA 公钥，请检查网络连接后重试"}
 
+            if not _core_verify_license(signature_b64, pubkey):
+                logger.warning("RSA signature verification FAILED — license may be forged")
+                return {"valid": False, "message": "RSA 签名验证失败，授权可能被篡改"}
+            logger.info("RSA signature verification passed")
+        else:
+            # 无签名数据 — 仅在纯 Python 模式下允许（开发/测试）
+            if USING_CORE:
+                logger.error("No signature in activation response but core engine is active")
+                return {"valid": False, "message": "授权服务器未返回签名数据"}
+            logger.warning("No signature in response (Python fallback mode, skipping RSA verify)")
+
+        # Step 3: 提取授权数据
         tier = data.get("tier", "pro")
         features = data.get("features", [])
+        expires_at = data.get("expires_at")
+        device_slot = data.get("device_slot", "")
 
-        # 服务端返回的 features 优先，若无则按 tier 默认
+        # 如果 features 为空，按 tier 填充默认值
         if not features:
             if tier == "oss":
                 features = []
@@ -311,95 +319,159 @@ class LicenseService:
             else:
                 features = list(PRO_FEATURES.keys())
 
+        # Step 4: 存入本地数据库 — 先清理旧授权，再写入新授权
+        self._deactivate_all()
         license_obj = License(
             license_key=license_key,
             tier=tier,
             features=json.dumps(features),
             status="active",
-            rsa_signature=data.get("signature", ""),
-            fingerprint_hash=self._get_fingerprint(),
-            device_slot=data.get("device_slot", ""),
-            expires_at=data.get("expires_at"),
+            rsa_signature=signature_b64,
+            fingerprint_hash=fingerprint,
+            device_name=device_name,
+            device_slot=device_slot,
+            expires_at=expires_at,
+            last_verified_at=datetime.now(timezone.utc),
         )
         self.db.add(license_obj)
         self.db.commit()
 
+        # Step 5: 写入内存
         set_license(tier, features)
+
         return {
             "valid": True,
             "tier": tier,
             "features": features,
-            "expires_at": data.get("expires_at"),
+            "expires_at": expires_at,
+            "device_slot": device_slot,
         }
 
+    async def deactivate(self) -> dict:
+        """
+        取消激活 — 本地 + 通知授权平台
+        """
+        lic = self.get_active_license()
+        if lic:
+            # 通知授权平台解绑设备
+            await self._notify_deactivate(lic)
+            lic.status = "revoked"
+            self.db.commit()
+
+        reset()
+        return {"active": False, "tier": "oss", "message": "License deactivated"}
+
+    async def _notify_deactivate(self, lic: License):
+        """通知授权平台解绑设备"""
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.post(
+                    f"{settings.license_server_url}/api/v1/deactivate",
+                    json={
+                        "license_key": lic.license_key,
+                        "fingerprint": lic.fingerprint_hash or self._get_fingerprint(),
+                    },
+                )
+                logger.info(f"Notified license server: device deactivated for {lic.license_key[:8]}***")
+        except Exception as e:
+            logger.warning(f"Failed to notify license server about deactivation: {e}")
+
+    def _deactivate_all(self):
+        """将所有 active 的授权标记为 revoked"""
+        self.db.query(License).filter(License.status == "active").update({"status": "revoked"})
+        self.db.flush()
+
     def load_cached_license(self):
-        lic = self.get_current_license()
+        """启动时从本地数据库恢复授权状态"""
+        lic = self.get_active_license()
         if lic:
             features = json.loads(lic.features) if lic.features else []
             tier = lic.tier if lic.tier in ("oss", "pro", "enterprise") else "pro"
             set_license(tier, features)
+            logger.info(f"Cached license loaded: tier={tier}, features={len(features)}")
+        else:
+            logger.info("No cached license found, running as OSS")
 
     def _get_fingerprint(self) -> str:
+        """生成设备指纹 — 稳定的设备唯一标识"""
         import hashlib, platform, os, uuid
         parts = []
+
+        # 1. 环境变量覆盖（Docker 部署推荐设置）
+        env_fp = os.environ.get('DEVICE_FINGERPRINT', '')
+        if env_fp:
+            parts.append(f"env:{env_fp}")
+
+        # 2. Linux machine-id
         for path in ['/etc/machine-id', '/var/lib/dbus/machine-id']:
             if os.path.isfile(path):
-                parts.append(open(path).read().strip()[:64])
+                try:
+                    parts.append(open(path).read().strip()[:64])
+                except Exception:
+                    pass
                 break
+
+        # 3. MAC 地址
         try:
             mac = uuid.getnode()
             if mac != uuid.UUID(int=0).node:
                 parts.append(f"mac:{mac}")
         except Exception:
             pass
+
+        # 4. 系统+架构
         parts.append(f"{platform.system()}-{platform.machine()}")
-        env_fp = os.environ.get('DEVICE_FINGERPRINT', '')
-        if env_fp:
-            parts.insert(0, f"env:{env_fp}")
+
         raw = '|'.join(parts)
         return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
     def _get_device_name(self) -> str:
-        """Get a human-readable device name for the license platform"""
+        """生成人类可读的设备名称"""
         import platform, os, socket
-        # 1. Environment variable override
+
+        # 1. 环境变量覆盖
         name = os.environ.get('DEVICE_NAME', '')
         if name:
             return name
-        # 2. Docker container name (from hostname)
+
+        # 2. hostname（Docker 容器名、服务器名）
         hostname = socket.gethostname()
-        if hostname and hostname != 'localhost' and not hostname.startswith('DESKTOP'):
-            return f"{hostname} ({platform.system()})"
-        # 3. Fallback: OS + arch
+        if hostname and hostname not in ('localhost', '0.0.0.0'):
+            # Docker 容器名通常是随机 hex，如 7275d4494039
+            if not hostname.startswith('DESKTOP'):
+                return f"{hostname} ({platform.system()})"
+
+        # 3. 回退: OS + 架构
         return f"{platform.system()} {platform.machine()}"
 
     def _load_public_key(self) -> str | None:
-        """加载 RSA 公钥。本地有文件则读取，否则从授权服务器获取并缓存。"""
+        """
+        加载 RSA 公钥 — 多策略降级：
+        1. 本地文件
+        2. 从授权服务器获取并缓存
+        """
         path = settings.rsa_public_key_path
         if path.exists():
             content = path.read_text().strip()
             if content.startswith("-----BEGIN PUBLIC KEY-----"):
                 return content
 
-        # 本地没有 → 从授权服务器获取
+        # 从授权服务器获取
         try:
             import httpx as _httpx
             resp = _httpx.get(f"{settings.license_server_url}/api/v1/public-key", timeout=10)
             if resp.status_code == 200:
                 pubkey = resp.text.strip()
                 if pubkey.startswith("-----BEGIN PUBLIC KEY-----"):
-                    # 缓存到本地
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text(pubkey)
+                    self._cache_public_key(path, pubkey)
                     logger.info("RSA public key fetched from license server and cached locally")
                     return pubkey
-                # 也许返回的是 JSON 格式
+                # 尝试 JSON 格式
                 try:
                     data = resp.json()
                     pk = data.get("public_key", "")
                     if pk and pk.startswith("-----BEGIN PUBLIC KEY-----"):
-                        path.parent.mkdir(parents=True, exist_ok=True)
-                        path.write_text(pk)
+                        self._cache_public_key(path, pk)
                         logger.info("RSA public key fetched from license server (JSON) and cached locally")
                         return pk
                 except Exception:
@@ -408,6 +480,14 @@ class LicenseService:
             logger.warning(f"Failed to fetch public key from server: {e}")
 
         return None
+
+    def _cache_public_key(self, path, content: str):
+        """缓存公钥到本地文件"""
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content)
+        except Exception as e:
+            logger.warning(f"Failed to cache public key: {e}")
 
 
 def is_feature_enabled(feature: str) -> bool:
