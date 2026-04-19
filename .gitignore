@@ -17,14 +17,14 @@ keys/*.pem
 
 # Frontend
 **/node_modules/
-**/dist/
+frontend/dist/
+# backend/frontend_dist is the production build — DO track it
 
 # IDE
 .vscode/
 .idea/
 
-# Rust
-target/
+# Commercial (private)
 backend/clawmemory_core/
 license-platform-v2/
 clawmemory-core-repo/
