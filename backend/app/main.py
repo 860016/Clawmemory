@@ -9,10 +9,81 @@ from app.config import settings
 from app.database import init_db
 from app.services.setup_service import ensure_data_dirs
 from app.routers import auth, memories, license, backups, knowledge, file_watcher, wiki, pro_features, openclaw_memories
+import asyncio
 import time
 import logging
 
+
 logger = logging.getLogger("clawmemory.api")
+
+
+# ========== Background Scheduler ==========
+
+_scheduler_task: asyncio.Task | None = None
+
+
+async def _background_scheduler():
+    """Background task for auto decay and auto backup"""
+    from app.services.license_service import is_feature_enabled
+    from app.config import settings
+
+    while True:
+        await asyncio.sleep(3600)  # Check every hour
+        try:
+            # Auto Decay
+            if is_feature_enabled("auto_decay"):
+                from app.database import SessionLocal
+                from app.models.memory import Memory
+                from app.services import license_service as core
+                import time as _time
+
+                db = SessionLocal()
+                try:
+                    memories = db.query(Memory).filter(Memory.user_id == 1).all()
+                    memory_data = [
+                        {"id": m.id, "importance": m.importance,
+                         "last_accessed_at": m.last_accessed_at.timestamp() if m.last_accessed_at else 0}
+                        for m in memories
+                    ]
+                    results = core.decay_batch(memory_data)
+                    for r in results:
+                        m = db.query(Memory).filter(Memory.id == r["memory_id"]).first()
+                        if m:
+                            if r["should_prune"]:
+                                db.delete(m)
+                            else:
+                                m.importance = r["new_importance"]
+                    db.commit()
+                    logger.info("Auto decay applied: %d memories processed", len(results))
+                except Exception as e:
+                    logger.warning("Auto decay failed: %s", e)
+                finally:
+                    db.close()
+
+            # Auto Backup
+            if is_feature_enabled("auto_backup"):
+                import json
+                from pathlib import Path
+
+                schedule_file = settings.data_dir / "backup_schedule.json"
+                if schedule_file.exists():
+                    schedule = json.loads(schedule_file.read_text())
+                    if schedule.get("enabled"):
+                        from app.database import SessionLocal
+                        from app.services.backup_service import BackupService
+
+                        db = SessionLocal()
+                        try:
+                            svc = BackupService(db)
+                            svc.create_backup(1, notes="Auto backup")
+                            logger.info("Auto backup created")
+                        except Exception as e:
+                            logger.warning("Auto backup failed: %s", e)
+                        finally:
+                            db.close()
+
+        except Exception as e:
+            logger.warning("Background scheduler error: %s", e)
 
 
 # ========== ASGI-level 中间件 ==========
@@ -142,12 +213,18 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Failed to load cached license: {e}")
     finally:
         db.close()
+    # 启动后台调度器
+    global _scheduler_task
+    _scheduler_task = asyncio.create_task(_background_scheduler())
     yield
+    # 停止后台调度器
+    if _scheduler_task:
+        _scheduler_task.cancel()
 
 
 app = FastAPI(
     title="ClawMemory",
-    version="2.1.0",
+    version="2.2.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     lifespan=lifespan,
@@ -179,7 +256,7 @@ app.include_router(openclaw_memories.router)
 
 @app.get("/api/v1/health")
 async def health_check():
-    return {"status": "ok", "version": "2.1.0"}
+    return {"status": "ok", "version": "2.2.0"}
 
 
 @app.get("/api/v1/install-status")
@@ -207,7 +284,7 @@ async def install_status():
 
     return {
         "plugin": "ClawMemory",
-        "version": "2.1.0",
+        "version": "2.2.0",
         "status": "running" if db_ok else "degraded",
         "service_url": f"http://localhost:{settings.port}",
         "security_level": security_level,
@@ -296,7 +373,7 @@ async def get_dashboard_stats():
             "recentMemories": recent_list,
             "license": license_info,
             "passwordSet": bool(settings.access_password),
-            "version": "2.1.0",
+            "version": "2.2.0",
         }
     finally:
         db.close()

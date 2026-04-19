@@ -27,6 +27,10 @@
           <el-icon><Document /></el-icon>
           <span>{{ $t('nav.wiki') }}</span>
         </el-menu-item>
+        <el-menu-item index="/pro">
+          <el-icon><Promotion /></el-icon>
+          <span>{{ $t('nav.pro') }}</span>
+        </el-menu-item>
         <el-menu-item index="/settings">
           <el-icon><Setting /></el-icon>
           <span>{{ $t('nav.settings') }}</span>
@@ -49,7 +53,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { HomeFilled, Collection, Connection, Setting, SwitchButton, Document } from '@element-plus/icons-vue'
+import { HomeFilled, Collection, Connection, Setting, SwitchButton, Document, Promotion } from '@element-plus/icons-vue'
 import axios from '../api/client'
 
 const { t } = useI18n()
@@ -63,7 +67,7 @@ const tierClass = computed(() => tier.value === 'oss' ? 'tier-free' : 'tier-pro'
 
 onMounted(async () => {
   try {
-    const { data } = await axios.get('/api/v1/license/info')
+    const { data } = await axios.get('/license/info')
     tier.value = data.tier || 'oss'
   } catch {
     tier.value = 'oss'

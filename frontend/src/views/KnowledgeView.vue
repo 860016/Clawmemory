@@ -15,6 +15,9 @@
         <el-button type="primary" @click="showEntityDialog = true">
           <el-icon><Plus /></el-icon> {{ $t('knowledge.addEntity') }}
         </el-button>
+        <el-button v-if="licenseFeatures.ai_extract || licenseFeatures.auto_graph" type="success" @click="$router.push('/pro')">
+          🤖 {{ $t('nav.pro') }}
+        </el-button>
       </div>
     </div>
 

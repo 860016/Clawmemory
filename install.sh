@@ -194,16 +194,16 @@ PYVER=$(python3 -c "import sys; print(f'cp{sys.version_info.major}{sys.version_i
 if [ "$SYS" = "linux" ]; then
     # Linux: manylinux 格式
     if [ "$ARCH" = "aarch64" ]; then
-        WHEEL_PATTERN="clawmemory_core-2.1.0-${PYVER}-${PYVER}-manylinux*_aarch64.whl"
+        WHEEL_PATTERN="clawmemory_core-2.2.0-${PYVER}-${PYVER}-manylinux*_aarch64.whl"
     else
-        WHEEL_PATTERN="clawmemory_core-2.1.0-${PYVER}-${PYVER}-manylinux*_x86_64.whl"
+        WHEEL_PATTERN="clawmemory_core-2.2.0-${PYVER}-${PYVER}-manylinux*_x86_64.whl"
     fi
 elif [ "$SYS" = "darwin" ]; then
-    WHEEL_PATTERN="clawmemory_core-2.1.0-${PYVER}-${PYVER}-macosx*_${ARCH}.whl"
+    WHEEL_PATTERN="clawmemory_core-2.2.0-${PYVER}-${PYVER}-macosx*_${ARCH}.whl"
 elif [ "$SYS" = "windows" ]; then
-    WHEEL_PATTERN="clawmemory_core-2.1.0-${PYVER}-${PYVER}-win_${ARCH}.whl"
+    WHEEL_PATTERN="clawmemory_core-2.2.0-${PYVER}-${PYVER}-win_${ARCH}.whl"
 else
-    WHEEL_PATTERN="clawmemory_core-2.1.0-${PYVER}-${PYVER}-*.whl"
+    WHEEL_PATTERN="clawmemory_core-2.2.0-${PYVER}-${PYVER}-*.whl"
 fi
 
 WHEEL_URL="https://github.com/860016/Clawmemory/releases/latest/download/${WHEEL_PATTERN}"

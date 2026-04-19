@@ -1,6 +1,6 @@
 {
   "name": "clawmemory",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -20,7 +20,7 @@
     "cytoscape": "^3.33.2",
     "echarts": "^5.5.0",
     "element-plus": "^2.7.0",
-    "marked": "^18.0.1",
+    "marked": "^18.0.2",
     "pinia": "^2.1.0",
     "vue": "^3.4.0",
     "vue-i18n": "^9.13.0",
