@@ -33,7 +33,7 @@ for arg in "$@"; do
 done
 
 echo "============================================"
-echo "  ClawMemory 安装程序 v2.8.2"
+echo "  ClawMemory 安装程序 v2.8.3"
 echo "============================================"
 echo "安装目录: $INSTALL_DIR"
 echo "后端端口: $BACKEND_PORT"
@@ -313,9 +313,8 @@ fi
 
 if [ "$CORE_ENGINE" = "python" ]; then
     echo ""
-    echo "  ❌ 核心安全引擎未安装！Pro 功能不可用！"
-    echo "  ❌ 无法激活 Pro/Enterprise 授权码"
-    echo "  请检查网络连接后重试，或手动安装 clawmemory-core wheel"
+    echo "  ⚠️  C 安全引擎未安装，使用纯 Python 兜底"
+    echo "  ℹ️  Pro 功能将在激活时自动下载并安装"
 fi
 
 # 配置环境变量
