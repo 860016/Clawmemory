@@ -286,7 +286,7 @@ async def install_status():
     elif core_engine == "c":
         security_level = "high"
     else:
-        security_level = "low"
+        security_level = "none"
 
     return {
         "plugin": "ClawMemory",
@@ -308,7 +308,7 @@ async def install_status():
                 "description": {
                     "rust": "Rust (PyO3) — 最高安全，RSA 硬验证（已弃用）",
                     "c": "C/CPython — 高安全，RSA 硬验证",
-                    "python": "纯 Python — 低安全，仅 OSS 免费版",
+                    "python": "未安装核心引擎 — Pro 功能不可用，仅限 OSS 免费版",
                 }.get(core_engine, "unknown"),
             },
         },
@@ -503,10 +503,10 @@ async def get_usage_stats(days: int = 30):
 def _get_next_steps(is_licensed: bool, frontend_ready: bool, pubkey_ok: bool, core_engine: str) -> list:
     steps = []
     if core_engine == "python":
-        steps.append("⚠️ 安全引擎为纯 Python 模式，授权保护较弱。建议安装 clawmemory-core (C 编译版)")
+        steps.append("❌ 核心安全引擎未安装！Pro 功能不可用，无法激活授权码。请安装 clawmemory-core (C 编译版)")
     if not pubkey_ok:
         steps.append("⚠️ RSA 公钥缺失，无法验证授权签名。请确保授权服务器可访问或手动放置 backend/keys/public.pem")
-    if not is_licensed:
+    if not is_licensed and core_engine != "python":
         steps.append("在「设置 → 授权管理」中输入授权码，激活 Pro 功能")
     if not frontend_ready:
         steps.append("前端界面未安装，请运行 cd frontend && npm install && npm run build")

@@ -74,6 +74,39 @@ if [ "$USE_DOCKER" = true ]; then
         docker-compose up --build -d
     fi
 
+    # 更新 OpenClaw AGENTS.md
+    OPENCLAW_HOME="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
+    if [ -d "$OPENCLAW_HOME" ]; then
+        AGENTS_FILE="$OPENCLAW_HOME/workspace/AGENTS.md"
+        if [ -f "$AGENTS_FILE" ] && grep -q "ClawMemory" "$AGENTS_FILE" 2>/dev/null; then
+            echo "  ✅ AGENTS.md 已包含 ClawMemory 配置"
+        else
+            mkdir -p "$(dirname "$AGENTS_FILE")"
+            cat >> "$AGENTS_FILE" << 'AGENTS_EOF'
+
+---
+
+## 🧠 ClawMemory — 主要记忆系统
+
+> **ClawMemory 是本工作区的核心记忆管理系统，所有对话和重要信息必须记录到 ClawMemory。**
+
+### 记忆记录规则
+
+- **每一句对话都必须记录到 ClawMemory**，包括用户请求、AI 回复、关键决策和上下文
+- 使用 ClawMemory API 写入记忆
+- 记忆分层：`core`（核心/偏好）、`knowledge`（知识）、`episodic`（事件/对话）
+- 重要决定 → `core` 层；学到的知识 → `knowledge` 层；对话记录 → `episodic` 层
+
+### 优先级
+
+- ClawMemory 优先于本地 MEMORY.md 和 memory/ 目录
+- 如遇冲突，以 ClawMemory 中的数据为准
+
+AGENTS_EOF
+            echo "  ✅ AGENTS.md 已更新 — ClawMemory 配置为主要记忆系统"
+        fi
+    fi
+
     echo ""
     echo "============================================"
     echo "  ✅ Docker 安装完成！"
@@ -279,8 +312,10 @@ if [ "$CORE_ENGINE" = "python" ] && [ -f "$INSTALL_DIR/backend/clawmemory_core/s
 fi
 
 if [ "$CORE_ENGINE" = "python" ]; then
-    echo "  ⚠️  使用纯 Python 模式（安全性较低）"
-    echo "  ⚠️  建议安装 clawmemory-core C 编译版以获得 RSA 硬验证保护"
+    echo ""
+    echo "  ❌ 核心安全引擎未安装！Pro 功能不可用！"
+    echo "  ❌ 无法激活 Pro/Enterprise 授权码"
+    echo "  请检查网络连接后重试，或手动安装 clawmemory-core wheel"
 fi
 
 # 配置环境变量
@@ -359,6 +394,11 @@ mkdir -p "$INSTALL_DIR/backend/keys"
 # RSA 公钥
 echo ""
 echo "[5/6] RSA 公钥..."
+# 升级模式强制刷新公钥（防止旧公钥与服务器不匹配导致验签失败）
+if [ "$UPGRADE_MODE" = true ] && [ -f "$INSTALL_DIR/backend/keys/public.pem" ]; then
+    echo "  升级模式：刷新公钥..."
+    rm -f "$INSTALL_DIR/backend/keys/public.pem"
+fi
 if [ ! -f "$INSTALL_DIR/backend/keys/public.pem" ]; then
     echo "  正在从授权服务器获取公钥..."
     PUBKEY_FETCHED=false
@@ -464,6 +504,61 @@ fi
 # 版本一致性检查
 APP_VERSION=$(python3 -c "import app.main; print(getattr(app.main.app, 'version', 'unknown'))" 2>/dev/null || echo "unknown")
 echo "  ℹ️  应用版本: $APP_VERSION | 引擎: $CORE_ENGINE"
+
+# 更新 OpenClaw AGENTS.md — 将 ClawMemory 配置为主要记忆系统
+echo ""
+echo "配置 OpenClaw 集成..."
+OPENCLAW_HOME="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
+if [ -d "$OPENCLAW_HOME" ]; then
+    AGENTS_FILE="$OPENCLAW_HOME/workspace/AGENTS.md"
+
+    # 检查是否已配置 ClawMemory
+    if [ -f "$AGENTS_FILE" ] && grep -q "ClawMemory" "$AGENTS_FILE" 2>/dev/null; then
+        echo "  ✅ AGENTS.md 已包含 ClawMemory 配置，跳过"
+    else
+        # 确保目录存在
+        mkdir -p "$(dirname "$AGENTS_FILE")"
+
+        # 生成 AGENTS.md 内容
+        cat >> "$AGENTS_FILE" << 'AGENTS_EOF'
+
+---
+
+## 🧠 ClawMemory — 主要记忆系统
+
+> **ClawMemory 是本工作区的核心记忆管理系统，所有对话和重要信息必须记录到 ClawMemory。**
+
+### 记忆记录规则
+
+- **每一句对话都必须记录到 ClawMemory**，包括用户请求、AI 回复、关键决策和上下文
+- 使用 ClawMemory API (`http://localhost:BACKEND_PORT/api/v1/memories`) 写入记忆
+- 记忆分层：`core`（核心/偏好）、`knowledge`（知识）、`episodic`（事件/对话）
+- 重要决定 → `core` 层；学到的知识 → `knowledge` 层；对话记录 → `episodic` 层
+
+### 工作流程
+
+1. **会话开始**：从 ClawMemory 加载用户偏好和近期上下文
+2. **对话中**：每句对话实时写入 ClawMemory（episodic 层）
+3. **关键决策**：立即写入 ClawMemory（core 层）
+4. **会话结束前**：确保本轮所有重要信息已持久化
+
+### 优先级
+
+- ClawMemory 优先于本地 MEMORY.md 和 memory/ 目录
+- 如遇冲突，以 ClawMemory 中的数据为准
+- MEMORY.md 作为离线备份，定期从 ClawMemory 同步
+
+AGENTS_EOF
+
+        # 替换端口号
+        sed -i "s/BACKEND_PORT/${BACKEND_PORT}/g" "$AGENTS_FILE" 2>/dev/null || \
+            sed -i '' "s/BACKEND_PORT/${BACKEND_PORT}/g" "$AGENTS_FILE" 2>/dev/null
+
+        echo "  ✅ AGENTS.md 已更新 — ClawMemory 配置为主要记忆系统"
+    fi
+else
+    echo "  ⏭️  未检测到 OpenClaw，跳过 AGENTS.md 配置"
+fi
 
 echo ""
 echo "============================================"

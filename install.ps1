@@ -184,8 +184,10 @@ if ($CoreEngine -eq "python" -and (Test-Path "$InstallDir\backend\clawmemory_cor
 }
 
 if ($CoreEngine -eq "python") {
-    Write-Host "  使用纯 Python 模式（安全性较低）" -ForegroundColor Yellow
-    Write-Host "  建议下载 clawmemory-core C 编译版以获得 RSA 硬验证保护" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  核心安全引擎未安装！Pro 功能不可用！" -ForegroundColor Red
+    Write-Host "  无法激活 Pro/Enterprise 授权码" -ForegroundColor Red
+    Write-Host "  请检查网络连接后重试，或手动安装 clawmemory-core wheel" -ForegroundColor Red
 }
 
 # 配置环境变量
@@ -263,6 +265,11 @@ New-Item -ItemType Directory -Force -Path "$InstallDir\backend\keys" | Out-Null
 # RSA 公钥
 Write-Host ""
 Write-Host "[5/6] RSA 公钥..." -ForegroundColor Yellow
+# 升级模式强制刷新公钥（防止旧公钥与服务器不匹配导致验签失败）
+if ($Upgrade -and (Test-Path "$InstallDir\backend\keys\public.pem")) {
+    Write-Host "  升级模式：刷新公钥..." -ForegroundColor Cyan
+    Remove-Item "$InstallDir\backend\keys\public.pem" -Force -ErrorAction SilentlyContinue
+}
 if (-not (Test-Path "$InstallDir\backend\keys\public.pem")) {
     $pubKeyFetched = $false
 
@@ -363,6 +370,65 @@ try {
     Write-Host "  后端服务已运行 (版本: $($health.version))" -ForegroundColor Green
 } catch {
     Write-Host "  后端服务未启动 (安装后请运行 start.bat)" -ForegroundColor Yellow
+}
+
+# 更新 OpenClaw AGENTS.md — 将 ClawMemory 配置为主要记忆系统
+Write-Host ""
+Write-Host "配置 OpenClaw 集成..." -ForegroundColor Yellow
+$OpenClawHome = if ($env:OPENCLAW_STATE_DIR) { $env:OPENCLAW_STATE_DIR } else { "$env:USERPROFILE\.openclaw" }
+if (Test-Path $OpenClawHome) {
+    $AgentsFile = Join-Path $OpenClawHome "workspace\AGENTS.md"
+    $AgentsDir = Split-Path -Parent $AgentsFile
+
+    $alreadyConfigured = $false
+    if (Test-Path $AgentsFile) {
+        $content = Get-Content $AgentsFile -Raw -ErrorAction SilentlyContinue
+        if ($content -and $content.Contains("ClawMemory")) {
+            $alreadyConfigured = $true
+        }
+    }
+
+    if ($alreadyConfigured) {
+        Write-Host "  AGENTS.md 已包含 ClawMemory 配置，跳过" -ForegroundColor Green
+    } else {
+        if (-not (Test-Path $AgentsDir)) {
+            New-Item -ItemType Directory -Force -Path $AgentsDir | Out-Null
+        }
+
+        $agentsContent = @"
+
+---
+
+## 🧠 ClawMemory — 主要记忆系统
+
+> **ClawMemory 是本工作区的核心记忆管理系统，所有对话和重要信息必须记录到 ClawMemory。**
+
+### 记忆记录规则
+
+- **每一句对话都必须记录到 ClawMemory**，包括用户请求、AI 回复、关键决策和上下文
+- 使用 ClawMemory API (`http://localhost:$Port/api/v1/memories`) 写入记忆
+- 记忆分层：`core`（核心/偏好）、`knowledge`（知识）、`episodic`（事件/对话）
+- 重要决定 → `core` 层；学到的知识 → `knowledge` 层；对话记录 → `episodic` 层
+
+### 工作流程
+
+1. **会话开始**：从 ClawMemory 加载用户偏好和近期上下文
+2. **对话中**：每句对话实时写入 ClawMemory（episodic 层）
+3. **关键决策**：立即写入 ClawMemory（core 层）
+4. **会话结束前**：确保本轮所有重要信息已持久化
+
+### 优先级
+
+- ClawMemory 优先于本地 MEMORY.md 和 memory/ 目录
+- 如遇冲突，以 ClawMemory 中的数据为准
+- MEMORY.md 作为离线备份，定期从 ClawMemory 同步
+
+"@
+        Add-Content -Path $AgentsFile -Value $agentsContent -Encoding UTF8
+        Write-Host "  AGENTS.md 已更新 — ClawMemory 配置为主要记忆系统" -ForegroundColor Green
+    }
+} else {
+    Write-Host "  未检测到 OpenClaw，跳过 AGENTS.md 配置" -ForegroundColor Yellow
 }
 
 Write-Host ""
