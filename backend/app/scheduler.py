@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.database import SessionLocal
-from app.services.daily_report_service import DailyReportService
+from app.pro.pro_loader import get_pro_class
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -15,8 +15,12 @@ def generate_daily_report_sync():
     logger.info("Starting daily report generation...")
     db = SessionLocal()
     try:
-        service = DailyReportService(db)
-        # 在 BackgroundScheduler 中运行，需要创建新的事件循环
+        cls = get_pro_class("daily_report_service", "DailyReportService")
+        if cls is None:
+            logger.warning("Pro module not available, skipping daily report")
+            return
+
+        service = cls(db)
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -35,7 +39,6 @@ def generate_daily_report_sync():
 
 def init_scheduler():
     """初始化定时任务"""
-    # 每天 22:00 生成日报
     scheduler.add_job(
         generate_daily_report_sync,
         "cron",

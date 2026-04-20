@@ -97,7 +97,7 @@
         <div class="detail-stats">
           <div class="detail-stat" v-for="(v, k) in currentReport.stats" :key="k">
             <span class="detail-stat-value">{{ v }}</span>
-            <span class="detail-stat-label">{{ statLabel(k) }}</span>
+            <span class="detail-stat-label">{{ statLabel(String(k)) }}</span>
           </div>
         </div>
       </div>

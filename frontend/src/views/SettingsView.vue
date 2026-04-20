@@ -57,6 +57,10 @@
             <el-input v-model="licenseKey" :placeholder="$t('settings.licensePlaceholder')" class="license-input" />
             <el-button type="primary" @click="activateLicense" :loading="activating">{{ $t('settings.activateLicense') }}</el-button>
           </div>
+          <div v-if="proInstallStatus" class="pro-install-status">
+            <div class="status-text">{{ proInstallStatus }}</div>
+            <el-progress v-if="proInstalling" :percentage="proInstallProgress" :stroke-width="6" />
+          </div>
         </div>
       </div>
 
@@ -212,6 +216,9 @@ const activeSection = ref((route.query.section as string) || '')
 const license = ref<any>({ active: false, tier: 'oss', features: [] })
 const licenseKey = ref('')
 const activating = ref(false)
+const proInstalling = ref(false)
+const proInstallProgress = ref(0)
+const proInstallStatus = ref('')
 const backingUp = ref(false)
 const passwordSet = ref(false)
 const showPasswordDialog = ref(false)
@@ -343,6 +350,10 @@ async function activateLicense() {
       ElMessage.success(t('settings.activated'))
       licenseKey.value = ''
       await loadLicense()
+      
+      if (data.pro_download_url) {
+        await installProModule(data.pro_download_url, data.pro_fallback_urls || [])
+      }
     } else {
       ElMessage.error(data.message || t('common.failed'))
     }
@@ -354,6 +365,40 @@ async function activateLicense() {
       ElMessage.error(t('common.failed'))
     }
   } finally { activating.value = false }
+}
+
+async function installProModule(url: string, fallbackUrls: string[]) {
+  proInstalling.value = true
+  proInstallProgress.value = 0
+  proInstallStatus.value = '正在下载 Pro 模块...'
+  
+  try {
+    const fallbackParam = fallbackUrls.length > 0 ? fallbackUrls.join(',') : ''
+    const { data } = await axios.post('/license/pro/install', null, {
+      params: { url, fallback_urls: fallbackParam },
+      timeout: 120000,
+      onDownloadProgress: (e) => {
+        if (e.total) {
+          proInstallProgress.value = Math.round((e.loaded / e.total) * 100)
+        }
+      }
+    })
+    
+    if (data.success) {
+      ElMessage.success('Pro 模块安装成功')
+      proInstallStatus.value = '安装完成'
+    } else {
+      ElMessage.error(data.message || 'Pro 模块安装失败')
+      proInstallStatus.value = '安装失败'
+    }
+  } catch (e: any) {
+    const detail = e.response?.data?.detail || e.message
+    ElMessage.error(`Pro 模块安装失败: ${detail}`)
+    proInstallStatus.value = '安装失败'
+  } finally {
+    proInstalling.value = false
+    setTimeout(() => { proInstallStatus.value = '' }, 3000)
+  }
 }
 
 async function deactivateLicense() {
@@ -472,6 +517,8 @@ async function emptyTrash() {
 .price-features { list-style: none; padding: 0; margin: 8px 0 0; font-size: 12px; color: var(--cm-text-muted); line-height: 1.8; text-align: left; }
 .activate-section { display: flex; gap: 8px; justify-content: center; }
 .license-input { width: 260px; }
+.pro-install-status { margin-top: 12px; padding: 12px; background: rgba(16,185,129,0.05); border-radius: 8px; }
+.status-text { font-size: 13px; color: var(--cm-text); margin-bottom: 8px; }
 .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--cm-border); font-size: 14px; color: var(--cm-text); }
 .setting-desc { color: var(--cm-text-muted); font-size: 13px; }
 .backup-list { margin-top: 12px; border-top: 1px solid var(--cm-border); padding-top: 8px; max-height: 200px; overflow-y: auto; }

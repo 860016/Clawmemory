@@ -465,6 +465,8 @@ class LicenseService:
             "features": features,
             "expires_at": expires_at,
             "device_slot": device_slot,
+            "pro_download_url": settings.pro_download_url,
+            "pro_fallback_urls": settings.pro_fallback_urls,
         }
 
     async def deactivate(self) -> dict:

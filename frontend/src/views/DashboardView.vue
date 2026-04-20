@@ -177,9 +177,9 @@
           </div>
           <div class="distribution-bars" v-if="Object.keys(usageStats.sourceDistribution || {}).length">
             <div class="dist-bar" v-for="(count, source) in usageStats.sourceDistribution" :key="source">
-              <div class="dist-label">{{ sourceLabel(source as string) }}</div>
+              <div class="dist-label">{{ sourceLabel(String(source)) }}</div>
               <div class="dist-track">
-                <div class="dist-fill" :class="String(source)" :style="{ width: distWidth(count as number, usageStats.totalMemories) }"></div>
+                <div class="dist-fill" :class="String(source)" :style="{ width: distWidth(Number(count), usageStats.totalMemories) }"></div>
               </div>
               <div class="dist-count">{{ count }}</div>
             </div>
@@ -194,9 +194,9 @@
           </div>
           <div class="distribution-bars" v-if="usageStats.importanceDistribution">
             <div class="dist-bar" v-for="(count, level) in usageStats.importanceDistribution" :key="level">
-              <div class="dist-label">{{ importanceLabel(level as string) }}</div>
+              <div class="dist-label">{{ importanceLabel(String(level)) }}</div>
               <div class="dist-track">
-                <div class="dist-fill importance" :class="String(level)" :style="{ width: distWidth(count as number, stats.memoryCount) }"></div>
+                <div class="dist-fill importance" :class="String(level)" :style="{ width: distWidth(Number(count), stats.memoryCount) }"></div>
               </div>
               <div class="dist-count">{{ count }}</div>
             </div>
@@ -213,11 +213,11 @@
           </div>
           <div class="distribution-bars" v-if="Object.keys(usageStats.tokenByLayer || {}).length">
             <div class="dist-bar" v-for="(tokens, layer) in usageStats.tokenByLayer" :key="layer">
-              <div class="dist-label">{{ layerLabels[layer as string] || layer }}</div>
+              <div class="dist-label">{{ layerLabels[String(layer)] || layer }}</div>
               <div class="dist-track">
-                <div class="dist-fill layer" :class="String(layer)" :style="{ width: distWidth(tokens as number, usageStats.totalEstimatedTokens) }"></div>
+                <div class="dist-fill layer" :class="String(layer)" :style="{ width: distWidth(Number(tokens), usageStats.totalEstimatedTokens) }"></div>
               </div>
-              <div class="dist-count">{{ formatNumber(tokens as number) }}</div>
+              <div class="dist-count">{{ formatNumber(Number(tokens)) }}</div>
             </div>
           </div>
           <div v-else class="empty-hint">{{ $t('common.noData') }}</div>
@@ -232,7 +232,7 @@
             <div class="dist-bar" v-for="(count, etype) in usageStats.entityTypeDistribution" :key="etype">
               <div class="dist-label">{{ etype }}</div>
               <div class="dist-track">
-                <div class="dist-fill entity" :style="{ width: distWidth(count as number, stats.entityCount), background: entityTypeColor(etype as string) }"></div>
+                <div class="dist-fill entity" :style="{ width: distWidth(Number(count), stats.entityCount), background: entityTypeColor(String(etype)) }"></div>
               </div>
               <div class="dist-count">{{ count }}</div>
             </div>
@@ -510,7 +510,7 @@ const dailyTrendPoints = computed(() => {
 const dailyTrendLinePath = computed(() => {
   const pts = dailyTrendPoints.value
   if (!pts.length) return ''
-  return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+  return pts.map((p: {x: number, y: number}, i: number) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
 })
 
 const dailyTrendAreaPath = computed(() => {
@@ -518,7 +518,7 @@ const dailyTrendAreaPath = computed(() => {
   if (!pts.length) return ''
   const plotH = chartHeight - chartPadding.top - chartPadding.bottom
   const baseY = chartPadding.top + plotH
-  const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+  const linePath = pts.map((p: {x: number, y: number}, i: number) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
   return `${linePath} L${pts[pts.length - 1].x},${baseY} L${pts[0].x},${baseY} Z`
 })
 

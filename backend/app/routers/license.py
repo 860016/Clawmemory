@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.models.license import License
 from app.schemas.license import LicenseActivateRequest
 from app.services.license_service import LicenseService, current_tier, is_feature_enabled, reset
+from app.pro.pro_loader import is_pro_installed, get_pro_info, download_pro_package, uninstall_pro
 
 router = APIRouter(prefix="/api/v1/license", tags=["license"])
 
@@ -82,6 +83,10 @@ async def activate_license(req: LicenseActivateRequest, _=Depends(get_current_us
     if result.get("valid"):
         info = _build_license_info(db)
         info["valid"] = True
+        if result.get("pro_download_url"):
+            info["pro_download_url"] = result["pro_download_url"]
+        if result.get("pro_fallback_urls"):
+            info["pro_fallback_urls"] = result["pro_fallback_urls"]
         return info
     return result
 
@@ -91,3 +96,30 @@ async def deactivate_license(_=Depends(get_current_user), db: Session = Depends(
     svc = LicenseService(db)
     result = await svc.deactivate()
     return result
+
+
+@router.get("/pro/status")
+def get_pro_status(_=Depends(get_current_user)):
+    """获取 Pro 模块安装状态"""
+    return get_pro_info()
+
+
+@router.post("/pro/install")
+async def install_pro(
+    url: str = Query(..., description="主下载链接"),
+    fallback_urls: str | None = Query(None, description="备用下载链接（逗号分隔）"),
+    _=Depends(get_current_user),
+):
+    """安装 Pro 模块"""
+    fallback_list = [u.strip() for u in fallback_urls.split(",") if u.strip()] if fallback_urls else []
+    success = await download_pro_package(url, fallback_list)
+    if success:
+        return {"success": True, "message": "Pro module installed", "info": get_pro_info()}
+    return {"success": False, "message": "Failed to download Pro module from all sources"}
+
+
+@router.post("/pro/uninstall")
+def uninstall_pro_module(_=Depends(get_current_user)):
+    """卸载 Pro 模块"""
+    success = uninstall_pro()
+    return {"success": success, "message": "Pro module uninstalled" if success else "Failed to uninstall"}
