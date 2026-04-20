@@ -6,14 +6,11 @@ Cython 编译脚本 - 将 Pro 模块编译为 .pyd/.so 二进制文件
     python setup_cython.py build      # 编译
     python setup_cython.py package    # 编译并打包为 zip
     python setup_cython.py clean      # 清理编译产物
-
-输出:
-    build/pro_package/    - 编译后的文件
-    dist/pro_module.zip   - 分发包（用于 GitHub Releases）
 """
 
 import os
 import sys
+import json
 import shutil
 import zipfile
 import subprocess
@@ -36,12 +33,9 @@ def run_cython_build():
         print(f"Error: Pro directory not found: {PRO_DIR}")
         sys.exit(1)
 
-    print(f"\nPro directory: {PRO_DIR}")
-    print(f"Build directory: {BUILD_DIR}")
-
     if BUILD_DIR.exists():
         shutil.rmtree(BUILD_DIR)
-    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    BUILD_DIR.mkdir(parents=True)
 
     py_files = list(PRO_DIR.glob("*.py"))
     py_files = [f for f in py_files if not f.name.startswith("_")]
@@ -55,103 +49,90 @@ def run_cython_build():
         print(f"  - {f.name}")
 
     print("\nInstalling Cython...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "cython"])
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "cython", "-q"])
 
-    print("\nCompiling with Cython...")
-    for py_file in py_files:
-        print(f"  Compiling {py_file.name}...")
-        result = subprocess.run(
-            [sys.executable, "-m", "cython", "-3", str(py_file)],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            print(f"    Warning: Cython compilation failed for {py_file.name}")
-            print(f"    {result.stderr}")
-        else:
-            c_file = py_file.with_suffix(".c")
-            if c_file.exists():
-                print(f"    Generated {c_file.name}")
+    # 创建临时构建目录
+    temp_build = BUILD_DIR / "temp"
+    temp_build.mkdir()
 
-    print("\nBuilding binary extensions...")
-    setup_py_content = '''
+    # 复制源文件
+    for f in py_files:
+        shutil.copy2(f, temp_build / f.name)
+
+    # 创建 setup.py
+    setup_content = '''
 from setuptools import setup, Extension
 from Cython.Build import cythonize
-import os
 import glob
+import os
 
-extensions = []
-for cython_file in glob.glob("*.pyx"):
-    module_name = os.path.splitext(cython_file)[0]
-    extensions.append(
+ext_modules = []
+for py_file in glob.glob("*.py"):
+    module_name = os.path.splitext(py_file)[0]
+    ext_modules.append(
         Extension(
             module_name,
-            [cython_file],
-            extra_compile_args=["-O3"],
+            [py_file],
         )
     )
 
 setup(
     ext_modules=cythonize(
-        extensions,
+        ext_modules,
         compiler_directives={
             'language_level': '3',
             'boundscheck': False,
             'wraparound': False,
-            'cdivision': True,
         },
-        annotate=True,
     ),
+    script_args=['build_ext', '--inplace'],
 )
 '''
+    (temp_build / "setup.py").write_text(setup_content)
 
-    for py_file in py_files:
-        c_file = py_file.with_suffix(".c")
-        if c_file.exists():
-            pyx_file = BUILD_DIR / py_file.with_suffix(".pyx").name
-            shutil.copy2(c_file, pyx_file)
-
-    setup_py = BUILD_DIR / "setup.py"
-    setup_py.write_text(setup_py_content)
-
+    print("\nCompiling with Cython...")
     result = subprocess.run(
-        [sys.executable, "setup.py", "build_ext", "--inplace"],
-        cwd=BUILD_DIR,
+        [sys.executable, "setup.py"],
+        cwd=temp_build,
         capture_output=True,
         text=True,
     )
 
     if result.returncode != 0:
-        print(f"Warning: Binary compilation had issues:")
-        print(result.stderr[:500])
+        print(f"Compilation error:\n{result.stderr[-1000:]}")
+        print("\nFalling back to .py distribution...")
+        for f in py_files:
+            shutil.copy2(f, BUILD_DIR / f.name)
     else:
-        print("Binary compilation successful")
+        print("Compilation successful!")
+        # 复制编译产物
+        for item in temp_build.iterdir():
+            if item.suffix in ('.pyd', '.so', '.py'):
+                if not item.name.startswith("_"):
+                    shutil.copy2(item, BUILD_DIR / item.name)
 
-    print("\nCopying non-compiled files...")
-    for item in PRO_DIR.iterdir():
-        if item.name.startswith("__"):
-            continue
-        if item.is_file() and item.suffix == ".py":
-            if not item.name.startswith("_"):
-                shutil.copy2(item, BUILD_DIR / item.name)
+    # 清理临时目录
+    shutil.rmtree(temp_build)
 
+    # 创建 manifest
     manifest = {
         "version": VERSION,
         "build_time": datetime.now().isoformat(),
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
         "platform": sys.platform,
-        "files": [f.name for f in BUILD_DIR.iterdir() if f.is_file()],
+        "files": [f.name for f in BUILD_DIR.iterdir() if f.is_file() and not f.name.startswith("setup")],
     }
-
-    import json
     (BUILD_DIR / ".pro_manifest.json").write_text(json.dumps(manifest, indent=2))
     (BUILD_DIR / ".pro_installed").touch()
 
     print(f"\nBuild complete! Files in: {BUILD_DIR}")
+    total_size = 0
     for f in BUILD_DIR.iterdir():
         if f.is_file():
             size = f.stat().st_size
+            total_size += size
             print(f"  {f.name}: {size:,} bytes")
+    print(f"\nTotal size: {total_size:,} bytes ({total_size/1024:.1f} KB)")
 
 
 def create_package():
@@ -184,44 +165,25 @@ def create_package():
 def clean():
     """清理编译产物"""
     print("Cleaning build artifacts...")
-
-    dirs_to_clean = [
-        Path(__file__).parent / "build",
-        DIST_DIR,
-    ]
-
-    for d in dirs_to_clean:
+    for d in [Path(__file__).parent / "build", DIST_DIR]:
         if d.exists():
             shutil.rmtree(d)
             print(f"  Removed: {d}")
-
-    c_files = list(PRO_DIR.glob("*.c"))
-    for f in c_files:
-        f.unlink()
-        print(f"  Removed: {f}")
-
     print("Clean complete")
 
 
-def main():
+if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python setup_cython.py [build|package|clean]")
         sys.exit(1)
 
-    command = sys.argv[1].lower()
-
-    if command == "build":
+    cmd = sys.argv[1].lower()
+    if cmd == "build":
         run_cython_build()
-    elif command == "package":
+    elif cmd == "package":
         run_cython_build()
         create_package()
-    elif command == "clean":
+    elif cmd == "clean":
         clean()
     else:
-        print(f"Unknown command: {command}")
-        print("Usage: python setup_cython.py [build|package|clean]")
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
+        print(f"Unknown command: {cmd}")
