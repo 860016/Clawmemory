@@ -1,9 +1,7 @@
 import axios from './client'
 
 export default {
-  listPages(category?: string) {
-    const params: any = {}
-    if (category) params.category = category
+  listPages(params?: any) {
     return axios.get('/wiki/pages', { params })
   },
   getPage(id: number) {
@@ -26,5 +24,23 @@ export default {
   },
   getCategories() {
     return axios.get('/wiki/categories')
+  },
+  getStats() {
+    return axios.get('/wiki/stats')
+  },
+  getConfig() {
+    return axios.get('/wiki/config')
+  },
+  extractFromConversation(conversation: string, is_complete: boolean = true) {
+    return axios.post('/wiki/ai/extract', { conversation, is_complete })
+  },
+  refinePage(id: number, additional_context: string = '') {
+    return axios.post(`/wiki/pages/${id}/refine`, { additional_context })
+  },
+  markComplete(id: number) {
+    return axios.post(`/wiki/pages/${id}/mark-complete`)
+  },
+  markInProgress(id: number) {
+    return axios.post(`/wiki/pages/${id}/mark-in-progress`)
   },
 }

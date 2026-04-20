@@ -35,7 +35,7 @@ def get_db():
 
 def init_db():
     from app.models import (  # noqa: F401
-        memory, knowledge, license as lic, backup, wiki
+        memory, knowledge, license as lic, backup, wiki, daily_report
     )
     Base.metadata.create_all(bind=engine)
     try:

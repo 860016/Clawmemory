@@ -94,5 +94,57 @@ class VectorService:
         collection = self.get_collection(user_id)
         return collection.count()
 
+    def get_entity_collection(self, user_id: int):
+        """获取实体向量集合"""
+        client = self._get_client()
+        name = f"user_{user_id}_entities"
+        return client.get_or_create_collection(
+            name=name,
+            metadata={"hnsw:space": "cosine"},
+        )
+
+    def add_entity(self, user_id: int, entity_id: int, name: str, description: str, entity_type: str):
+        """添加实体到向量索引"""
+        if not self._available:
+            return
+        collection = self.get_entity_collection(user_id)
+        content = f"{name} {description}" if description else name
+        collection.upsert(
+            ids=[f"entity_{entity_id}"],
+            documents=[content],
+            metadatas=[{"entity_id": entity_id, "name": name, "type": entity_type}],
+        )
+
+    def search_entities(self, user_id: int, query: str, n_results: int = 10) -> list[dict]:
+        """语义搜索实体"""
+        if not self._available:
+            return []
+        collection = self.get_entity_collection(user_id)
+        if collection.count() == 0:
+            return []
+        results = collection.query(
+            query_texts=[query],
+            n_results=min(n_results, collection.count()),
+        )
+        items = []
+        if results["ids"] and results["ids"][0]:
+            for i, doc_id in enumerate(results["ids"][0]):
+                meta = results["metadatas"][0][i] if results["metadatas"] else {}
+                items.append({
+                    "entity_id": meta.get("entity_id"),
+                    "name": meta.get("name", ""),
+                    "type": meta.get("type", ""),
+                    "content": results["documents"][0][i] if results["documents"] else "",
+                    "score": 1 - results["distances"][0][i] if results["distances"] else 0,
+                })
+        return items
+
+    def delete_entity(self, user_id: int, entity_id: int):
+        """从向量索引删除实体"""
+        if not self._available:
+            return
+        collection = self.get_entity_collection(user_id)
+        collection.delete(ids=[f"entity_{entity_id}"])
+
 
 vector_service = VectorService()

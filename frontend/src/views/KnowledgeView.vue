@@ -3,20 +3,20 @@
     <div class="page-header">
       <h1>🕸️ {{ $t('knowledge.title') }}</h1>
       <div class="header-actions">
-        <el-button @click="activeTab = 'graph'">
-          <el-icon><Connection /></el-icon> {{ $t('knowledge.graphView') }}
-        </el-button>
         <el-button @click="activeTab = 'entities'">
           <el-icon><Grid /></el-icon> {{ $t('knowledge.entities') }}
         </el-button>
         <el-button @click="activeTab = 'relations'">
           <el-icon><Share /></el-icon> {{ $t('knowledge.relations') }}
         </el-button>
+        <el-button @click="activeTab = 'graph'">
+          <el-icon><Connection /></el-icon> {{ $t('knowledge.graphView') }}
+        </el-button>
+        <el-button @click="activeTab = 'analysis'" v-if="licenseFeatures.ai_extract">
+          <el-icon><DataAnalysis /></el-icon> {{ $t('knowledge.analysis') }}
+        </el-button>
         <el-button type="primary" @click="showEntityDialog = true">
           <el-icon><Plus /></el-icon> {{ $t('knowledge.addEntity') }}
-        </el-button>
-        <el-button v-if="licenseFeatures.ai_extract || licenseFeatures.auto_graph" type="success" @click="$router.push('/pro')">
-          🤖 {{ $t('nav.pro') }}
         </el-button>
       </div>
     </div>
@@ -91,6 +91,88 @@
       </div>
     </div>
 
+    <!-- 图谱分析视图 -->
+    <div v-if="activeTab === 'analysis'" class="analysis-view">
+      <div class="analysis-header">
+        <el-input v-model="semanticSearchQuery" :placeholder="$t('knowledge.semanticSearch')" clearable class="semantic-search" @keyup.enter="handleSemanticSearch">
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-button type="primary" @click="handleSemanticSearch" :loading="semanticSearching">{{ $t('knowledge.search') }}</el-button>
+      </div>
+
+      <!-- 语义搜索结果 -->
+      <div v-if="semanticSearchResults.length > 0" class="semantic-results">
+        <h3>{{ $t('knowledge.semanticResults') }} ({{ semanticSearchResults.length }})</h3>
+        <div class="result-list">
+          <div class="result-item" v-for="r in semanticSearchResults" :key="r.entity_id">
+            <span class="result-name">{{ r.name }}</span>
+            <span class="result-type-badge" :class="r.type">{{ r.type }}</span>
+            <span class="result-score">{{ Math.round(r.score * 100) }}%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 图谱统计 -->
+      <div class="stats-grid">
+        <div class="stat-card" v-for="stat in graphStats" :key="stat.label">
+          <div class="stat-value">{{ stat.value }}</div>
+          <div class="stat-label">{{ stat.label }}</div>
+        </div>
+      </div>
+
+      <!-- 中心度分析 -->
+      <div class="analysis-section" v-if="centralityData.length">
+        <h3>🎯 {{ $t('knowledge.centralityAnalysis') }}</h3>
+        <div class="centrality-list">
+          <div class="centrality-item" v-for="c in centralityData.slice(0, 10)" :key="c.id">
+            <span class="centrality-name">{{ c.name }}</span>
+            <span class="centrality-type" :class="c.type">{{ c.type }}</span>
+            <div class="centrality-bars">
+              <div class="bar-row">
+                <span class="bar-label">Degree</span>
+                <div class="bar"><div class="bar-fill" :style="{ width: (c.degree_centrality * 100) + '%' }"></div></div>
+                <span class="bar-value">{{ c.degree_centrality }}</span>
+              </div>
+              <div class="bar-row">
+                <span class="bar-label">Betweenness</span>
+                <div class="bar"><div class="bar-fill" :style="{ width: (c.betweenness_centrality * 100) + '%' }"></div></div>
+                <span class="bar-value">{{ c.betweenness_centrality }}</span>
+              </div>
+              <div class="bar-row">
+                <span class="bar-label">PageRank</span>
+                <div class="bar"><div class="bar-fill" :style="{ width: (c.pagerank * 100) + '%' }"></div></div>
+                <span class="bar-value">{{ c.pagerank }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 社区发现 -->
+      <div class="analysis-section" v-if="communitiesData.length">
+        <h3>🔗 {{ $t('knowledge.communityDetection') }}</h3>
+        <div class="community-grid">
+          <div class="community-card" v-for="comm in communitiesData" :key="comm.community_id">
+            <div class="community-header">
+              <span class="community-id">#{{ comm.community_id }}</span>
+              <span class="community-size">{{ comm.size }} {{ $t('knowledge.entities') }}</span>
+            </div>
+            <div class="community-entities">
+              <span class="community-entity-tag" v-for="e in comm.entities.slice(0, 8)" :key="e.id">
+                {{ e.name }}
+              </span>
+              <span class="community-entity-tag more" v-if="comm.entities.length > 8">+{{ comm.entities.length - 8 }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="!centralityData.length && !communitiesData.length" class="empty-analysis">
+        <div class="empty-icon">◇</div>
+        <p>{{ $t('knowledge.emptyAnalysis') }}</p>
+      </div>
+    </div>
+
     <el-dialog v-model="showEntityDialog" :title="editingEntity ? $t('common.edit') : $t('knowledge.addEntity')" width="440px">
       <el-form label-position="top">
         <el-form-item :label="$t('knowledge.entityName')">
@@ -143,7 +225,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Connection, Grid, Share } from '@element-plus/icons-vue'
+import { Plus, Connection, Grid, Share, DataAnalysis, Search } from '@element-plus/icons-vue'
 import axios from '../api/client'
 import cytoscape from 'cytoscape'
 
@@ -160,6 +242,13 @@ const editingEntity = ref<any>(null)
 const saving = ref(false)
 const cyContainer = ref<HTMLElement>()
 const licenseFeatures = ref<any>({})
+
+const semanticSearchQuery = ref('')
+const semanticSearchResults = ref<any[]>([])
+const semanticSearching = ref(false)
+const centralityData = ref<any[]>([])
+const communitiesData = ref<any[]>([])
+const graphStats = ref<any[]>([])
 
 const entityForm = ref({ name: '', entity_type: '', description: '' })
 const relationForm = ref({ source_id: null as number | null, relation_type: '', target_id: null as number | null, description: '' })
@@ -230,8 +319,42 @@ async function loadGraph() {
   } catch { graphData.value = { nodes: [], edges: [] } }
 }
 
+async function loadAnalysis() {
+  if (!licenseFeatures.value.ai_extract) return
+  try {
+    const [centrality, communities, stats] = await Promise.all([
+      axios.get('/knowledge/analysis/centrality'),
+      axios.get('/knowledge/analysis/communities'),
+      axios.get('/knowledge/analysis/stats'),
+    ])
+    centralityData.value = centrality.data || []
+    communitiesData.value = communities.data || []
+    const s = stats.data || {}
+    graphStats.value = [
+      { label: t('knowledge.totalEntities'), value: s.total_entities || 0 },
+      { label: t('knowledge.totalRelations'), value: s.total_relations || 0 },
+      { label: t('knowledge.density'), value: s.density || 0 },
+      { label: t('knowledge.avgDegree'), value: s.avg_degree || 0 },
+      { label: t('knowledge.connectedComponents'), value: s.connected_components || 0 },
+    ]
+  } catch {}
+}
+
+async function handleSemanticSearch() {
+  if (!semanticSearchQuery.value.trim()) return
+  semanticSearching.value = true
+  try {
+    const { data } = await axios.get('/knowledge/entities/search', {
+      params: { q: semanticSearchQuery.value, limit: 20 }
+    })
+    semanticSearchResults.value = data || []
+  } catch { semanticSearchResults.value = [] }
+  finally { semanticSearching.value = false }
+}
+
 watch(activeTab, async (val) => {
   if (val === 'graph' && graphData.value.nodes.length) { await nextTick(); renderGraph() }
+  if (val === 'analysis') { await loadAnalysis() }
 })
 
 watch(() => route.query.tab, (tab) => {
@@ -357,4 +480,69 @@ function truncate(str: string, len: number) { return str && str.length > len ? s
   .graph-container { min-height: 350px; }
   .cy-container { height: 350px; }
 }
+
+/* Analysis View */
+.analysis-view { display: flex; flex-direction: column; gap: 24px; }
+.analysis-header { display: flex; gap: 12px; align-items: center; }
+.semantic-search { flex: 1; max-width: 400px; }
+
+/* Semantic Results */
+.semantic-results { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 16px; }
+.semantic-results h3 { font-size: 16px; color: var(--cm-text); margin: 0 0 12px; }
+.result-list { display: flex; flex-direction: column; gap: 8px; }
+.result-item { display: flex; align-items: center; gap: 8px; background: var(--cm-bg); padding: 10px 14px; border-radius: 8px; }
+.result-name { font-weight: 600; color: var(--cm-text); flex: 1; }
+.result-type-badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.result-type-badge.person { background: rgba(64,158,255,0.15); color: #409eff; }
+.result-type-badge.organization { background: rgba(103,194,58,0.15); color: #67c23a; }
+.result-type-badge.location { background: rgba(230,162,60,0.15); color: #e6a23c; }
+.result-type-badge.concept { background: rgba(245,108,108,0.15); color: #f56c6c; }
+.result-type-badge.event { background: rgba(144,147,153,0.15); color: #909399; }
+.result-type-badge.tool { background: rgba(16,185,129,0.15); color: #10B981; }
+.result-type-badge.project { background: rgba(179,127,235,0.15); color: #b37feb; }
+.result-type-badge.technology { background: rgba(6,182,212,0.15); color: #06b6d4; }
+.result-type-badge.other { background: rgba(125,133,144,0.15); color: var(--cm-text-muted); }
+.result-score { font-size: 12px; color: #10B981; font-weight: 600; }
+
+/* Stats Grid */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.stat-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 10px; padding: 16px; text-align: center; }
+.stat-value { font-size: 28px; font-weight: 700; color: #10B981; }
+.stat-label { font-size: 12px; color: var(--cm-text-muted); margin-top: 4px; }
+
+/* Analysis Sections */
+.analysis-section { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 20px; }
+.analysis-section h3 { font-size: 16px; color: var(--cm-text); margin: 0 0 16px; }
+
+/* Centrality List */
+.centrality-list { display: flex; flex-direction: column; gap: 12px; }
+.centrality-item { background: var(--cm-bg); border: 1px solid var(--cm-border); border-radius: 8px; padding: 12px; }
+.centrality-name { font-weight: 600; color: var(--cm-text); margin-right: 8px; }
+.centrality-type { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.centrality-type.person { background: rgba(64,158,255,0.15); color: #409eff; }
+.centrality-type.organization { background: rgba(103,194,58,0.15); color: #67c23a; }
+.centrality-type.location { background: rgba(230,162,60,0.15); color: #e6a23c; }
+.centrality-type.concept { background: rgba(245,108,108,0.15); color: #f56c6c; }
+.centrality-type.event { background: rgba(144,147,153,0.15); color: #909399; }
+.centrality-type.tool { background: rgba(16,185,129,0.15); color: #10B981; }
+.centrality-type.project { background: rgba(179,127,235,0.15); color: #b37feb; }
+.centrality-type.technology { background: rgba(6,182,212,0.15); color: #06b6d4; }
+.centrality-bars { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.bar-row { display: flex; align-items: center; gap: 8px; }
+.bar-label { font-size: 11px; color: var(--cm-text-muted); width: 80px; }
+.bar { flex: 1; height: 6px; background: var(--cm-border); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; background: #10B981; border-radius: 3px; transition: width 0.3s; }
+.bar-value { font-size: 11px; color: var(--cm-text); width: 40px; text-align: right; }
+
+/* Community Grid */
+.community-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.community-card { background: var(--cm-bg); border: 1px solid var(--cm-border); border-radius: 8px; padding: 12px; }
+.community-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.community-id { font-size: 12px; font-weight: 600; color: var(--cm-text); }
+.community-size { font-size: 11px; color: var(--cm-text-muted); }
+.community-entities { display: flex; gap: 4px; flex-wrap: wrap; }
+.community-entity-tag { padding: 2px 8px; background: var(--cm-border); border-radius: 4px; font-size: 11px; color: var(--cm-text-secondary); }
+.community-entity-tag.more { background: rgba(16,185,129,0.15); color: #10B981; }
+
+.empty-analysis { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 200px; color: var(--cm-text-placeholder); }
 </style>

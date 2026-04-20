@@ -69,7 +69,7 @@
       <el-pagination v-model:current-page="currentPage" :page-size="pageSize" :total="total" layout="prev, pager, next" @current-change="loadMemories" />
     </div>
 
-    <el-dialog v-model="showAddDialog" :title="editingMemory ? $t('memories.editTitle') : $t('memories.addTitle')" width="500px" class="custom-dialog">
+    <el-dialog v-model="showAddDialog" :title="editingMemory ? $t('memories.editTitle') : $t('memories.addTitle')" width="600px" class="custom-dialog">
       <el-form label-position="top">
         <el-form-item :label="$t('memories.layer')">
           <el-select v-model="form.layer" style="width: 100%">
@@ -83,7 +83,7 @@
           <el-input v-model="form.key" :placeholder="$t('memories.titlePlaceholder')" />
         </el-form-item>
         <el-form-item :label="$t('memories.content')">
-          <el-input v-model="form.value" type="textarea" :rows="4" :placeholder="$t('memories.contentPlaceholder')" />
+          <el-input v-model="form.value" type="textarea" :rows="8" :placeholder="$t('memories.contentPlaceholder')" resize="vertical" style="min-height: 120px" />
         </el-form-item>
         <el-form-item :label="$t('memories.importanceField')">
           <el-slider v-model="form.importance" :min="0" :max="100" :format-tooltip="(v: number) => v + '%'" />

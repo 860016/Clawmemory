@@ -8,10 +8,11 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app.config import settings, APP_VERSION
 from app.database import init_db
 from app.services.setup_service import ensure_data_dirs
-from app.routers import auth, memories, license, backups, knowledge, file_watcher, wiki, pro_features, openclaw_memories, openclaw_skills
+from app.routers import auth, memories, license, backups, knowledge, file_watcher, wiki, pro_features, openclaw_memories, openclaw_skills, daily_reports
 import asyncio
 import time
 import logging
+import json
 
 
 logger = logging.getLogger("clawmemory.api")
@@ -23,38 +24,81 @@ _scheduler_task: asyncio.Task | None = None
 
 
 async def _background_scheduler():
-    """Background task for auto decay and auto backup"""
-    from app.services.license_service import is_feature_enabled
+    """Background task for auto decay and auto backup
+    
+    新的衰减策略（逐步降级 + 回收站机制）：
+    - 15天未访问：轻度衰减 10%
+    - 30天未访问：中度衰减 30%，标记为 archived
+    - 60天未访问：进入回收站（trashed）
+    - 回收站保留 30天后自动清空
+    
+    用户可以通过设置开启/关闭自动衰减，Pro 用户默认开启。
+    """
+    from app.services.license_service import is_feature_enabled, current_tier
     from app.config import settings
+    from datetime import datetime, timezone
 
     while True:
         await asyncio.sleep(3600)  # Check every hour
         try:
-            # Auto Decay
-            if is_feature_enabled("auto_decay"):
+            # Auto Decay - Pro 功能，只有 Pro/Enterprise 用户才能使用
+            from app.services.license_service import is_feature_enabled
+            decay_enabled = is_feature_enabled("auto_decay")
+            
+            if decay_enabled:
                 from app.database import SessionLocal
                 from app.models.memory import Memory
                 from app.services import license_service as core
-                import time as _time
 
                 db = SessionLocal()
                 try:
+                    now = time.time()
+                    
+                    # 处理所有记忆（包括 active, archived, trashed）
                     memories = db.query(Memory).filter(Memory.user_id == 1).all()
                     memory_data = [
-                        {"id": m.id, "importance": m.importance,
-                         "last_accessed_at": m.last_accessed_at.timestamp() if m.last_accessed_at else 0}
+                        {
+                            "id": m.id,
+                            "importance": m.importance,
+                            "last_accessed_at": m.last_accessed_at.timestamp() if m.last_accessed_at else 0,
+                            "status": m.status or "active",
+                            "trashed_at": m.trashed_at.timestamp() if m.trashed_at else 0,
+                        }
                         for m in memories
                     ]
-                    results = core.decay_batch(memory_data)
+                    results = core.decay_batch(memory_data, now)
+                    
+                    archived_count = 0
+                    trashed_count = 0
+                    pruned_count = 0
+                    
                     for r in results:
                         m = db.query(Memory).filter(Memory.id == r["memory_id"]).first()
                         if m:
-                            if r["should_prune"]:
+                            # 更新重要性
+                            m.importance = r["new_importance"]
+                            m.decay_stage = r["decay_stage"]
+                            
+                            # 更新状态
+                            new_status = r.get("new_status", m.status)
+                            if new_status != m.status:
+                                m.status = new_status
+                                if new_status == "archived":
+                                    archived_count += 1
+                                elif new_status == "trashed":
+                                    m.trashed_at = datetime.now(timezone.utc)
+                                    trashed_count += 1
+                            
+                            # 回收站中的记忆超过 30天，永久删除
+                            if r.get("should_prune"):
                                 db.delete(m)
-                            else:
-                                m.importance = r["new_importance"]
+                                pruned_count += 1
+                    
                     db.commit()
-                    logger.info("Auto decay applied: %d memories processed", len(results))
+                    logger.info(
+                        "Auto decay applied: %d processed, %d archived, %d trashed, %d pruned",
+                        len(results), archived_count, trashed_count, pruned_count
+                    )
                 except Exception as e:
                     logger.warning("Auto decay failed: %s", e)
                 finally:
@@ -62,9 +106,6 @@ async def _background_scheduler():
 
             # Auto Backup
             if is_feature_enabled("auto_backup"):
-                import json
-                from pathlib import Path
-
                 schedule_file = settings.data_dir / "backup_schedule.json"
                 if schedule_file.exists():
                     schedule = json.loads(schedule_file.read_text())
@@ -216,10 +257,25 @@ async def lifespan(app: FastAPI):
     # 启动后台调度器
     global _scheduler_task
     _scheduler_task = asyncio.create_task(_background_scheduler())
+    # 启动 APScheduler（日报等定时任务）
+    try:
+        from app.scheduler import init_scheduler, start_scheduler
+        init_scheduler()
+        start_scheduler()
+        logger.info("APScheduler started")
+    except Exception as e:
+        logger.warning(f"Failed to start APScheduler: {e}")
     yield
     # 停止后台调度器
     if _scheduler_task:
         _scheduler_task.cancel()
+    # 停止 APScheduler
+    try:
+        from app.scheduler import stop_scheduler
+        stop_scheduler()
+        logger.info("APScheduler stopped")
+    except Exception:
+        pass
 
 
 app = FastAPI(
@@ -253,6 +309,7 @@ app.include_router(wiki.router)
 app.include_router(pro_features.router)
 app.include_router(openclaw_memories.router)
 app.include_router(openclaw_skills.router)
+app.include_router(daily_reports.router)
 
 
 @app.get("/api/v1/health")

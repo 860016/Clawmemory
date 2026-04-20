@@ -83,3 +83,57 @@ def delete_relation(relation_id: int, _=Depends(get_current_user), db: Session =
 def get_graph_data(_=Depends(get_current_user), db: Session = Depends(get_db)):
     svc = KnowledgeService(db)
     return svc.get_graph_data()
+
+
+# --- Graph Analysis (Pro) ---
+@router.get("/analysis/centrality")
+def get_centrality(_=Depends(get_current_user), db: Session = Depends(get_db)):
+    """中心度分析（Pro 功能）"""
+    if not is_feature_enabled("ai_extract"):
+        raise HTTPException(status_code=403, detail="Pro feature: graph analysis")
+    from app.services.graph_analyzer import GraphAnalyzer
+    analyzer = GraphAnalyzer(db)
+    return analyzer.centrality_analysis()
+
+
+@router.get("/analysis/communities")
+def get_communities(_=Depends(get_current_user), db: Session = Depends(get_db)):
+    """社区发现（Pro 功能）"""
+    if not is_feature_enabled("ai_extract"):
+        raise HTTPException(status_code=403, detail="Pro feature: graph analysis")
+    from app.services.graph_analyzer import GraphAnalyzer
+    analyzer = GraphAnalyzer(db)
+    return analyzer.community_detection()
+
+
+@router.get("/analysis/stats")
+def get_graph_stats(_=Depends(get_current_user), db: Session = Depends(get_db)):
+    """图谱统计"""
+    from app.services.graph_analyzer import GraphAnalyzer
+    analyzer = GraphAnalyzer(db)
+    return analyzer.get_graph_stats()
+
+
+@router.get("/analysis/path/{source_id}/{target_id}")
+def get_shortest_path(source_id: int, target_id: int, _=Depends(get_current_user), db: Session = Depends(get_db)):
+    """两实体间最短路径"""
+    from app.services.graph_analyzer import GraphAnalyzer
+    analyzer = GraphAnalyzer(db)
+    return analyzer.shortest_path(source_id, target_id)
+
+
+@router.get("/analysis/neighbors/{entity_id}")
+def get_entity_neighbors(entity_id: int, depth: int = Query(2, ge=1, le=3), _=Depends(get_current_user), db: Session = Depends(get_db)):
+    """实体邻居探索"""
+    from app.services.graph_analyzer import GraphAnalyzer
+    analyzer = GraphAnalyzer(db)
+    return analyzer.entity_neighbors(entity_id, depth)
+
+
+# --- Entity Semantic Search ---
+@router.get("/entities/search")
+def search_entities_semantic(q: str, limit: int = Query(10, ge=1, le=30), _=Depends(get_current_user), db: Session = Depends(get_db)):
+    """语义搜索实体"""
+    from app.services.vector_service import vector_service
+    results = vector_service.search_entities(1, q, limit)
+    return results

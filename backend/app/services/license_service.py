@@ -109,6 +109,7 @@ if _COMPUTE_ENGINE == "none":
     try:
         from app.core.memory_decay import (
             calculate_decay, should_prune, reinforce, decay_memory, decay_batch, get_decay_stats,
+            get_decay_stage, should_archive, should_trash, should_prune_from_trash, get_stage_info,
         )
         from app.core.conflict_resolver import (
             detect_conflict, resolve_conflict, scan_for_conflicts, get_conflict_summary,
@@ -126,7 +127,7 @@ if _COMPUTE_ENGINE == "none":
 if _COMPUTE_ENGINE == "none":
     logger.warning("Compute engine: using pure Python fallback — basic functionality only")
 
-    def calculate_decay(importance: float, age_seconds: float, half_life: float = 30*24*3600) -> float:
+    def calculate_decay(importance: float, age_days: float) -> float:
         return importance
 
     def should_prune(importance: float) -> bool:
@@ -135,14 +136,43 @@ if _COMPUTE_ENGINE == "none":
     def reinforce(importance: float, factor: float = 1.5) -> float:
         return importance
 
-    def decay_memory(memory_id: int, current_importance: float, last_accessed_at: float, now: float = 0.0, half_life: float = 30*24*3600) -> dict:
-        return {"memory_id": memory_id, "new_importance": current_importance, "should_prune": False, "age_seconds": 0}
+    def get_decay_stage(age_days: float) -> int:
+        return 0
 
-    def decay_batch(memories: list, now: float = 0.0, half_life: float = 30*24*3600) -> list:
+    def should_archive(age_days: float) -> bool:
+        return False
+
+    def should_trash(age_days: float) -> bool:
+        return False
+
+    def should_prune_from_trash(trashed_days: float) -> bool:
+        return False
+
+    def decay_memory(memory_id: int, current_importance: float, last_accessed_at: float,
+                      current_status: str = "active", trashed_at: float = 0.0, now: float = 0.0) -> dict:
+        return {
+            "memory_id": memory_id,
+            "new_importance": current_importance,
+            "new_status": current_status,
+            "should_prune": False,
+            "decay_stage": 0,
+            "age_days": 0,
+        }
+
+    def decay_batch(memories: list, now: float = 0.0) -> list:
         return []
 
     def get_decay_stats(memories: list, now: float = 0.0) -> dict:
-        return {"total": 0, "prune_candidates": 0, "avg_importance": 0.0, "decayed_count": 0}
+        return {
+            "total": 0, "active": 0, "archived": 0, "trashed": 0,
+            "to_archive": 0, "to_trash": 0, "to_prune": 0, "avg_importance": 0.0,
+        }
+
+    def get_stage_info() -> dict:
+        return {
+            "stage_1_days": 15, "stage_2_days": 30, "stage_3_days": 60, "trash_expire_days": 30,
+            "description": {"stage_0": "纯 Python 兜底模式，无衰减"},
+        }
 
     def detect_conflict(memory_a: dict, memory_b: dict):
         return None

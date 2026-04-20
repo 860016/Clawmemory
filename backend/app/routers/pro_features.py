@@ -214,125 +214,35 @@ def token_stats(_=Depends(get_current_user), db: Session = Depends(get_db)):
 
 class AIExtractRequest(BaseModel):
     memory_ids: Optional[list[int]] = None
+    limit: int = 50
 
 @router.post("/ai/extract")
-def ai_extract(req: AIExtractRequest, _=Depends(get_current_user), db: Session = Depends(get_db)):
-    """Extract entities and relations from memories using NLP heuristics (requires ai_extract)"""
+async def ai_extract(req: AIExtractRequest, _=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Extract entities and relations from memories using LLM (requires ai_extract)"""
     if not is_feature_enabled("ai_extract"):
         raise HTTPException(status_code=403, detail="Pro feature: AI extract")
 
-    from app.models.memory import Memory
-    from app.models.knowledge import Entity, Relation
-    import re
-
-    if req.memory_ids:
-        memories = db.query(Memory).filter(Memory.id.in_(req.memory_ids), Memory.user_id == 1).all()
-    else:
-        memories = db.query(Memory).filter(Memory.user_id == 1).all()
-
-    # Heuristic extraction: find capitalized terms, quoted terms, key patterns
-    extracted_entities = []
-    extracted_relations = []
-
-    # Common patterns for entity extraction
-    entity_patterns = [
-        r'"([^"]+)"',           # Quoted terms
-        r'「([^」]+)」',         # Chinese quoted terms
-        r'【([^】]+)】',         # Chinese bracketed terms
-    ]
-
-    existing_entities = {e.name.lower(): e for e in db.query(Entity).filter(Entity.user_id == 1).all()}
-
-    for m in memories:
-        text = f"{m.key} {m.value}"
-        found_terms = set()
-
-        for pattern in entity_patterns:
-            for match in re.finditer(pattern, text):
-                term = match.group(1).strip()
-                if len(term) >= 2 and len(term) <= 50:
-                    found_terms.add(term)
-
-        # Extract from key patterns like "user_name", "project_name"
-        key_parts = re.split(r'[_\-\s]+', m.key)
-        for part in key_parts:
-            if len(part) >= 3 and not part.lower() in ('the', 'and', 'for', 'with'):
-                found_terms.add(part)
-
-        for term in found_terms:
-            if term.lower() not in existing_entities:
-                # Determine entity type heuristically
-                entity_type = "concept"
-                if any(kw in term.lower() for kw in ['project', 'proj', 'app', '系统', '项目']):
-                    entity_type = "project"
-                elif any(kw in term.lower() for kw in ['person', 'user', 'name', '用户', '人']):
-                    entity_type = "person"
-                elif any(kw in term.lower() for kw in ['tool', 'lib', 'framework', '工具', '库']):
-                    entity_type = "tool"
-                elif any(kw in term.lower() for kw in ['event', 'incident', '事件']):
-                    entity_type = "event"
-
-                entity = Entity(
-                    user_id=1,
-                    name=term,
-                    entity_type=entity_type,
-                    description=f"Auto-extracted from memory: {m.key}",
-                )
-                db.add(entity)
-                extracted_entities.append({"name": term, "type": entity_type, "source_memory": m.key})
-                existing_entities[term.lower()] = entity
-
-    db.commit()
-
-    # Now try to find relations between entities in the same memory
-    for m in memories:
-        text = f"{m.key} {m.value}".lower()
-        matched = [e for name, e in existing_entities.items() if name in text]
-        for i in range(len(matched)):
-            for j in range(i + 1, len(matched)):
-                # Check if relation already exists
-                exists = db.query(Relation).filter(
-                    Relation.source_id == matched[i].id,
-                    Relation.target_id == matched[j].id,
-                ).first()
-                if not exists:
-                    rel = Relation(
-                        user_id=1,
-                        source_id=matched[i].id,
-                        target_id=matched[j].id,
-                        relation_type="co_occurs",
-                        description=f"Both mentioned in: {m.key}",
-                    )
-                    db.add(rel)
-                    extracted_relations.append({
-                        "source": matched[i].name,
-                        "target": matched[j].name,
-                        "type": "co_occurs",
-                    })
-
-    db.commit()
-    return {
-        "entities_extracted": len(extracted_entities),
-        "relations_extracted": len(extracted_relations),
-        "entities": extracted_entities,
-        "relations": extracted_relations,
-    }
+    from app.services.entity_extractor import EntityExtractor
+    extractor = EntityExtractor(db)
+    return await extractor.extract_batch(req.memory_ids, req.limit)
 
 
 # ========== Auto Graph ==========
 
 class AutoGraphRequest(BaseModel):
     overwrite: bool = False
+    limit: int = 100
 
 @router.post("/auto-graph")
-def auto_graph(req: AutoGraphRequest, _=Depends(get_current_user), db: Session = Depends(get_db)):
-    """Auto-generate knowledge graph from memories (requires auto_graph)"""
+async def auto_graph(req: AutoGraphRequest, _=Depends(get_current_user), db: Session = Depends(get_db)):
+    """Auto-generate knowledge graph from memories using LLM (requires auto_graph)"""
     if not is_feature_enabled("auto_graph"):
         raise HTTPException(status_code=403, detail="Pro feature: auto graph")
 
     from app.models.memory import Memory
     from app.models.knowledge import Entity, Relation
-    import re
+    from app.services.entity_extractor import EntityExtractor
+    from app.services.relation_discovery import RelationDiscovery
 
     # If overwrite, clear existing graph
     if req.overwrite:
@@ -340,70 +250,16 @@ def auto_graph(req: AutoGraphRequest, _=Depends(get_current_user), db: Session =
         db.query(Entity).filter(Entity.user_id == 1).delete()
         db.commit()
 
-    memories = db.query(Memory).filter(Memory.user_id == 1).all()
-    existing_entities = {e.name.lower(): e for e in db.query(Entity).filter(Entity.user_id == 1).all()}
+    extractor = EntityExtractor(db)
+    result = await extractor.extract_batch(limit=req.limit)
 
-    # Group memories by layer for relationship inference
-    layer_entities = {}
-    entities_created = 0
-    relations_created = 0
+    # Run relation inference
+    discovery = RelationDiscovery(db)
+    inferred = await discovery.infer_relations()
 
-    for m in memories:
-        # Each memory's key becomes an entity
-        entity_name = m.key.replace('_', ' ').replace('-', ' ').title()
-        layer = m.layer
-
-        if entity_name.lower() not in existing_entities:
-            entity_type_map = {
-                "preference": "concept",
-                "knowledge": "concept",
-                "short_term": "event",
-                "private": "concept",
-            }
-            entity = Entity(
-                user_id=1,
-                name=entity_name,
-                entity_type=entity_type_map.get(layer, "concept"),
-                description=m.value[:200] if m.value else "",
-            )
-            db.add(entity)
-            db.flush()
-            existing_entities[entity_name.lower()] = entity
-            entities_created += 1
-            layer_entities.setdefault(layer, []).append(entity)
-
-    db.commit()
-
-    # Create relations between entities in the same layer
-    for layer, ents in layer_entities.items():
-        for i in range(len(ents)):
-            for j in range(i + 1, min(i + 5, len(ents))):  # Limit to nearby entities
-                exists = db.query(Relation).filter(
-                    Relation.source_id == ents[i].id,
-                    Relation.target_id == ents[j].id,
-                ).first()
-                if not exists:
-                    rel_type = "related_to"
-                    if layer == "preference":
-                        rel_type = "prefers_alongside"
-                    elif layer == "knowledge":
-                        rel_type = "related_to"
-                    elif layer == "short_term":
-                        rel_type = "co_occurs"
-                    rel = Relation(
-                        user_id=1,
-                        source_id=ents[i].id,
-                        target_id=ents[j].id,
-                        relation_type=rel_type,
-                        description=f"Same layer: {layer}",
-                    )
-                    db.add(rel)
-                    relations_created += 1
-
-    db.commit()
     return {
-        "entities_created": entities_created,
-        "relations_created": relations_created,
+        **result,
+        "relations_inferred": len(inferred),
         "total_entities": db.query(Entity).filter(Entity.user_id == 1).count(),
         "total_relations": db.query(Relation).filter(Relation.user_id == 1).count(),
     }

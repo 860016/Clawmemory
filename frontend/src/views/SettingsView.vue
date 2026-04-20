@@ -116,6 +116,57 @@
         </div>
       </div>
 
+      <!-- 记忆衰减设置 -->
+      <div class="settings-card" :class="{ 'section-highlight': activeSection === 'decay' }" id="settings-decay">
+        <div class="card-title">🧠 {{ $t('settings.memoryDecay') || '记忆衰减' }}</div>
+        <div class="decay-info" v-if="decayInfo">
+          <div class="decay-stage-info">
+            <div class="stage-item">
+              <span class="stage-label">15天未访问</span>
+              <span class="stage-desc">轻度衰减 10%</span>
+            </div>
+            <div class="stage-item">
+              <span class="stage-label">30天未访问</span>
+              <span class="stage-desc">中度衰减 30%，标记为不重要</span>
+            </div>
+            <div class="stage-item">
+              <span class="stage-label">60天未访问</span>
+              <span class="stage-desc">进入回收站</span>
+            </div>
+            <div class="stage-item">
+              <span class="stage-label">回收站保留</span>
+              <span class="stage-desc">30天后自动清空</span>
+            </div>
+          </div>
+        </div>
+        <div class="setting-item">
+          <span>{{ $t('settings.autoDecay') || '自动衰减' }}</span>
+          <el-switch v-model="decayEnabled" @change="updateDecaySettings" :loading="decayLoading" />
+        </div>
+        <div class="decay-stats" v-if="decayStats">
+          <div class="stats-row">
+            <span class="stats-label">{{ $t('settings.totalMemories') || '总记忆' }}</span>
+            <span class="stats-value">{{ decayStats.total }}</span>
+          </div>
+          <div class="stats-row">
+            <span class="stats-label">{{ $t('settings.activeMemories') || '正常记忆' }}</span>
+            <span class="stats-value">{{ decayStats.active }}</span>
+          </div>
+          <div class="stats-row">
+            <span class="stats-label">{{ $t('settings.archivedMemories') || '不重要记忆' }}</span>
+            <span class="stats-value warning">{{ decayStats.archived }}</span>
+          </div>
+          <div class="stats-row">
+            <span class="stats-label">{{ $t('settings.trashedMemories') || '回收站' }}</span>
+            <span class="stats-value danger">{{ decayStats.trashed }}</span>
+          </div>
+        </div>
+        <div class="decay-actions" v-if="decayStats && decayStats.trashed > 0">
+          <el-button size="small" type="warning" @click="viewTrash">{{ $t('settings.viewTrash') || '查看回收站' }}</el-button>
+          <el-button size="small" type="danger" @click="emptyTrash">{{ $t('settings.emptyTrash') || '清空回收站' }}</el-button>
+        </div>
+      </div>
+
       <!-- 系统信息 -->
       <div class="settings-card" :class="{ 'section-highlight': activeSection === 'system' }" id="settings-system">
         <div class="card-title">◇ {{ $t('settings.system') }}</div>
@@ -171,6 +222,10 @@ const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
 const appVersion = ref('2.8.2')
 const backups = ref<any[]>([])
+const decayEnabled = ref(false)
+const decayLoading = ref(false)
+const decayStats = ref<any>(null)
+const decayInfo = ref<any>(null)
 
 const featureLabels: Record<string, string> = {
   ai_extract: t('settings.featAiExtract'),
@@ -195,7 +250,7 @@ const featureLabels: Record<string, string> = {
 }
 
 onMounted(async () => {
-  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadBackups()])
+  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadBackups(), loadDecaySettings(), loadDecayStats()])
   if (activeSection.value) {
     nextTick(() => scrollToSection(activeSection.value))
   }
@@ -337,18 +392,57 @@ async function uploadBackup(file: File) {
   backingUp.value = true
   try {
     const { data } = await axios.post('/backups/upload', formData)
-    // Upload returns the backup record — now restore it
     if (data && data.id) {
       await axios.post(`/backups/${data.id}/restore`)
     }
     ElMessage.success(t('settings.backupRestored'))
-    await loadLicense() // refresh data
+    await loadLicense()
   } catch (e: any) {
     ElMessage.error(e.response?.data?.detail || t('settings.restoreFailed'))
   } finally {
     backingUp.value = false
   }
   return false
+}
+
+async function loadDecaySettings() {
+  try {
+    const { data } = await axios.get('/memories/decay/settings')
+    decayEnabled.value = data.enabled
+    decayInfo.value = data
+  } catch {}
+}
+
+async function loadDecayStats() {
+  try {
+    const { data } = await axios.get('/memories/decay/stats')
+    decayStats.value = data.stats
+  } catch {}
+}
+
+async function updateDecaySettings() {
+  decayLoading.value = true
+  try {
+    await axios.post('/memories/decay/settings', null, { params: { enabled: decayEnabled.value } })
+    ElMessage.success(decayEnabled.value ? '自动衰减已开启' : '自动衰减已关闭')
+  } catch {
+    ElMessage.error(t('common.failed'))
+  } finally {
+    decayLoading.value = false
+  }
+}
+
+async function viewTrash() {
+  window.location.href = '/memories?status=trashed'
+}
+
+async function emptyTrash() {
+  try {
+    await ElMessageBox.confirm('确定要清空回收站吗？此操作不可恢复。', '确认', { type: 'warning' })
+    await axios.delete('/memories/trash')
+    ElMessage.success('回收站已清空')
+    await loadDecayStats()
+  } catch {}
 }
 </script>
 
@@ -388,4 +482,16 @@ async function uploadBackup(file: File) {
 .backup-meta { font-size: 11px; color: var(--cm-text-muted); }
 .backup-actions { display: flex; gap: 4px; }
 @media (max-width: 768px) { .settings-grid { grid-template-columns: 1fr; } .pricing { flex-direction: column; } }
+.decay-info { margin-bottom: 16px; }
+.decay-stage-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.stage-item { display: flex; justify-content: space-between; padding: 8px 12px; background: var(--cm-bg); border-radius: 8px; font-size: 12px; }
+.stage-label { color: var(--cm-text-muted); }
+.stage-desc { color: var(--cm-text); font-weight: 500; }
+.decay-stats { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--cm-border); }
+.stats-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+.stats-label { color: var(--cm-text-muted); }
+.stats-value { color: var(--cm-text); font-weight: 500; }
+.stats-value.warning { color: #ffc107; }
+.stats-value.danger { color: #e91e63; }
+.decay-actions { margin-top: 12px; display: flex; gap: 8px; }
 </style>

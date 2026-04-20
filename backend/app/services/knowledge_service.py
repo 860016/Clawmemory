@@ -1,6 +1,7 @@
 import json
 from sqlalchemy.orm import Session
 from app.models.knowledge import Entity, Relation
+from app.services.vector_service import vector_service
 
 
 class KnowledgeService:
@@ -21,12 +22,26 @@ class KnowledgeService:
         self.db.add(entity)
         self.db.commit()
         self.db.refresh(entity)
+
+        # 添加到向量索引
+        try:
+            vector_service.add_entity(1, entity.id, entity.name, entity.description or "", entity.entity_type)
+        except Exception:
+            pass
+
         return entity
 
     def delete_entity(self, entity_id: int) -> bool:
         entity = self.db.query(Entity).filter(Entity.id == entity_id, Entity.user_id == 1).first()
         if not entity:
             return False
+
+        # 从向量索引删除
+        try:
+            vector_service.delete_entity(1, entity_id)
+        except Exception:
+            pass
+
         self.db.delete(entity)
         self.db.commit()
         return True
@@ -42,6 +57,13 @@ class KnowledgeService:
                 setattr(entity, k, v)
         self.db.commit()
         self.db.refresh(entity)
+
+        # 更新向量索引
+        try:
+            vector_service.add_entity(1, entity.id, entity.name, entity.description or "", entity.entity_type)
+        except Exception:
+            pass
+
         return entity
 
     # Relation CRUD

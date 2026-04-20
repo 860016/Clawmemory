@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     port: int = 8765
     debug: bool = False
 
+    # LLM / AI
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    llm_model: str = "gpt-4o-mini"
+
     # License
     license_server_url: str = "https://auth.bestu.top"
     rsa_public_key_path: Path = base_dir / "keys" / "public.pem"

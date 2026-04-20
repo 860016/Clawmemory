@@ -113,6 +113,7 @@ const navItems = [
   { path: '/memories', label: 'nav.memories', icon: Collection, emoji: '🧠' },
   { path: '/knowledge', label: 'nav.knowledge', icon: Connection, emoji: '🕸️' },
   { path: '/wiki', label: 'nav.wiki', icon: Document, emoji: '📖' },
+  { path: '/reports', label: 'nav.reports', icon: DataAnalysis, emoji: '📊' },
   { path: '/pro', label: 'nav.pro', icon: Promotion, emoji: '🚀' },
   { path: '/settings', label: 'nav.settings', icon: Setting, emoji: '⚙️' },
 ]
