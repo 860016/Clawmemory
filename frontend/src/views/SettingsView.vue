@@ -70,8 +70,8 @@
         <div class="setting-item">
           <span>{{ $t('settings.language') }}</span>
           <el-select v-model="currentLocale" @change="changeLocale" style="width: 140px">
-            <el-option label="中文" value="zh" />
-            <el-option label="English" value="en" />
+            <el-option v-if="currentLocale === 'zh'" :label="$t('settings.english')" value="en" />
+            <el-option v-else :label="$t('settings.chinese')" value="zh" />
           </el-select>
         </div>
       </div>
