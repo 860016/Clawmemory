@@ -25,7 +25,6 @@ frontend/dist/
 .idea/
 
 # Commercial (private)
-backend/clawmemory_core/
 license-platform-v2/
 clawmemory-core-repo/
 
@@ -33,7 +32,6 @@ clawmemory-core-repo/
 backend/app/core/
 
 # Build artifacts
-backend/clawmemory_core/.cargo/
 *.zip
 scripts/
 
