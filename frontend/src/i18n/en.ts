@@ -408,6 +408,7 @@ export default {
     totalEntities: 'Total Entities',
     totalWikiUpdated: 'Wiki Updated',
     generated: 'Report generated',
+    generateSkipped: 'Cannot generate report',
     sun: 'Sun',
     mon: 'Mon',
     tue: 'Tue',
@@ -415,5 +416,10 @@ export default {
     thu: 'Thu',
     fri: 'Fri',
     sat: 'Sat',
+    reason: {
+      no_memories: 'No new memories today',
+      no_entities: 'No new entities today',
+      no_wiki_updates: 'No Wiki updates today',
+    },
   },
 }

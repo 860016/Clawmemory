@@ -19,11 +19,11 @@ def generate_daily_report_sync():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            report = loop.run_until_complete(service.generate_report())
+            report, reasons = loop.run_until_complete(service.generate_report())
             if report:
                 logger.info(f"Daily report generated: {report.report_date}")
             else:
-                logger.info("No data for today, skipped report generation")
+                logger.info(f"No data for today, skipped report generation. Reasons: {reasons}")
         finally:
             loop.close()
     except Exception as e:

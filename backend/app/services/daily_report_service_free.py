@@ -4,8 +4,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from app.models.daily_report import DailyReport
 from app.models.memory import Memory
-from app.models.entity import Entity
-from app.models.wiki_page import WikiPage
+from app.models.knowledge import Entity
+from app.models.wiki import WikiPage
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +33,22 @@ class DailyReportService:
             .first()
         )
 
-    async def generate_report(self, target_date: Optional[datetime] = None) -> Optional[DailyReport]:
-        """生成日报"""
+    async def generate_report(self, target_date: Optional[datetime] = None) -> tuple:
+        """生成日报
+        返回: (report, reason) - report为None时reason说明失败原因
+        """
         if target_date is None:
             target_date = datetime.now()
 
         date_str = target_date.strftime("%Y-%m-%d")
         start_dt = datetime(target_date.year, target_date.month, target_date.day)
         end_dt = start_dt + timedelta(days=1)
+
+        # 检查是否已存在
+        existing = self.get_report(date_str)
+        if existing:
+            logger.info(f"Report already exists for {date_str}")
+            return existing, None
 
         # 统计当日数据
         new_memories = (
@@ -62,14 +70,12 @@ class DailyReportService:
         )
 
         if new_memories == 0 and new_entities == 0 and updated_wiki == 0:
+            reasons = []
+            reasons.append("no_memories")
+            reasons.append("no_entities")
+            reasons.append("no_wiki_updates")
             logger.info(f"No data for {date_str}, skipping report")
-            return None
-
-        # 检查是否已存在
-        existing = self.get_report(date_str)
-        if existing:
-            logger.info(f"Report already exists for {date_str}")
-            return existing
+            return None, reasons
 
         # 创建日报
         report = DailyReport(
@@ -92,7 +98,7 @@ class DailyReportService:
         self.db.refresh(report)
 
         logger.info(f"Daily report created for {date_str}")
-        return report
+        return report, None
 
     def get_stats_summary(self, days: int = 7) -> dict:
         """获取统计摘要"""

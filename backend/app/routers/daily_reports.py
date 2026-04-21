@@ -77,12 +77,17 @@ async def generate_report(
     else:
         target = datetime.now()
 
-    report = await service.generate_report(target)
+    report, reasons = await service.generate_report(target)
 
     if not report:
-        return {"message": "No data for this date, report skipped"}
+        return {
+            "success": False,
+            "message": "No data for this date, report skipped",
+            "reasons": reasons or [],
+        }
 
     return {
+        "success": True,
         "message": "Report generated",
         "report_date": report.report_date,
         "summary": report.summary,

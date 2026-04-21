@@ -155,9 +155,15 @@ async function handleGenerateToday() {
   generating.value = true
   try {
     const { data } = await axios.post('/reports/daily/generate')
-    ElMessage.success(data.message || t('dailyReport.generated'))
-    await loadReports()
-    await loadStats()
+    if (data.success) {
+      ElMessage.success(data.message || t('dailyReport.generated'))
+      await loadReports()
+      await loadStats()
+    } else {
+      const reasons = data.reasons || []
+      const reasonTexts = reasons.map((r: string) => t(`dailyReport.reason.${r}`))
+      ElMessage.warning(`${t('dailyReport.generateSkipped')}: ${reasonTexts.join('、')}`)
+    }
   } catch (e: any) {
     ElMessage.error(e.response?.data?.detail || t('common.failed'))
   } finally {

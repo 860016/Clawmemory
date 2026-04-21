@@ -408,6 +408,7 @@ export default {
     totalEntities: '总实体',
     totalWikiUpdated: '知识页更新',
     generated: '报告已生成',
+    generateSkipped: '无法生成日报',
     sun: '周日',
     mon: '周一',
     tue: '周二',
@@ -415,5 +416,10 @@ export default {
     thu: '周四',
     fri: '周五',
     sat: '周六',
+    reason: {
+      no_memories: '今日无新增记忆',
+      no_entities: '今日无新增实体',
+      no_wiki_updates: '今日无 Wiki 更新',
+    },
   },
 }
