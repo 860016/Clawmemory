@@ -426,6 +426,18 @@ function handleUserCommand(command: string) {
 }
 
 /* ===== Mobile Responsive ===== */
+@media (max-width: 1024px) {
+  .nav-label {
+    display: none;
+  }
+  .nav-item {
+    padding: 8px 10px;
+  }
+  .logo-text {
+    display: none;
+  }
+}
+
 @media (max-width: 768px) {
   .hamburger-btn {
     display: flex;
@@ -441,35 +453,73 @@ function handleUserCommand(command: string) {
     top: 56px;
     bottom: 0;
     z-index: 90;
-    width: 220px;
+    width: 240px;
     transform: translateX(-100%);
     transition: transform 0.3s ease;
     box-shadow: var(--cm-shadow-lg);
+    background: var(--cm-bg-secondary);
   }
 
   .layout:not(.sidebar-collapsed) .sidebar {
     transform: translateX(0);
   }
 
-  /* 小屏幕显示图标+emoji导航 */
-  .topbar-nav {
-    display: flex;
+  .sidebar::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: -1;
   }
-  .nav-label {
-    display: none;
+
+  .main-content {
+    padding: 0;
   }
-  .topbar-nav .nav-item {
-    padding: 8px;
+
+  .topbar {
+    padding: 0 12px;
+    gap: 8px;
   }
-  .nav-item.active::after { display: none; }
+
+  .topbar-right {
+    gap: 6px;
+  }
+
+  .tier-badge {
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+
+  .theme-toggle {
+    padding: 4px 6px;
+  }
+
+  .user-btn {
+    padding: 4px 6px;
+  }
 }
 
-@media (max-width: 1024px) {
-  .nav-label {
-    display: none;
+@media (max-width: 480px) {
+  .topbar {
+    height: 50px;
+    padding: 0 8px;
   }
-  .nav-item {
-    padding: 8px 10px;
+
+  .logo svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .sidebar {
+    width: 220px;
+    top: 50px;
+  }
+
+  .hamburger-btn {
+    padding: 4px;
   }
 }
 </style>

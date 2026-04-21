@@ -532,7 +532,95 @@ async function emptyTrash() {
 .backup-name { font-size: 13px; color: var(--cm-text); font-weight: 500; }
 .backup-meta { font-size: 11px; color: var(--cm-text-muted); }
 .backup-actions { display: flex; gap: 4px; }
-@media (max-width: 768px) { .settings-grid { grid-template-columns: 1fr; } .pricing { flex-direction: column; } }
+@media (max-width: 768px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .pricing {
+    flex-direction: column;
+  }
+  .settings-page {
+    padding: 16px;
+  }
+  .settings-card {
+    padding: 16px;
+  }
+  .settings-card h2 {
+    font-size: 16px;
+  }
+  .setting-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .license-input {
+    width: 100%;
+  }
+  .activate-section {
+    flex-direction: column;
+  }
+  .activate-section .el-button {
+    width: 100%;
+  }
+  .price-card {
+    padding: 16px;
+  }
+  .price-name {
+    font-size: 16px;
+  }
+  .price-amount {
+    font-size: 20px;
+  }
+  .price-features {
+    font-size: 11px;
+  }
+  .decay-stage-info {
+    grid-template-columns: 1fr;
+  }
+  .stage-item {
+    padding: 6px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-page {
+    padding: 12px;
+  }
+  .settings-card {
+    padding: 14px;
+    border-radius: 10px;
+  }
+  .settings-card h2 {
+    font-size: 15px;
+  }
+  .setting-item {
+    padding: 8px 0;
+  }
+  .setting-desc {
+    font-size: 12px;
+  }
+  .price-card {
+    padding: 14px;
+  }
+  .price-amount {
+    font-size: 18px;
+  }
+  .pro-install-status {
+    padding: 10px;
+  }
+  .status-text {
+    font-size: 12px;
+  }
+  .backup-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .backup-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
 .decay-info { margin-bottom: 16px; }
 .decay-stage-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .stage-item { display: flex; justify-content: space-between; padding: 8px 12px; background: var(--cm-bg); border-radius: 8px; font-size: 12px; }

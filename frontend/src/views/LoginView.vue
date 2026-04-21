@@ -359,10 +359,70 @@ function copyCliCommand() {
   padding: 24px 0;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
+  .login-page {
+    padding: 16px;
+  }
   .login-card {
-    padding: 32px 24px;
+    padding: 36px 28px;
     border-radius: 16px;
+  }
+  .login-header h1 {
+    font-size: 24px;
+  }
+  .login-header p {
+    font-size: 14px;
+  }
+  .login-form .el-input {
+    font-size: 14px;
+  }
+  .login-form .el-button {
+    font-size: 14px;
+    padding: 10px 16px;
+  }
+  .reset-password-section {
+    padding-top: 16px;
+  }
+  .reset-password-section h3 {
+    font-size: 14px;
+  }
+  .reset-token-section {
+    margin-top: 6px;
+  }
+  .reset-success-box {
+    padding: 18px 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-page {
+    padding: 12px;
+  }
+  .login-card {
+    padding: 28px 20px;
+    border-radius: 14px;
+  }
+  .login-header h1 {
+    font-size: 20px;
+  }
+  .login-header p {
+    font-size: 13px;
+  }
+  .login-form .el-input {
+    font-size: 13px;
+  }
+  .login-form .el-button {
+    font-size: 13px;
+    padding: 8px 14px;
+  }
+  .reset-password-section {
+    padding-top: 14px;
+  }
+  .reset-password-section h3 {
+    font-size: 13px;
+  }
+  .reset-success-box {
+    padding: 16px 0;
   }
 }
 </style>

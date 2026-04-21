@@ -589,8 +589,150 @@ function formatTime(t: string) {
 }
 
 @media (max-width: 768px) {
-  .wiki-layout { flex-direction: column; }
-  .wiki-sidebar { width: 100%; }
-  .page-grid { grid-template-columns: 1fr; }
+  .wiki-page {
+    padding: 16px;
+  }
+  .wiki-layout {
+    flex-direction: column;
+  }
+  .wiki-sidebar {
+    width: 100%;
+  }
+  .page-grid {
+    grid-template-columns: 1fr;
+  }
+  .page-header h1 {
+    font-size: 20px;
+  }
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .header-actions .el-button {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    font-size: 12px;
+  }
+  .page-card {
+    padding: 14px;
+  }
+  .card-title {
+    font-size: 15px;
+  }
+  .card-preview {
+    font-size: 11px;
+    -webkit-line-clamp: 2;
+  }
+  .view-title {
+    font-size: 22px;
+  }
+  .page-view {
+    padding: 16px;
+  }
+  .markdown-body :deep(h1) {
+    font-size: 20px;
+  }
+  .markdown-body :deep(h2) {
+    font-size: 18px;
+  }
+  .markdown-body :deep(h3) {
+    font-size: 15px;
+  }
+  .markdown-body {
+    font-size: 14px;
+  }
+  .category-item,
+  .status-item {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+  .sidebar-title {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .wiki-page {
+    padding: 12px;
+  }
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .page-header h1 {
+    font-size: 18px;
+  }
+  .header-stats {
+    gap: 4px;
+  }
+  .stat-badge {
+    padding: 1px 8px;
+    font-size: 10px;
+  }
+  .header-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .header-actions .el-button {
+    font-size: 11px;
+    padding: 0 6px;
+  }
+  .page-card {
+    padding: 12px;
+    border-radius: 10px;
+  }
+  .card-title {
+    font-size: 14px;
+  }
+  .card-preview {
+    font-size: 10px;
+  }
+  .card-meta {
+    font-size: 10px;
+  }
+  .view-title {
+    font-size: 20px;
+  }
+  .view-meta {
+    gap: 8px;
+  }
+  .page-view {
+    padding: 14px;
+    border-radius: 10px;
+  }
+  .markdown-body :deep(h1) {
+    font-size: 18px;
+  }
+  .markdown-body :deep(h2) {
+    font-size: 16px;
+  }
+  .markdown-body :deep(h3) {
+    font-size: 14px;
+  }
+  .markdown-body {
+    font-size: 13px;
+  }
+  .markdown-body :deep(pre) {
+    padding: 12px;
+    font-size: 12px;
+  }
+  .markdown-body :deep(code) {
+    font-size: 12px;
+  }
+  .key-section {
+    padding: 12px;
+  }
+  .key-list li {
+    font-size: 13px;
+  }
+  .ai-summary {
+    padding: 12px;
+  }
+  .ai-summary-content {
+    font-size: 13px;
+  }
 }
 </style>

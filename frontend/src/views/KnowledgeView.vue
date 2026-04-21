@@ -475,10 +475,134 @@ function truncate(str: string, len: number) { return str && str.length > len ? s
 .entity-actions { display: flex; gap: 4px; }
 
 @media (max-width: 768px) {
-  .search-input { width: 100%; }
-  .entity-grid { grid-template-columns: 1fr; }
-  .graph-container { min-height: 350px; }
-  .cy-container { height: 350px; }
+  .knowledge-page {
+    padding: 16px;
+  }
+  .search-input {
+    width: 100%;
+  }
+  .entity-grid {
+    grid-template-columns: 1fr;
+  }
+  .graph-container {
+    min-height: 350px;
+  }
+  .cy-container {
+    height: 350px;
+  }
+  .page-header h1 {
+    font-size: 20px;
+  }
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .header-actions .el-button {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .list-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .entity-limit {
+    text-align: center;
+  }
+  .relation-item {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px 10px;
+  }
+  .rel-node {
+    font-size: 13px;
+  }
+  .rel-arrow {
+    font-size: 11px;
+  }
+  .semantic-search {
+    max-width: 100%;
+    flex: 1;
+  }
+  .analysis-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .community-grid {
+    grid-template-columns: 1fr;
+  }
+  .centrality-name {
+    font-size: 13px;
+  }
+  .bar-label {
+    width: 60px;
+    font-size: 10px;
+  }
+  .bar-value {
+    width: 32px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .knowledge-page {
+    padding: 12px;
+  }
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .page-header h1 {
+    font-size: 18px;
+  }
+  .header-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .header-actions .el-button {
+    font-size: 11px;
+    padding: 0 6px;
+  }
+  .entity-card {
+    padding: 12px;
+  }
+  .entity-name {
+    font-size: 14px;
+  }
+  .entity-desc {
+    font-size: 12px;
+  }
+  .group-header {
+    margin-bottom: 8px;
+  }
+  .group-emoji {
+    font-size: 18px;
+  }
+  .group-title {
+    font-size: 14px;
+  }
+  .graph-container {
+    min-height: 280px;
+  }
+  .cy-container {
+    height: 280px;
+  }
+  .stat-card {
+    padding: 12px;
+  }
+  .stat-value {
+    font-size: 22px;
+  }
+  .stat-label {
+    font-size: 11px;
+  }
 }
 
 /* Analysis View */

@@ -498,5 +498,127 @@ async function downloadProModule() {
 .upsell-icon { font-size: 48px; margin-bottom: 16px; }
 .pro-upsell h2 { color: var(--cm-text); margin: 0 0 12px; }
 .pro-upsell p { color: var(--cm-text-muted); margin-bottom: 20px; }
-@media (max-width: 768px) { .pro-grid { grid-template-columns: 1fr; } }
+@media (max-width: 768px) {
+  .pro-grid {
+    grid-template-columns: 1fr;
+  }
+  .pro-page {
+    padding: 16px;
+  }
+  .pro-card {
+    padding: 16px;
+  }
+  .pro-card h2 {
+    font-size: 16px;
+  }
+  .pro-card h3 {
+    font-size: 14px;
+  }
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+  .feature-item {
+    padding: 12px;
+  }
+  .feature-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+  .feature-name {
+    font-size: 14px;
+  }
+  .feature-desc {
+    font-size: 12px;
+  }
+  .pro-upsell {
+    padding: 40px 16px;
+  }
+  .upsell-icon {
+    font-size: 40px;
+  }
+  .pro-upsell h2 {
+    font-size: 20px;
+  }
+  .pro-upsell p {
+    font-size: 14px;
+  }
+  .conflict-values {
+    flex-direction: column;
+  }
+  .router-test {
+    flex-direction: column;
+  }
+  .router-test .el-button {
+    width: 100%;
+  }
+  .extract-result,
+  .graph-result {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .progress-bar {
+    height: 18px;
+  }
+  .progress-text {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pro-page {
+    padding: 12px;
+  }
+  .pro-card {
+    padding: 14px;
+    border-radius: 10px;
+  }
+  .pro-card h2 {
+    font-size: 15px;
+  }
+  .pro-card h3 {
+    font-size: 13px;
+  }
+  .feature-item {
+    padding: 10px;
+  }
+  .feature-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+  .feature-name {
+    font-size: 13px;
+  }
+  .feature-desc {
+    font-size: 11px;
+  }
+  .pro-upsell {
+    padding: 30px 12px;
+  }
+  .upsell-icon {
+    font-size: 36px;
+  }
+  .pro-upsell h2 {
+    font-size: 18px;
+  }
+  .pro-upsell p {
+    font-size: 13px;
+  }
+  .conflict-key {
+    font-size: 12px;
+  }
+  .conflict-values {
+    font-size: 11px;
+  }
+  .conflict-meta {
+    font-size: 11px;
+  }
+  .route-result {
+    font-size: 12px;
+  }
+  .backup-schedule .setting-item {
+    font-size: 13px;
+  }
+}
 </style>

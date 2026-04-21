@@ -779,8 +779,142 @@ function formatNumber(n: number) {
 .file-list { font-size: 13px; color: var(--cm-text-muted); margin-top: 4px; }
 
 @media (max-width: 768px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .content-grid { grid-template-columns: 1fr; }
-  .skill-grid { grid-template-columns: 1fr; }
+  .dashboard {
+    padding: 16px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .stat-card {
+    padding: 14px;
+  }
+  .stat-icon-wrap {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+  .stat-value {
+    font-size: 22px;
+  }
+  .stat-label {
+    font-size: 11px;
+  }
+  .content-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .card {
+    padding: 14px;
+  }
+  .page-header h1 {
+    font-size: 20px;
+  }
+  .page-header {
+    margin-bottom: 14px;
+  }
+  .skill-grid {
+    grid-template-columns: 1fr;
+  }
+  .dist-label {
+    width: 48px;
+    font-size: 11px;
+  }
+  .dist-count {
+    width: 40px;
+    font-size: 11px;
+  }
+  .layer-label {
+    width: 44px;
+    font-size: 11px;
+  }
+  .layer-count {
+    width: 28px;
+    font-size: 11px;
+  }
+  .accessed-item {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .accessed-rank {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+  }
+  .accessed-key {
+    font-size: 12px;
+  }
+  .accessed-count {
+    font-size: 11px;
+  }
+  .memory-item {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .memory-layer-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+  .memory-key {
+    font-size: 12px;
+  }
+  .memory-value {
+    font-size: 11px;
+  }
+  .memory-time {
+    font-size: 10px;
+  }
+  .license-tier {
+    font-size: 16px;
+  }
+  .period-selector .el-radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 12px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .stat-card {
+    padding: 12px;
+    gap: 10px;
+  }
+  .stat-icon-wrap {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+  .stat-value {
+    font-size: 20px;
+  }
+  .page-header h1 {
+    font-size: 18px;
+  }
+  .card {
+    padding: 12px;
+    border-radius: 10px;
+  }
+  .card-header h3 {
+    font-size: 14px;
+  }
+  .chart-container {
+    min-height: 180px;
+  }
+  .skill-card {
+    padding: 10px;
+  }
+  .skill-name {
+    font-size: 13px;
+  }
+  .skill-desc {
+    font-size: 11px;
+  }
 }
 </style>

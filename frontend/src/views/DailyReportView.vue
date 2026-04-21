@@ -246,7 +246,134 @@ function statLabel(key: string) {
 .detail-stat-label { font-size: 11px; color: var(--cm-text-muted); }
 
 @media (max-width: 768px) {
-  .stats-summary { grid-template-columns: repeat(2, 1fr); }
-  .detail-stats { grid-template-columns: repeat(2, 1fr); }
+  .daily-report-page {
+    padding: 16px;
+  }
+  .stats-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .detail-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .page-header h1 {
+    font-size: 20px;
+  }
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .header-actions .el-button {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    font-size: 12px;
+  }
+  .stat-card {
+    padding: 14px;
+  }
+  .stat-value {
+    font-size: 24px;
+  }
+  .stat-label {
+    font-size: 11px;
+  }
+  .report-card {
+    padding: 16px;
+  }
+  .report-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .report-title {
+    font-size: 16px;
+  }
+  .report-date {
+    font-size: 12px;
+  }
+  .detail-section h3 {
+    font-size: 15px;
+  }
+  .detail-section p,
+  .detail-section li {
+    font-size: 13px;
+  }
+  .detail-stat-value {
+    font-size: 18px;
+  }
+  .detail-stat-label {
+    font-size: 10px;
+  }
+  .empty-state {
+    padding: 40px 16px;
+  }
+  .empty-icon {
+    font-size: 40px;
+  }
+  .empty-state h3 {
+    font-size: 16px;
+  }
+  .empty-state p {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .daily-report-page {
+    padding: 12px;
+  }
+  .page-header h1 {
+    font-size: 18px;
+  }
+  .header-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .header-actions .el-button {
+    font-size: 11px;
+    padding: 0 6px;
+  }
+  .stats-summary {
+    grid-template-columns: 1fr;
+  }
+  .stat-card {
+    padding: 12px;
+  }
+  .stat-value {
+    font-size: 20px;
+  }
+  .report-card {
+    padding: 14px;
+    border-radius: 10px;
+  }
+  .report-title {
+    font-size: 15px;
+  }
+  .detail-section h3 {
+    font-size: 14px;
+  }
+  .detail-section p,
+  .detail-section li {
+    font-size: 12px;
+  }
+  .detail-stats {
+    grid-template-columns: 1fr;
+  }
+  .detail-stat-value {
+    font-size: 16px;
+  }
+  .empty-state {
+    padding: 30px 12px;
+  }
+  .empty-icon {
+    font-size: 36px;
+  }
+  .empty-state h3 {
+    font-size: 15px;
+  }
+  .empty-state p {
+    font-size: 12px;
+  }
 }
 </style>

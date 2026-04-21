@@ -383,5 +383,101 @@ async function handleImport(agentName: string) {
 .import-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 0; }
 .loading-spin { animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@media (max-width: 768px) { .search-input { width: 100%; } .memory-list, .search-results { grid-template-columns: 1fr; } .header-actions { width: 100%; justify-content: flex-end; } }
+@media (max-width: 768px) {
+  .memories-page {
+    padding: 16px;
+  }
+  .search-input {
+    width: 100%;
+  }
+  .memory-list,
+  .search-results {
+    grid-template-columns: 1fr;
+  }
+  .header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .page-header h1 {
+    font-size: 20px;
+  }
+  .toolbar {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .memory-card {
+    padding: 14px;
+  }
+  .card-key {
+    font-size: 14px;
+  }
+  .card-value {
+    font-size: 12px;
+  }
+  .card-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .card-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .el-radio-group {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .memories-page {
+    padding: 12px;
+  }
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+  .header-actions .el-button {
+    width: 100%;
+  }
+  .page-header h1 {
+    font-size: 18px;
+  }
+  .memory-card {
+    padding: 12px;
+    border-radius: 10px;
+  }
+  .card-key {
+    font-size: 13px;
+  }
+  .card-value {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .card-top {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .layer-tag {
+    font-size: 10px;
+    padding: 1px 8px;
+  }
+  .importance {
+    font-size: 10px;
+  }
+  .card-meta {
+    font-size: 10px;
+  }
+  .el-radio-group .el-radio-button {
+    margin-bottom: 4px;
+  }
+  .el-radio-button__inner {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
 </style>
