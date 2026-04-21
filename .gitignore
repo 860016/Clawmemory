@@ -29,15 +29,13 @@ backend/clawmemory_core/
 license-platform-v2/
 clawmemory-core-repo/
 
+# Cython source files (private)
+backend/app/core/
+
 # Build artifacts
 backend/clawmemory_core/.cargo/
 *.zip
 scripts/
-
-# Compiled Cython outputs (keep .pyx source)
-backend/app/core/*.so
-backend/app/core/*.pyd
-backend/app/core/*.c
 
 # Pro modules (downloaded during activation, not in repo)
 backend/app/pro/*.pyd
