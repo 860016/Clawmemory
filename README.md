@@ -113,43 +113,6 @@ echo 'DEVICE_FINGERPRINT=my-device-123' > .env
 
 ---
 
-## 授权说明
-
-| 版本 | 价格 | 功能 |
-|------|------|------|
-| **OSS** | 免费 | 记忆 CRUD + FTS5 搜索 + 语义搜索 |
-| **Pro** | ¥29/月 | +知识图谱 +自动备份 +记忆衰减 +Token路由 +矛盾治理 +AI日报 +Wiki AI |
-| **Enterprise** | ¥99/月 | +API访问 +SSO +审计日志 +时间旅行 +离线模式 |
-
-在 **设置 → 授权管理** 中输入授权码激活。激活后 Pro 模块将自动下载并安装。
-
----
-
-## Pro 模块架构
-
-Pro 功能代码不直接包含在开源仓库中，而是在授权激活时从服务器下载加密模块。
-
-### 安全设计
-- Pro 模块使用 Cython 编译为二进制文件（.pyd/.so），无法直接查看源码
-- 模块在授权激活后动态加载，未授权时不可用
-- 支持主服务器 + 备用服务器下载，确保高可用
-
-### 打包 Pro 模块（仅开发者）
-```bash
-python package_pro.py          # 打包 Pro 模块
-python setup_cython.py build   # Cython 编译
-python setup_cython.py package # 编译并打包
-```
-
-### 配置下载服务器
-在 `.env` 中设置 Pro 模块下载地址：
-```env
-CLAWMEMORY_PRO_DOWNLOAD_URL=https://your-server.com/pro_module.zip
-CLAWMEMORY_PRO_FALLBACK_URLS=["https://backup1.com/pro.zip", "https://backup2.com/pro.zip"]
-```
-
----
-
 ## 高级操作
 
 ```bash

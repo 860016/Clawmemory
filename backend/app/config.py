@@ -52,10 +52,6 @@ class Settings(BaseSettings):
     license_server_url: str = "https://auth.bestu.top"
     rsa_public_key_path: Path = base_dir / "keys" / "public.pem"
 
-    # Pro module download URLs (fixed, configured by admin)
-    pro_download_url: str = ""
-    pro_fallback_urls: list[str] = []
-
     # CORS (前端预构建后同源部署，"*" 可用；开发模式需指定 localhost)
     cors_origins: list[str] = ["*"]
 
