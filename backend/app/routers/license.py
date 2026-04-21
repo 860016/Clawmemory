@@ -5,7 +5,7 @@ from app.middleware.auth import get_current_user
 from app.models.license import License
 from app.schemas.license import LicenseActivateRequest
 from app.services.license_service import LicenseService, current_tier, is_feature_enabled, reset
-from app.pro.pro_loader import is_pro_installed, get_pro_info, download_pro_package, uninstall_pro
+from app.core.pro_loader import is_pro_installed, get_pro_info, download_pro_package, uninstall_pro
 
 router = APIRouter(prefix="/api/v1/license", tags=["license"])
 

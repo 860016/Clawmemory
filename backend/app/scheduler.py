@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.database import SessionLocal
-from app.pro.pro_loader import get_pro_class
+from app.core.pro_loader import get_pro_class
 import asyncio
 
 logger = logging.getLogger(__name__)

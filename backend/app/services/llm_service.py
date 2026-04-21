@@ -1,5 +1,5 @@
 import logging
-from app.pro.pro_loader import get_pro_module
+from app.core.pro_loader import get_pro_module
 
 logger = logging.getLogger(__name__)
 

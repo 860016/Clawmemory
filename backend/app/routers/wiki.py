@@ -6,7 +6,7 @@ from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.services.wiki_service import WikiService
 from app.services.license_service import is_feature_enabled
-from app.pro.pro_loader import get_pro_class
+from app.core.pro_loader import get_pro_class
 
 router = APIRouter(prefix="/api/v1/wiki", tags=["wiki"])
 

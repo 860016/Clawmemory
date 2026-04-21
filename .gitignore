@@ -28,22 +28,11 @@ frontend/dist/
 license-platform-v2/
 clawmemory-core-repo/
 
-# Cython source files (private)
+# Pro engine (private - compiled and distributed separately)
 backend/app/core/
 
-# Build artifacts
-*.zip
-scripts/
-
-# Pro modules (downloaded during activation, not in repo)
-backend/app/pro/*.pyd
-backend/app/pro/*.so
-backend/app/pro/*.c
-backend/app/pro/daily_report_service.py
-backend/app/pro/llm_service.py
-backend/app/pro/wiki_ai_service.py
-backend/app/pro/.pro_installed
-backend/app/pro/.pro_manifest.json
+# Pro runtime modules (downloaded during activation)
+backend/app/pro/
 
 # OS
 .DS_Store
