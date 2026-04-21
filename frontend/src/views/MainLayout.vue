@@ -138,6 +138,7 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
       { path: '/?tab=stats', label: 'nav.stats', icon: DataAnalysis },
       { path: '/?tab=skills', label: 'nav.skills', icon: MagicStick },
       { path: '/reports', label: 'nav.reports', icon: DataAnalysis },
+      { path: '/guide', label: 'nav.guide', icon: Document },
     ]}
   ],
   '/memories': [

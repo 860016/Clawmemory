@@ -8,7 +8,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app.config import settings, APP_VERSION
 from app.database import init_db
 from app.services.setup_service import ensure_data_dirs
-from app.routers import auth, memories, license, backups, knowledge, file_watcher, wiki, pro_features, openclaw_memories, openclaw_skills, daily_reports
+from app.routers import auth, memories, license, backups, knowledge, file_watcher, wiki, pro_features, openclaw_memories, openclaw_skills, daily_reports, chromadb
 import asyncio
 import time
 import logging
@@ -310,6 +310,7 @@ app.include_router(pro_features.router)
 app.include_router(openclaw_memories.router)
 app.include_router(openclaw_skills.router)
 app.include_router(daily_reports.router)
+app.include_router(chromadb.router)
 
 
 @app.get("/api/v1/health")

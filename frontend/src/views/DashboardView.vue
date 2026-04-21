@@ -312,6 +312,44 @@
       </div>
 
       <div class="content-grid">
+        <!-- ChromaDB Installation Card -->
+        <div class="card chromadb-card">
+          <div class="card-header">
+            <h3>🔮 {{ $t('dashboard.chromadbTitle') }}</h3>
+            <el-tag :type="chromadbInstalled ? 'success' : 'warning'" size="small">
+              {{ chromadbInstalled ? $t('dashboard.chromadbInstalled') : $t('dashboard.chromadbNotInstalled') }}
+            </el-tag>
+          </div>
+          <div class="chromadb-content">
+            <p class="chromadb-desc">{{ $t('dashboard.chromadbDesc') }}</p>
+            <div class="chromadb-features">
+              <div class="feature-item">
+                <span class="feature-icon">✨</span>
+                <span class="feature-text">{{ $t('dashboard.chromadbFeature1') }}</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">🎯</span>
+                <span class="feature-text">{{ $t('dashboard.chromadbFeature2') }}</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">🚀</span>
+                <span class="feature-text">{{ $t('dashboard.chromadbFeature3') }}</span>
+              </div>
+            </div>
+            <div class="chromadb-actions">
+              <el-button type="primary" @click="installChromaDB" :loading="installing" v-if="!chromadbInstalled">
+                {{ $t('dashboard.installChromaDB') }}
+              </el-button>
+              <el-button type="success" disabled v-else>
+                ✓ {{ $t('dashboard.chromadbReady') }}
+              </el-button>
+              <el-button text @click="$router.push('/guide')">
+                {{ $t('dashboard.viewGuide') }} →
+              </el-button>
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header">
             <h3>📊 {{ $t('dashboard.layerDistribution') }}</h3>
@@ -376,6 +414,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import axios from '../api/client'
 
 const { t } = useI18n()
@@ -424,10 +463,18 @@ const layerLabels: Record<string, string> = {
   private: t('memories.private'),
 }
 
+// ChromaDB state
+const chromadbInstalled = ref(false)
+const installing = ref(false)
+
 onMounted(async () => {
   try {
     const { data } = await axios.get('/stats')
     stats.value = data
+  } catch {}
+  try {
+    const { data } = await axios.get('/chromadb/status')
+    chromadbInstalled.value = data.available
   } catch {}
 })
 
@@ -450,6 +497,23 @@ async function scanSkills() {
     scanned.value = true
   } finally {
     scanning.value = false
+  }
+}
+
+async function installChromaDB() {
+  installing.value = true
+  try {
+    const { data } = await axios.post('/chromadb/install')
+    if (data.success) {
+      chromadbInstalled.value = true
+      ElMessage.success(t('dashboard.installSuccess'))
+    } else {
+      ElMessage.error(data.message || t('dashboard.installFailed'))
+    }
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || t('dashboard.installFailed'))
+  } finally {
+    installing.value = false
   }
 }
 
@@ -680,6 +744,19 @@ function formatNumber(n: number) {
 .card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 20px; }
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .card-header h3 { margin: 0; font-size: 15px; color: var(--cm-text); font-weight: 600; }
+
+/* ChromaDB Card */
+.chromadb-card {
+  background: linear-gradient(135deg, var(--cm-bg-secondary) 0%, rgba(139, 92, 246, 0.05) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+.chromadb-content { display: flex; flex-direction: column; gap: 16px; }
+.chromadb-desc { font-size: 14px; color: var(--cm-text-secondary); line-height: 1.6; margin: 0; }
+.chromadb-features { display: flex; flex-direction: column; gap: 10px; }
+.feature-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--cm-bg); border-radius: 8px; border: 1px solid var(--cm-border); }
+.feature-icon { font-size: 18px; }
+.feature-text { font-size: 13px; color: var(--cm-text-secondary); }
+.chromadb-actions { display: flex; gap: 8px; align-items: center; }
 
 .chart-card { min-height: 300px; }
 .chart-container { width: 100%; min-height: 220px; }
