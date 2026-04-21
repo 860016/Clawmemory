@@ -200,13 +200,13 @@
       <div class="pro-card">
         <div class="card-header">
           <span class="card-icon">📦</span>
-          <span class="card-title">下载 Pro 模块</span>
+          <span class="card-title">{{ $t('settings.downloadProModule') }}</span>
         </div>
         <div class="card-body">
-          <p class="card-desc">手动下载并安装 Pro 模块，适用于激活时未自动下载的情况。</p>
+          <p class="card-desc">{{ $t('settings.downloadProModuleDesc') }}</p>
           <div class="card-actions">
             <el-button size="small" type="primary" @click="downloadProModule" :loading="proDownloading">
-              {{ proDownloadStatus || '下载 Pro 模块' }}
+              {{ proDownloadStatus || $t('settings.downloadBtn') }}
             </el-button>
           </div>
           <div v-if="proInstallProgress > 0" class="progress-bar">
@@ -405,20 +405,19 @@ async function saveBackupSchedule() {
 
 async function downloadProModule() {
   proDownloading.value = true
-  proDownloadStatus.value = '正在获取下载地址...'
+  proDownloadStatus.value = t('settings.fetchingUrl')
   proInstallProgress.value = 0
   
   try {
-    // 先从授权状态获取下载地址
     const { data: licenseInfo } = await axios.get('/license/info')
     
     if (!licenseInfo.pro_download_url) {
-      ElMessage.error('授权服务器未配置 Pro 模块下载地址，请联系管理员')
+      ElMessage.error(t('settings.noDownloadUrl'))
       proDownloadStatus.value = ''
       return
     }
 
-    proDownloadStatus.value = '正在下载...'
+    proDownloadStatus.value = t('settings.downloading')
     const fallbackParam = (licenseInfo.pro_fallback_urls || []).length > 0 
       ? licenseInfo.pro_fallback_urls.join(',') 
       : ''
@@ -434,16 +433,16 @@ async function downloadProModule() {
     })
     
     if (data.success) {
-      ElMessage.success('Pro 模块安装成功')
-      proDownloadStatus.value = '安装完成'
+      ElMessage.success(t('settings.installSuccess'))
+      proDownloadStatus.value = t('settings.installComplete')
     } else {
-      ElMessage.error(data.message || 'Pro 模块安装失败')
-      proDownloadStatus.value = '安装失败'
+      ElMessage.error(data.message || t('settings.installFailed'))
+      proDownloadStatus.value = t('settings.installFailed')
     }
   } catch (e: any) {
     const detail = e.response?.data?.detail || e.message
-    ElMessage.error(`Pro 模块安装失败: ${detail}`)
-    proDownloadStatus.value = '安装失败'
+    ElMessage.error(`${t('settings.installFailed')}: ${detail}`)
+    proDownloadStatus.value = t('settings.installFailed')
   } finally {
     proDownloading.value = false
     setTimeout(() => { proDownloadStatus.value = '' }, 3000)

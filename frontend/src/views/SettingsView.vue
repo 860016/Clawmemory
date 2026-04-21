@@ -355,8 +355,7 @@ async function activateLicense() {
       if (data.pro_download_url) {
         await installProModule(data.pro_download_url, data.pro_fallback_urls || [])
       } else {
-        // 授权服务器未配置下载地址，提示用户
-        ElMessage.info('授权已激活，Pro 模块暂未配置下载地址，请联系管理员')
+        ElMessage.info(t('settings.proModuleNotConfigured'))
       }
     } else {
       ElMessage.error(data.message || t('common.failed'))
@@ -374,7 +373,7 @@ async function activateLicense() {
 async function installProModule(url: string, fallbackUrls: string[]) {
   proInstalling.value = true
   proInstallProgress.value = 0
-  proInstallStatus.value = '正在下载 Pro 模块...'
+  proInstallStatus.value = t('settings.installing')
   
   try {
     const fallbackParam = fallbackUrls.length > 0 ? fallbackUrls.join(',') : ''
@@ -389,18 +388,17 @@ async function installProModule(url: string, fallbackUrls: string[]) {
     })
     
     if (data.success) {
-      ElMessage.success('Pro 模块安装成功')
-      proInstallStatus.value = '安装完成'
-      // 刷新授权状态以显示 Pro 功能
+      ElMessage.success(t('settings.installSuccess'))
+      proInstallStatus.value = t('settings.installComplete')
       await loadLicense()
     } else {
-      ElMessage.error(data.message || 'Pro 模块安装失败')
-      proInstallStatus.value = '安装失败'
+      ElMessage.error(data.message || t('settings.installFailed'))
+      proInstallStatus.value = t('settings.installFailed')
     }
   } catch (e: any) {
     const detail = e.response?.data?.detail || e.message
-    ElMessage.error(`Pro 模块安装失败: ${detail}`)
-    proInstallStatus.value = '安装失败'
+    ElMessage.error(`${t('settings.installFailed')}: ${detail}`)
+    proInstallStatus.value = t('settings.installFailed')
   } finally {
     proInstalling.value = false
     setTimeout(() => { proInstallStatus.value = '' }, 3000)
