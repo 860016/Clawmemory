@@ -10,46 +10,35 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# ========== 授权引擎与计算引擎分离架构 ==========
+# ========== v3.0 授权架构 ==========
 #
 # 安全设计原则：
-#   1. 授权检查不依赖模块级变量，每次调用时重新验证
-#   2. 使用 importlib.util.find_spec() 检查 clawmemory_core 是否真的存在
-#   3. 即使修改了 Python 代码，也无法绕过真正的授权检查
+#   1. 授权状态存储在本地数据库 + 内存中
+#   2. clawmemory_core (C/Rust wheel) 是可选增强，提供 RSA 硬验证
+#   3. 没有 clawmemory_core 时，授权平台验证 + 本地数据库即可激活
+#   4. Pro 功能模块在激活后自动下载安装
 #
-# 授权引擎 (License Engine):
-#   - 只有 clawmemory_core (C wheel) 才能激活 Pro/Enterprise
-#   - .pyx 编译版和纯 Python 都无法设置授权，永远锁定为 OSS
-#
-# 计算引擎 (Compute Engine):
-#   - clawmemory_core → 最高性能 + 安全
-#   - .pyx 编译版 → 中等性能，可用于计算但无授权
-#   - 纯 Python 兜底 → 基础功能可用
+# 引擎层级：
+#   - clawmemory_core → RSA 硬验证 + 高性能计算
+#   - .pyx 编译版 → 中等性能计算
+#   - 纯 Python 兜底 → 基础功能
 
 _LICENSE_ENGINE = "none"
 _COMPUTE_ENGINE = "none"
 
-# ========== 核心安全函数：检查 clawmemory_core 是否真的存在 ==========
+# ========== Python 层授权状态（不依赖 clawmemory_core） ==========
+
+_python_tier = "oss"
+_python_features: list[str] = []
+
 
 def _has_clawmemory_core() -> bool:
-    """
-    检查 clawmemory_core 是否真的存在
-    
-    使用 importlib.util.find_spec() 而不是 try/except，
-    这样即使修改了模块级变量，也无法绕过此检查。
-    """
     return importlib.util.find_spec("clawmemory_core") is not None
 
 
 def _get_core_functions():
-    """
-    从 clawmemory_core 获取授权函数
-    
-    每次调用时重新导入，确保检查的是真正的模块。
-    """
     if not _has_clawmemory_core():
         return None
-    
     try:
         import clawmemory_core
         return {
@@ -79,8 +68,7 @@ if _core_funcs:
     else:
         _LICENSE_ENGINE = "rust"
         logger.info("License engine: Rust (PyO3) — maximum security")
-    
-    # 尝试加载计算功能
+
     try:
         import clawmemory_core as _core
         calculate_decay = _core.calculate_decay
@@ -101,7 +89,7 @@ if _core_funcs:
     except (ImportError, AttributeError):
         logger.warning("clawmemory_core missing compute functions, will try .pyx fallback")
 else:
-    logger.info("clawmemory_core not installed, license activation will be blocked")
+    logger.info("clawmemory_core not installed, using Python license management")
 
 # ========== Step 2: 加载 .pyx 计算引擎（如果需要） ==========
 
@@ -118,7 +106,7 @@ if _COMPUTE_ENGINE == "none":
             estimate_complexity, route_model, get_routing_stats,
         )
         _COMPUTE_ENGINE = "pyx"
-        logger.info("Compute engine: .pyx compiled — compute functions available, but NO license activation")
+        logger.info("Compute engine: .pyx compiled — compute functions available")
     except ImportError as e:
         logger.warning("Failed to load .pyx compute modules: %s", e)
 
@@ -196,62 +184,42 @@ if _COMPUTE_ENGINE == "none":
         return {"total": 0, "distribution": {}, "avg_complexity": 0.0, "total_cost": 0.0}
 
 
-# ========== 授权功能：每次调用时重新检查 clawmemory_core ==========
+# ========== 授权功能：优先使用 clawmemory_core，回退到 Python ==========
 
 def check_feature(feature: str) -> bool:
-    """
-    检查功能是否启用
-    
-    安全设计：每次调用时重新检查 clawmemory_core 是否存在，
-    不依赖模块级变量，防止通过修改代码绕过。
-    """
     funcs = _get_core_functions()
     if funcs:
         return funcs["check_feature"](feature)
-    return False
+    return feature in _python_features
 
 
 def get_tier() -> str:
-    """
-    获取当前授权等级
-    
-    安全设计：每次调用时重新检查 clawmemory_core 是否存在。
-    """
     funcs = _get_core_functions()
     if funcs:
         return funcs["get_tier"]()
-    return "oss"
+    return _python_tier
 
 
 def set_license(tier: str, features: list):
-    """
-    设置授权状态
-    
-    安全设计：只有 clawmemory_core 存在时才能设置，
-    否则抛出异常。
-    """
+    global _python_tier, _python_features
     funcs = _get_core_functions()
     if funcs:
         return funcs["set_license"](tier, features)
-    logger.warning("set_license() BLOCKED: clawmemory_core not installed")
-    raise RuntimeError("License activation requires clawmemory_core (C/Rust wheel)")
+    _python_tier = tier
+    _python_features = list(features)
+    logger.info("License set (Python): tier=%s, features=%d", tier, len(features))
 
 
 def reset():
-    """
-    重置授权状态
-    
-    安全设计：只有 clawmemory_core 存在时才能重置。
-    """
+    global _python_tier, _python_features
     funcs = _get_core_functions()
     if funcs:
         return funcs["reset"]()
+    _python_tier = "oss"
+    _python_features = []
 
 
 def verify_integrity() -> bool:
-    """
-    校验授权数据是否被篡改
-    """
     funcs = _get_core_functions()
     if funcs:
         try:
@@ -262,22 +230,35 @@ def verify_integrity() -> bool:
 
 
 def _core_verify_license(license_data_b64: str, public_key_pem: str) -> dict:
-    """
-    RSA 签名验证
-    
-    安全设计：只有 clawmemory_core 存在时才能验证。
-    """
     funcs = _get_core_functions()
     if funcs:
         return funcs["verify_license"](license_data_b64, public_key_pem)
-    logger.warning("RSA verify BLOCKED: clawmemory_core not installed")
     return {}
+
+
+def _python_verify_license(license_data_b64: str, public_key_pem: str) -> dict:
+    try:
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        public_key = serialization.load_pem_public_key(public_key_pem.encode())
+        payload_b64, signature_b64 = license_data_b64.rsplit(".", 1)
+        payload = base64.urlsafe_b64decode(payload_b64 + "==")
+        signature = base64.urlsafe_b64decode(signature_b64 + "==")
+
+        public_key.verify(signature, payload, padding.PKCS1v15(), hashes.SHA256())
+        return json.loads(payload)
+    except ImportError:
+        logger.warning("cryptography library not available, skipping RSA verify")
+        return {}
+    except Exception as e:
+        logger.warning("Python RSA verify failed: %s", e)
+        return {}
 
 
 # ========== 辅助函数 ==========
 
 def get_license_engine() -> str:
-    """获取授权引擎类型: c/rust/none"""
     if _has_clawmemory_core():
         funcs = _get_core_functions()
         if funcs:
@@ -285,32 +266,28 @@ def get_license_engine() -> str:
             if "c-cpython" in _build:
                 return "c"
             return "rust"
-    return "none"
+    return "python"
 
 
 def get_compute_engine() -> str:
-    """获取计算引擎类型: c/rust/pyx/none"""
     return _COMPUTE_ENGINE
 
 
 def get_engine_info() -> dict:
-    """获取引擎完整信息"""
     has_core = _has_clawmemory_core()
     return {
         "license_engine": get_license_engine(),
         "compute_engine": _COMPUTE_ENGINE,
         "has_clawmemory_core": has_core,
-        "can_activate": has_core,
+        "can_activate": True,
     }
 
 
 def is_feature_enabled(feature: str) -> bool:
-    """检查功能是否启用（别名）"""
     return check_feature(feature)
 
 
 def current_tier() -> str:
-    """获取当前授权等级（别名）"""
     return get_tier()
 
 
@@ -348,27 +325,12 @@ class LicenseService:
         self.db = db
 
     def get_active_license(self) -> License | None:
-        """获取当前活跃的授权记录"""
         return self.db.query(License).filter(License.status == "active").first()
 
     async def activate(self, license_key: str) -> dict:
-        """
-        激活授权码 — 完整流程：
-        1. 检查 clawmemory_core 是否存在
-        2. 向授权平台发送激活请求
-        3. RSA 签名验证
-        4. 存入本地数据库
-        5. 写入内存
-        """
-        # Step 0: 安全引擎检查 — 使用 _has_clawmemory_core() 而不是模块变量
-        if not _has_clawmemory_core():
-            logger.error("Cannot activate: clawmemory_core not installed")
-            return {"valid": False, "message": "未安装核心安全引擎，请先安装 clawmemory-core 后再激活"}
-
         fingerprint = self._get_fingerprint()
         device_name = self._get_device_name()
 
-        # Step 1: 向授权平台请求激活
         try:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.post(
@@ -388,49 +350,38 @@ class LicenseService:
         except Exception as e:
             return {"valid": False, "message": f"激活请求失败: {e}"}
 
-        # 授权平台返回错误
         if not data.get("valid"):
             return {"valid": False, "message": data.get("message", "授权码无效")}
 
-        # Step 2: RSA 签名验证（核心安全环节）
+        # RSA 签名验证（可选增强）
         signature_b64 = data.get("signature", "")
         if signature_b64:
             pubkey = self._load_public_key()
-            if not pubkey:
-                logger.error("RSA public key not available, cannot verify license signature")
-                return {"valid": False, "message": "无法获取 RSA 公钥，请检查网络连接后重试"}
-
-            verified_data = _core_verify_license(signature_b64, pubkey)
-            if not verified_data:
-                # 验签失败 — 尝试刷新公钥后重试
-                logger.warning("RSA verify failed with cached key, refreshing from server...")
-                fresh_pubkey = self._load_public_key(force_refresh=True)
-                if fresh_pubkey and fresh_pubkey != pubkey:
-                    verified_data = _core_verify_license(signature_b64, fresh_pubkey)
-                    if verified_data:
-                        logger.info("RSA signature verification passed after key refresh")
-                        pubkey = fresh_pubkey
-                    else:
-                        logger.warning("RSA signature verification FAILED even with fresh key")
-                        return {"valid": False, "message": "RSA 签名验证失败，授权可能被篡改"}
+            if pubkey:
+                verified_data = _core_verify_license(signature_b64, pubkey)
+                if not verified_data:
+                    verified_data = _python_verify_license(signature_b64, pubkey)
+                if verified_data:
+                    logger.info("RSA signature verification passed")
                 else:
-                    logger.warning("RSA signature verification FAILED")
-                    return {"valid": False, "message": "RSA 签名验证失败，授权可能被篡改"}
+                    fresh_pubkey = self._load_public_key(force_refresh=True)
+                    if fresh_pubkey and fresh_pubkey != pubkey:
+                        verified_data = _core_verify_license(signature_b64, fresh_pubkey)
+                        if not verified_data:
+                            verified_data = _python_verify_license(signature_b64, fresh_pubkey)
+                    if not verified_data:
+                        logger.warning("RSA signature verification FAILED")
+                        return {"valid": False, "message": "RSA 签名验证失败，授权可能被篡改"}
             else:
-                logger.info("RSA signature verification passed")
+                logger.warning("No public key available, skipping RSA verify")
         else:
-            if _has_clawmemory_core():
-                logger.error("No signature in activation response but core engine is active")
-                return {"valid": False, "message": "授权服务器未返回签名数据"}
-            logger.warning("No signature in response (no core engine, skipping RSA verify)")
+            logger.info("No signature in response, server-side verification only")
 
-        # Step 3: 提取授权数据
         tier = data.get("tier", "pro")
         features = data.get("features", [])
         expires_at = data.get("expires_at")
         device_slot = data.get("device_slot", "")
 
-        # 如果 features 为空，按 tier 填充默认值
         if not features:
             if tier == "oss":
                 features = []
@@ -439,7 +390,6 @@ class LicenseService:
             else:
                 features = list(PRO_FEATURES.keys())
 
-        # Step 4: 存入本地数据库
         self._deactivate_all()
         license_obj = License(
             license_key=license_key,
@@ -456,7 +406,6 @@ class LicenseService:
         self.db.add(license_obj)
         self.db.commit()
 
-        # Step 5: 写入内存（通过 clawmemory_core）
         set_license(tier, features)
 
         return {
@@ -470,7 +419,6 @@ class LicenseService:
         }
 
     async def deactivate(self) -> dict:
-        """取消激活 — 本地 + 通知授权平台"""
         lic = self.get_active_license()
         if lic:
             await self._notify_deactivate(lic)
@@ -481,7 +429,6 @@ class LicenseService:
         return {"active": False, "tier": "oss", "message": "License deactivated"}
 
     async def _notify_deactivate(self, lic: License):
-        """通知授权平台解绑设备"""
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 await client.post(
@@ -496,20 +443,10 @@ class LicenseService:
             logger.warning(f"Failed to notify license server about deactivation: {e}")
 
     def _deactivate_all(self):
-        """将所有 active 的授权标记为 revoked"""
         self.db.query(License).filter(License.status == "active").update({"status": "revoked"})
         self.db.flush()
 
     def load_cached_license(self):
-        """
-        启动时从本地数据库恢复授权状态
-        
-        安全设计：使用 _has_clawmemory_core() 检查，而不是模块变量。
-        """
-        if not _has_clawmemory_core():
-            logger.warning("Cached license ignored: clawmemory_core not installed, running as OSS")
-            return
-
         lic = self.get_active_license()
         if lic:
             features = json.loads(lic.features) if lic.features else []
@@ -520,7 +457,6 @@ class LicenseService:
             logger.info("No cached license found, running as OSS")
 
     def _get_fingerprint(self) -> str:
-        """生成设备指纹"""
         import hashlib, platform, os, uuid
         parts = []
 
@@ -549,7 +485,6 @@ class LicenseService:
         return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
     def _get_device_name(self) -> str:
-        """生成人类可读的设备名称"""
         import platform, os, socket
 
         name = os.environ.get('DEVICE_NAME', '')
@@ -564,40 +499,24 @@ class LicenseService:
         return f"{platform.system()} {platform.machine()}"
 
     def _load_public_key(self, force_refresh: bool = False) -> str | None:
-        """加载 RSA 公钥"""
         path = settings.rsa_public_key_path
         if not force_refresh and path.exists():
-            content = path.read_text().strip()
-            if content.startswith("-----BEGIN PUBLIC KEY-----"):
-                return content
+            try:
+                return path.read_text()
+            except Exception:
+                pass
 
         try:
-            import httpx as _httpx
-            resp = _httpx.get(f"{settings.license_server_url}/api/v1/public-key", timeout=10)
+            pubkey_url = f"{settings.license_server_url}/api/v1/public-key"
+            resp = httpx.get(pubkey_url, timeout=10)
             if resp.status_code == 200:
-                pubkey = resp.text.strip()
-                if pubkey.startswith("-----BEGIN PUBLIC KEY-----"):
-                    self._cache_public_key(path, pubkey)
-                    logger.info("RSA public key fetched from license server and cached locally")
-                    return pubkey
-                try:
-                    data = resp.json()
-                    pk = data.get("public_key", "")
-                    if pk and pk.startswith("-----BEGIN PUBLIC KEY-----"):
-                        self._cache_public_key(path, pk)
-                        logger.info("RSA public key fetched from license server (JSON) and cached locally")
-                        return pk
-                except Exception:
-                    pass
+                data = resp.json()
+                pem = data.get("public_key", "")
+                if pem and "BEGIN PUBLIC KEY" in pem:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(pem)
+                    return pem
         except Exception as e:
             logger.warning(f"Failed to fetch public key from server: {e}")
 
         return None
-
-    def _cache_public_key(self, path, content: str):
-        """缓存公钥到本地文件"""
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(content)
-        except Exception as e:
-            logger.warning(f"Failed to cache public key: {e}")

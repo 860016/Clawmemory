@@ -40,7 +40,14 @@ app/core/*.pyd
 app/core/*.c
 
 # Pro modules (downloaded during activation, not in repo)
-backend/app/pro/
+backend/app/pro/*.pyd
+backend/app/pro/*.so
+backend/app/pro/*.c
+backend/app/pro/daily_report_service.py
+backend/app/pro/llm_service.py
+backend/app/pro/wiki_ai_service.py
+backend/app/pro/.pro_installed
+backend/app/pro/.pro_manifest.json
 
 # OS
 .DS_Store
