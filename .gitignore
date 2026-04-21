@@ -35,9 +35,9 @@ backend/clawmemory_core/.cargo/
 scripts/
 
 # Compiled Cython outputs (keep .pyx source)
-app/core/*.so
-app/core/*.pyd
-app/core/*.c
+backend/app/core/*.so
+backend/app/core/*.pyd
+backend/app/core/*.c
 
 # Pro modules (downloaded during activation, not in repo)
 backend/app/pro/*.pyd
