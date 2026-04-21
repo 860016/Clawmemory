@@ -18,3 +18,5 @@ class License(Base):
     last_verified_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
+    pro_download_url = Column(Text, nullable=True)
+    pro_fallback_urls = Column(Text, nullable=True)  # JSON array

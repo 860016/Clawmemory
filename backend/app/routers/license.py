@@ -15,7 +15,6 @@ def _build_license_info(db: Session) -> dict:
     tier = current_tier()
     active = tier != "oss"
 
-    # 当前启用的功能列表
     all_pro_features = [
         "ai_extract", "auto_graph", "unlimited_graph",
         "auto_decay", "decay_report", "prune_suggest", "reinforce",
@@ -25,7 +24,6 @@ def _build_license_info(db: Session) -> dict:
     ]
     features = [f for f in all_pro_features if is_feature_enabled(f)]
 
-    # 从数据库读取额外信息
     lic = db.query(License).filter(License.status == "active").first()
     expires_at = None
     device_slot = ""
@@ -33,23 +31,32 @@ def _build_license_info(db: Session) -> dict:
     device_count = 0
     license_type = "none"
     license_key_display = ""
+    pro_download_url = ""
+    pro_fallback_urls = []
 
     if lic:
         expires_at = str(lic.expires_at) if lic.expires_at else None
         device_slot = lic.device_slot or ""
         license_type = lic.tier
-        # 脱敏显示授权码
         if lic.license_key and len(lic.license_key) > 8:
             license_key_display = lic.license_key[:4] + "****" + lic.license_key[-4:]
         else:
             license_key_display = "****"
-        # 解析 device_slot: "2/3" → device_count=2, max_devices=3
         if device_slot and "/" in device_slot:
             try:
                 parts = device_slot.split("/")
                 device_count = int(parts[0])
                 max_devices = int(parts[1])
             except (ValueError, IndexError):
+                pass
+        # 从数据库读取 Pro 下载地址
+        if lic.pro_download_url:
+            pro_download_url = lic.pro_download_url
+        if lic.pro_fallback_urls:
+            try:
+                import json
+                pro_fallback_urls = json.loads(lic.pro_fallback_urls)
+            except Exception:
                 pass
 
     return {
@@ -63,6 +70,8 @@ def _build_license_info(db: Session) -> dict:
         "device_count": device_count,
         "license_key": license_key_display,
         "is_valid": True,
+        "pro_download_url": pro_download_url,
+        "pro_fallback_urls": pro_fallback_urls,
     }
 
 

@@ -381,6 +381,8 @@ class LicenseService:
         features = data.get("features", [])
         expires_at = data.get("expires_at")
         device_slot = data.get("device_slot", "")
+        pro_download_url = data.get("pro_download_url", "")
+        pro_fallback_urls = data.get("pro_fallback_urls", [])
 
         if not features:
             if tier == "oss":
@@ -402,6 +404,8 @@ class LicenseService:
             device_slot=device_slot,
             expires_at=expires_at,
             last_verified_at=datetime.now(timezone.utc),
+            pro_download_url=pro_download_url,
+            pro_fallback_urls=json.dumps(pro_fallback_urls),
         )
         self.db.add(license_obj)
         self.db.commit()
