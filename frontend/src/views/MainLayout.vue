@@ -113,7 +113,6 @@ const navItems = [
   { path: '/memories', label: 'nav.memories', icon: Collection, emoji: '🧠' },
   { path: '/knowledge', label: 'nav.knowledge', icon: Connection, emoji: '🕸️' },
   { path: '/wiki', label: 'nav.wiki', icon: Document, emoji: '📖' },
-  { path: '/reports', label: 'nav.reports', icon: DataAnalysis, emoji: '📊' },
   { path: '/pro', label: 'nav.pro', icon: Promotion, emoji: '🚀' },
   { path: '/settings', label: 'nav.settings', icon: Setting, emoji: '⚙️' },
 ]
@@ -138,6 +137,7 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
       { path: '/', label: 'nav.overview', icon: HomeFilled },
       { path: '/?tab=stats', label: 'nav.stats', icon: DataAnalysis },
       { path: '/?tab=skills', label: 'nav.skills', icon: MagicStick },
+      { path: '/reports', label: 'nav.reports', icon: DataAnalysis },
     ]}
   ],
   '/memories': [

@@ -2,20 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.middleware.auth import get_current_user
-from app.services.license_service import is_feature_enabled
-from app.core.pro_loader import get_pro_class
+from app.services.daily_report_service_free import DailyReportService
 from datetime import datetime
-import asyncio
 
 router = APIRouter(prefix="/api/v1/reports", tags=["daily_reports"])
 
 
-def _get_service(db: Session):
-    """获取 DailyReportService 实例"""
-    cls = get_pro_class("daily_report_service", "DailyReportService")
-    if cls is None:
-        raise HTTPException(status_code=503, detail="Pro module not installed")
-    return cls(db)
+def _get_service(db: Session) -> DailyReportService:
+    """获取 DailyReportService 实例（免费功能）"""
+    return DailyReportService(db)
 
 
 @router.get("/daily")
@@ -74,10 +69,7 @@ async def generate_report(
     _=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """手动生成日报（Pro 功能）"""
-    if not is_feature_enabled("ai_extract"):
-        raise HTTPException(status_code=403, detail="Pro feature: daily report")
-
+    """手动生成日报"""
     service = _get_service(db)
 
     if date:

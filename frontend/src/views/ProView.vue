@@ -195,6 +195,26 @@
           </div>
         </div>
       </div>
+
+      <!-- Download Pro Module -->
+      <div class="pro-card">
+        <div class="card-header">
+          <span class="card-icon">📦</span>
+          <span class="card-title">下载 Pro 模块</span>
+        </div>
+        <div class="card-body">
+          <p class="card-desc">手动下载并安装 Pro 模块，适用于激活时未自动下载的情况。</p>
+          <div class="card-actions">
+            <el-button size="small" type="primary" @click="downloadProModule" :loading="proDownloading">
+              {{ proDownloadStatus || '下载 Pro 模块' }}
+            </el-button>
+          </div>
+          <div v-if="proInstallProgress > 0" class="progress-bar">
+            <div class="progress-fill" :style="{ width: proInstallProgress + '%' }"></div>
+            <span class="progress-text">{{ proInstallProgress }}%</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Not Pro -->
@@ -243,6 +263,11 @@ const graphResult = ref<any>(null)
 
 // Backup
 const backupSchedule = ref({ enabled: false, interval_hours: 24 })
+
+// Pro module download
+const proDownloading = ref(false)
+const proDownloadStatus = ref('')
+const proInstallProgress = ref(0)
 
 onMounted(async () => {
   try {
@@ -377,6 +402,53 @@ async function saveBackupSchedule() {
     ElMessage.error(e.response?.data?.detail || t('common.failed'))
   }
 }
+
+async function downloadProModule() {
+  proDownloading.value = true
+  proDownloadStatus.value = '正在获取下载地址...'
+  proInstallProgress.value = 0
+  
+  try {
+    // 先从授权状态获取下载地址
+    const { data: licenseInfo } = await axios.get('/license/info')
+    
+    if (!licenseInfo.pro_download_url) {
+      ElMessage.error('授权服务器未配置 Pro 模块下载地址，请联系管理员')
+      proDownloadStatus.value = ''
+      return
+    }
+
+    proDownloadStatus.value = '正在下载...'
+    const fallbackParam = (licenseInfo.pro_fallback_urls || []).length > 0 
+      ? licenseInfo.pro_fallback_urls.join(',') 
+      : ''
+    
+    const { data } = await axios.post('/license/pro/install', null, {
+      params: { url: licenseInfo.pro_download_url, fallback_urls: fallbackParam },
+      timeout: 120000,
+      onDownloadProgress: (e) => {
+        if (e.total) {
+          proInstallProgress.value = Math.round((e.loaded / e.total) * 100)
+        }
+      }
+    })
+    
+    if (data.success) {
+      ElMessage.success('Pro 模块安装成功')
+      proDownloadStatus.value = '安装完成'
+    } else {
+      ElMessage.error(data.message || 'Pro 模块安装失败')
+      proDownloadStatus.value = '安装失败'
+    }
+  } catch (e: any) {
+    const detail = e.response?.data?.detail || e.message
+    ElMessage.error(`Pro 模块安装失败: ${detail}`)
+    proDownloadStatus.value = '安装失败'
+  } finally {
+    proDownloading.value = false
+    setTimeout(() => { proDownloadStatus.value = '' }, 3000)
+  }
+}
 </script>
 
 <style scoped>
@@ -420,6 +492,9 @@ async function saveBackupSchedule() {
 .route-model strong { color: #10B981; }
 .extract-result, .graph-result { display: flex; gap: 20px; margin-top: 12px; }
 .backup-schedule .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; color: var(--cm-text); font-size: 14px; }
+.progress-bar { position: relative; height: 20px; background: var(--cm-border); border-radius: 10px; margin-top: 12px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #10B981, #059669); transition: width 0.3s ease; border-radius: 10px; }
+.progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 600; color: var(--cm-text); }
 .pro-upsell { text-align: center; padding: 80px 20px; }
 .upsell-icon { font-size: 48px; margin-bottom: 16px; }
 .pro-upsell h2 { color: var(--cm-text); margin: 0 0 12px; }
