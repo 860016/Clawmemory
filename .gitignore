@@ -41,3 +41,14 @@ Thumbs.db
 # Temp files
 *.log
 *.tmp
+InstallationLog.txt
+
+# Build scripts (private)
+scripts/
+build_core.py
+build_pro_windows.py
+package_pro.py
+setup_cython.py
+sync_version.py
+backend/setup_cython.py
+backend/scripts/

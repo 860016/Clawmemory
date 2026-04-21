@@ -351,8 +351,12 @@ async function activateLicense() {
       licenseKey.value = ''
       await loadLicense()
       
+      // 检查是否有 Pro 下载地址
       if (data.pro_download_url) {
         await installProModule(data.pro_download_url, data.pro_fallback_urls || [])
+      } else {
+        // 授权服务器未配置下载地址，提示用户
+        ElMessage.info('授权已激活，Pro 模块暂未配置下载地址，请联系管理员')
       }
     } else {
       ElMessage.error(data.message || t('common.failed'))
@@ -387,6 +391,8 @@ async function installProModule(url: string, fallbackUrls: string[]) {
     if (data.success) {
       ElMessage.success('Pro 模块安装成功')
       proInstallStatus.value = '安装完成'
+      // 刷新授权状态以显示 Pro 功能
+      await loadLicense()
     } else {
       ElMessage.error(data.message || 'Pro 模块安装失败')
       proInstallStatus.value = '安装失败'
