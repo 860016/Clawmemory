@@ -229,14 +229,36 @@ def verify_integrity() -> bool:
     return True
 
 
-def _core_verify_license(license_data_b64: str, public_key_pem: str) -> dict:
+def _core_verify_license(license_data_b64: str, public_key_pem: str) -> dict | None:
+    """
+    使用 clawmemory_core 验证 RSA 签名
+    
+    返回:
+        dict: 验证成功
+        None: 验证失败或 core 不可用
+    """
     funcs = _get_core_functions()
     if funcs:
-        return funcs["verify_license"](license_data_b64, public_key_pem)
-    return {}
+        try:
+            result = funcs["verify_license"](license_data_b64, public_key_pem)
+            if result:
+                return result
+            return None
+        except Exception as e:
+            logger.warning("clawmemory_core verify failed: %s", e)
+            return None
+    return None
 
 
-def _python_verify_license(license_data_b64: str, public_key_pem: str) -> dict:
+def _python_verify_license(license_data_b64: str, public_key_pem: str) -> dict | None:
+    """
+    使用 Python cryptography 库验证 RSA 签名
+    
+    返回:
+        dict: 验证成功，返回解析后的 payload
+        None: 验证失败
+        {}: 缺少 cryptography 库，跳过验证
+    """
     try:
         from cryptography.hazmat.primitives import hashes, serialization
         from cryptography.hazmat.primitives.asymmetric import padding
@@ -247,13 +269,14 @@ def _python_verify_license(license_data_b64: str, public_key_pem: str) -> dict:
         signature = base64.urlsafe_b64decode(signature_b64 + "==")
 
         public_key.verify(signature, payload, padding.PKCS1v15(), hashes.SHA256())
+        logger.info("Python RSA verify: signature valid")
         return json.loads(payload)
     except ImportError:
         logger.warning("cryptography library not available, skipping RSA verify")
         return {}
     except Exception as e:
         logger.warning("Python RSA verify failed: %s", e)
-        return {}
+        return None
 
 
 # ========== 辅助函数 ==========
@@ -358,23 +381,34 @@ class LicenseService:
         if signature_b64:
             pubkey = self._load_public_key()
             if pubkey:
+                # 尝试验证签名
                 verified_data = _core_verify_license(signature_b64, pubkey)
-                if not verified_data:
+                
+                # core 验证失败或不可用时，尝试 Python 验证
+                if verified_data is None:
                     verified_data = _python_verify_license(signature_b64, pubkey)
-                if verified_data:
-                    logger.info("RSA signature verification passed")
-                else:
+                
+                # Python 验证返回 {} 表示缺少库，返回 None 表示验证失败
+                if verified_data is None:
                     # 验证失败，尝试从服务器获取最新公钥
+                    logger.warning("RSA verify failed with cached key, trying fresh key...")
                     fresh_pubkey = self._load_public_key(force_refresh=True)
                     if fresh_pubkey:
                         verified_data = _core_verify_license(signature_b64, fresh_pubkey)
-                        if not verified_data:
+                        if verified_data is None:
                             verified_data = _python_verify_license(signature_b64, fresh_pubkey)
-                        if verified_data:
+                        if verified_data and verified_data != {}:
                             logger.info("RSA signature verification passed with fresh key")
-                    if not verified_data:
-                        logger.warning("RSA signature verification FAILED")
+                    
+                    # 如果还是失败，则返回错误
+                    if verified_data is None:
+                        logger.error("RSA signature verification FAILED with both cached and fresh keys")
                         return {"valid": False, "message": "RSA 签名验证失败，授权可能被篡改"}
+                elif verified_data == {}:
+                    # 缺少 cryptography 库，跳过验证
+                    logger.warning("cryptography not available, skipping RSA verify")
+                else:
+                    logger.info("RSA signature verification passed")
             else:
                 logger.warning("No public key available, skipping RSA verify")
         else:
