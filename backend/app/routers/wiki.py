@@ -6,7 +6,7 @@ from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.services.wiki_service import WikiService
 from app.services.license_service import is_feature_enabled
-from app.core.pro_loader import get_pro_class
+from app.pro.services.wiki_ai_service import get_wiki_ai_service_class
 
 router = APIRouter(prefix="/api/v1/wiki", tags=["wiki"])
 
@@ -145,7 +145,7 @@ def get_config(_=Depends(get_current_user)):
 @router.get("/stats")
 def get_stats(_=Depends(get_current_user), db: Session = Depends(get_db)):
     """获取知识库统计"""
-    cls = get_pro_class("wiki_ai_service", "WikiAIService")
+    cls = get_wiki_ai_service_class()
     if cls is None:
         return {"total": 0, "completed": 0, "in_progress": 0, "draft": 0, "ai_generated": 0}
     svc = cls(db)
@@ -162,7 +162,7 @@ async def extract_from_conversation(
     if not is_feature_enabled("ai_extract"):
         raise HTTPException(status_code=403, detail="Pro feature: AI extract")
 
-    cls = get_pro_class("wiki_ai_service", "WikiAIService")
+    cls = get_wiki_ai_service_class()
     if cls is None:
         raise HTTPException(status_code=503, detail="Pro module not installed")
     svc = cls(db)
@@ -187,7 +187,7 @@ async def refine_page(
     if not is_feature_enabled("ai_extract"):
         raise HTTPException(status_code=403, detail="Pro feature: AI extract")
 
-    cls = get_pro_class("wiki_ai_service", "WikiAIService")
+    cls = get_wiki_ai_service_class()
     if cls is None:
         raise HTTPException(status_code=503, detail="Pro module not installed")
     svc = cls(db)
@@ -200,7 +200,7 @@ async def refine_page(
 @router.post("/pages/{page_id}/mark-complete")
 def mark_complete(page_id: int, _=Depends(get_current_user), db: Session = Depends(get_db)):
     """标记知识卡片为完成"""
-    cls = get_pro_class("wiki_ai_service", "WikiAIService")
+    cls = get_wiki_ai_service_class()
     if cls is None:
         raise HTTPException(status_code=503, detail="Pro module not installed")
     svc = cls(db)
@@ -213,7 +213,7 @@ def mark_complete(page_id: int, _=Depends(get_current_user), db: Session = Depen
 @router.post("/pages/{page_id}/mark-in-progress")
 def mark_in_progress(page_id: int, _=Depends(get_current_user), db: Session = Depends(get_db)):
     """标记知识卡片为进行中"""
-    cls = get_pro_class("wiki_ai_service", "WikiAIService")
+    cls = get_wiki_ai_service_class()
     if cls is None:
         raise HTTPException(status_code=503, detail="Pro module not installed")
     svc = cls(db)

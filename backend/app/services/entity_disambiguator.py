@@ -3,7 +3,7 @@ import logging
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from app.models.knowledge import Entity
-from app.services.llm_service import llm_service
+from app.pro.services.llm_service import llm_service
 from app.services.license_service import is_feature_enabled
 
 logger = logging.getLogger(__name__)

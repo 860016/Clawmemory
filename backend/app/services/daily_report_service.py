@@ -1,12 +1,5 @@
-import logging
-from app.core.pro_loader import get_pro_class
+# 日报已转为免费功能，直接使用免费版本
+# 此文件保留仅为兼容性，实际使用 daily_report_service_free.py
+from app.services.daily_report_service_free import DailyReportService
 
-logger = logging.getLogger(__name__)
-
-
-def get_daily_report_service_class():
-    """获取 DailyReportService 类（从 Pro 模块加载）"""
-    cls = get_pro_class("daily_report_service", "DailyReportService")
-    if cls is None:
-        logger.warning("Pro module not available, daily report feature disabled")
-    return cls
+__all__ = ["DailyReportService"]

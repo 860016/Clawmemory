@@ -8,7 +8,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app.config import settings, APP_VERSION
 from app.database import init_db
 from app.services.setup_service import ensure_data_dirs
-from app.routers import auth, memories, license, backups, knowledge, file_watcher, wiki, pro_features, openclaw_memories, openclaw_skills, daily_reports, chromadb
+from app.routers import auth, memories, license, backups, knowledge, file_watcher, wiki, openclaw_memories, openclaw_skills, daily_reports, chromadb
+from app.pro.routers import pro_features
 import asyncio
 import time
 import logging
