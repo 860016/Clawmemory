@@ -243,6 +243,13 @@ class RateLimitASGI:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 自动创建缺失模块的占位文件
+    try:
+        from app.setup_stubs import create_stub_files
+        create_stub_files()
+    except Exception as e:
+        logger.warning(f"Failed to create stub files: {e}")
+    
     ensure_data_dirs()
     init_db()
     # 加载缓存的授权信息
