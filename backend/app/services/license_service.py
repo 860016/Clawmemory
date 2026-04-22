@@ -364,11 +364,14 @@ class LicenseService:
                 if verified_data:
                     logger.info("RSA signature verification passed")
                 else:
+                    # 验证失败，尝试从服务器获取最新公钥
                     fresh_pubkey = self._load_public_key(force_refresh=True)
-                    if fresh_pubkey and fresh_pubkey != pubkey:
+                    if fresh_pubkey:
                         verified_data = _core_verify_license(signature_b64, fresh_pubkey)
                         if not verified_data:
                             verified_data = _python_verify_license(signature_b64, fresh_pubkey)
+                        if verified_data:
+                            logger.info("RSA signature verification passed with fresh key")
                     if not verified_data:
                         logger.warning("RSA signature verification FAILED")
                         return {"valid": False, "message": "RSA 签名验证失败，授权可能被篡改"}
