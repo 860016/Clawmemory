@@ -1,5 +1,5 @@
 <template>
-  <div class="layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+  <div class="layout" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'mobile': isMobile }">
     <!-- Top Navigation Bar -->
     <header class="topbar">
       <div class="topbar-left">
@@ -15,6 +15,7 @@
         </div>
       </div>
 
+      <!-- Desktop Top Nav -->
       <nav class="topbar-nav">
         <router-link
           v-for="item in navItems"
@@ -49,8 +50,8 @@
     </header>
 
     <div class="layout-body">
-      <!-- Left Sidebar -->
-      <aside class="sidebar" v-if="currentSubNav.length">
+      <!-- Left Sidebar (Desktop) / Drawer (Mobile) -->
+      <aside class="sidebar" v-if="currentSubNav.length && !isMobile" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
         <div class="sidebar-inner">
           <div class="sidebar-section" v-for="group in currentSubNav" :key="group.label">
             <div class="sidebar-group-title" v-if="group.label">{{ $t(group.label) }}</div>
@@ -68,16 +69,46 @@
         </div>
       </aside>
 
+      <!-- Mobile Sub Nav (Horizontal scrollable) -->
+      <div class="mobile-sub-nav" v-if="currentSubNav.length && isMobile">
+        <div class="mobile-sub-nav-inner">
+          <router-link
+            v-for="item in currentSubNavItems"
+            :key="item.path"
+            :to="item.path"
+            class="mobile-sub-item"
+            :class="{ active: isSubNavActive(item) }"
+          >
+            <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
+            <span>{{ $t(item.label) }}</span>
+          </router-link>
+        </div>
+      </div>
+
       <!-- Main Content -->
       <main class="main-content">
         <router-view />
       </main>
     </div>
+
+    <!-- Mobile Bottom Tab Bar -->
+    <nav class="mobile-tab-bar" v-if="isMobile">
+      <router-link
+        v-for="item in navItems"
+        :key="item.path"
+        :to="item.path"
+        class="mobile-tab-item"
+        :class="{ active: isNavActive(item.path) }"
+      >
+        <el-icon><component :is="item.icon" /></el-icon>
+        <span class="mobile-tab-label">{{ $t(item.label) }}</span>
+      </router-link>
+    </nav>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '../stores/theme'
@@ -94,18 +125,36 @@ const route = useRoute()
 const router = useRouter()
 const themeStore = useThemeStore()
 const sidebarCollapsed = ref(false)
+const isMobile = ref(window.innerWidth <= 768)
 
 const tier = ref('oss')
 const tierLabel = computed(() => tier.value === 'oss' ? t('tier.free') : t('tier.pro'))
 const tierClass = computed(() => tier.value === 'oss' ? 'tier-free' : 'tier-pro')
 
-onMounted(async () => {
+// Handle window resize
+const handleResize = () => {
+  isMobile.value = window.innerWidth <= 768
+  if (!isMobile.value) {
+    sidebarCollapsed.value = false
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('resize', handleResize)
+  handleResize()
   try {
-    const { data } = await axios.get('/license/info')
-    tier.value = data.tier || 'oss'
+    axios.get('/license/info').then(({ data }) => {
+      tier.value = data.tier || 'oss'
+    }).catch(() => {
+      tier.value = 'oss'
+    })
   } catch {
     tier.value = 'oss'
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
 })
 
 const navItems = [
@@ -126,7 +175,6 @@ function isSubNavActive(item: { path: string }) {
   if (item.path.includes('?')) {
     return route.fullPath === item.path
   }
-  // For paths without query, match when on same route without query params
   return route.path === item.path && !Object.keys(route.query).length
 }
 
@@ -183,6 +231,15 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
 const currentSubNav = computed(() => {
   const path = '/' + (route.path.split('/')[1] || '')
   return subNavMap[path] || []
+})
+
+// Flatten sub nav items for mobile
+const currentSubNavItems = computed(() => {
+  const items: Array<{ path: string; label: string; icon?: any }> = []
+  currentSubNav.value.forEach(group => {
+    items.push(...group.items)
+  })
+  return items
 })
 
 function handleUserCommand(command: string) {
@@ -367,11 +424,12 @@ function handleUserCommand(command: string) {
 /* ===== Layout Body ===== */
 .layout-body {
   display: flex;
+  flex-direction: column;
   flex: 1;
   overflow: hidden;
 }
 
-/* ===== Sidebar ===== */
+/* ===== Sidebar (Desktop) ===== */
 .sidebar {
   width: 200px;
   flex-shrink: 0;
@@ -426,6 +484,97 @@ function handleUserCommand(command: string) {
   background: var(--cm-bg);
 }
 
+/* ===== Mobile Sub Nav (Horizontal) ===== */
+.mobile-sub-nav {
+  display: none;
+  background: var(--cm-bg-secondary);
+  border-bottom: 1px solid var(--cm-border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.mobile-sub-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-sub-nav-inner {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  min-width: max-content;
+}
+
+.mobile-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  color: var(--cm-text-muted);
+  text-decoration: none;
+  background: var(--cm-bg);
+  border: 1px solid var(--cm-border);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.mobile-sub-item:hover {
+  color: var(--cm-text);
+  border-color: var(--cm-primary);
+}
+.mobile-sub-item.active {
+  color: var(--cm-primary);
+  background: rgba(var(--cm-primary-rgb), 0.1);
+  border-color: var(--cm-primary);
+  font-weight: 600;
+}
+
+/* ===== Mobile Bottom Tab Bar ===== */
+.mobile-tab-bar {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: var(--cm-bg-secondary);
+  border-top: 1px solid var(--cm-border);
+  z-index: 100;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0 4px;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.mobile-tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  color: var(--cm-text-muted);
+  text-decoration: none;
+  font-size: 10px;
+  transition: all 0.2s ease;
+  flex: 1;
+  max-width: 80px;
+}
+.mobile-tab-item:hover {
+  color: var(--cm-text);
+}
+.mobile-tab-item.active {
+  color: var(--cm-primary);
+}
+.mobile-tab-item .el-icon {
+  font-size: 20px;
+}
+.mobile-tab-label {
+  font-size: 10px;
+  line-height: 1.2;
+}
+
 /* ===== Mobile Responsive ===== */
 @media (max-width: 1024px) {
   .nav-label {
@@ -440,6 +589,10 @@ function handleUserCommand(command: string) {
 }
 
 @media (max-width: 768px) {
+  .layout {
+    padding-bottom: 56px;
+  }
+
   .hamburger-btn {
     display: flex;
   }
@@ -449,31 +602,15 @@ function handleUserCommand(command: string) {
   }
 
   .sidebar {
-    position: fixed;
-    left: 0;
-    top: 56px;
-    bottom: 0;
-    z-index: 90;
-    width: 240px;
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-    box-shadow: var(--cm-shadow-lg);
-    background: var(--cm-bg-secondary);
+    display: none;
   }
 
-  .layout:not(.sidebar-collapsed) .sidebar {
-    transform: translateX(0);
+  .mobile-sub-nav {
+    display: block;
   }
 
-  .sidebar::after {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: -1;
+  .mobile-tab-bar {
+    display: flex;
   }
 
   .main-content {
@@ -514,13 +651,16 @@ function handleUserCommand(command: string) {
     height: 20px;
   }
 
-  .sidebar {
-    width: 220px;
-    top: 50px;
-  }
-
   .hamburger-btn {
     padding: 4px;
+  }
+
+  .mobile-tab-bar {
+    height: 50px;
+  }
+
+  .layout {
+    padding-bottom: 50px;
   }
 }
 </style>

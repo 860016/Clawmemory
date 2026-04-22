@@ -10,24 +10,11 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# ========== v3.0 授权架构 ==========
-#
-# 安全设计原则：
-#   1. 授权状态存储在本地数据库 + 内存中
-#   2. clawmemory_core (C/Rust wheel) 是可选增强，提供 RSA 硬验证
-#   3. 没有 clawmemory_core 时，授权平台验证 + 本地数据库即可激活
-#   4. Pro 功能模块在激活后自动下载安装
-#
-# 引擎层级：
-#   - clawmemory_core → RSA 硬验证 + 高性能计算
-#   - .pyx 编译版 → 中等性能计算
-#   - 纯 Python 兜底 → 基础功能
-
+# ========== 引擎状态 ==========
 _LICENSE_ENGINE = "none"
 _COMPUTE_ENGINE = "none"
 
-# ========== Python 层授权状态（不依赖 clawmemory_core） ==========
-
+# Python 层授权状态
 _python_tier = "oss"
 _python_features: list[str] = []
 
@@ -54,17 +41,13 @@ def _get_core_functions():
         return None
 
 
-# ========== Step 1: 初始化时尝试加载 clawmemory_core ==========
-
+# 初始化引擎
 _core_funcs = _get_core_functions()
 if _core_funcs:
     _build = _core_funcs["get_build_info"]()
     if "c-cpython" in _build:
         _LICENSE_ENGINE = "c"
-        if "cng" in _build:
-            logger.info("License engine: C/CPython + Windows CNG — high security RSA verification")
-        else:
-            logger.info("License engine: C/CPython + OpenSSL — high security RSA verification")
+        logger.info("License engine: C/CPython — high security")
     else:
         _LICENSE_ENGINE = "rust"
         logger.info("License engine: Rust (PyO3) — maximum security")
@@ -87,12 +70,9 @@ if _core_funcs:
         _COMPUTE_ENGINE = _LICENSE_ENGINE
         logger.info("Compute engine: %s (from clawmemory_core)", _COMPUTE_ENGINE)
     except (ImportError, AttributeError):
-        logger.warning("clawmemory_core missing compute functions, will try .pyx fallback")
-else:
-    logger.info("clawmemory_core not installed, using Python license management")
+        logger.warning("clawmemory_core missing compute functions")
 
-# ========== Step 2: 加载 .pyx 计算引擎（如果需要） ==========
-
+# 加载 .pyx 计算引擎
 if _COMPUTE_ENGINE == "none":
     try:
         from app.core.memory_decay import (
@@ -106,197 +86,69 @@ if _COMPUTE_ENGINE == "none":
             estimate_complexity, route_model, get_routing_stats,
         )
         _COMPUTE_ENGINE = "pyx"
-        logger.info("Compute engine: .pyx compiled — compute functions available")
-    except ImportError as e:
-        logger.warning("Failed to load .pyx compute modules: %s", e)
+        logger.info("Compute engine: pyx")
+    except ImportError:
+        logger.info("No pyx modules, using pure Python")
 
-# ========== Step 3: 计算功能兜底 ==========
-
+# 纯 Python 兜底
 if _COMPUTE_ENGINE == "none":
-    logger.warning("Compute engine: using pure Python fallback — basic functionality only")
-
-    def calculate_decay(importance: float, age_days: float) -> float:
-        return importance
-
-    def should_prune(importance: float) -> bool:
-        return False
-
-    def reinforce(importance: float, factor: float = 1.5) -> float:
-        return importance
-
-    def get_decay_stage(age_days: float) -> int:
-        return 0
-
-    def should_archive(age_days: float) -> bool:
-        return False
-
-    def should_trash(age_days: float) -> bool:
-        return False
-
-    def should_prune_from_trash(trashed_days: float) -> bool:
-        return False
-
-    def decay_memory(memory_id: int, current_importance: float, last_accessed_at: float,
-                      current_status: str = "active", trashed_at: float = 0.0, now: float = 0.0) -> dict:
-        return {
-            "memory_id": memory_id,
-            "new_importance": current_importance,
-            "new_status": current_status,
-            "should_prune": False,
-            "decay_stage": 0,
-            "age_days": 0,
-        }
-
-    def decay_batch(memories: list, now: float = 0.0) -> list:
-        return []
-
-    def get_decay_stats(memories: list, now: float = 0.0) -> dict:
-        return {
-            "total": 0, "active": 0, "archived": 0, "trashed": 0,
-            "to_archive": 0, "to_trash": 0, "to_prune": 0, "avg_importance": 0.0,
-        }
-
-    def get_stage_info() -> dict:
-        return {
-            "stage_1_days": 15, "stage_2_days": 30, "stage_3_days": 60, "trash_expire_days": 30,
-            "description": {"stage_0": "纯 Python 兜底模式，无衰减"},
-        }
-
-    def detect_conflict(memory_a: dict, memory_b: dict):
-        return None
-
-    def resolve_conflict(conflict: dict, strategy: str = None) -> dict:
-        return {"conflict": conflict, "strategy": "none", "winner": None, "action": "none"}
-
-    def scan_for_conflicts(memories: list) -> list:
-        return []
-
-    def get_conflict_summary(conflicts: list) -> dict:
-        return {"total": 0, "by_severity": {"low": 0, "medium": 0, "high": 0}, "auto_resolvable": 0, "needs_review": 0}
-
-    def estimate_complexity(message: str, context_length: int = 0, has_code: bool = False, has_reasoning: bool = False) -> float:
-        return 0.0
-
-    def route_model(message: str, available_models: list, context_length: int = 0, user_tier: str = "oss", budget_remaining: float = None) -> dict:
-        return {"selected_model": None, "complexity": 0.0, "routing_reason": "no_engine", "estimated_cost": 0.0, "estimated_tokens": 0}
-
-    def get_routing_stats(routing_history: list) -> dict:
-        return {"total": 0, "distribution": {}, "avg_complexity": 0.0, "total_cost": 0.0}
+    from app.services.memory_decay_py import (
+        calculate_decay, should_prune, reinforce, decay_memory, decay_batch, get_decay_stats,
+        get_decay_stage, should_archive, should_trash, should_prune_from_trash, get_stage_info,
+    )
+    from app.services.conflict_resolver_py import (
+        detect_conflict, resolve_conflict, scan_for_conflicts, get_conflict_summary,
+    )
+    from app.services.token_router_py import (
+        estimate_complexity, route_model, get_routing_stats,
+    )
+    _COMPUTE_ENGINE = "python"
+    logger.info("Compute engine: pure Python")
 
 
-# ========== 授权功能：优先使用 clawmemory_core，回退到 Python ==========
+# ========== 授权管理 ==========
 
-def check_feature(feature: str) -> bool:
-    funcs = _get_core_functions()
-    if funcs:
-        return funcs["check_feature"](feature)
-    return feature in _python_features
+def _set_python_license(license_data: dict) -> None:
+    global _python_tier, _python_features
+    _python_tier = license_data.get("tier", "oss")
+    _python_features = license_data.get("features", [])
+    logger.info("Python license set: tier=%s, features=%s", _python_tier, _python_features)
+
+
+def _reset_python_license() -> None:
+    global _python_tier, _python_features
+    _python_tier = "oss"
+    _python_features = []
+    logger.info("Python license reset")
 
 
 def get_tier() -> str:
-    funcs = _get_core_functions()
-    if funcs:
-        return funcs["get_tier"]()
+    if _core_funcs:
+        return _core_funcs["get_tier"]()
     return _python_tier
 
 
-def set_license(tier: str, features: list):
-    global _python_tier, _python_features
-    funcs = _get_core_functions()
-    if funcs:
-        return funcs["set_license"](tier, features)
-    _python_tier = tier
-    _python_features = list(features)
-    logger.info("License set (Python): tier=%s, features=%d", tier, len(features))
+def check_feature(feature: str) -> bool:
+    if _core_funcs:
+        return _core_funcs["check_feature"](feature)
+    return feature in _python_features
 
 
-def reset():
-    global _python_tier, _python_features
-    funcs = _get_core_functions()
-    if funcs:
-        return funcs["reset"]()
-    _python_tier = "oss"
-    _python_features = []
+def reset() -> None:
+    if _core_funcs:
+        _core_funcs["reset"]()
+    _reset_python_license()
 
-
-def verify_integrity() -> bool:
-    funcs = _get_core_functions()
-    if funcs:
-        try:
-            return funcs["verify_integrity"]()
-        except Exception:
-            return False
-    return True
-
-
-def _core_verify_license(license_data_b64: str, public_key_pem: str) -> dict | None:
-    """
-    使用 clawmemory_core 验证 RSA 签名
-    
-    返回:
-        dict: 验证成功
-        None: 验证失败或 core 不可用
-    """
-    funcs = _get_core_functions()
-    if funcs:
-        try:
-            result = funcs["verify_license"](license_data_b64, public_key_pem)
-            if result:
-                return result
-            return None
-        except Exception as e:
-            logger.warning("clawmemory_core verify failed: %s", e)
-            return None
-    return None
-
-
-def _python_verify_license(license_data_b64: str, public_key_pem: str) -> dict | None:
-    """
-    使用 Python cryptography 库验证 RSA 签名
-    
-    返回:
-        dict: 验证成功，返回解析后的 payload
-        None: 验证失败
-        {}: 缺少 cryptography 库，跳过验证
-    """
-    try:
-        from cryptography.hazmat.primitives import hashes, serialization
-        from cryptography.hazmat.primitives.asymmetric import padding
-
-        public_key = serialization.load_pem_public_key(public_key_pem.encode())
-        payload_b64, signature_b64 = license_data_b64.rsplit(".", 1)
-        payload = base64.urlsafe_b64decode(payload_b64 + "==")
-        signature = base64.urlsafe_b64decode(signature_b64 + "==")
-
-        public_key.verify(signature, payload, padding.PKCS1v15(), hashes.SHA256())
-        logger.info("Python RSA verify: signature valid")
-        return json.loads(payload)
-    except ImportError:
-        logger.warning("cryptography library not available, skipping RSA verify")
-        return {}
-    except Exception as e:
-        logger.warning("Python RSA verify failed: %s", e)
-        return None
-
-
-# ========== 辅助函数 ==========
 
 def get_license_engine() -> str:
-    if _has_clawmemory_core():
-        funcs = _get_core_functions()
-        if funcs:
-            _build = funcs["get_build_info"]()
-            if "c-cpython" in _build:
-                return "c"
-            return "rust"
-    return "python"
+    return _LICENSE_ENGINE
 
 
 def get_compute_engine() -> str:
     return _COMPUTE_ENGINE
 
 
-def get_engine_info() -> dict:
+def get_license_status() -> dict:
     has_core = _has_clawmemory_core()
     return {
         "license_engine": get_license_engine(),
@@ -354,6 +206,7 @@ class LicenseService:
         fingerprint = self._get_fingerprint()
         device_name = self._get_device_name()
 
+        # 1. 调用授权服务器
         try:
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.post(
@@ -376,126 +229,99 @@ class LicenseService:
         if not data.get("valid"):
             return {"valid": False, "message": data.get("message", "授权码无效")}
 
-        # RSA 签名验证（可选增强）
+        # 2. RSA 签名验证（如果服务器返回了签名）
         signature_b64 = data.get("signature", "")
         if signature_b64:
             pubkey = self._load_public_key()
             if pubkey:
-                # 尝试验证签名
-                verified_data = _core_verify_license(signature_b64, pubkey)
+                verify_result = self._verify_signature(signature_b64, pubkey)
+                if verify_result is False:
+                    # 验证失败，尝试刷新公钥
+                    logger.warning("RSA 验证失败，尝试刷新公钥...")
+                    pubkey = self._load_public_key(force_refresh=True)
+                    if pubkey:
+                        verify_result = self._verify_signature(signature_b64, pubkey)
                 
-                # core 验证失败或不可用时，尝试 Python 验证
-                if verified_data is None:
-                    verified_data = _python_verify_license(signature_b64, pubkey)
-                
-                # Python 验证返回 {} 表示缺少库，返回 None 表示验证失败
-                if verified_data is None:
-                    # 验证失败，尝试从服务器获取最新公钥
-                    logger.warning("RSA verify failed with cached key, trying fresh key...")
-                    fresh_pubkey = self._load_public_key(force_refresh=True)
-                    if fresh_pubkey:
-                        verified_data = _core_verify_license(signature_b64, fresh_pubkey)
-                        if verified_data is None:
-                            verified_data = _python_verify_license(signature_b64, fresh_pubkey)
-                        if verified_data and verified_data != {}:
-                            logger.info("RSA signature verification passed with fresh key")
-                    
-                    # 如果还是失败，则返回错误
-                    if verified_data is None:
-                        logger.error("RSA signature verification FAILED with both cached and fresh keys")
-                        return {"valid": False, "message": "RSA 签名验证失败，授权可能被篡改"}
-                elif verified_data == {}:
-                    # 缺少 cryptography 库，跳过验证
-                    logger.warning("cryptography not available, skipping RSA verify")
+                if verify_result is False:
+                    logger.error("RSA 签名验证失败")
+                    return {"valid": False, "message": "RSA 签名验证失败，授权可能被篡改"}
+                elif verify_result is True:
+                    logger.info("RSA 签名验证通过")
                 else:
-                    logger.info("RSA signature verification passed")
+                    logger.info("跳过 RSA 验证（缺少验证库）")
             else:
-                logger.warning("No public key available, skipping RSA verify")
-        else:
-            logger.info("No signature in response, server-side verification only")
+                logger.warning("无法获取公钥，跳过 RSA 验证")
 
-        tier = data.get("tier", "pro")
-        features = data.get("features", [])
-        expires_at = data.get("expires_at")
-        device_slot = data.get("device_slot", "")
-        pro_download_url = data.get("pro_download_url", "")
-        pro_fallback_urls = data.get("pro_fallback_urls", [])
+        # 3. 保存授权信息到数据库
+        try:
+            # 停用旧的授权
+            self.db.query(License).filter(License.status == "active").update({
+                "status": "inactive"
+            })
 
-        if not features:
-            if tier == "oss":
-                features = []
-            elif tier == "enterprise":
-                features = list(PRO_FEATURES.keys()) + list(ENTERPRISE_EXTRA_FEATURES.keys())
-            else:
-                features = list(PRO_FEATURES.keys())
+            # 创建新的授权记录
+            license_data = {
+                "license_key": license_key,
+                "tier": data.get("tier", "pro"),
+                "status": "active",
+                "device_fingerprint": fingerprint,
+                "device_name": device_name,
+                "expires_at": data.get("expires_at"),
+                "device_slot": data.get("device_slot", ""),
+                "features": json.dumps(data.get("features", [])),
+                "pro_download_url": data.get("pro_download_url", ""),
+                "pro_fallback_urls": json.dumps(data.get("pro_fallback_urls", [])),
+            }
 
-        self._deactivate_all()
-        license_obj = License(
-            license_key=license_key,
-            tier=tier,
-            features=json.dumps(features),
-            status="active",
-            rsa_signature=signature_b64,
-            fingerprint_hash=fingerprint,
-            device_name=device_name,
-            device_slot=device_slot,
-            expires_at=expires_at,
-            last_verified_at=datetime.now(timezone.utc),
-            pro_download_url=pro_download_url,
-            pro_fallback_urls=json.dumps(pro_fallback_urls),
-        )
-        self.db.add(license_obj)
-        self.db.commit()
+            lic = License(**license_data)
+            self.db.add(lic)
+            self.db.commit()
 
-        set_license(tier, features)
+            # 4. 设置内存中的授权状态
+            if _core_funcs:
+                _core_funcs["set_license"](license_data)
+            _set_python_license(license_data)
 
-        return {
-            "valid": True,
-            "tier": tier,
-            "features": features,
-            "expires_at": expires_at,
-            "device_slot": device_slot,
-            "pro_download_url": data.get("pro_download_url", ""),
-            "pro_fallback_urls": data.get("pro_fallback_urls", []),
-        }
+            return {
+                "valid": True,
+                "message": "激活成功",
+                "tier": data.get("tier", "pro"),
+                "expires_at": data.get("expires_at"),
+                "features": data.get("features", []),
+                "pro_download_url": data.get("pro_download_url", ""),
+                "pro_fallback_urls": data.get("pro_fallback_urls", []),
+            }
+
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"保存授权信息失败: {e}")
+            return {"valid": False, "message": f"保存授权信息失败: {e}"}
 
     async def deactivate(self) -> dict:
         lic = self.get_active_license()
-        if lic:
-            await self._notify_deactivate(lic)
-            lic.status = "revoked"
-            self.db.commit()
+        if not lic:
+            return {"success": False, "message": "没有激活的授权"}
 
-        reset()
-        return {"active": False, "tier": "oss", "message": "License deactivated"}
-
-    async def _notify_deactivate(self, lic: License):
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
+            async with httpx.AsyncClient(timeout=15) as client:
                 await client.post(
                     f"{settings.license_server_url}/api/v1/deactivate",
                     json={
                         "license_key": lic.license_key,
-                        "fingerprint": lic.fingerprint_hash or self._get_fingerprint(),
+                        "fingerprint": self._get_fingerprint(),
                     },
                 )
-                logger.info(f"Notified license server: device deactivated for {lic.license_key[:8]}***")
         except Exception as e:
-            logger.warning(f"Failed to notify license server about deactivation: {e}")
+            logger.warning(f"通知服务器停用失败: {e}")
 
-    def _deactivate_all(self):
-        self.db.query(License).filter(License.status == "active").update({"status": "revoked"})
-        self.db.flush()
-
-    def load_cached_license(self):
-        lic = self.get_active_license()
-        if lic:
-            features = json.loads(lic.features) if lic.features else []
-            tier = lic.tier if lic.tier in ("oss", "pro", "enterprise") else "pro"
-            set_license(tier, features)
-            logger.info(f"Cached license loaded: tier={tier}, features={len(features)}")
-        else:
-            logger.info("No cached license found, running as OSS")
+        try:
+            lic.status = "inactive"
+            self.db.commit()
+            reset()
+            return {"success": True, "message": "已停用授权"}
+        except Exception as e:
+            self.db.rollback()
+            return {"success": False, "message": f"停用失败: {e}"}
 
     def _get_fingerprint(self) -> str:
         import hashlib, platform, os, uuid
@@ -540,24 +366,69 @@ class LicenseService:
         return f"{platform.system()} {platform.machine()}"
 
     def _load_public_key(self, force_refresh: bool = False) -> str | None:
+        """加载公钥，支持缓存和强制刷新"""
         path = settings.rsa_public_key_path
+        
+        # 先尝试从缓存加载
         if not force_refresh and path.exists():
             try:
-                return path.read_text()
+                content = path.read_text().strip()
+                if "BEGIN PUBLIC KEY" in content:
+                    return content
             except Exception:
                 pass
-
+        
+        # 从服务器获取最新公钥
         try:
             pubkey_url = f"{settings.license_server_url}/api/v1/public-key"
             resp = httpx.get(pubkey_url, timeout=10)
             if resp.status_code == 200:
                 data = resp.json()
-                pem = data.get("public_key", "")
+                pem = data.get("public_key", "").strip()
                 if pem and "BEGIN PUBLIC KEY" in pem:
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text(pem)
+                    logger.info("已从服务器获取最新公钥")
                     return pem
         except Exception as e:
-            logger.warning(f"Failed to fetch public key from server: {e}")
+            logger.warning(f"从服务器获取公钥失败: {e}")
 
         return None
+
+    def _verify_signature(self, signature_b64: str, public_key_pem: str) -> bool | None:
+        """
+        验证 RSA 签名
+        
+        返回:
+            True: 验证成功
+            False: 验证失败（签名无效）
+            None: 无法验证（缺少库）
+        """
+        # 1. 尝试使用 clawmemory_core
+        if _core_funcs:
+            try:
+                result = _core_funcs["verify_license"](signature_b64, public_key_pem)
+                if result:
+                    return True
+                return False
+            except Exception as e:
+                logger.warning(f"clawmemory_core 验证失败: {e}")
+
+        # 2. 尝试使用 Python cryptography
+        try:
+            from cryptography.hazmat.primitives import hashes, serialization
+            from cryptography.hazmat.primitives.asymmetric import padding
+
+            public_key = serialization.load_pem_public_key(public_key_pem.encode())
+            payload_b64, sig_b64 = signature_b64.rsplit(".", 1)
+            payload = base64.urlsafe_b64decode(payload_b64 + "==")
+            signature = base64.urlsafe_b64decode(sig_b64 + "==")
+
+            public_key.verify(signature, payload, padding.PKCS1v15(), hashes.SHA256())
+            return True
+        except ImportError:
+            logger.warning("缺少 cryptography 库，跳过 RSA 验证")
+            return None
+        except Exception as e:
+            logger.warning(f"Python RSA 验证失败: {e}")
+            return False
