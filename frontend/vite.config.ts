@@ -17,7 +17,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../backend/frontend_dist',
+    outDir: '../go-backend/frontend_dist',
     rollupOptions: {
       output: {
         manualChunks: {

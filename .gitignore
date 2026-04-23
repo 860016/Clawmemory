@@ -1,14 +1,3 @@
-# Python
-__pycache__/
-*.py[cod]
-*.so
-*.pyd
-*.egg-info/
-dist/
-build/
-venv/
-.venv/
-
 # Data & Keys
 data/
 *.db
@@ -18,7 +7,7 @@ keys/*.pem
 # Frontend
 **/node_modules/
 frontend/dist/
-# backend/frontend_dist is the production build — DO track it
+# go-backend/frontend_dist is the production build — DO track it
 
 # IDE
 .vscode/
@@ -26,13 +15,6 @@ frontend/dist/
 
 # Commercial (private)
 license-platform-v2/
-clawmemory-core-repo/
-
-# Pro engine (private - compiled and distributed separately)
-backend/app/core/
-
-# Pro runtime modules (downloaded during activation)
-backend/app/pro/
 
 # OS
 .DS_Store
@@ -42,16 +24,6 @@ Thumbs.db
 *.log
 *.tmp
 InstallationLog.txt
-
-# Build scripts (private)
-scripts/
-build_core.py
-build_pro_windows.py
-package_pro.py
-setup_cython.py
-sync_version.py
-backend/setup_cython.py
-backend/scripts/
 
 # Go backend build artifacts
 go-backend/*.exe
