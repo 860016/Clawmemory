@@ -95,28 +95,14 @@
           <span class="setting-desc">data/clawmemory.db</span>
         </div>
         <div class="setting-item">
-          <span>{{ $t('settings.createBackup') }}</span>
-          <el-button size="small" type="primary" @click="createBackup" :loading="backingUp">{{ $t('settings.backupNow') }}</el-button>
+          <span>{{ $t('settings.exportData') }}</span>
+          <el-button size="small" type="primary" @click="exportData">{{ $t('settings.export') }}</el-button>
         </div>
         <div class="setting-item">
-          <span>{{ $t('settings.importBackup') }}</span>
-          <el-upload :show-file-list="false" :before-upload="uploadBackup" accept=".zip" action="" :auto-upload="false">
+          <span>{{ $t('settings.importData') }}</span>
+          <el-upload :show-file-list="false" :before-upload="importData" accept=".json" action="" :auto-upload="false">
             <el-button size="small" type="warning">{{ $t('settings.chooseFile') }}</el-button>
           </el-upload>
-        </div>
-        <!-- 备份列表 -->
-        <div v-if="backups.length" class="backup-list">
-          <div class="backup-item" v-for="b in backups" :key="b.id">
-            <div class="backup-info">
-              <span class="backup-name">{{ b.filename || $t('settings.backup') + ' #' + b.id }}</span>
-              <span class="backup-meta">{{ formatBackupTime(b.created_at) }} · {{ formatSize(b.file_size) }}</span>
-            </div>
-            <div class="backup-actions">
-              <el-button text size="small" @click="downloadBackup(b.id)">⬇</el-button>
-              <el-button text size="small" @click="restoreBackup(b.id)">{{ $t('settings.restore') }}</el-button>
-              <el-button text size="small" type="danger" @click="deleteBackup(b.id)">✕</el-button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -219,7 +205,7 @@ const activating = ref(false)
 const proInstalling = ref(false)
 const proInstallProgress = ref(0)
 const proInstallStatus = ref('')
-const backingUp = ref(false)
+const exporting = ref(false)
 const passwordSet = ref(false)
 const showPasswordDialog = ref(false)
 const oldPassword = ref('')
@@ -228,7 +214,7 @@ const settingPassword = ref(false)
 const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
 const appVersion = ref('2.8.2')
-const backups = ref<any[]>([])
+
 const decayEnabled = ref(false)
 const decayLoading = ref(false)
 const decayStats = ref<any>(null)
@@ -257,7 +243,7 @@ const featureLabels: Record<string, string> = {
 }
 
 onMounted(async () => {
-  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadBackups(), loadDecaySettings(), loadDecayStats()])
+  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats()])
   if (activeSection.value) {
     nextTick(() => scrollToSection(activeSection.value))
   }
@@ -295,50 +281,31 @@ async function loadInstallStatus() {
   try { const { data } = await axios.get('/install-status'); coreEngine.value = data.checks?.security_engine || 'python'; if (data.version) appVersion.value = data.version } catch {}
 }
 
-async function loadBackups() {
-  try { const { data } = await axios.get('/backups'); backups.value = data || [] } catch { backups.value = [] }
-}
-
-function formatBackupTime(ts: string) {
-  if (!ts) return ''
-  const d = new Date(ts)
-  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-function formatSize(bytes: number) {
-  if (!bytes) return ''
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
-}
-
-async function downloadBackup(id: number) {
+async function exportData() {
+  exporting.value = true
   try {
-    const { data } = await axios.get(`/backups/${id}/download`, { responseType: 'blob' })
+    const { data } = await axios.get('/data/export', { responseType: 'blob' })
     const url = URL.createObjectURL(data)
     const a = document.createElement('a')
-    a.href = url; a.download = `backup_${id}.zip`; a.click()
+    a.href = url; a.download = `clawmemory-export-${new Date().toISOString().split('T')[0]}.json`; a.click()
     URL.revokeObjectURL(url)
-  } catch { ElMessage.error(t('common.failed')) }
+    ElMessage.success(t('settings.exportSuccess'))
+  } catch { ElMessage.error(t('settings.exportFailed')) }
+  finally { exporting.value = false }
 }
 
-async function restoreBackup(id: number) {
+async function importData(file: File) {
+  const formData = new FormData(); formData.append('file', file)
+  exporting.value = true
   try {
-    await ElMessageBox.confirm(t('settings.restoreConfirm'), t('common.confirm'), { type: 'warning' })
-    backingUp.value = true
-    await axios.post(`/backups/${id}/restore`)
-    ElMessage.success(t('settings.backupRestored'))
-    await loadBackups()
-  } catch {} finally { backingUp.value = false }
-}
-
-async function deleteBackup(id: number) {
-  try {
-    await ElMessageBox.confirm(t('settings.deleteBackupConfirm'), t('common.confirm'), { type: 'warning' })
-    await axios.delete(`/backups/${id}`)
-    ElMessage.success(t('common.success'))
-    await loadBackups()
-  } catch {}
+    await axios.post('/data/import', formData)
+    ElMessage.success(t('settings.importSuccess'))
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || t('settings.importFailed'))
+  } finally {
+    exporting.value = false
+  }
+  return false
 }
 
 async function activateLicense() {
@@ -427,31 +394,6 @@ async function handleSetPassword() {
     ElMessage.success(t('settings.passwordSet')); showPasswordDialog.value = false; oldPassword.value = ''; newPassword.value = ''; passwordSet.value = true
   } catch (e: any) { ElMessage.error(e.response?.data?.detail || t('common.failed')) }
   finally { settingPassword.value = false }
-}
-
-async function createBackup() {
-  backingUp.value = true
-  try { await axios.post('/backups', { notes: '手动备份' }); ElMessage.success(t('settings.backupCreated')); await loadBackups() }
-  catch { ElMessage.error(t('settings.backupFailed')) }
-  finally { backingUp.value = false }
-}
-
-async function uploadBackup(file: File) {
-  const formData = new FormData(); formData.append('file', file)
-  backingUp.value = true
-  try {
-    const { data } = await axios.post('/backups/upload', formData)
-    if (data && data.id) {
-      await axios.post(`/backups/${data.id}/restore`)
-    }
-    ElMessage.success(t('settings.backupRestored'))
-    await loadLicense()
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('settings.restoreFailed'))
-  } finally {
-    backingUp.value = false
-  }
-  return false
 }
 
 async function loadDecaySettings() {
