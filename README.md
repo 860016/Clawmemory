@@ -1,68 +1,71 @@
-# ClawMemory - OpenClaw 记忆管理插件
+# ClawMemory v2.0 — AI 记忆管理工具
 
-OpenClaw 的记忆管理模块，提供记忆存储、搜索、知识图谱、自动备份等功能。
+ClawMemory 是一款现代化的 AI 记忆管理工具，支持知识图谱、智能日报、记忆衰减分析、冲突检测等高级功能。
 
-**前端已预构建，安装只需 Python，不需要 Node.js。**
-
-## 🤖 OpenClaw 安装指引
-
-> 如果你是 OpenClaw AI，请按以下步骤安装并汇报结果：
-
-### 安装步骤
-1. 执行 `bash install.sh --license-server=https://auth.bestu.top` (Linux/macOS) 或 `powershell -File install.ps1` (Windows) 或 `bash install.sh --docker` (Docker)
-2. 启动服务: `bash start.sh` 或 `start.bat` 或 `docker compose up -d`
-3. 检查安装状态: `curl http://localhost:8765/api/v1/install-status`
-
-### 安装后汇报格式
-安装完成后，请访问 `/api/v1/install-status` 接口，并按以下格式向用户汇报：
-
-```
-ClawMemory 安装完成！
-
-状态: {status}
-版本: {version}
-引擎: {checks.core_engine}
-授权: {checks.license.tier} ({checks.license.activated ? '已激活' : '未激活'})
-前端: {checks.frontend}
-数据库: {checks.database}
-
-下一步:
-- 逐条列出 next_steps 数组内容
-```
-
-**不要自行编造端点数量或功能列表，一切以 install-status 接口返回为准。**
+**支持双后端**：Python (传统) / Go (高性能，推荐)
 
 ---
 
-## 环境要求
+## ✨ 核心特性
+
+| 特性 | 开源版 | Pro 版 |
+|------|--------|--------|
+| 记忆管理 | ✓ | ✓ |
+| 知识图谱 (网格/图谱/列表三视图) | ✓ | ✓ |
+| Wiki 知识库 | ✓ | ✓ |
+| 智能日报 | ✓ | ✓ |
+| 本地数据导出/导入 | ✓ | ✓ |
+| 全文搜索 + 语义搜索 | ✓ | ✓ |
+| AI 提取/摘要 (多模型) | - | ✓ |
+| 记忆衰减算法 | 基础 | 高级 |
+| 冲突检测与合并 | 基础 | 高级 |
+| Token 智能路由 (单条+批量) | 基础 | 高级 |
+| 趋势分析 | - | ✓ |
+| 报告生成 | - | ✓ |
+| 多设备同步 | - | ✓ |
+
+### 🤖 支持的 AI 模型
+
+- **OpenAI**: GPT-4o / GPT-4o-mini / GPT-4-turbo / GPT-3.5-turbo
+- **Anthropic**: Claude 3.5 Sonnet / Claude 3 Opus / Claude 3 Haiku
+- **DeepSeek**: DeepSeek-Chat / DeepSeek-Reasoner
+- **月之暗面 (Moonshot)**: moonshot-v1-8k/32k/128k
+- **智谱 (Zhipu)**: GLM-4 / GLM-4-Flash / GLM-4-Air
+- **通义千问 (Qwen)**: Qwen-Max / Qwen-Plus / Qwen-Turbo
+- **自定义**: 任意 OpenAI 兼容 API
+
+---
+
+## 🚀 快速开始
+
+### 环境要求
 
 | 组件 | 最低版本 | 说明 |
 |------|----------|------|
-| **Python** | 3.10+ | 唯一必须的依赖 |
-| Node.js | 18+ | 仅重新构建前端时需要 (可选) |
+| **Python** | 3.10+ | 传统后端必需 |
+| **Go** | 1.21+ | Go 后端必需 (推荐) |
+| Node.js | 18+ | 仅重新构建前端时需要 |
 | Docker | 20.10+ | Docker 安装方式 (可选) |
 
-**支持平台**：Windows / macOS / Linux (x86_64 + ARM64)
+**支持平台**: Windows / macOS / Linux (x86_64 + ARM64)
 
----
+### 一键安装
 
-## 一键安装
-
-### Linux / macOS
+#### Linux / macOS
 
 ```bash
 cd clawmemory
 bash install.sh --license-server=https://auth.bestu.top
 ```
 
-### Windows
+#### Windows
 
 ```powershell
 cd clawmemory
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-### Docker（任何平台）
+#### Docker（任何平台）
 
 ```bash
 cd clawmemory
@@ -75,7 +78,36 @@ bash install.sh --docker
 
 ---
 
-## 环境变量
+## 🏗️ 架构
+
+```
+clawmemory/
+├── backend/                  # Python 后端 (传统)
+│   ├── app/                  # 应用代码
+│   ├── frontend_dist/        # 前端预构建产物
+│   └── requirements.txt
+├── go-backend/               # Go 后端 (高性能，推荐)
+│   ├── cmd/server/           # 主程序入口
+│   ├── internal/             # 内部包
+│   ├── pkg/                  # 可复用包
+│   └── pro/                  # Pro 功能模块
+├── frontend/                 # Vue3 前端源码
+│   ├── src/views/            # 页面组件
+│   │   ├── KnowledgeViewV2.vue   # 知识图谱 (新版)
+│   │   ├── DailyReportViewV2.vue # 日报 (新版)
+│   │   └── MainLayout.vue        # 主布局 (新版)
+│   └── src/styles/           # 设计系统
+├── license-platform-v2/      # PHP 授权平台
+│   └── src/
+│       ├── AiServiceController.php   # AI 服务
+│       └── ProApiController.php      # Pro API
+├── install.sh / install.ps1  # 一键安装脚本
+└── README.md
+```
+
+---
+
+## ⚙️ 环境变量
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
@@ -89,66 +121,83 @@ bash install.sh --docker
 
 ---
 
-## 不同环境注意事项
+## 🔨 构建
 
-### 🐳 Docker 安装
-
-容器每次重建 hostname 会变，导致授权失效。**必须固定指纹**：
+### 前端构建
 
 ```bash
-echo 'DEVICE_FINGERPRINT=my-device-123' > .env
+cd frontend
+npm install
+npm run build
 ```
 
-### 🖥️ 本地安装 (Windows/macOS/Linux)
+构建产物输出到 `backend/frontend_dist/` (Python) 或 `go-backend/frontend_dist/` (Go)。
 
-无需额外配置，指纹基于机器 ID + MAC 地址，重装系统才会变。
+### Go 后端编译
 
-### 🍎 macOS (Apple Silicon ARM64)
+```bash
+cd go-backend
 
-完全兼容。
+# 当前平台
+go build -o clawmemory.exe ./cmd/server
 
-### 💻 Windows
+# 跨平台编译 (全平台)
+bash scripts/build-all.sh 1.0.0
+```
 
-安装脚本: `install.ps1`，启动: `start.bat`。
+支持 12 个构建目标：
+- Windows: amd64, arm64
+- Linux: amd64, arm64, 386
+- macOS: amd64, arm64
 
 ---
 
-## 高级操作
+## 🌐 API 文档
 
-```bash
-# 重新构建前端 (需要 Node.js)
-bash install.sh --rebuild-frontend
+### 认证
+- `POST /api/v1/auth/register` - 注册
+- `POST /api/v1/auth/login` - 登录
+- `POST /api/v1/auth/reset-password` - 重置密码
 
-# 注册为系统服务 (Linux，开机自启)
-sudo bash install_service.sh
+### 记忆
+- `GET /api/v1/memories` - 列表
+- `POST /api/v1/memories` - 创建
+- `GET /api/v1/memories/:id` - 详情
+- `PUT /api/v1/memories/:id` - 更新
+- `DELETE /api/v1/memories/:id` - 删除（软删除）
 
-# 检查安装状态
-curl http://localhost:8765/api/v1/install-status
-```
+### Pro API (需授权)
+- `POST /api/v1/pro/ai/extract` - AI 提取
+- `POST /api/v1/pro/ai/summarize` - AI 摘要
+- `POST /api/v1/pro/router/batch` - 批量路由
+- `POST /api/v1/pro/analyze/trends` - 趋势分析
+- `POST /api/v1/pro/analyze/report` - 报告生成
+- `POST /api/v1/pro/conflicts/detect` - 冲突检测
 
-## 目录结构
+---
 
-```
-clawmemory/
-├── install.sh / install.ps1  # 安装脚本
-├── install_service.sh        # 系统服务注册
-├── start.sh / start.bat      # 启动
-├── stop.sh / stop.bat        # 停止
-├── README.md
-├── package_pro.py            # Pro 模块打包脚本
-├── setup_cython.py           # Cython 编译脚本
-├── backend/
-│   ├── app/                  # 应用代码
-│   │   ├── pro/              # Pro 模块 (激活后下载)
-│   │   │   ├── __init__.py
-│   │   │   └── pro_loader.py
-│   │   ├── core/             # 核心引擎 (.pyx 源码)
-│   │   ├── routers/          # API 路由
-│   │   ├── services/         # 业务逻辑
-│   │   └── models/           # 数据库模型
-│   ├── frontend_dist/        # 前端预构建产物 (已包含，无需 npm build)
-│   ├── requirements.txt      # Python 依赖
-│   └── .env.example          # 环境变量模板
-├── frontend/                 # Vue3 前端源码 (仅 --rebuild-frontend 时需要)
-└── data/                     # 数据目录 (安装后生成)
-```
+## 📝 更新日志
+
+### v2.0 (2026-04-24)
+- 🎨 全新现代化 UI (知识图谱/日报/主布局)
+- 🤖 AI 提取/摘要 (支持国内外 7+ 主流模型)
+- 📊 批量路由、趋势分析、报告生成
+- 🌍 完善国际化 (中文/英文)
+- 🚀 Go 高性能后端 (全平台编译)
+- ☁️ Pro 云端 API 方案
+- 🔒 移除云端备份，改为本地数据导出/导入
+
+---
+
+## 📄 许可证
+
+- 开源版: MIT License
+- Pro 版: 商业授权，联系 [auth.bestu.top](https://auth.bestu.top)
+
+---
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 PR！
+
+GitHub: [https://github.com/860016/Clawmemory](https://github.com/860016/Clawmemory)

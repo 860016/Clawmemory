@@ -246,13 +246,11 @@ import { useI18n } from 'vue-i18n'
 import {
   ArrowLeft, ArrowRight, MagicStick, Loading,
   Document, Connection, Download, Share,
-  DocumentChecked, Star, Lightbulb, Timer, Compass,
+  DocumentChecked, Star, Sunny, Timer, Compass,
   DataAnalysis, Check, ArrowUp, ArrowDown
 } from '@element-plus/icons-vue'
-import { useReportStore } from '@/stores/report'
 
 const { t } = useI18n()
-const store = useReportStore()
 
 // State
 const currentDate = ref(new Date())
@@ -399,14 +397,14 @@ function truncate(text: string, length: number) {
   return text.length > length ? text.slice(0, length) + '...' : text
 }
 
-function statLabel(key: string) {
+function statLabel(key: string | number) {
   const labels: Record<string, string> = {
     new_memories: t('dailyReport.memories'),
     new_entities: t('dailyReport.entities'),
     updated_wiki: t('dailyReport.wiki'),
     active_hours: t('dailyReport.hours'),
   }
-  return labels[key] || key
+  return labels[String(key)] || String(key)
 }
 
 onMounted(() => {

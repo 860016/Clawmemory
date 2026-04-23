@@ -52,3 +52,12 @@ setup_cython.py
 sync_version.py
 backend/setup_cython.py
 backend/scripts/
+
+# Go backend build artifacts
+go-backend/*.exe
+go-backend/clawmemory
+go-backend/clawmemory-pro
+go-backend/releases/
+
+# Temp docs
+梳理方案.md

@@ -189,7 +189,7 @@ import {
   Menu, User, Search, Sunny, Moon, Trophy, SwitchButton,
   DataAnalysis, MagicStick, Upload, Grid, Share,
   TrendCharts, Warning, Cpu, FolderOpened, Lock, Coin, Monitor,
-  DocumentChecked, Star, Lightbulb, Timer, Compass
+  DocumentChecked, Star, Timer, Compass
 } from '@element-plus/icons-vue'
 import axios from '../api/client'
 
