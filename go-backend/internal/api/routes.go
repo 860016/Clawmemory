@@ -61,8 +61,27 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.GET("/stats", handleGetStats(db))
 		authorized.GET("/stats/usage", handleGetUsageStats(db))
 
-		authorized.GET("/settings", handleGetSettings())
-		authorized.PUT("/settings", handleUpdateSettings())
+		authorized.GET("/settings", handleGetSettings(db))
+		authorized.PUT("/settings", handleUpdateSettings(db))
+
+		authorized.GET("/memories/decay/stats", handleDecayStats(db))
+		authorized.POST("/memories/decay/apply", handleDecayApply(db))
+		authorized.PUT("/memories/decay/settings", handleDecaySettingsUpdate(db))
+		authorized.GET("/memories/decay/settings", handleDecaySettingsGet(db))
+		authorized.DELETE("/memories/trash", handleEmptyTrash(db))
+		authorized.GET("/memories/trash", handleListTrash(db))
+
+		authorized.GET("/memories/export", handleExportData(db))
+		authorized.POST("/memories/import", handleImportData(db))
+		authorized.GET("/data/export", handleExportData(db))
+		authorized.POST("/data/import", handleImportData(db))
+
+		authorized.GET("/memories/dedup/scan", handleDedupScan(db))
+		authorized.POST("/memories/dedup/merge", handleDedupMerge(db))
+
+		authorized.GET("/memories/health", handleMemoryHealth(db))
+
+		authorized.GET("/memories/recommend", handleMemoryRecommend(db))
 
 		authorized.GET("/openclaw-skills/scan", handleScanSkills)
 		authorized.GET("/openclaw-skills/detail", handleSkillDetail)
@@ -101,7 +120,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 			pro.POST("/evolution/discover", handleProEvolutionDiscover(proProxy, db))
 			pro.POST("/evolution/infer", handleProEvolutionInfer(proProxy))
 			pro.POST("/evolution/importance", handleProEvolutionImportance(proProxy, db))
-			pro.POST("/evolution/prefetch", handleProEvolutionPrefetch(proProxy))
+			pro.POST("/evolution/prefetch", handleProEvolutionPrefetch(proProxy, db))
 		}
 	}
 }

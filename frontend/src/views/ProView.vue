@@ -7,6 +7,10 @@
     </div>
 
     <div class="pro-grid" v-if="isPro">
+      <div class="fallback-banner" v-if="isFallback">
+        <span>⚠️ {{ $t('pro.fallbackMode') }}</span>
+        <span class="fallback-desc">{{ $t('pro.usingLocalAlgorithm') }}</span>
+      </div>
       <!-- Memory Decay -->
       <div class="pro-card" :class="{ 'section-highlight': activeSection === 'decay' }" id="pro-decay">
         <div class="card-header">
@@ -365,6 +369,7 @@ const { t } = useI18n()
 const route = useRoute()
 
 const isPro = ref(false)
+const isFallback = ref(false)
 const loading = ref<Record<string, boolean>>({})
 const activeSection = ref((route.query.section as string) || '')
 
@@ -432,6 +437,10 @@ async function loadDecayStats() {
     const { data } = await proApi.getDecayStats()
     decayStats.value = data
     pruneSuggestions.value = (data.memories || []).filter((m: any) => m.should_prune)
+    if (data.fallback) {
+      isFallback.value = true
+      ElMessage.info({ message: t('pro.usingLocalAlgorithm'), duration: 3000 })
+    }
   } catch (e: any) {
     if (e.response?.status !== 403) ElMessage.error(e.response?.data?.detail || t('common.failed'))
   } finally { loading.value.decay = false }
@@ -533,6 +542,10 @@ async function previewCompress() {
   try {
     const { data } = await proApi.compressPreview(compressLevel.value)
     compressPreviewData.value = data
+    if (data.fallback) {
+      isFallback.value = true
+      ElMessage.info({ message: t('pro.usingLocalAlgorithm'), duration: 3000 })
+    }
   } catch (e: any) {
     ElMessage.error(e.response?.data?.detail || t('common.failed'))
   } finally { loading.value.compressPreview = false }
@@ -574,6 +587,10 @@ async function runDiscoverRelations() {
     const { data } = await proApi.discoverRelations()
     discoverResult.value = data
     ElMessage.success(t('pro.discoveredCount', { count: data.relations?.length || 0 }))
+    if (data.fallback) {
+      isFallback.value = true
+      ElMessage.info({ message: t('pro.usingLocalAlgorithm'), duration: 3000 })
+    }
   } catch (e: any) {
     ElMessage.error(e.response?.data?.detail || t('common.failed'))
   } finally { loading.value.discover = false }
@@ -618,6 +635,9 @@ async function runPrefetch() {
 .page-header h1 { font-size: 24px; font-weight: 700; color: var(--cm-text); margin: 0; }
 .pro-badge { background: rgba(16,185,129,0.15); color: #10B981; padding: 2px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
 .pro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 16px; }
+.fallback-banner { grid-column: 1 / -1; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
+.fallback-banner span:first-child { font-weight: 600; color: #D97706; font-size: 14px; }
+.fallback-desc { font-size: 12px; color: var(--cm-text-muted); }
 .pro-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; overflow: hidden; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
 .pro-card:hover { border-color: rgba(16,185,129,0.25); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
 .pro-card.section-highlight { border-color: #10B981; box-shadow: 0 0 0 2px rgba(16,185,129,0.2); transition: all 0.3s ease; }

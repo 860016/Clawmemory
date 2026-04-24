@@ -112,6 +112,14 @@ type License struct {
 	CreatedAt        time.Time `json:"created_at"`
 }
 
+// Setting 设置
+type Setting struct {
+	ID    uint   `gorm:"primarykey" json:"id"`
+	UserID uint  `gorm:"index;not null;default:1" json:"user_id"`
+	Key   string `gorm:"size:100;not null;uniqueIndex:idx_user_key" json:"key"`
+	Value string `gorm:"type:text" json:"value"`
+}
+
 // Backup 备份
 type Backup struct {
 	ID        uint      `gorm:"primarykey" json:"id"`

@@ -38,5 +38,6 @@ func Migrate(db *gorm.DB) error {
 		&models.DailyReport{},
 		&models.License{},
 		&models.Backup{},
+		&models.Setting{},
 	)
 }
