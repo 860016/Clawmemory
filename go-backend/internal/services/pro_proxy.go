@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -69,9 +70,22 @@ func (p *ProProxy) proxyRequest(path string, body interface{}) (map[string]inter
 	}
 	defer resp.Body.Close()
 
+	bodyBytes, _ := io.ReadAll(resp.Body)
+
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		return nil, &ProError{
+			Message: fmt.Sprintf("Pro server returned non-JSON response (HTTP %d): %s", resp.StatusCode, string(bodyBytes[:min(len(bodyBytes), 200)])),
+			Code:    http.StatusBadGateway,
+		}
+	}
+
 	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return nil, &ProError{
+			Message: fmt.Sprintf("Pro server returned invalid JSON: %v", err),
+			Code:    http.StatusBadGateway,
+		}
 	}
 
 	if resp.StatusCode == http.StatusForbidden {
@@ -82,7 +96,10 @@ func (p *ProProxy) proxyRequest(path string, body interface{}) (map[string]inter
 		if msg, ok := result["error"].(string); ok {
 			return nil, &ProError{Message: msg, Code: resp.StatusCode}
 		}
-		return nil, ErrProServerUnreachable
+		return nil, &ProError{
+			Message: fmt.Sprintf("Pro server error (HTTP %d)", resp.StatusCode),
+			Code:    resp.StatusCode,
+		}
 	}
 
 	return result, nil

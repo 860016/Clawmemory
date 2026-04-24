@@ -57,9 +57,19 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.GET("/reports/:date", handleGetReportByDate(db))
 
 		authorized.GET("/stats", handleGetStats(db))
+		authorized.GET("/stats/usage", handleGetUsageStats(db))
 
 		authorized.GET("/settings", handleGetSettings())
 		authorized.PUT("/settings", handleUpdateSettings())
+
+		authorized.GET("/openclaw-skills/scan", handleScanSkills)
+		authorized.GET("/openclaw-skills/detail", handleSkillDetail)
+
+		authorized.GET("/openclaw-memories/scan", handleScanOpenClawMemories)
+		authorized.GET("/openclaw-memories/scan/:agentName", handleScanOpenClawAgent)
+
+		authorized.GET("/chromadb/status", handleChromaDBStatus)
+		authorized.POST("/chromadb/install", handleChromaDBInstall)
 
 		pro := authorized.Group("/pro")
 		{

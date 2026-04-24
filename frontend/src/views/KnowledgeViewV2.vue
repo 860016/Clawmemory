@@ -403,7 +403,16 @@ function zoomOut() {
 }
 
 // Keyboard shortcut
-onMounted(() => {
+onMounted(async () => {
+  try {
+    await Promise.all([
+      store.fetchEntities(1, 100),
+      store.fetchRelations(1, 100),
+    ])
+  } catch (e) {
+    console.error('Failed to load knowledge data:', e)
+  }
+  
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault()

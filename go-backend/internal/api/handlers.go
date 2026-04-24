@@ -1,8 +1,12 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"time"
 
 	"clawmemory/internal/middleware"
 	"clawmemory/internal/services"
@@ -481,11 +485,57 @@ func handleGetStats(db *gorm.DB) gin.HandlerFunc {
 		db.Model(&struct{ ID uint }{}).Table("relations").Count(&relationCount)
 		db.Model(&struct{ ID uint }{}).Table("wiki_pages").Count(&wikiCount)
 
+		layerStats := make(map[string]int64)
+		rows, _ := db.Raw("SELECT COALESCE(layer, 'knowledge') as layer, COUNT(*) as cnt FROM memories WHERE status != 'trashed' GROUP BY layer").Rows()
+		for rows.Next() {
+			var layer string
+			var cnt int64
+			rows.Scan(&layer, &cnt)
+			layerStats[layer] = cnt
+		}
+		rows.Close()
+
+		if len(layerStats) == 0 {
+			layerStats["knowledge"] = 0
+		}
+
+		type RecentMemory struct {
+			ID        uint      `json:"id"`
+			Key       string    `json:"key"`
+			Layer     string    `json:"layer"`
+			CreatedAt time.Time `json:"created_at"`
+		}
+		var recentMemories []RecentMemory
+		db.Table("memories").Where("status != ?", "trashed").Order("created_at desc").Limit(10).Find(&recentMemories)
+
+		recentMemoriesJson := make([]map[string]interface{}, 0)
+		for _, m := range recentMemories {
+			recentMemoriesJson = append(recentMemoriesJson, map[string]interface{}{
+				"id":         m.ID,
+				"key":        m.Key,
+				"layer":      m.Layer,
+				"created_at": m.CreatedAt.Format("2006-01-02 15:04:05"),
+			})
+		}
+
+		var licenseInfo map[string]interface{}
+		licenseInfo = map[string]interface{}{
+			"tier":       "oss",
+			"active":     false,
+			"type":       "",
+			"expires_at": "",
+			"device_slot": "",
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"memories":  memoryCount,
-			"entities":  entityCount,
-			"relations": relationCount,
-			"wiki":      wikiCount,
+			"memoryCount":    memoryCount,
+			"entityCount":    entityCount,
+			"relationCount":  relationCount,
+			"wikiCount":      wikiCount,
+			"layerStats":     layerStats,
+			"recentMemories": recentMemoriesJson,
+			"license":        licenseInfo,
+			"passwordSet":    true,
 		})
 	}
 }
@@ -820,4 +870,282 @@ func handleProEvolutionPrefetch(proxy *services.ProProxy) gin.HandlerFunc {
 		}
 		c.JSON(http.StatusOK, result)
 	}
+}
+
+func handleGetUsageStats(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		days, _ := strconv.Atoi(c.DefaultQuery("days", "30"))
+		if days < 1 {
+			days = 30
+		}
+		if days > 365 {
+			days = 365
+		}
+
+		var memories []struct {
+			ID        uint      `json:"id"`
+			Key       string    `json:"key"`
+			Layer     string    `json:"layer"`
+			CreatedAt time.Time `json:"created_at"`
+		}
+		db.Table("memories").Where("status != ?", "trashed").Order("created_at desc").Find(&memories)
+
+		now := time.Now()
+		cutoff := now.AddDate(0, 0, -days)
+
+		dailyTrend := make([]map[string]interface{}, 0)
+		for i := days - 1; i >= 0; i-- {
+			date := now.AddDate(0, 0, -i).Format("2006-01-02")
+			dayStart, _ := time.Parse("2006-01-02", date)
+			dayEnd := dayStart.AddDate(0, 0, 1)
+			count := 0
+			for _, m := range memories {
+				if m.CreatedAt.After(dayStart) && m.CreatedAt.Before(dayEnd) {
+					count++
+				}
+			}
+			dailyTrend = append(dailyTrend, map[string]interface{}{
+				"date":  date,
+				"count": count,
+			})
+		}
+
+		sourceDist := make(map[string]int)
+		importanceDist := make(map[string]int)
+		layerDist := make(map[string]int)
+		entityTypeDist := make(map[string]int)
+
+		for _, m := range memories {
+			layer := m.Layer
+			if layer == "" {
+				layer = "knowledge"
+			}
+			sourceDist["manual"]++
+			importanceDist["medium"]++
+			layerDist[layer]++
+		}
+
+		db.Table("entities").Find(&struct{}{})
+		var entityCount int64
+		db.Table("entities").Count(&entityCount)
+
+		rows, _ := db.Raw("SELECT entity_type, COUNT(*) as cnt FROM entities GROUP BY entity_type").Rows()
+		for rows.Next() {
+			var etype string
+			var cnt int64
+			rows.Scan(&etype, &cnt)
+			entityTypeDist[etype] = int(cnt)
+		}
+		rows.Close()
+
+		c.JSON(http.StatusOK, gin.H{
+			"dailyTrend":            dailyTrend,
+			"dailyTokenTrend":       []map[string]interface{}{},
+			"sourceDistribution":   sourceDist,
+			"importanceDistribution": importanceDist,
+			"tokenByLayer":          layerDist,
+			"totalEstimatedTokens": len(memories) * 100,
+			"topAccessed":           []map[string]interface{}{},
+			"operationCounts":      map[string]int{},
+			"entityTypeDistribution": entityTypeDist,
+			"totalMemories":         len(memories),
+			"days":                 days,
+		})
+	}
+}
+
+func handleScanSkills(c *gin.Context) {
+	dataDirs := []string{}
+
+	homeDir, _ := os.UserHomeDir()
+	if homeDir != "" {
+		dataDirs = append(dataDirs, filepath.Join(homeDir, ".openclaw", "skills"))
+	}
+
+	exe, _ := os.Executable()
+	if exe != "" {
+		dataDirs = append(dataDirs, filepath.Join(filepath.Dir(exe), "skills"))
+	}
+
+	globalSkills := make([]map[string]interface{}, 0)
+	workspaceSkills := make([]map[string]interface{}, 0)
+
+	for _, dir := range dataDirs {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			skillFile := filepath.Join(dir, entry.Name(), "skill.json")
+			if _, err := os.Stat(skillFile); err != nil {
+				continue
+			}
+			content, err := os.ReadFile(skillFile)
+			if err != nil {
+				continue
+			}
+			var skill map[string]interface{}
+			if json.Unmarshal(content, &skill) == nil {
+				skill["skill_dir"] = entry.Name()
+				if dir == filepath.Join(homeDir, ".openclaw", "skills") {
+					skill["scope"] = "global"
+					globalSkills = append(globalSkills, skill)
+				} else {
+					skill["scope"] = "workspace"
+					workspaceSkills = append(workspaceSkills, skill)
+				}
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"global_skills":   globalSkills,
+		"workspace_skills": workspaceSkills,
+	})
+}
+
+func handleSkillDetail(c *gin.Context) {
+	skillDir := c.Query("skill_dir")
+	scope := c.Query("scope")
+
+	homeDir, _ := os.UserHomeDir()
+	var baseDir string
+	if scope == "global" && homeDir != "" {
+		baseDir = filepath.Join(homeDir, ".openclaw", "skills")
+	} else {
+		exe, _ := os.Executable()
+		baseDir = filepath.Join(filepath.Dir(exe), "skills")
+	}
+
+	skillFile := filepath.Join(baseDir, skillDir, "skill.json")
+	content, err := os.ReadFile(skillFile)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "skill not found"})
+		return
+	}
+
+	var skill map[string]interface{}
+	if err := json.Unmarshal(content, &skill); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid skill file"})
+		return
+	}
+
+	skill["skill_dir"] = skillDir
+	skill["scope"] = scope
+
+	c.JSON(http.StatusOK, skill)
+}
+
+func handleChromaDBStatus(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"available": false,
+		"reason":    "ChromaDB integration is not available in Go backend",
+	})
+}
+
+func handleChromaDBInstall(c *gin.Context) {
+	c.JSON(http.StatusBadRequest, gin.H{
+		"success": false,
+		"message": "ChromaDB integration is not available in Go backend. This feature requires Python backend.",
+	})
+}
+
+func handleScanOpenClawMemories(c *gin.Context) {
+	homeDir, _ := os.UserHomeDir()
+	openclawDirs := []string{}
+
+	if homeDir != "" {
+		openclawDirs = append(openclawDirs, filepath.Join(homeDir, ".openclaw"))
+	}
+	exe, _ := os.Executable()
+	if exe != "" {
+		openclawDirs = append(openclawDirs, filepath.Join(filepath.Dir(exe), "openclaw"))
+	}
+
+	for _, dir := range openclawDirs {
+		memFile := filepath.Join(dir, "memories.json")
+		if _, err := os.Stat(memFile); err == nil {
+			content, err := os.ReadFile(memFile)
+			if err != nil {
+				continue
+			}
+			var memories []map[string]interface{}
+			if json.Unmarshal(content, &memories) == nil {
+				agents := make([]map[string]interface{}, 0)
+				agentMap := make(map[string]bool)
+				for _, m := range memories {
+					if agent, ok := m["agent_name"].(string); ok && agent != "" && !agentMap[agent] {
+						agentMap[agent] = true
+						agents = append(agents, map[string]interface{}{
+							"name":        agent,
+							"memory_count": 1,
+						})
+					} else if ok && agentMap[agent] {
+						for _, a := range agents {
+							if a["name"] == agent {
+								a["memory_count"] = a["memory_count"].(int) + 1
+							}
+						}
+					}
+				}
+				c.JSON(http.StatusOK, gin.H{
+					"found":         true,
+					"openclaw_dir":  dir,
+					"agents":        agents,
+					"total_memories": len(memories),
+				})
+				return
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"found": false,
+	})
+}
+
+func handleScanOpenClawAgent(c *gin.Context) {
+	agentName := c.Param("agentName")
+	
+	homeDir, _ := os.UserHomeDir()
+	openclawDirs := []string{}
+	if homeDir != "" {
+		openclawDirs = append(openclawDirs, filepath.Join(homeDir, ".openclaw"))
+	}
+	exe, _ := os.Executable()
+	if exe != "" {
+		openclawDirs = append(openclawDirs, filepath.Join(filepath.Dir(exe), "openclaw"))
+	}
+
+	for _, dir := range openclawDirs {
+		memFile := filepath.Join(dir, "memories.json")
+		if _, err := os.Stat(memFile); err == nil {
+			content, err := os.ReadFile(memFile)
+			if err != nil {
+				continue
+			}
+			var memories []map[string]interface{}
+			if json.Unmarshal(content, &memories) == nil {
+				filtered := make([]map[string]interface{}, 0)
+				for _, m := range memories {
+					if m["agent_name"] == agentName {
+						filtered = append(filtered, m)
+					}
+				}
+				c.JSON(http.StatusOK, gin.H{
+					"agent":          agentName,
+					"memories":       filtered,
+					"total_filtered": len(filtered),
+				})
+				return
+			}
+		}
+	}
+
+	c.JSON(http.StatusNotFound, gin.H{
+		"error": "agent not found",
+	})
 }
