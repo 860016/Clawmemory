@@ -31,6 +31,8 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	authorized := r.Group("/api/v1")
 	authorized.Use(middleware.Auth(cfg))
 	{
+		authorized.GET("/auth/me", handleGetMe(authService))
+
 		authorized.GET("/memories", handleListMemories(db))
 		authorized.POST("/memories", handleCreateMemory(db))
 		authorized.GET("/memories/:id", handleGetMemory(db))
@@ -67,9 +69,13 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 
 		authorized.GET("/openclaw-memories/scan", handleScanOpenClawMemories)
 		authorized.GET("/openclaw-memories/scan/:agentName", handleScanOpenClawAgent)
+		authorized.POST("/openclaw-memories/import", handleImportOpenClawMemories(db))
 
 		authorized.GET("/chromadb/status", handleChromaDBStatus)
 		authorized.POST("/chromadb/install", handleChromaDBInstall)
+
+		authorized.GET("/backups", handleListBackups)
+		authorized.POST("/backups", handleCreateBackup)
 
 		pro := authorized.Group("/pro")
 		{

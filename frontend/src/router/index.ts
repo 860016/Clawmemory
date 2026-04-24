@@ -14,7 +14,7 @@ const router = createRouter({
         { path: 'skills', redirect: '/?tab=skills' },
         { path: 'wiki', name: 'wiki', component: () => import('../views/WikiView.vue') },
         { path: 'reports', name: 'reports', component: () => import('../views/DailyReportViewV2.vue') },
-        { path: 'guide', name: 'guide', component: () => import('../views/UserGuideView.vue') },
+        { path: 'docs', name: 'docs', component: () => import('../views/UserGuideView.vue') },
         { path: 'pro', name: 'pro', component: () => import('../views/ProView.vue') },
         { path: 'settings', name: 'settings', component: () => import('../views/SettingsView.vue') },
       ],

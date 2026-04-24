@@ -30,7 +30,7 @@ export default {
     importMemories: 'Import Memories',
     overview: 'Overview',
     stats: 'Stats',
-    guide: 'User Guide',
+    guide: 'Docs',
   },
   tier: {
     free: 'Free',
@@ -436,8 +436,8 @@ export default {
     },
   },
   guide: {
-    title: 'User Guide',
-    subtitle: 'Quick start guide for ClawMemory features',
+    title: 'Docs',
+    subtitle: 'ClawMemory Documentation',
     gettingStarted: 'Getting Started',
     step1: 'Set access password: Go to Settings and set an access password for your ClawMemory',
     step2: 'Add memories: Manually add in Memories, or import existing memories from OpenClaw',

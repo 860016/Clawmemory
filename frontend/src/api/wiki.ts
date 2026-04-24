@@ -2,22 +2,22 @@ import axios from './client'
 
 export default {
   listPages(params?: any) {
-    return axios.get('/wiki/pages', { params })
+    return axios.get('/wiki', { params })
   },
   getPage(id: number) {
-    return axios.get(`/wiki/pages/${id}`)
+    return axios.get(`/wiki/${id}`)
   },
   getTree() {
-    return axios.get('/wiki/pages/tree')
+    return axios.get('/wiki/tree')
   },
   createPage(data: any) {
-    return axios.post('/wiki/pages', data)
+    return axios.post('/wiki', data)
   },
   updatePage(id: number, data: any) {
-    return axios.put(`/wiki/pages/${id}`, data)
+    return axios.put(`/wiki/${id}`, data)
   },
   deletePage(id: number) {
-    return axios.delete(`/wiki/pages/${id}`)
+    return axios.delete(`/wiki/${id}`)
   },
   search(query: string, limit = 20) {
     return axios.get('/wiki/search', { params: { q: query, limit } })
@@ -35,12 +35,12 @@ export default {
     return axios.post('/wiki/ai/extract', { conversation, is_complete })
   },
   refinePage(id: number, additional_context: string = '') {
-    return axios.post(`/wiki/pages/${id}/refine`, { additional_context })
+    return axios.post(`/wiki/${id}/refine`, { additional_context })
   },
   markComplete(id: number) {
-    return axios.post(`/wiki/pages/${id}/mark-complete`)
+    return axios.post(`/wiki/${id}/mark-complete`)
   },
   markInProgress(id: number) {
-    return axios.post(`/wiki/pages/${id}/mark-in-progress`)
+    return axios.post(`/wiki/${id}/mark-in-progress`)
   },
 }

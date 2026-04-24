@@ -253,7 +253,9 @@ const navItems = [
   { path: '/memories', label: 'nav.memories', icon: Collection },
   { path: '/knowledge', label: 'nav.knowledge', icon: Connection },
   { path: '/wiki', label: 'nav.wiki', icon: Document },
+  { path: '/reports', label: 'nav.reports', icon: DataAnalysis },
   { path: '/pro', label: 'nav.pro', icon: Promotion },
+  { path: '/docs', label: 'nav.guide', icon: DocumentChecked },
 ]
 
 function isNavActive(path: string) {
@@ -274,7 +276,7 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
     { items: [
       { path: '/', label: 'nav.overview', icon: HomeFilled },
       { path: '/reports', label: 'nav.reports', icon: DataAnalysis },
-      { path: '/guide', label: 'nav.guide', icon: Document },
+      { path: '/docs', label: 'nav.guide', icon: DocumentChecked },
     ]}
   ],
   '/memories': [
@@ -294,6 +296,22 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
     { items: [
       { path: '/wiki', label: 'wiki.allPages', icon: Document },
       { path: '/wiki?tab=categories', label: 'wiki.categories', icon: FolderOpened },
+    ]}
+  ],
+  '/reports': [
+    { items: [
+      { path: '/reports', label: 'dailyReport.title', icon: DataAnalysis },
+      { path: '/reports?tab=today', label: 'dailyReport.generateToday', icon: Timer },
+      { path: '/reports?tab=history', label: 'dailyReport.history', icon: Star },
+    ]}
+  ],
+  '/docs': [
+    { items: [
+      { path: '/docs', label: 'guide.gettingStarted', icon: Compass },
+      { path: '/docs?tab=chromadb', label: 'guide.chromadbGuide', icon: Monitor },
+      { path: '/docs?tab=layers', label: 'guide.memoryLayers', icon: TrendCharts },
+      { path: '/docs?tab=graph', label: 'guide.knowledgeGraph', icon: Connection },
+      { path: '/docs?tab=pro', label: 'guide.proFeatures', icon: Promotion },
     ]}
   ],
   '/pro': [

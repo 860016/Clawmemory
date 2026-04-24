@@ -343,7 +343,7 @@
               <el-button type="success" disabled v-else>
                 ✓ {{ $t('dashboard.chromadbReady') }}
               </el-button>
-              <el-button text @click="$router.push('/guide')">
+              <el-button text @click="$router.push('/docs')">
                 {{ $t('dashboard.viewGuide') }} →
               </el-button>
             </div>

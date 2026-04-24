@@ -103,6 +103,14 @@ func (s *AuthService) Register(username, password string) (*models.User, error) 
 	return user, nil
 }
 
+func (s *AuthService) GetUserByID(userID uint) (*models.User, error) {
+	var user models.User
+	if err := s.db.First(&user, userID).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (s *AuthService) Login(username, password string) (string, error) {
 	var user models.User
 	if err := s.db.Where("username = ?", username).First(&user).Error; err != nil {

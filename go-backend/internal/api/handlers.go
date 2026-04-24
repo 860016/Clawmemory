@@ -2,10 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"clawmemory/internal/middleware"
@@ -70,6 +73,27 @@ func handleLogin(authService *services.AuthService) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"access_token": token})
+	}
+}
+
+func handleGetMe(authService *services.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, exists := c.Get("user_id")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{"detail": "unauthorized"})
+			return
+		}
+
+		user, err := authService.GetUserByID(userID.(uint))
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"detail": "user not found"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":       user.ID,
+			"username": user.Username,
+		})
 	}
 }
 
@@ -1147,5 +1171,196 @@ func handleScanOpenClawAgent(c *gin.Context) {
 
 	c.JSON(http.StatusNotFound, gin.H{
 		"error": "agent not found",
+	})
+}
+
+func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			AgentName      string `json:"agent_name"`
+			TargetAgentID  *int   `json:"target_agent_id"`
+			Layer          string `json:"layer"`
+			SkipExisting   bool   `json:"skip_existing"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
+			return
+		}
+		if req.AgentName == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"detail": "agent_name is required"})
+			return
+		}
+		if req.Layer == "" {
+			req.Layer = "knowledge"
+		}
+
+		homeDir, _ := os.UserHomeDir()
+		openclawDirs := []string{}
+		if homeDir != "" {
+			openclawDirs = append(openclawDirs, filepath.Join(homeDir, ".openclaw"))
+		}
+		exe, _ := os.Executable()
+		if exe != "" {
+			openclawDirs = append(openclawDirs, filepath.Join(filepath.Dir(exe), "openclaw"))
+		}
+
+		var imported, skipped, errors int
+		for _, dir := range openclawDirs {
+			memFile := filepath.Join(dir, "memories.json")
+			if _, err := os.Stat(memFile); err != nil {
+				continue
+			}
+			content, err := os.ReadFile(memFile)
+			if err != nil {
+				continue
+			}
+			var memories []map[string]interface{}
+			if json.Unmarshal(content, &memories) != nil {
+				continue
+			}
+
+			for _, m := range memories {
+				if m["agent_name"] != req.AgentName {
+					skipped++
+					continue
+				}
+
+				key, _ := m["key"].(string)
+				contentStr, _ := m["content"].(string)
+				if key == "" || contentStr == "" {
+					errors++
+					continue
+				}
+
+				if req.SkipExisting {
+					var count int64
+					db.Table("memories").Where("key = ?", key).Count(&count)
+					if count > 0 {
+						skipped++
+						continue
+					}
+				}
+
+				importance := float64(0.5)
+				if imp, ok := m["importance"].(float64); ok {
+					importance = imp
+				} else if imp, ok := m["importance"].(int64); ok {
+					importance = float64(imp)
+				}
+
+				tags := ""
+				if t, ok := m["tags"].([]interface{}); ok && len(t) > 0 {
+					tagStrs := make([]string, 0, len(t))
+					for _, tag := range t {
+						if s, ok := tag.(string); ok {
+							tagStrs = append(tagStrs, s)
+						}
+					}
+					tags = strings.Join(tagStrs, ",")
+				} else if t, ok := m["tags"].(string); ok {
+					tags = t
+				}
+
+				source := "openclaw"
+				if s, ok := m["source"].(string); ok && s != "" {
+					source = s
+				}
+
+				result := db.Exec(`INSERT INTO memories (key, content, layer, importance, tags, source, status, created_at, updated_at)
+					VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`,
+					key, contentStr, req.Layer, importance, tags, source)
+				if result.Error != nil {
+					errors++
+				} else {
+					imported++
+				}
+			}
+			break
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"imported": imported,
+			"skipped":  skipped,
+			"errors":   errors,
+		})
+	}
+}
+
+func handleListBackups(c *gin.Context) {
+	backupDir := filepath.Join(".", "backups")
+	if _, err := os.Stat(backupDir); os.IsNotExist(err) {
+		c.JSON(http.StatusOK, gin.H{"backups": []interface{}{}})
+		return
+	}
+
+	entries, err := os.ReadDir(backupDir)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"backups": []interface{}{}})
+		return
+	}
+
+	backups := make([]map[string]interface{}, 0)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".db") && !strings.HasSuffix(entry.Name(), ".sql") && !strings.HasSuffix(entry.Name(), ".zip") {
+			continue
+		}
+		info, _ := entry.Info()
+		backups = append(backups, map[string]interface{}{
+			"filename":    entry.Name(),
+			"size":        info.Size(),
+			"created_at":  info.ModTime().Format("2006-01-02 15:04:05"),
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"backups": backups})
+}
+
+func handleCreateBackup(c *gin.Context) {
+	backupDir := filepath.Join(".", "backups")
+	os.MkdirAll(backupDir, 0755)
+
+	timestamp := time.Now().Format("20060102_150405")
+	filename := fmt.Sprintf("clawmemory_backup_%s.db", timestamp)
+	backupPath := filepath.Join(backupDir, filename)
+
+	dbPath := "clawmemory.db"
+	if envDb := os.Getenv("DB_PATH"); envDb != "" {
+		dbPath = envDb
+	}
+
+	src, err := os.Open(dbPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": fmt.Sprintf("Cannot open database file: %v", err),
+		})
+		return
+	}
+	defer src.Close()
+
+	dst, err := os.Create(backupPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": fmt.Sprintf("Cannot create backup file: %v", err),
+		})
+		return
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": fmt.Sprintf("Backup failed: %v", err),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":  true,
+		"filename": filename,
+		"path":     backupPath,
+		"size":     dst.(interface{ Size() int64 }).Size(),
 	})
 }

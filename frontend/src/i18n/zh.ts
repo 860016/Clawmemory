@@ -32,7 +32,7 @@ export default {
     importMemories: '导入记忆',
     overview: '概览',
     stats: '统计',
-    guide: '使用说明',
+    guide: '文档',
   },
   tier: {
     free: '免费版',
@@ -438,8 +438,8 @@ export default {
     },
   },
   guide: {
-    title: '使用说明',
-    subtitle: '快速上手 ClawMemory 各项功能',
+    title: '文档',
+    subtitle: 'ClawMemory 功能文档',
     gettingStarted: '快速开始',
     step1: '设置访问密码：进入设置页，为您的 ClawMemory 设置访问密码',
     step2: '添加记忆：在记忆库中手动添加，或从 OpenClaw 导入现有记忆',
