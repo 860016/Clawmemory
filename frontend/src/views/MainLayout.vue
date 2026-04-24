@@ -253,13 +253,11 @@ const navItems = [
   { path: '/memories', label: 'nav.memories', icon: Collection },
   { path: '/knowledge', label: 'nav.knowledge', icon: Connection },
   { path: '/wiki', label: 'nav.wiki', icon: Document },
-  { path: '/reports', label: 'nav.reports', icon: DataAnalysis },
   { path: '/pro', label: 'nav.pro', icon: Promotion },
-  { path: '/docs', label: 'nav.guide', icon: DocumentChecked },
 ]
 
 function isNavActive(path: string) {
-  if (path === '/') return route.path === '/'
+  if (path === '/') return route.path === '/' || route.path === '/reports' || route.path === '/docs'
   return route.path.startsWith(path)
 }
 
@@ -275,6 +273,8 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
   '/': [
     { items: [
       { path: '/', label: 'nav.overview', icon: HomeFilled },
+      { path: '/?tab=stats', label: 'nav.stats', icon: TrendCharts },
+      { path: '/?tab=skills', label: 'nav.skills', icon: Cpu },
       { path: '/reports', label: 'nav.reports', icon: DataAnalysis },
       { path: '/docs', label: 'nav.guide', icon: DocumentChecked },
     ]}
@@ -298,22 +298,6 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
       { path: '/wiki?tab=categories', label: 'wiki.categories', icon: FolderOpened },
     ]}
   ],
-  '/reports': [
-    { items: [
-      { path: '/reports', label: 'dailyReport.title', icon: DataAnalysis },
-      { path: '/reports?tab=today', label: 'dailyReport.generateToday', icon: Timer },
-      { path: '/reports?tab=history', label: 'dailyReport.history', icon: Star },
-    ]}
-  ],
-  '/docs': [
-    { items: [
-      { path: '/docs', label: 'guide.gettingStarted', icon: Compass },
-      { path: '/docs?tab=chromadb', label: 'guide.chromadbGuide', icon: Monitor },
-      { path: '/docs?tab=layers', label: 'guide.memoryLayers', icon: TrendCharts },
-      { path: '/docs?tab=graph', label: 'guide.knowledgeGraph', icon: Connection },
-      { path: '/docs?tab=pro', label: 'guide.proFeatures', icon: Promotion },
-    ]}
-  ],
   '/pro': [
     { items: [
       { path: '/pro?section=decay', label: 'pro.decay', icon: TrendCharts },
@@ -335,6 +319,9 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
 
 const currentSubNav = computed(() => {
   const path = '/' + (route.path.split('/')[1] || '')
+  if (path === '/reports' || path === '/docs') {
+    return subNavMap['/'] || []
+  }
   return subNavMap[path] || []
 })
 
