@@ -104,52 +104,52 @@
 
       <!-- 记忆衰减设置 -->
       <div class="settings-card" :class="{ 'section-highlight': activeSection === 'decay' }" id="settings-decay">
-        <div class="card-title">🧠 {{ $t('settings.memoryDecay') || '记忆衰减' }}</div>
+        <div class="card-title">🧠 {{ $t('settings.memoryDecay') }}</div>
         <div class="decay-info" v-if="decayInfo">
           <div class="decay-stage-info">
             <div class="stage-item">
-              <span class="stage-label">15天未访问</span>
-              <span class="stage-desc">轻度衰减 10%</span>
+              <span class="stage-label">{{ $t('settings.stage15d') }}</span>
+              <span class="stage-desc">{{ $t('settings.stage15dDesc') }}</span>
             </div>
             <div class="stage-item">
-              <span class="stage-label">30天未访问</span>
-              <span class="stage-desc">中度衰减 30%，标记为不重要</span>
+              <span class="stage-label">{{ $t('settings.stage30d') }}</span>
+              <span class="stage-desc">{{ $t('settings.stage30dDesc') }}</span>
             </div>
             <div class="stage-item">
-              <span class="stage-label">60天未访问</span>
-              <span class="stage-desc">进入回收站</span>
+              <span class="stage-label">{{ $t('settings.stage60d') }}</span>
+              <span class="stage-desc">{{ $t('settings.stage60dDesc') }}</span>
             </div>
             <div class="stage-item">
-              <span class="stage-label">回收站保留</span>
-              <span class="stage-desc">30天后自动清空</span>
+              <span class="stage-label">{{ $t('settings.stageTrash') }}</span>
+              <span class="stage-desc">{{ $t('settings.stageTrashDesc') }}</span>
             </div>
           </div>
         </div>
         <div class="setting-item">
-          <span>{{ $t('settings.autoDecay') || '自动衰减' }}</span>
+          <span>{{ $t('settings.autoDecay') }}</span>
           <el-switch v-model="decayEnabled" @change="updateDecaySettings" :loading="decayLoading" />
         </div>
         <div class="decay-stats" v-if="decayStats">
           <div class="stats-row">
-            <span class="stats-label">{{ $t('settings.totalMemories') || '总记忆' }}</span>
+            <span class="stats-label">{{ $t('settings.totalMemories') }}</span>
             <span class="stats-value">{{ decayStats.total }}</span>
           </div>
           <div class="stats-row">
-            <span class="stats-label">{{ $t('settings.activeMemories') || '正常记忆' }}</span>
+            <span class="stats-label">{{ $t('settings.activeMemories') }}</span>
             <span class="stats-value">{{ decayStats.active }}</span>
           </div>
           <div class="stats-row">
-            <span class="stats-label">{{ $t('settings.archivedMemories') || '不重要记忆' }}</span>
+            <span class="stats-label">{{ $t('settings.archivedMemories') }}</span>
             <span class="stats-value warning">{{ decayStats.archived }}</span>
           </div>
           <div class="stats-row">
-            <span class="stats-label">{{ $t('settings.trashedMemories') || '回收站' }}</span>
+            <span class="stats-label">{{ $t('settings.trashedMemories') }}</span>
             <span class="stats-value danger">{{ decayStats.trashed }}</span>
           </div>
         </div>
         <div class="decay-actions" v-if="decayStats && decayStats.trashed > 0">
-          <el-button size="small" type="warning" @click="viewTrash">{{ $t('settings.viewTrash') || '查看回收站' }}</el-button>
-          <el-button size="small" type="danger" @click="emptyTrash">{{ $t('settings.emptyTrash') || '清空回收站' }}</el-button>
+          <el-button size="small" type="warning" @click="viewTrash">{{ $t('settings.viewTrash') }}</el-button>
+          <el-button size="small" type="danger" @click="emptyTrash">{{ $t('settings.emptyTrash') }}</el-button>
         </div>
       </div>
 
@@ -366,7 +366,7 @@ async function updateDecaySettings() {
   decayLoading.value = true
   try {
     await axios.post('/memories/decay/settings', null, { params: { enabled: decayEnabled.value } })
-    ElMessage.success(decayEnabled.value ? '自动衰减已开启' : '自动衰减已关闭')
+    ElMessage.success(decayEnabled.value ? t('settings.decayEnabled') : t('settings.decayDisabled'))
   } catch {
     ElMessage.error(t('common.failed'))
   } finally {
@@ -380,9 +380,9 @@ async function viewTrash() {
 
 async function emptyTrash() {
   try {
-    await ElMessageBox.confirm('确定要清空回收站吗？此操作不可恢复。', '确认', { type: 'warning' })
+    await ElMessageBox.confirm(t('settings.emptyTrashConfirm'), t('settings.confirm'), { type: 'warning' })
     await axios.delete('/memories/trash')
-    ElMessage.success('回收站已清空')
+    ElMessage.success(t('settings.trashEmptied'))
     await loadDecayStats()
   } catch {}
 }

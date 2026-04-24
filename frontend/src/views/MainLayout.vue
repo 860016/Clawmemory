@@ -339,15 +339,15 @@ const searchResults = computed(() => [
     category: 'memories',
     label: t('nav.memories'),
     items: [
-      { id: 1, title: 'Go 后端迁移方案', description: '技术笔记', icon: Collection },
-      { id: 2, title: 'UI 设计规范', description: '设计文档', icon: Collection },
+      { id: 1, title: 'Go Backend Migration', description: t('memories.knowledge'), icon: Collection },
+      { id: 2, title: 'UI Design Guide', description: t('wiki.title'), icon: Collection },
     ]
   },
   {
     category: 'knowledge',
     label: t('nav.knowledge'),
     items: [
-      { id: 3, title: 'ClawMemory 项目', description: '知识实体', icon: Connection },
+      { id: 3, title: 'ClawMemory Project', description: t('knowledge.entities'), icon: Connection },
     ]
   }
 ])

@@ -200,44 +200,44 @@
       <div class="pro-card" :class="{ 'section-highlight': activeSection === 'compress' }" id="pro-compress">
         <div class="card-header">
           <span class="card-icon">🗜️</span>
-          <span class="card-title">记忆压缩</span>
+          <span class="card-title">{{ $t('pro.compress') }}</span>
         </div>
         <div class="card-body">
-          <p class="card-desc">压缩记忆库，减少 Token 占用，保留核心信息</p>
+          <p class="card-desc">{{ $t('pro.compressDesc') }}</p>
           <div class="compress-levels">
             <div class="level-option" :class="{ active: compressLevel === 'light' }" @click="compressLevel = 'light'">
-              <div class="level-name">轻度</div>
-              <div class="level-rate">~20-30%</div>
-              <div class="level-desc">去重·截断·去噪</div>
+              <div class="level-name">{{ $t('pro.compressLight') }}</div>
+              <div class="level-rate">{{ $t('pro.compressLightRate') }}</div>
+              <div class="level-desc">{{ $t('pro.compressLightDesc') }}</div>
             </div>
             <div class="level-option" :class="{ active: compressLevel === 'medium' }" @click="compressLevel = 'medium'">
-              <div class="level-name">中度</div>
-              <div class="level-rate">~50-60%</div>
-              <div class="level-desc">摘要·合并·标签化</div>
+              <div class="level-name">{{ $t('pro.compressMedium') }}</div>
+              <div class="level-rate">{{ $t('pro.compressMediumRate') }}</div>
+              <div class="level-desc">{{ $t('pro.compressMediumDesc') }}</div>
             </div>
             <div class="level-option" :class="{ active: compressLevel === 'deep' }" @click="compressLevel = 'deep'">
-              <div class="level-name">深度</div>
-              <div class="level-rate">~70-80%</div>
-              <div class="level-desc">聚类·图谱化·归档</div>
+              <div class="level-name">{{ $t('pro.compressDeep') }}</div>
+              <div class="level-rate">{{ $t('pro.compressDeepRate') }}</div>
+              <div class="level-desc">{{ $t('pro.compressDeepDesc') }}</div>
             </div>
           </div>
           <div class="card-actions">
-            <el-button size="small" @click="previewCompress" :loading="loading.compressPreview">预览压缩</el-button>
-            <el-button size="small" type="primary" @click="applyCompress" :loading="loading.compressApply">执行压缩</el-button>
+            <el-button size="small" @click="previewCompress" :loading="loading.compressPreview">{{ $t('pro.previewCompress') }}</el-button>
+            <el-button size="small" type="primary" @click="applyCompress" :loading="loading.compressApply">{{ $t('pro.applyCompress') }}</el-button>
           </div>
           <div v-if="compressPreviewData" class="compress-result">
             <div class="stats-row">
               <div class="stat-item">
                 <span class="stat-value">{{ compressPreviewData.original_count }}</span>
-                <span class="stat-label">原始记忆</span>
+                <span class="stat-label">{{ $t('pro.originalMemories') }}</span>
               </div>
               <div class="stat-item">
                 <span class="stat-value warn">{{ compressPreviewData.compressed_count }}</span>
-                <span class="stat-label">压缩后</span>
+                <span class="stat-label">{{ $t('pro.compressedResult') }}</span>
               </div>
               <div class="stat-item">
                 <span class="stat-value" :class="{ success: compressPreviewData.ratio > 0.5 }">{{ Math.round(compressPreviewData.ratio * 100) }}%</span>
-                <span class="stat-label">压缩率</span>
+                <span class="stat-label">{{ $t('pro.compressRatio') }}</span>
               </div>
             </div>
             <div v-if="compressPreviewData.details" class="compress-details">
@@ -249,15 +249,15 @@
           </div>
           <div class="auto-compress-setting">
             <div class="setting-item">
-              <span>自动压缩</span>
+              <span>{{ $t('pro.autoCompress') }}</span>
               <el-switch v-model="compressConfig.auto_enabled" @change="saveCompressConfig" />
             </div>
             <div class="setting-item" v-if="compressConfig.auto_enabled">
-              <span>触发阈值</span>
+              <span>{{ $t('pro.compressThreshold') }}</span>
               <el-select v-model="compressConfig.threshold" size="small" @change="saveCompressConfig" style="width: 140px">
-                <el-option label="500 条记忆" :value="500" />
-                <el-option label="1000 条记忆" :value="1000" />
-                <el-option label="2000 条记忆" :value="2000" />
+                <el-option :label="$t('pro.threshold500')" :value="500" />
+                <el-option :label="$t('pro.threshold1000')" :value="1000" />
+                <el-option :label="$t('pro.threshold2000')" :value="2000" />
               </el-select>
             </div>
           </div>
@@ -268,38 +268,38 @@
       <div class="pro-card" :class="{ 'section-highlight': activeSection === 'evolution' }" id="pro-evolution">
         <div class="card-header">
           <span class="card-icon">🧬</span>
-          <span class="card-title">智能进化</span>
+          <span class="card-title">{{ $t('pro.evolution') }}</span>
         </div>
         <div class="card-body">
-          <p class="card-desc">让记忆系统越用越聪明，自动发现关联与推理链</p>
+          <p class="card-desc">{{ $t('pro.evolutionDesc') }}</p>
           <div class="evolution-actions">
-            <el-button size="small" @click="loadEvolutionInsights" :loading="loading.insights">进化洞察</el-button>
-            <el-button size="small" @click="runDiscoverRelations" :loading="loading.discover">发现关联</el-button>
-            <el-button size="small" @click="runInferChains" :loading="loading.infer">推理链</el-button>
-            <el-button size="small" @click="runImportanceAdjust" :loading="loading.importance">重要性调整</el-button>
+            <el-button size="small" @click="loadEvolutionInsights" :loading="loading.insights">{{ $t('pro.evolutionInsights') }}</el-button>
+            <el-button size="small" @click="runDiscoverRelations" :loading="loading.discover">{{ $t('pro.discoverRelations') }}</el-button>
+            <el-button size="small" @click="runInferChains" :loading="loading.infer">{{ $t('pro.inferChains') }}</el-button>
+            <el-button size="small" @click="runImportanceAdjust" :loading="loading.importance">{{ $t('pro.importanceAdjust') }}</el-button>
           </div>
           <div v-if="evolutionInsights" class="evolution-insights">
             <div class="stats-row">
               <div class="stat-item">
                 <span class="stat-value">{{ evolutionInsights.total_memories }}</span>
-                <span class="stat-label">总记忆</span>
+                <span class="stat-label">{{ $t('pro.totalMemoriesLabel') }}</span>
               </div>
               <div class="stat-item">
                 <span class="stat-value success">{{ evolutionInsights.relations_count }}</span>
-                <span class="stat-label">关联数</span>
+                <span class="stat-label">{{ $t('pro.relationsCount') }}</span>
               </div>
               <div class="stat-item">
                 <span class="stat-value warn">{{ evolutionInsights.discovered_relations }}</span>
-                <span class="stat-label">新发现</span>
+                <span class="stat-label">{{ $t('pro.newDiscoveries') }}</span>
               </div>
               <div class="stat-item">
                 <span class="stat-value">{{ evolutionInsights.inferred_chains }}</span>
-                <span class="stat-label">推理链</span>
+                <span class="stat-label">{{ $t('pro.inferChainsLabel') }}</span>
               </div>
             </div>
           </div>
           <div v-if="discoverResult" class="discover-result">
-            <div class="sub-title">发现的关联 ({{ discoverResult.relations?.length || 0 }})</div>
+            <div class="sub-title">{{ $t('pro.discoveredRelations') }} ({{ discoverResult.relations?.length || 0 }})</div>
             <div class="discover-list">
               <div v-for="(r, i) in (discoverResult.relations || []).slice(0, 8)" :key="i" class="discover-item">
                 <span class="discover-source">{{ r.source }}</span>
@@ -312,7 +312,7 @@
             </div>
           </div>
           <div v-if="inferResult" class="infer-result">
-            <div class="sub-title">推理链 ({{ inferResult.chains?.length || 0 }})</div>
+            <div class="sub-title">{{ $t('pro.inferChainsTitle') }} ({{ inferResult.chains?.length || 0 }})</div>
             <div class="chain-list">
               <div v-for="(c, i) in (inferResult.chains || []).slice(0, 5)" :key="i" class="chain-item">
                 <div class="chain-nodes">
@@ -328,14 +328,14 @@
           </div>
           <div class="prefetch-section">
             <div class="setting-item">
-              <span>记忆预取</span>
+              <span>{{ $t('pro.memoryPrefetch') }}</span>
             </div>
             <div class="router-test">
-              <el-input v-model="prefetchContext" placeholder="输入上下文，预加载相关记忆" size="small" />
-              <el-button size="small" type="primary" @click="runPrefetch" :loading="loading.prefetch">预取</el-button>
+              <el-input v-model="prefetchContext" :placeholder="$t('pro.prefetchPlaceholder')" size="small" />
+              <el-button size="small" type="primary" @click="runPrefetch" :loading="loading.prefetch">{{ $t('pro.prefetch') }}</el-button>
             </div>
             <div v-if="prefetchResult" class="prefetch-result">
-              <span class="prefetch-count">匹配 {{ prefetchResult.matched_count }} 条记忆</span>
+              <span class="prefetch-count">{{ $t('pro.prefetchMatched', { count: prefetchResult.matched_count }) }}</span>
             </div>
           </div>
         </div>
@@ -542,7 +542,7 @@ async function applyCompress() {
   loading.value.compressApply = true
   try {
     const { data } = await proApi.compressApply(compressLevel.value)
-    ElMessage.success(`压缩完成: ${data.compressed_count} 条记忆已压缩，压缩率 ${Math.round(data.ratio * 100)}%`)
+    ElMessage.success(t('pro.compressDone', { count: data.compressed_count, ratio: Math.round(data.ratio * 100) }))
     compressPreviewData.value = null
   } catch (e: any) {
     ElMessage.error(e.response?.data?.detail || t('common.failed'))
@@ -573,7 +573,7 @@ async function runDiscoverRelations() {
   try {
     const { data } = await proApi.discoverRelations()
     discoverResult.value = data
-    ElMessage.success(`发现 ${data.relations?.length || 0} 条新关联`)
+    ElMessage.success(t('pro.discoveredCount', { count: data.relations?.length || 0 }))
   } catch (e: any) {
     ElMessage.error(e.response?.data?.detail || t('common.failed'))
   } finally { loading.value.discover = false }
@@ -584,7 +584,7 @@ async function runInferChains() {
   try {
     const { data } = await proApi.inferChains()
     inferResult.value = data
-    ElMessage.success(`推理出 ${data.chains?.length || 0} 条推理链`)
+    ElMessage.success(t('pro.inferredCount', { count: data.chains?.length || 0 }))
   } catch (e: any) {
     ElMessage.error(e.response?.data?.detail || t('common.failed'))
   } finally { loading.value.infer = false }
@@ -594,7 +594,7 @@ async function runImportanceAdjust() {
   loading.value.importance = true
   try {
     const { data } = await proApi.getImportanceAdjustments()
-    ElMessage.success(`已调整 ${data.adjusted_count || 0} 条记忆的重要性`)
+    ElMessage.success(t('pro.adjustedCount', { count: data.adjusted_count || 0 }))
   } catch (e: any) {
     ElMessage.error(e.response?.data?.detail || t('common.failed'))
   } finally { loading.value.importance = false }
