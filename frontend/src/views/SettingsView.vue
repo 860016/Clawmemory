@@ -153,6 +153,54 @@
         </div>
       </div>
 
+      <!-- 记忆健康度 -->
+      <div class="settings-card">
+        <div class="card-title">💊 {{ $t('settings.memoryHealth') }}</div>
+        <div v-if="healthScore" class="health-display">
+          <div class="health-score" :class="healthGrade">{{ healthScore.overall_score }}</div>
+          <div class="health-grade">{{ healthScore.grade }}</div>
+          <div class="health-dimensions">
+            <div class="dim-item" v-for="(dim, key) in healthScore.dimensions" :key="key">
+              <span class="dim-label">{{ dim.label }}</span>
+              <div class="dim-bar"><div class="dim-fill" :style="{ width: dim.score + '%' }"></div></div>
+              <span class="dim-value">{{ dim.score }}</span>
+            </div>
+          </div>
+          <div class="health-suggestions" v-if="healthScore.suggestions?.length">
+            <div class="suggestion" v-for="(s, i) in healthScore.suggestions" :key="i">{{ s }}</div>
+          </div>
+        </div>
+        <div v-else class="setting-item">
+          <span>{{ $t('settings.clickToCheck') }}</span>
+          <el-button size="small" type="primary" @click="checkHealth" :loading="healthLoading">{{ $t('settings.checkHealth') }}</el-button>
+        </div>
+      </div>
+
+      <!-- 记忆去重 -->
+      <div class="settings-card">
+        <div class="card-title">🔍 {{ $t('settings.memoryDedup') }}</div>
+        <div v-if="dedupResult" class="dedup-display">
+          <div class="dedup-stats">
+            <span>{{ $t('settings.totalMemories') }}: {{ dedupResult.total_memories }}</span>
+            <span>{{ $t('settings.duplicates') }}: {{ dedupResult.total_duplicates }}</span>
+            <span>{{ $t('settings.dedupRate') }}: {{ Math.round((dedupResult.dedup_rate || 0) * 100) }}%</span>
+          </div>
+          <div class="dedup-groups" v-if="dedupResult.duplicate_groups?.length">
+            <div class="dedup-group" v-for="(g, i) in dedupResult.duplicate_groups" :key="i">
+              <div class="dedup-group-header">{{ g.key }} ({{ $t('settings.similarity') }}: {{ Math.round(g.similarity * 100) }}%)</div>
+              <div class="dedup-item" v-for="m in g.memories" :key="m.id">
+                <span class="dedup-id">#{{ m.id }}</span>
+                <span class="dedup-value">{{ m.value }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="setting-item">
+          <span>{{ $t('settings.scanDuplicates') }}</span>
+          <el-button size="small" type="primary" @click="scanDedup" :loading="dedupLoading">{{ $t('settings.scan') }}</el-button>
+        </div>
+      </div>
+
       <!-- 系统信息 -->
       <div class="settings-card" :class="{ 'section-highlight': activeSection === 'system' }" id="settings-system">
         <div class="card-title">◇ {{ $t('settings.system') }}</div>
@@ -185,7 +233,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -212,6 +260,19 @@ const decayEnabled = ref(false)
 const decayLoading = ref(false)
 const decayStats = ref<any>(null)
 const decayInfo = ref<any>(null)
+
+const healthScore = ref<any>(null)
+const healthLoading = ref(false)
+const healthGrade = computed(() => {
+  if (!healthScore.value) return ''
+  const s = healthScore.value.overall_score
+  if (s >= 80) return 'grade-a'
+  if (s >= 60) return 'grade-b'
+  return 'grade-c'
+})
+
+const dedupResult = ref<any>(null)
+const dedupLoading = ref(false)
 
 const featureLabels: Record<string, string> = {
   ai_extract: t('settings.featAiExtract'),
@@ -277,8 +338,9 @@ async function loadInstallStatus() {
 async function exportData() {
   exporting.value = true
   try {
-    const { data } = await axios.get('/data/export', { responseType: 'blob' })
-    const url = URL.createObjectURL(data)
+    const { data } = await axios.get('/data/export')
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url; a.download = `clawmemory-export-${new Date().toISOString().split('T')[0]}.json`; a.click()
     URL.revokeObjectURL(url)
@@ -288,16 +350,17 @@ async function exportData() {
 }
 
 async function importData(file: File) {
-  const formData = new FormData(); formData.append('file', file)
-  exporting.value = true
-  try {
-    await axios.post('/data/import', formData)
-    ElMessage.success(t('settings.importSuccess'))
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('settings.importFailed'))
-  } finally {
-    exporting.value = false
+  const reader = new FileReader()
+  reader.onload = async (e) => {
+    try {
+      const jsonData = JSON.parse(e.target?.result as string)
+      await axios.post('/data/import', jsonData)
+      ElMessage.success(t('settings.importSuccess'))
+    } catch (e: any) {
+      ElMessage.error(e.response?.data?.error || t('settings.importFailed'))
+    }
   }
+  reader.readAsText(file)
   return false
 }
 
@@ -365,7 +428,7 @@ async function loadDecayStats() {
 async function updateDecaySettings() {
   decayLoading.value = true
   try {
-    await axios.post('/memories/decay/settings', null, { params: { enabled: decayEnabled.value } })
+    await axios.put('/memories/decay/settings', { enabled: decayEnabled.value })
     ElMessage.success(decayEnabled.value ? t('settings.decayEnabled') : t('settings.decayDisabled'))
   } catch {
     ElMessage.error(t('common.failed'))
@@ -385,6 +448,35 @@ async function emptyTrash() {
     ElMessage.success(t('settings.trashEmptied'))
     await loadDecayStats()
   } catch {}
+}
+
+async function checkHealth() {
+  healthLoading.value = true
+  try {
+    const { data } = await axios.get('/memories/health')
+    healthScore.value = data
+  } catch {
+    ElMessage.error(t('common.failed'))
+  } finally {
+    healthLoading.value = false
+  }
+}
+
+async function scanDedup() {
+  dedupLoading.value = true
+  try {
+    const { data } = await axios.get('/memories/dedup/scan')
+    dedupResult.value = data
+    if (data.total_duplicates > 0) {
+      ElMessage.warning(t('settings.foundDuplicates', { count: data.total_duplicates }))
+    } else {
+      ElMessage.success(t('settings.noDuplicates'))
+    }
+  } catch {
+    ElMessage.error(t('common.failed'))
+  } finally {
+    dedupLoading.value = false
+  }
 }
 </script>
 
@@ -526,4 +618,26 @@ async function emptyTrash() {
 .stats-value.warning { color: #ffc107; }
 .stats-value.danger { color: #e91e63; }
 .decay-actions { margin-top: 12px; display: flex; gap: 8px; }
+.health-display { text-align: center; }
+.health-score { font-size: 48px; font-weight: 700; margin: 8px 0; }
+.health-score.grade-a { color: #10B981; }
+.health-score.grade-b { color: #F59E0B; }
+.health-score.grade-c { color: #EF4444; }
+.health-grade { font-size: 18px; font-weight: 600; color: var(--cm-text-muted); margin-bottom: 12px; }
+.health-dimensions { text-align: left; }
+.dim-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.dim-label { font-size: 12px; color: var(--cm-text-muted); width: 60px; }
+.dim-bar { flex: 1; height: 6px; background: var(--cm-border); border-radius: 3px; overflow: hidden; }
+.dim-fill { height: 100%; background: #10B981; border-radius: 3px; transition: width 0.5s; }
+.dim-value { font-size: 12px; color: var(--cm-text); width: 36px; text-align: right; }
+.health-suggestions { margin-top: 12px; text-align: left; }
+.suggestion { font-size: 12px; color: var(--cm-text-muted); padding: 4px 0; border-top: 1px solid var(--cm-border); }
+.dedup-display { margin-bottom: 12px; }
+.dedup-stats { display: flex; gap: 16px; font-size: 13px; color: var(--cm-text); margin-bottom: 8px; }
+.dedup-groups { max-height: 200px; overflow-y: auto; }
+.dedup-group { margin-bottom: 8px; }
+.dedup-group-header { font-size: 13px; font-weight: 600; color: var(--cm-text); margin-bottom: 4px; }
+.dedup-item { display: flex; gap: 8px; font-size: 12px; padding: 2px 0; }
+.dedup-id { color: var(--cm-text-muted); }
+.dedup-value { color: var(--cm-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
 </style>
