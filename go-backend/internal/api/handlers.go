@@ -1090,39 +1090,60 @@ func handleScanOpenClawMemories(c *gin.Context) {
 	}
 
 	for _, dir := range openclawDirs {
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			continue
+		}
+
+		agents := make([]map[string]interface{}, 0)
+		agentCountMap := make(map[string]int)
+		totalMemories := 0
+
 		memFile := filepath.Join(dir, "memories.json")
-		if _, err := os.Stat(memFile); err == nil {
-			content, err := os.ReadFile(memFile)
-			if err != nil {
-				continue
-			}
+		if data, err := os.ReadFile(memFile); err == nil {
 			var memories []map[string]interface{}
-			if json.Unmarshal(content, &memories) == nil {
-				agents := make([]map[string]interface{}, 0)
-				agentMap := make(map[string]bool)
+			if json.Unmarshal(data, &memories) == nil {
+				totalMemories += len(memories)
 				for _, m := range memories {
-					if agent, ok := m["agent_name"].(string); ok && agent != "" && !agentMap[agent] {
-						agentMap[agent] = true
-						agents = append(agents, map[string]interface{}{
-							"name":        agent,
-							"memory_count": 1,
-						})
-					} else if ok && agentMap[agent] {
-						for _, a := range agents {
-							if a["name"] == agent {
-								a["memory_count"] = a["memory_count"].(int) + 1
-							}
-						}
+					agent := "default"
+					if a, ok := m["agent_name"].(string); ok && a != "" {
+						agent = a
+					}
+					agentCountMap[agent]++
+				}
+			}
+		}
+
+		entries, err := os.ReadDir(dir)
+		if err == nil {
+			for _, entry := range entries {
+				if !entry.IsDir() {
+					continue
+				}
+				agentMemFile := filepath.Join(dir, entry.Name(), "memories.json")
+				if data, err := os.ReadFile(agentMemFile); err == nil {
+					var memories []map[string]interface{}
+					if json.Unmarshal(data, &memories) == nil {
+						totalMemories += len(memories)
+						agentCountMap[entry.Name()] += len(memories)
 					}
 				}
-				c.JSON(http.StatusOK, gin.H{
-					"found":         true,
-					"openclaw_dir":  dir,
-					"agents":        agents,
-					"total_memories": len(memories),
-				})
-				return
 			}
+		}
+
+		if totalMemories > 0 {
+			for name, count := range agentCountMap {
+				agents = append(agents, map[string]interface{}{
+					"name":         name,
+					"memory_count": count,
+				})
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"found":         true,
+				"openclaw_dir":  dir,
+				"agents":        agents,
+				"total_memories": totalMemories,
+			})
+			return
 		}
 	}
 

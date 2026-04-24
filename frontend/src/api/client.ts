@@ -28,9 +28,14 @@ api.interceptors.response.use(
     } else if (status === 405) {
       ElMessage.error('请求方法不允许')
     } else {
-      const msg = error.response?.data?.detail || error.response?.data?.message || 'Request failed'
-      if (typeof msg === 'string' && !msg.includes('rate limit')) {
-        ElMessage.error(msg)
+      let msg = error.response?.data?.detail || error.response?.data?.message || 'Request failed'
+      if (typeof msg === 'string') {
+        if (msg.includes('non-JSON response') || msg.includes('<html') || msg.includes('Pro server')) {
+          msg = 'Pro 功能暂不可用，授权服务器未就绪'
+        }
+        if (!msg.includes('rate limit')) {
+          ElMessage.error(msg)
+        }
       }
     }
     return Promise.reject(error)
