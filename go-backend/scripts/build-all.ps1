@@ -78,23 +78,6 @@ Build-Target -Os "linux" -Arch "386" -OutputName "clawmemory-linux-386"
 Build-Target -Os "darwin" -Arch "amd64" -OutputName "clawmemory-darwin-amd64"
 Build-Target -Os "darwin" -Arch "arm64" -OutputName "clawmemory-darwin-arm64"
 
-# ========== Pro 版 ==========
-Write-Host ""
-Write-Host "📦 编译 Pro 版..." -ForegroundColor Magenta
-
-# Windows
-Build-Target -Os "windows" -Arch "amd64" -OutputName "clawmemory-pro-windows-amd64.exe" -Tags "pro"
-Build-Target -Os "windows" -Arch "arm64" -OutputName "clawmemory-pro-windows-arm64.exe" -Tags "pro"
-
-# Linux
-Build-Target -Os "linux" -Arch "amd64" -OutputName "clawmemory-pro-linux-amd64" -Tags "pro"
-Build-Target -Os "linux" -Arch "arm64" -OutputName "clawmemory-pro-linux-arm64" -Tags "pro"
-Build-Target -Os "linux" -Arch "386" -OutputName "clawmemory-pro-linux-386" -Tags "pro"
-
-# macOS
-Build-Target -Os "darwin" -Arch "amd64" -OutputName "clawmemory-pro-darwin-amd64" -Tags "pro"
-Build-Target -Os "darwin" -Arch "arm64" -OutputName "clawmemory-pro-darwin-arm64" -Tags "pro"
-
 # ========== 生成校验和 ==========
 Write-Host ""
 Write-Host "🔐 生成校验和..." -ForegroundColor Yellow
@@ -119,13 +102,12 @@ ClawMemory v${Version}
 - macOS 11+ (Intel/Apple Silicon)
 
 ## 文件说明
-- clawmemory-*: 开源版（免费）
-- clawmemory-pro-*: Pro 版（需授权）
+- clawmemory-*: 开源版（免费），Pro 功能通过授权激活使用
 
 ## 快速开始
 1. 下载对应平台的文件
 2. 直接运行（无需安装）
-3. 打开浏览器访问 http://localhost:8000
+3. 打开浏览器访问 http://localhost:8765
 
 ## 校验
 Get-FileHash -Algorithm SHA256 <文件名>

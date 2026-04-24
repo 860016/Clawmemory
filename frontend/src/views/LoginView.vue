@@ -112,7 +112,8 @@ onMounted(async () => {
   try {
     const { data } = await axios.get('/auth/init-status')
     passwordSet.value = data.password_set
-  } catch {
+  } catch (e) {
+    console.error('Failed to check init status:', e)
     passwordSet.value = false
   }
   // Auto-fill reset token from URL
@@ -145,10 +146,29 @@ async function handleSetPassword() {
   loading.value = true
   try {
     const { data } = await axios.post('/auth/set-password', { password: password.value })
-    localStorage.setItem('token', data.access_token)
-    router.push('/')
+    if (data.access_token) {
+      localStorage.setItem('token', data.access_token)
+      passwordSet.value = true
+      router.push('/')
+    } else {
+      ElMessage.error(t('common.failed'))
+    }
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    const detail = e.response?.data?.detail || ''
+    console.error('Set password error:', detail, e.response?.status)
+    if (detail === 'password already set') {
+      try {
+        const { data: loginData } = await axios.post('/auth/login', { password: password.value })
+        localStorage.setItem('token', loginData.access_token)
+        passwordSet.value = true
+        router.push('/')
+        return
+      } catch (loginErr: any) {
+        ElMessage.error(loginErr.response?.data?.detail || t('login.wrongPassword'))
+      }
+    } else {
+      ElMessage.error(detail || t('common.failed'))
+    }
   } finally {
     loading.value = false
   }

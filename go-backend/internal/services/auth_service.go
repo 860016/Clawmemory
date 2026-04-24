@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"clawmemory/internal/models"
@@ -31,13 +32,24 @@ func (s *AuthService) IsPasswordSet() bool {
 	return count > 0
 }
 
+func (s *AuthService) CheckInitStatus() (bool, error) {
+	var count int64
+	if err := s.db.Model(&models.User{}).Count(&count).Error; err != nil {
+		log.Printf("CheckInitStatus: database error: %v", err)
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (s *AuthService) SetPassword(password string) (string, error) {
 	if s.IsPasswordSet() {
+		log.Println("SetPassword: password already set")
 		return "", errors.New("password already set")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
+		log.Printf("SetPassword: failed to hash password: %v", err)
 		return "", err
 	}
 
@@ -47,9 +59,11 @@ func (s *AuthService) SetPassword(password string) (string, error) {
 	}
 
 	if err := s.db.Create(user).Error; err != nil {
+		log.Printf("SetPassword: failed to create user: %v", err)
 		return "", err
 	}
 
+	log.Printf("SetPassword: user created successfully, ID=%d", user.ID)
 	return s.generateToken(user.ID)
 }
 

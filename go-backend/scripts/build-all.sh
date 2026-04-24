@@ -60,23 +60,6 @@ build_target "linux" "386" "clawmemory-linux-386" ""
 build_target "darwin" "amd64" "clawmemory-darwin-amd64" ""
 build_target "darwin" "arm64" "clawmemory-darwin-arm64" ""
 
-# ========== Pro 版 ==========
-echo ""
-echo "📦 编译 Pro 版..."
-
-# Windows
-build_target "windows" "amd64" "clawmemory-pro-windows-amd64.exe" "pro"
-build_target "windows" "arm64" "clawmemory-pro-windows-arm64.exe" "pro"
-
-# Linux
-build_target "linux" "amd64" "clawmemory-pro-linux-amd64" "pro"
-build_target "linux" "arm64" "clawmemory-pro-linux-arm64" "pro"
-build_target "linux" "386" "clawmemory-pro-linux-386" "pro"
-
-# macOS
-build_target "darwin" "amd64" "clawmemory-pro-darwin-amd64" "pro"
-build_target "darwin" "arm64" "clawmemory-pro-darwin-arm64" "pro"
-
 # ========== 生成校验和 ==========
 echo ""
 echo "🔐 生成校验和..."
@@ -97,13 +80,12 @@ ClawMemory v${VERSION}
 - macOS 11+ (Intel/Apple Silicon)
 
 ## 文件说明
-- clawmemory-*: 开源版（免费）
-- clawmemory-pro-*: Pro 版（需授权）
+- clawmemory-*: 开源版（免费），Pro 功能通过授权激活使用
 
 ## 快速开始
 1. 下载对应平台的文件
 2. 直接运行（无需安装）
-3. 打开浏览器访问 http://localhost:8000
+3. 打开浏览器访问 http://localhost:8765
 
 ## 校验
 sha256sum -c checksums.txt

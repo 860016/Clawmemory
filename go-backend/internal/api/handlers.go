@@ -13,8 +13,13 @@ import (
 
 func handleInitStatus(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		passwordSet, err := authService.CheckInitStatus()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"detail": "failed to check init status"})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{
-			"password_set": authService.IsPasswordSet(),
+			"password_set": passwordSet,
 		})
 	}
 }
