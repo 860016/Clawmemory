@@ -11,6 +11,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const DefaultUsername = "admin"
+
 type AuthService struct {
 	db        *gorm.DB
 	jwtSecret []byte
@@ -23,14 +25,53 @@ func NewAuthService(db *gorm.DB, jwtSecret string) *AuthService {
 	}
 }
 
+func (s *AuthService) IsPasswordSet() bool {
+	var count int64
+	s.db.Model(&models.User{}).Count(&count)
+	return count > 0
+}
+
+func (s *AuthService) SetPassword(password string) (string, error) {
+	if s.IsPasswordSet() {
+		return "", errors.New("password already set")
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+
+	user := &models.User{
+		Username: DefaultUsername,
+		Password: string(hashedPassword),
+	}
+
+	if err := s.db.Create(user).Error; err != nil {
+		return "", err
+	}
+
+	return s.generateToken(user.ID)
+}
+
+func (s *AuthService) LoginWithPassword(password string) (string, error) {
+	var user models.User
+	if err := s.db.Where("username = ?", DefaultUsername).First(&user).Error; err != nil {
+		return "", errors.New("invalid credentials")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		return "", errors.New("invalid credentials")
+	}
+
+	return s.generateToken(user.ID)
+}
+
 func (s *AuthService) Register(username, password string) (*models.User, error) {
-	// 检查用户是否已存在
 	var existing models.User
 	if err := s.db.Where("username = ?", username).First(&existing).Error; err == nil {
 		return nil, errors.New("username already exists")
 	}
 
-	// 加密密码
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -58,18 +99,7 @@ func (s *AuthService) Login(username, password string) (string, error) {
 		return "", errors.New("invalid credentials")
 	}
 
-	// 生成 JWT
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": user.ID,
-		"exp":     time.Now().Add(time.Hour * 24 * 7).Unix(),
-	})
-
-	tokenString, err := token.SignedString(s.jwtSecret)
-	if err != nil {
-		return "", err
-	}
-
-	return tokenString, nil
+	return s.generateToken(user.ID)
 }
 
 func (s *AuthService) ChangePassword(userID uint, oldPassword, newPassword string) error {
@@ -88,4 +118,18 @@ func (s *AuthService) ChangePassword(userID uint, oldPassword, newPassword strin
 	}
 
 	return s.db.Model(&user).Update("password", string(hashedPassword)).Error
+}
+
+func (s *AuthService) generateToken(userID uint) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": userID,
+		"exp":     time.Now().Add(time.Hour * 24 * 7).Unix(),
+	})
+
+	tokenString, err := token.SignedString(s.jwtSecret)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
 }

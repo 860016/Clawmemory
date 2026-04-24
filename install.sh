@@ -86,6 +86,7 @@ echo "[4/5] 配置环境变量..."
 if [ ! -f "$INSTALL_DIR/go-backend/.env" ]; then
     SECRET_KEY=$(openssl rand -hex 32 2>/dev/null || cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     cat > "$INSTALL_DIR/go-backend/.env" << EOF
+HOST=0.0.0.0
 SECRET_KEY=$SECRET_KEY
 PORT=$PORT
 DATA_DIR=$INSTALL_DIR/data

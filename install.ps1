@@ -86,6 +86,7 @@ Write-Host "[4/5] 配置环境变量..." -ForegroundColor Yellow
 if (-not (Test-Path "$InstallDir\go-backend\.env")) {
     $secretKey = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 32 | ForEach-Object { [char]$_ })
     @"
+HOST=0.0.0.0
 SECRET_KEY=$secretKey
 PORT=$Port
 DATA_DIR=$InstallDir\data

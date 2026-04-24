@@ -12,26 +12,25 @@ import (
 func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	cfg := config.Load()
 
-	// 初始化服务
 	authService := services.NewAuthService(db, cfg.JWTSecret)
 	licenseManager := services.NewLicenseManager(db, cfg)
+	proProxy := services.NewProProxy(db, cfg)
 
-	// 公开路由
 	public := r.Group("/api/v1")
 	{
-		public.POST("/auth/register", handleRegister(authService))
+		public.GET("/auth/init-status", handleInitStatus(authService))
+		public.POST("/auth/set-password", handleSetPassword(authService))
 		public.POST("/auth/login", handleLogin(authService))
+		public.POST("/auth/register", handleRegister(authService))
 		public.POST("/auth/reset-password", handleResetPassword(authService))
 		public.GET("/license/info", handleLicenseInfo(licenseManager))
 		public.POST("/license/activate", handleLicenseActivate(licenseManager))
 		public.POST("/license/deactivate", handleLicenseDeactivate(licenseManager))
 	}
 
-	// 需要认证的路由
 	authorized := r.Group("/api/v1")
 	authorized.Use(middleware.Auth(cfg))
 	{
-		// 记忆管理
 		authorized.GET("/memories", handleListMemories(db))
 		authorized.POST("/memories", handleCreateMemory(db))
 		authorized.GET("/memories/:id", handleGetMemory(db))
@@ -41,31 +40,52 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.GET("/memories/search/keyword", handleSearchKeyword(db))
 		authorized.GET("/memories/search/semantic", handleSearchSemantic(db))
 
-		// 知识图谱
 		authorized.GET("/knowledge/entities", handleListEntities(db))
 		authorized.POST("/knowledge/entities", handleCreateEntity(db))
 		authorized.GET("/knowledge/relations", handleListRelations(db))
 		authorized.POST("/knowledge/relations", handleCreateRelation(db))
 		authorized.GET("/knowledge/graph", handleGetGraph(db))
 
-		// Wiki
 		authorized.GET("/wiki", handleListWiki(db))
 		authorized.POST("/wiki", handleCreateWiki(db))
 		authorized.GET("/wiki/:id", handleGetWiki(db))
 		authorized.PUT("/wiki/:id", handleUpdateWiki(db))
 		authorized.DELETE("/wiki/:id", handleDeleteWiki(db))
 
-		// 日报
 		authorized.GET("/reports", handleListReports(db))
 		authorized.POST("/reports", handleCreateReport(db))
 		authorized.GET("/reports/:date", handleGetReportByDate(db))
 
-		// 统计
 		authorized.GET("/stats", handleGetStats(db))
-		authorized.GET("/stats/decay", handleGetDecayStats(db, licenseManager))
 
-		// 设置
 		authorized.GET("/settings", handleGetSettings())
 		authorized.PUT("/settings", handleUpdateSettings())
+
+		pro := authorized.Group("/pro")
+		{
+			pro.GET("/decay/stats", handleProDecayStats(proProxy, db))
+			pro.POST("/decay/apply", handleProDecayApply(proProxy, db))
+			pro.POST("/reinforce/:id", handleProReinforce(proProxy, db))
+			pro.GET("/prune-suggest", handleProPruneSuggest(proProxy, db))
+			pro.GET("/conflicts/scan", handleProConflictScan(proProxy, db))
+			pro.POST("/conflicts/resolve/:index", handleProConflictResolve(proProxy))
+			pro.POST("/token/route", handleProTokenRoute(proProxy))
+			pro.GET("/token/stats", handleProTokenStats(proProxy))
+			pro.POST("/ai/extract", handleProAIExtract(proProxy, db))
+			pro.POST("/auto-graph", handleProAutoGraph(proProxy))
+			pro.GET("/backup/schedule", handleProBackupSchedule(proProxy))
+			pro.POST("/backup/schedule", handleProSetBackupSchedule(proProxy))
+
+			pro.POST("/compress/preview", handleProCompressPreview(proProxy, db))
+			pro.POST("/compress/apply", handleProCompressApply(proProxy, db))
+			pro.GET("/compress/config", handleProCompressConfig(proProxy))
+			pro.PUT("/compress/config", handleProSetCompressConfig(proProxy))
+
+			pro.GET("/evolution/insights", handleProEvolutionInsights(proProxy))
+			pro.POST("/evolution/discover", handleProEvolutionDiscover(proProxy, db))
+			pro.POST("/evolution/infer", handleProEvolutionInfer(proProxy))
+			pro.POST("/evolution/importance", handleProEvolutionImportance(proProxy, db))
+			pro.POST("/evolution/prefetch", handleProEvolutionPrefetch(proProxy))
+		}
 	}
 }

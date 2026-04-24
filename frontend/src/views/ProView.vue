@@ -196,25 +196,151 @@
         </div>
       </div>
 
-      <!-- Download Pro Module -->
-      <div class="pro-card">
+      <!-- Memory Compression -->
+      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'compress' }" id="pro-compress">
         <div class="card-header">
-          <span class="card-icon">📦</span>
-          <span class="card-title">{{ $t('settings.downloadProModule') }}</span>
+          <span class="card-icon">🗜️</span>
+          <span class="card-title">记忆压缩</span>
         </div>
         <div class="card-body">
-          <p class="card-desc">{{ $t('settings.downloadProModuleDesc') }}</p>
-          <div class="card-actions">
-            <el-button size="small" type="primary" @click="downloadProModule" :loading="proDownloading">
-              {{ proDownloadStatus || $t('settings.downloadBtn') }}
-            </el-button>
+          <p class="card-desc">压缩记忆库，减少 Token 占用，保留核心信息</p>
+          <div class="compress-levels">
+            <div class="level-option" :class="{ active: compressLevel === 'light' }" @click="compressLevel = 'light'">
+              <div class="level-name">轻度</div>
+              <div class="level-rate">~20-30%</div>
+              <div class="level-desc">去重·截断·去噪</div>
+            </div>
+            <div class="level-option" :class="{ active: compressLevel === 'medium' }" @click="compressLevel = 'medium'">
+              <div class="level-name">中度</div>
+              <div class="level-rate">~50-60%</div>
+              <div class="level-desc">摘要·合并·标签化</div>
+            </div>
+            <div class="level-option" :class="{ active: compressLevel === 'deep' }" @click="compressLevel = 'deep'">
+              <div class="level-name">深度</div>
+              <div class="level-rate">~70-80%</div>
+              <div class="level-desc">聚类·图谱化·归档</div>
+            </div>
           </div>
-          <div v-if="proInstallProgress > 0" class="progress-bar">
-            <div class="progress-fill" :style="{ width: proInstallProgress + '%' }"></div>
-            <span class="progress-text">{{ proInstallProgress }}%</span>
+          <div class="card-actions">
+            <el-button size="small" @click="previewCompress" :loading="loading.compressPreview">预览压缩</el-button>
+            <el-button size="small" type="primary" @click="applyCompress" :loading="loading.compressApply">执行压缩</el-button>
+          </div>
+          <div v-if="compressPreviewData" class="compress-result">
+            <div class="stats-row">
+              <div class="stat-item">
+                <span class="stat-value">{{ compressPreviewData.original_count }}</span>
+                <span class="stat-label">原始记忆</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value warn">{{ compressPreviewData.compressed_count }}</span>
+                <span class="stat-label">压缩后</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" :class="{ success: compressPreviewData.ratio > 0.5 }">{{ Math.round(compressPreviewData.ratio * 100) }}%</span>
+                <span class="stat-label">压缩率</span>
+              </div>
+            </div>
+            <div v-if="compressPreviewData.details" class="compress-details">
+              <div v-for="(d, i) in compressPreviewData.details.slice(0, 5)" :key="i" class="compress-detail-item">
+                <span class="detail-action">{{ d.action }}</span>
+                <span class="detail-target">{{ d.target }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="auto-compress-setting">
+            <div class="setting-item">
+              <span>自动压缩</span>
+              <el-switch v-model="compressConfig.auto_enabled" @change="saveCompressConfig" />
+            </div>
+            <div class="setting-item" v-if="compressConfig.auto_enabled">
+              <span>触发阈值</span>
+              <el-select v-model="compressConfig.threshold" size="small" @change="saveCompressConfig" style="width: 140px">
+                <el-option label="500 条记忆" :value="500" />
+                <el-option label="1000 条记忆" :value="1000" />
+                <el-option label="2000 条记忆" :value="2000" />
+              </el-select>
+            </div>
           </div>
         </div>
       </div>
+
+      <!-- Evolution Engine -->
+      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'evolution' }" id="pro-evolution">
+        <div class="card-header">
+          <span class="card-icon">🧬</span>
+          <span class="card-title">智能进化</span>
+        </div>
+        <div class="card-body">
+          <p class="card-desc">让记忆系统越用越聪明，自动发现关联与推理链</p>
+          <div class="evolution-actions">
+            <el-button size="small" @click="loadEvolutionInsights" :loading="loading.insights">进化洞察</el-button>
+            <el-button size="small" @click="runDiscoverRelations" :loading="loading.discover">发现关联</el-button>
+            <el-button size="small" @click="runInferChains" :loading="loading.infer">推理链</el-button>
+            <el-button size="small" @click="runImportanceAdjust" :loading="loading.importance">重要性调整</el-button>
+          </div>
+          <div v-if="evolutionInsights" class="evolution-insights">
+            <div class="stats-row">
+              <div class="stat-item">
+                <span class="stat-value">{{ evolutionInsights.total_memories }}</span>
+                <span class="stat-label">总记忆</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value success">{{ evolutionInsights.relations_count }}</span>
+                <span class="stat-label">关联数</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value warn">{{ evolutionInsights.discovered_relations }}</span>
+                <span class="stat-label">新发现</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ evolutionInsights.inferred_chains }}</span>
+                <span class="stat-label">推理链</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="discoverResult" class="discover-result">
+            <div class="sub-title">发现的关联 ({{ discoverResult.relations?.length || 0 }})</div>
+            <div class="discover-list">
+              <div v-for="(r, i) in (discoverResult.relations || []).slice(0, 8)" :key="i" class="discover-item">
+                <span class="discover-source">{{ r.source }}</span>
+                <span class="discover-arrow">→</span>
+                <span class="discover-type">{{ r.type }}</span>
+                <span class="discover-arrow">→</span>
+                <span class="discover-target">{{ r.target }}</span>
+                <el-tag size="small" type="info">{{ Math.round(r.confidence * 100) }}%</el-tag>
+              </div>
+            </div>
+          </div>
+          <div v-if="inferResult" class="infer-result">
+            <div class="sub-title">推理链 ({{ inferResult.chains?.length || 0 }})</div>
+            <div class="chain-list">
+              <div v-for="(c, i) in (inferResult.chains || []).slice(0, 5)" :key="i" class="chain-item">
+                <div class="chain-nodes">
+                  <span v-for="(n, j) in c.nodes" :key="j" class="chain-node">
+                    {{ n }}<span v-if="j < c.nodes.length - 1" class="chain-arrow"> → </span>
+                  </span>
+                </div>
+                <div class="chain-conclusion">
+                  ∴ {{ c.conclusion }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="prefetch-section">
+            <div class="setting-item">
+              <span>记忆预取</span>
+            </div>
+            <div class="router-test">
+              <el-input v-model="prefetchContext" placeholder="输入上下文，预加载相关记忆" size="small" />
+              <el-button size="small" type="primary" @click="runPrefetch" :loading="loading.prefetch">预取</el-button>
+            </div>
+            <div v-if="prefetchResult" class="prefetch-result">
+              <span class="prefetch-count">匹配 {{ prefetchResult.matched_count }} 条记忆</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- Not Pro -->
@@ -242,32 +368,31 @@ const isPro = ref(false)
 const loading = ref<Record<string, boolean>>({})
 const activeSection = ref((route.query.section as string) || '')
 
-// Decay
 const decayStats = ref<any>(null)
 const pruneSuggestions = ref<any[]>([])
 
-// Conflicts
 const conflicts = ref<any[]>([])
 const conflictSummary = ref<any>(null)
 
-// Token
 const tokenStatData = ref<any>(null)
 const testMessage = ref('')
 const routeResult = ref<any>(null)
 
-// Extract
 const extractResult = ref<any>(null)
 
-// Graph
 const graphResult = ref<any>(null)
 
-// Backup
 const backupSchedule = ref({ enabled: false, interval_hours: 24 })
 
-// Pro module download
-const proDownloading = ref(false)
-const proDownloadStatus = ref('')
-const proInstallProgress = ref(0)
+const compressLevel = ref<'light' | 'medium' | 'deep'>('light')
+const compressPreviewData = ref<any>(null)
+const compressConfig = ref<any>({ auto_enabled: false, threshold: 1000, level: 'light' })
+
+const evolutionInsights = ref<any>(null)
+const discoverResult = ref<any>(null)
+const inferResult = ref<any>(null)
+const prefetchContext = ref('')
+const prefetchResult = ref<any>(null)
 
 onMounted(async () => {
   try {
@@ -403,50 +528,87 @@ async function saveBackupSchedule() {
   }
 }
 
-async function downloadProModule() {
-  proDownloading.value = true
-  proDownloadStatus.value = t('settings.fetchingUrl')
-  proInstallProgress.value = 0
-  
+async function previewCompress() {
+  loading.value.compressPreview = true
   try {
-    const { data: licenseInfo } = await axios.get('/license/info')
-    
-    if (!licenseInfo.pro_download_url) {
-      ElMessage.error(t('settings.noDownloadUrl'))
-      proDownloadStatus.value = ''
-      return
-    }
-
-    proDownloadStatus.value = t('settings.downloading')
-    const fallbackParam = (licenseInfo.pro_fallback_urls || []).length > 0 
-      ? licenseInfo.pro_fallback_urls.join(',') 
-      : ''
-    
-    const { data } = await axios.post('/license/pro/install', null, {
-      params: { url: licenseInfo.pro_download_url, fallback_urls: fallbackParam },
-      timeout: 120000,
-      onDownloadProgress: (e) => {
-        if (e.total) {
-          proInstallProgress.value = Math.round((e.loaded / e.total) * 100)
-        }
-      }
-    })
-    
-    if (data.success) {
-      ElMessage.success(t('settings.installSuccess'))
-      proDownloadStatus.value = t('settings.installComplete')
-    } else {
-      ElMessage.error(data.message || t('settings.installFailed'))
-      proDownloadStatus.value = t('settings.installFailed')
-    }
+    const { data } = await proApi.compressPreview(compressLevel.value)
+    compressPreviewData.value = data
   } catch (e: any) {
-    const detail = e.response?.data?.detail || e.message
-    ElMessage.error(`${t('settings.installFailed')}: ${detail}`)
-    proDownloadStatus.value = t('settings.installFailed')
-  } finally {
-    proDownloading.value = false
-    setTimeout(() => { proDownloadStatus.value = '' }, 3000)
+    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+  } finally { loading.value.compressPreview = false }
+}
+
+async function applyCompress() {
+  loading.value.compressApply = true
+  try {
+    const { data } = await proApi.compressApply(compressLevel.value)
+    ElMessage.success(`压缩完成: ${data.compressed_count} 条记忆已压缩，压缩率 ${Math.round(data.ratio * 100)}%`)
+    compressPreviewData.value = null
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+  } finally { loading.value.compressApply = false }
+}
+
+async function saveCompressConfig() {
+  try {
+    await proApi.setCompressConfig(compressConfig.value)
+    ElMessage.success(t('common.success'))
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || t('common.failed'))
   }
+}
+
+async function loadEvolutionInsights() {
+  loading.value.insights = true
+  try {
+    const { data } = await proApi.getEvolutionInsights()
+    evolutionInsights.value = data
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+  } finally { loading.value.insights = false }
+}
+
+async function runDiscoverRelations() {
+  loading.value.discover = true
+  try {
+    const { data } = await proApi.discoverRelations()
+    discoverResult.value = data
+    ElMessage.success(`发现 ${data.relations?.length || 0} 条新关联`)
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+  } finally { loading.value.discover = false }
+}
+
+async function runInferChains() {
+  loading.value.infer = true
+  try {
+    const { data } = await proApi.inferChains()
+    inferResult.value = data
+    ElMessage.success(`推理出 ${data.chains?.length || 0} 条推理链`)
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+  } finally { loading.value.infer = false }
+}
+
+async function runImportanceAdjust() {
+  loading.value.importance = true
+  try {
+    const { data } = await proApi.getImportanceAdjustments()
+    ElMessage.success(`已调整 ${data.adjusted_count || 0} 条记忆的重要性`)
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+  } finally { loading.value.importance = false }
+}
+
+async function runPrefetch() {
+  if (!prefetchContext.value) return
+  loading.value.prefetch = true
+  try {
+    const { data } = await proApi.prefetchMemories(prefetchContext.value)
+    prefetchResult.value = data
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+  } finally { loading.value.prefetch = false }
 }
 </script>
 
@@ -491,6 +653,39 @@ async function downloadProModule() {
 .route-model strong { color: #10B981; }
 .extract-result, .graph-result { display: flex; gap: 20px; margin-top: 12px; }
 .backup-schedule .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; color: var(--cm-text); font-size: 14px; }
+.compress-levels { display: flex; gap: 10px; margin: 12px 0; }
+.level-option { flex: 1; padding: 10px 8px; border: 2px solid var(--cm-border); border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.2s ease; }
+.level-option:hover { border-color: rgba(16,185,129,0.4); }
+.level-option.active { border-color: #10B981; background: rgba(16,185,129,0.08); }
+.level-name { font-size: 14px; font-weight: 600; color: var(--cm-text); }
+.level-rate { font-size: 18px; font-weight: 700; color: #10B981; margin: 4px 0; }
+.level-desc { font-size: 11px; color: var(--cm-text-muted); }
+.compress-result { margin-top: 12px; }
+.compress-details { margin-top: 10px; }
+.compress-detail-item { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; color: var(--cm-text-secondary); }
+.detail-action { background: rgba(16,185,129,0.1); color: #10B981; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+.detail-target { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auto-compress-setting { margin-top: 14px; border-top: 1px solid var(--cm-border); padding-top: 10px; }
+.auto-compress-setting .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; color: var(--cm-text); font-size: 14px; }
+.evolution-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.evolution-insights { margin-top: 12px; }
+.stat-value.success { color: #10B981; }
+.discover-result { margin-top: 12px; }
+.discover-list { max-height: 200px; overflow-y: auto; }
+.discover-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 12px; color: var(--cm-text-secondary); }
+.discover-source, .discover-target { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.discover-type { color: #10B981; font-weight: 600; font-size: 11px; }
+.discover-arrow { color: var(--cm-text-muted); }
+.infer-result { margin-top: 12px; }
+.chain-list { max-height: 200px; overflow-y: auto; }
+.chain-item { padding: 8px 0; border-bottom: 1px solid var(--cm-border); }
+.chain-nodes { font-size: 12px; color: var(--cm-text-secondary); }
+.chain-node { font-weight: 500; }
+.chain-arrow { color: #10B981; font-weight: 600; }
+.chain-conclusion { font-size: 13px; color: #10B981; font-weight: 600; margin-top: 4px; }
+.prefetch-section { margin-top: 14px; border-top: 1px solid var(--cm-border); padding-top: 10px; }
+.prefetch-result { margin-top: 8px; }
+.prefetch-count { font-size: 13px; color: #10B981; font-weight: 500; }
 .progress-bar { position: relative; height: 20px; background: var(--cm-border); border-radius: 10px; margin-top: 12px; overflow: hidden; }
 .progress-fill { height: 100%; background: linear-gradient(90deg, #10B981, #059669); transition: width 0.3s ease; border-radius: 10px; }
 .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 600; color: var(--cm-text); }

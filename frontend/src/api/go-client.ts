@@ -20,8 +20,8 @@ api.interceptors.response.use(
     const status = error.response?.status
     if (status === 401) {
       localStorage.removeItem('token')
-      if (window.location.hash !== '#/login' && !window.location.pathname.endsWith('/login')) {
-        window.location.href = '/#/login'
+      if (!window.location.pathname.endsWith('/login')) {
+        window.location.href = '/login'
       }
     } else if (status === 403) {
       // 403 由具体页面处理

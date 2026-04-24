@@ -57,10 +57,6 @@
             <el-input v-model="licenseKey" :placeholder="$t('settings.licensePlaceholder')" class="license-input" />
             <el-button type="primary" @click="activateLicense" :loading="activating">{{ $t('settings.activateLicense') }}</el-button>
           </div>
-          <div v-if="proInstallStatus" class="pro-install-status">
-            <div class="status-text">{{ proInstallStatus }}</div>
-            <el-progress v-if="proInstalling" :percentage="proInstallProgress" :stroke-width="6" />
-          </div>
         </div>
       </div>
 
@@ -200,11 +196,8 @@ const { t } = useI18n()
 const route = useRoute()
 const activeSection = ref((route.query.section as string) || '')
 const license = ref<any>({ active: false, tier: 'oss', features: [] })
-const licenseKey = ref('')
 const activating = ref(false)
-const proInstalling = ref(false)
-const proInstallProgress = ref(0)
-const proInstallStatus = ref('')
+const licenseKey = ref('')
 const exporting = ref(false)
 const passwordSet = ref(false)
 const showPasswordDialog = ref(false)
@@ -317,13 +310,6 @@ async function activateLicense() {
       ElMessage.success(t('settings.activated'))
       licenseKey.value = ''
       await loadLicense()
-      
-      // 检查是否有 Pro 下载地址
-      if (data.pro_download_url) {
-        await installProModule(data.pro_download_url, data.pro_fallback_urls || [])
-      } else {
-        ElMessage.info(t('settings.proModuleNotConfigured'))
-      }
     } else {
       ElMessage.error(data.message || t('common.failed'))
     }
@@ -335,41 +321,6 @@ async function activateLicense() {
       ElMessage.error(t('common.failed'))
     }
   } finally { activating.value = false }
-}
-
-async function installProModule(url: string, fallbackUrls: string[]) {
-  proInstalling.value = true
-  proInstallProgress.value = 0
-  proInstallStatus.value = t('settings.installing')
-  
-  try {
-    const fallbackParam = fallbackUrls.length > 0 ? fallbackUrls.join(',') : ''
-    const { data } = await axios.post('/license/pro/install', null, {
-      params: { url, fallback_urls: fallbackParam },
-      timeout: 120000,
-      onDownloadProgress: (e) => {
-        if (e.total) {
-          proInstallProgress.value = Math.round((e.loaded / e.total) * 100)
-        }
-      }
-    })
-    
-    if (data.success) {
-      ElMessage.success(t('settings.installSuccess'))
-      proInstallStatus.value = t('settings.installComplete')
-      await loadLicense()
-    } else {
-      ElMessage.error(data.message || t('settings.installFailed'))
-      proInstallStatus.value = t('settings.installFailed')
-    }
-  } catch (e: any) {
-    const detail = e.response?.data?.detail || e.message
-    ElMessage.error(`${t('settings.installFailed')}: ${detail}`)
-    proInstallStatus.value = t('settings.installFailed')
-  } finally {
-    proInstalling.value = false
-    setTimeout(() => { proInstallStatus.value = '' }, 3000)
-  }
 }
 
 async function deactivateLicense() {

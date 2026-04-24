@@ -18,20 +18,22 @@ func Load() *Config {
 
 	return &Config{
 		DatabasePath:      filepath.Join(dataDir, "clawmemory.db"),
-		LicenseServerURL:  getEnv("LICENSE_SERVER_URL", "https://license.clawmemory.com"),
+		LicenseServerURL:  getEnv("LICENSE_SERVER_URL", "https://auth.bestu.top"),
 		RSAPublicKeyPath:  filepath.Join(dataDir, "keys", "public.pem"),
-		JWTSecret:         getEnv("JWT_SECRET", "clawmemory-default-secret-change-me"),
+		JWTSecret:         getEnv("SECRET_KEY", "clawmemory-default-secret-change-me"),
 		DataDir:           dataDir,
 	}
 }
 
 func getDataDir() string {
-	// Docker 环境
+	if dir := getEnv("DATA_DIR", ""); dir != "" {
+		return dir
+	}
+
 	if _, err := os.Stat("/app/data"); err == nil {
 		return "/app/data"
 	}
 
-	// 本地开发
 	exe, _ := os.Executable()
 	return filepath.Join(filepath.Dir(exe), "data")
 }
