@@ -73,7 +73,7 @@
         <div class="detail-row"><strong>{{ $t('skills.author') }}:</strong> {{ detailSkill.author }}</div>
         <div class="detail-row"><strong>{{ $t('skills.scope') }}:</strong> {{ detailSkill.scope }}</div>
         <div class="detail-row" v-if="detailSkill.tags?.length">
-          <strong>Tags:</strong>
+          <strong>{{ $t('pro.tags') }}:</strong>
           <el-tag v-for="tag in detailSkill.tags" :key="tag" size="small" style="margin: 2px">{{ tag }}</el-tag>
         </div>
         <div class="detail-row" v-if="detailSkill.files?.length">
@@ -81,7 +81,7 @@
           <div class="file-list">{{ detailSkill.files.join(', ') }}</div>
         </div>
         <div class="detail-body" v-if="detailSkill.body_full">
-          <strong>Content:</strong>
+          <strong>{{ $t('pro.content') }}:</strong>
           <pre>{{ detailSkill.body_full }}</pre>
         </div>
       </div>
