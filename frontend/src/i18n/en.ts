@@ -26,6 +26,9 @@ export default {
     loadFailed: 'Load failed',
     createFailed: 'Create failed',
     saveFailed: 'Save failed',
+    requestFailed: 'Request failed, please try again',
+    searchPlaceholder: 'Search...',
+    storageUsed: 'Storage used',
   },
   nav: {
     dashboard: 'Dashboard',

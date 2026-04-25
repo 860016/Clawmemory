@@ -26,6 +26,9 @@ export default {
     loadFailed: '加载失败',
     createFailed: '创建失败',
     saveFailed: '保存失败',
+    requestFailed: '请求失败，请稍后重试',
+    searchPlaceholder: '搜索...',
+    storageUsed: '存储已用',
   },
   nav: {
     dashboard: '仪表盘',

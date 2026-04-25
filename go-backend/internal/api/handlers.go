@@ -1446,6 +1446,16 @@ func parseSKILLMd(data []byte) (map[string]interface{}, error) {
 				result["body_full"] = strings.TrimSpace(content[bodyStart:])
 			}
 		}
+	} else {
+		lines := strings.Split(content, "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "# ") {
+				result["name"] = strings.TrimSpace(line[2:])
+				break
+			}
+		}
+		result["body_full"] = content
 	}
 
 	if _, ok := result["name"]; !ok {
@@ -1469,6 +1479,9 @@ func handleSkillDetail(c *gin.Context) {
 	}
 
 	cfg := config.Load()
+	if cfg.SkillsDir != "" {
+		searchDirs = append(searchDirs, cfg.SkillsDir)
+	}
 	if cfg.DataDir != "" {
 		searchDirs = append(searchDirs, filepath.Join(cfg.DataDir, "skills"))
 	}
@@ -1562,6 +1575,8 @@ func handleScanOpenClawMemories(c *gin.Context) {
 	if homeDir != "" {
 		addScanDir(filepath.Join(homeDir, ".openclaw"))
 		addScanDir(filepath.Join(homeDir, ".clawmemory"))
+		addScanDir(filepath.Join(homeDir, ".trae-cn"))
+		addScanDir(filepath.Join(homeDir, ".trae"))
 	}
 
 	cfg := config.Load()
@@ -1590,38 +1605,84 @@ func handleScanOpenClawMemories(c *gin.Context) {
 		agents := make([]map[string]interface{}, 0)
 		agentCountMap := make(map[string]int)
 		totalMemories := 0
+		var foundFiles []string
 
-		memFile := filepath.Join(dir, "memories.json")
-		if data, err := os.ReadFile(memFile); err == nil {
-			var memories []map[string]interface{}
-			if json.Unmarshal(data, &memories) == nil {
-				totalMemories += len(memories)
-				for _, m := range memories {
+		filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if d.IsDir() {
+				name := d.Name()
+				if name == "node_modules" || name == ".git" || name == "vendor" || name == "__pycache__" || name == ".cache" {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+
+			ext := strings.ToLower(filepath.Ext(path))
+			if ext != ".json" && ext != ".md" && ext != ".txt" {
+				return nil
+			}
+
+			foundFiles = append(foundFiles, path)
+
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return nil
+			}
+			content := string(data)
+
+			if ext == ".json" {
+				var memories []map[string]interface{}
+				if json.Unmarshal(data, &memories) == nil {
+					totalMemories += len(memories)
+					for _, m := range memories {
+						agent := "default"
+						if a, ok := m["agent_name"].(string); ok && a != "" {
+							agent = a
+						}
+						agentCountMap[agent]++
+					}
+				} else {
+					totalMemories++
+					relPath, _ := filepath.Rel(dir, path)
+					parts := strings.Split(relPath, string(filepath.Separator))
 					agent := "default"
-					if a, ok := m["agent_name"].(string); ok && a != "" {
-						agent = a
+					if len(parts) > 1 {
+						agent = parts[0]
 					}
 					agentCountMap[agent]++
 				}
+			} else if ext == ".md" {
+				sections := strings.Count(content, "\n## ") + 1
+				if sections == 0 {
+					sections = 1
+				}
+				totalMemories += sections
+				relPath, _ := filepath.Rel(dir, path)
+				parts := strings.Split(relPath, string(filepath.Separator))
+				agent := "markdown"
+				if len(parts) > 1 {
+					agent = parts[0]
+				}
+				agentCountMap[agent] += sections
+			} else if ext == ".txt" {
+				lines := len(strings.Split(content, "\n"))
+				totalMemories += lines / 3
+				if lines/3 == 0 && lines > 0 {
+					totalMemories++
+				}
+				relPath, _ := filepath.Rel(dir, path)
+				parts := strings.Split(relPath, string(filepath.Separator))
+				agent := "text"
+				if len(parts) > 1 {
+					agent = parts[0]
+				}
+				agentCountMap[agent]++
 			}
-		}
 
-		entries, err := os.ReadDir(dir)
-		if err == nil {
-			for _, entry := range entries {
-				if !entry.IsDir() {
-					continue
-				}
-				agentMemFile := filepath.Join(dir, entry.Name(), "memories.json")
-				if data, err := os.ReadFile(agentMemFile); err == nil {
-					var memories []map[string]interface{}
-					if json.Unmarshal(data, &memories) == nil {
-						totalMemories += len(memories)
-						agentCountMap[entry.Name()] += len(memories)
-					}
-				}
-			}
-		}
+			return nil
+		})
 
 		if totalMemories > 0 {
 			for name, count := range agentCountMap {
@@ -1631,10 +1692,11 @@ func handleScanOpenClawMemories(c *gin.Context) {
 				})
 			}
 			c.JSON(http.StatusOK, gin.H{
-				"found":         true,
-				"openclaw_dir":  dir,
-				"agents":        agents,
+				"found":          true,
+				"openclaw_dir":   dir,
+				"agents":         agents,
 				"total_memories": totalMemories,
+				"files_found":    foundFiles,
 			})
 			return
 		}
@@ -1838,6 +1900,7 @@ func handleAutoImportMemories(db *gorm.DB) gin.HandlerFunc {
 			searchDirs = append(searchDirs, filepath.Join(homeDir, ".openclaw"))
 			searchDirs = append(searchDirs, filepath.Join(homeDir, ".clawmemory"))
 			searchDirs = append(searchDirs, filepath.Join(homeDir, ".trae-cn"))
+			searchDirs = append(searchDirs, filepath.Join(homeDir, ".trae"))
 		}
 
 		cfg := config.Load()
@@ -1852,111 +1915,325 @@ func handleAutoImportMemories(db *gorm.DB) gin.HandlerFunc {
 			searchDirs = append(searchDirs, filepath.Join(wd, "data"))
 		}
 
+		exe, _ := os.Executable()
+		if exe != "" {
+			exeDir := filepath.Dir(exe)
+			searchDirs = append(searchDirs, exeDir)
+			searchDirs = append(searchDirs, filepath.Join(exeDir, "data"))
+		}
+
 		var imported, skipped, entitiesCreated int
 		var foundFiles []string
+		seenKeys := make(map[string]bool)
+
+		var existingKeys []string
+		db.Table("memories").Where("status != ?", "trashed").Pluck("key", &existingKeys)
+		for _, k := range existingKeys {
+			seenKeys[k] = true
+		}
 
 		for _, dir := range searchDirs {
-			memFile := filepath.Join(dir, "memories.json")
-			if _, err := os.Stat(memFile); err == nil {
-				foundFiles = append(foundFiles, memFile)
-				content, err := os.ReadFile(memFile)
+			filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 				if err != nil {
-					continue
+					return nil
 				}
-				var memories []map[string]interface{}
-				if json.Unmarshal(content, &memories) != nil {
-					continue
+				if d.IsDir() {
+					name := d.Name()
+					if name == "node_modules" || name == ".git" || name == "vendor" || name == "__pycache__" || name == ".cache" {
+						return filepath.SkipDir
+					}
+					return nil
 				}
 
-				for _, m := range memories {
-					key, _ := m["key"].(string)
-					contentStr, _ := m["content"].(string)
-					if key == "" || contentStr == "" {
-						skipped++
-						continue
-					}
-
-					var count int64
-					db.Table("memories").Where("key = ?", key).Count(&count)
-					if count > 0 {
-						skipped++
-						continue
-					}
-
-					layer := "knowledge"
-					if l, ok := m["layer"].(string); ok && l != "" {
-						layer = l
-					} else {
-						if strings.Contains(strings.ToLower(contentStr), "偏好") || strings.Contains(strings.ToLower(contentStr), "preference") || strings.Contains(strings.ToLower(contentStr), "我喜欢") || strings.Contains(strings.ToLower(contentStr), "i prefer") {
-							layer = "preference"
-						} else if strings.Contains(strings.ToLower(contentStr), "临时") || strings.Contains(strings.ToLower(contentStr), "temporary") || strings.Contains(strings.ToLower(contentStr), "todo") || strings.Contains(strings.ToLower(contentStr), "待办") {
-							layer = "short_term"
-						} else if strings.Contains(strings.ToLower(contentStr), "私密") || strings.Contains(strings.ToLower(contentStr), "private") || strings.Contains(strings.ToLower(contentStr), "密码") || strings.Contains(strings.ToLower(contentStr), "password") {
-							layer = "private"
-						}
-					}
-
-					importance := 0.5
-					if imp, ok := m["importance"].(float64); ok {
-						importance = imp
-					}
-
-					tags := ""
-					if t, ok := m["tags"].([]interface{}); ok && len(t) > 0 {
-						tagStrs := make([]string, 0)
-						for _, tag := range t {
-							if s, ok := tag.(string); ok {
-								tagStrs = append(tagStrs, s)
-							}
-						}
-						tags = strings.Join(tagStrs, ",")
-					}
-
-					source := "auto_import"
-					if s, ok := m["source"].(string); ok && s != "" {
-						source = s
-					}
-
-					result := db.Exec(`INSERT INTO memories (key, content, layer, importance, tags, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`, key, contentStr, layer, importance, tags, source)
-					if result.Error != nil {
-						skipped++
-						continue
-					}
-					imported++
-
-					if len(contentStr) > 20 && len(contentStr) < 500 {
-						entityType := "concept"
-						if strings.Contains(strings.ToLower(contentStr), "项目") || strings.Contains(strings.ToLower(contentStr), "project") {
-							entityType = "organization"
-						} else if strings.Contains(strings.ToLower(contentStr), "工具") || strings.Contains(strings.ToLower(contentStr), "tool") || strings.Contains(strings.ToLower(contentStr), "软件") {
-							entityType = "technology"
-						} else if strings.Contains(strings.ToLower(contentStr), "人") || strings.Contains(strings.ToLower(contentStr), "person") {
-							entityType = "person"
-						}
-
-						name := key
-						if len(name) > 50 {
-							name = name[:50]
-						}
-
-						var entityCount int64
-						db.Table("entities").Where("name = ?", name).Count(&entityCount)
-						if entityCount == 0 {
-							db.Exec(`INSERT INTO entities (user_id, name, entity_type, description, confidence, extract_method, created_at, updated_at) VALUES (1, ?, ?, ?, 0.8, 'auto_import', datetime('now'), datetime('now'))`, name, entityType, contentStr)
-							entitiesCreated++
-						}
-					}
+				ext := strings.ToLower(filepath.Ext(path))
+				if ext != ".json" && ext != ".md" && ext != ".txt" {
+					return nil
 				}
-			}
+
+				foundFiles = append(foundFiles, path)
+
+				data, err := os.ReadFile(path)
+				if err != nil {
+					return nil
+				}
+				content := string(data)
+
+				if ext == ".json" {
+					importFromJSON(db, content, seenKeys, &imported, &skipped, &entitiesCreated)
+				} else if ext == ".md" {
+					importFromMarkdown(db, path, content, seenKeys, &imported, &skipped, &entitiesCreated)
+				} else if ext == ".txt" {
+					importFromText(db, path, content, seenKeys, &imported, &skipped, &entitiesCreated)
+				}
+
+				return nil
+			})
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"imported":        imported,
-			"skipped":         skipped,
+			"imported":         imported,
+			"skipped":          skipped,
 			"entities_created": entitiesCreated,
-			"files_found":     foundFiles,
-			"message":         fmt.Sprintf("成功导入 %d 条记忆，创建 %d 个实体", imported, entitiesCreated),
+			"files_found":      foundFiles,
+			"message":          fmt.Sprintf("成功导入 %d 条记忆，创建 %d 个实体，跳过 %d 条", imported, entitiesCreated, skipped),
 		})
+	}
+}
+
+func importFromJSON(db *gorm.DB, content string, seenKeys map[string]bool, imported, skipped, entitiesCreated *int) {
+	var memories []map[string]interface{}
+	if json.Unmarshal([]byte(content), &memories) != nil {
+		var single map[string]interface{}
+		if json.Unmarshal([]byte(content), &single) != nil {
+			return
+		}
+		memories = []map[string]interface{}{single}
+	}
+
+	for _, m := range memories {
+		key, _ := m["key"].(string)
+		contentStr, _ := m["content"].(string)
+		if key == "" {
+			if name, ok := m["name"].(string); ok {
+				key = name
+			} else if title, ok := m["title"].(string); ok {
+				key = title
+			}
+		}
+		if contentStr == "" {
+			contentStr, _ = m["value"].(string)
+			if contentStr == "" {
+				contentStr, _ = m["text"].(string)
+				if contentStr == "" {
+					contentStr, _ = m["description"].(string)
+				}
+			}
+		}
+		if key == "" || contentStr == "" {
+			*skipped++
+			continue
+		}
+
+		if seenKeys[key] {
+			*skipped++
+			continue
+		}
+
+		layer := classifyLayer(key, contentStr)
+		importance := 0.5
+		if imp, ok := m["importance"].(float64); ok {
+			importance = imp
+		}
+
+		tags := extractTags(m)
+
+		source := "auto_import"
+		if s, ok := m["source"].(string); ok && s != "" {
+			source = s
+		}
+
+		result := db.Exec(`INSERT INTO memories (key, content, layer, importance, tags, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`, key, contentStr, layer, importance, tags, source)
+		if result.Error != nil {
+			*skipped++
+			continue
+		}
+		seenKeys[key] = true
+		*imported++
+
+		tryCreateEntity(db, key, contentStr, entitiesCreated)
+	}
+}
+
+func importFromMarkdown(db *gorm.DB, filePath, content string, seenKeys map[string]bool, imported, skipped, entitiesCreated *int) {
+	sections := strings.Split(content, "\n## ")
+	for i, section := range sections {
+		var key, body string
+		if i == 0 {
+			lines := strings.SplitN(section, "\n", 2)
+			key = strings.TrimPrefix(strings.TrimSpace(lines[0]), "# ")
+			if len(lines) > 1 {
+				body = strings.TrimSpace(lines[1])
+			}
+		} else {
+			lines := strings.SplitN(section, "\n", 2)
+			key = strings.TrimSpace(lines[0])
+			if len(lines) > 1 {
+				body = strings.TrimSpace(lines[1])
+			}
+		}
+
+		if key == "" || body == "" {
+			continue
+		}
+
+		key = fmt.Sprintf("md:%s", key)
+		if seenKeys[key] {
+			*skipped++
+			continue
+		}
+
+		layer := classifyLayer(key, body)
+		importance := 0.6
+
+		source := "auto_import_md"
+		relPath := filePath
+		if len(relPath) > 100 {
+			relPath = "..." + relPath[len(relPath)-97:]
+		}
+
+		result := db.Exec(`INSERT INTO memories (key, content, layer, importance, tags, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`, key, body, layer, importance, "markdown", source)
+		if result.Error != nil {
+			*skipped++
+			continue
+		}
+		seenKeys[key] = true
+		*imported++
+
+		tryCreateEntity(db, key, body, entitiesCreated)
+	}
+}
+
+func importFromText(db *gorm.DB, filePath, content string, seenKeys map[string]bool, imported, skipped, entitiesCreated *int) {
+	lines := strings.Split(content, "\n")
+	var buffer []string
+	var currentKey string
+
+	flushBuffer := func() {
+		if currentKey != "" && len(buffer) > 0 {
+			body := strings.Join(buffer, "\n")
+			key := fmt.Sprintf("txt:%s", currentKey)
+
+			if !seenKeys[key] {
+				layer := classifyLayer(key, body)
+				result := db.Exec(`INSERT INTO memories (key, content, layer, importance, tags, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`, key, body, layer, 0.4, "text", "auto_import_txt")
+				if result.Error == nil {
+					seenKeys[key] = true
+					*imported++
+					tryCreateEntity(db, key, body, entitiesCreated)
+				} else {
+					*skipped++
+				}
+			} else {
+				*skipped++
+			}
+		}
+		buffer = nil
+		currentKey = ""
+	}
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if len(trimmed) < 80 && !strings.HasPrefix(trimmed, "-") && !strings.HasPrefix(trimmed, "*") && strings.HasSuffix(trimmed, ":") {
+			flushBuffer()
+			currentKey = strings.TrimSuffix(trimmed, ":")
+		} else if len(trimmed) < 60 && !strings.HasPrefix(trimmed, "-") && !strings.HasPrefix(trimmed, "*") && currentKey == "" {
+			flushBuffer()
+			currentKey = trimmed
+		} else {
+			buffer = append(buffer, trimmed)
+		}
+	}
+	flushBuffer()
+
+	if *imported == 0 && len(strings.Fields(content)) > 5 {
+		key := fmt.Sprintf("txt:%s", filepath.Base(filePath))
+		key = strings.TrimSuffix(key, filepath.Ext(key))
+		if !seenKeys[key] && len(content) > 10 {
+			layer := classifyLayer(key, content)
+			result := db.Exec(`INSERT INTO memories (key, content, layer, importance, tags, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`, key, content, layer, 0.3, "text", "auto_import_txt")
+			if result.Error == nil {
+				seenKeys[key] = true
+				*imported++
+				tryCreateEntity(db, key, content, entitiesCreated)
+			}
+		}
+	}
+}
+
+func classifyLayer(key, content string) string {
+	lowerKey := strings.ToLower(key)
+	lowerContent := strings.ToLower(content)
+
+	if strings.Contains(lowerKey, "偏好") || strings.Contains(lowerKey, "preference") ||
+		strings.Contains(lowerContent, "我喜欢") || strings.Contains(lowerContent, "i prefer") ||
+		strings.Contains(lowerContent, "偏好") || strings.Contains(lowerContent, "preference") {
+		return "preference"
+	}
+	if strings.Contains(lowerKey, "临时") || strings.Contains(lowerKey, "temporary") ||
+		strings.Contains(lowerKey, "todo") || strings.Contains(lowerKey, "待办") ||
+		strings.Contains(lowerContent, "临时") || strings.Contains(lowerContent, "temporary") {
+		return "short_term"
+	}
+	if strings.Contains(lowerKey, "私密") || strings.Contains(lowerKey, "private") ||
+		strings.Contains(lowerKey, "密码") || strings.Contains(lowerKey, "password") ||
+		strings.Contains(lowerContent, "私密") || strings.Contains(lowerContent, "private") {
+		return "private"
+	}
+	if strings.Contains(lowerKey, "项目") || strings.Contains(lowerKey, "project") ||
+		strings.Contains(lowerContent, "项目") || strings.Contains(lowerContent, "project") {
+		return "knowledge"
+	}
+	if strings.Contains(lowerKey, "工具") || strings.Contains(lowerKey, "tool") ||
+		strings.Contains(lowerContent, "工具") || strings.Contains(lowerContent, "software") {
+		return "knowledge"
+	}
+	return "knowledge"
+}
+
+func extractTags(m map[string]interface{}) string {
+	if t, ok := m["tags"].([]interface{}); ok && len(t) > 0 {
+		tagStrs := make([]string, 0, len(t))
+		for _, tag := range t {
+			if s, ok := tag.(string); ok {
+				tagStrs = append(tagStrs, s)
+			}
+		}
+		return strings.Join(tagStrs, ",")
+	}
+	if t, ok := m["tags"].(string); ok {
+		return t
+	}
+	if cat, ok := m["category"].(string); ok {
+		return cat
+	}
+	return ""
+}
+
+func tryCreateEntity(db *gorm.DB, key, content string, entitiesCreated *int) {
+	if len(content) < 10 || len(content) > 2000 {
+		return
+	}
+
+	entityType := "concept"
+	lowerContent := strings.ToLower(content)
+	if strings.Contains(lowerContent, "项目") || strings.Contains(lowerContent, "project") {
+		entityType = "organization"
+	} else if strings.Contains(lowerContent, "工具") || strings.Contains(lowerContent, "tool") || strings.Contains(lowerContent, "软件") || strings.Contains(lowerContent, "software") {
+		entityType = "technology"
+	} else if strings.Contains(lowerContent, "人") || strings.Contains(lowerContent, "person") || strings.Contains(lowerContent, "用户") {
+		entityType = "person"
+	} else if strings.Contains(lowerContent, "地点") || strings.Contains(lowerContent, "location") || strings.Contains(lowerContent, "城市") {
+		entityType = "location"
+	} else if strings.Contains(lowerContent, "事件") || strings.Contains(lowerContent, "event") {
+		entityType = "event"
+	}
+
+	name := key
+	if strings.HasPrefix(name, "md:") || strings.HasPrefix(name, "txt:") {
+		name = name[3:]
+	}
+	if len(name) > 50 {
+		name = name[:50]
+	}
+
+	var entityCount int64
+	db.Table("entities").Where("name = ?", name).Count(&entityCount)
+	if entityCount == 0 {
+		db.Exec(`INSERT INTO entities (user_id, name, entity_type, description, confidence, extract_method, created_at, updated_at) VALUES (1, ?, ?, ?, 0.7, 'auto_import', datetime('now'), datetime('now'))`, name, entityType, content)
+		*entitiesCreated++
 	}
 }
 
