@@ -499,8 +499,10 @@ export default {
     adjustedCount: '已调整 {count} 条记忆的重要性',
     tags: '标签',
     content: '内容',
-    usingLocalAlgorithm: '正在使用本地基础算法（Pro 云端服务不可用，结果可能不如 Pro 版精确）',
-    fallbackMode: '本地降级模式',
+    usingLocalAlgorithm: '正在使用本地基础算法（未激活 Pro License，结果可能不如 Pro 版精确）',
+    fallbackMode: '本地基础模式',
+    proNotActivated: 'Pro 功能未激活',
+    proActivateHint: '请在设置页面输入 License Key 激活 Pro 功能',
   },
   skills: {
     title: '技能扫描',
