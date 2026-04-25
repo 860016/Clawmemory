@@ -6,7 +6,6 @@
     </div>
 
     <div class="guide-grid">
-      <!-- Getting Started -->
       <div class="guide-card">
         <div class="card-icon">🚀</div>
         <h2>{{ $t('guide.gettingStarted') }}</h2>
@@ -32,7 +31,6 @@
         </div>
       </div>
 
-      <!-- ChromaDB Guide -->
       <div class="guide-card highlight">
         <div class="card-icon">🔮</div>
         <h2>{{ $t('guide.chromadbGuide') }}</h2>
@@ -69,7 +67,6 @@
         </div>
       </div>
 
-      <!-- Memory Layers -->
       <div class="guide-card">
         <div class="card-icon">🧠</div>
         <h2>{{ $t('guide.memoryLayers') }}</h2>
@@ -95,7 +92,6 @@
         </div>
       </div>
 
-      <!-- Knowledge Graph -->
       <div class="guide-card">
         <div class="card-icon">🕸️</div>
         <h2>{{ $t('guide.knowledgeGraph') }}</h2>
@@ -109,7 +105,6 @@
         </div>
       </div>
 
-      <!-- Wiki -->
       <div class="guide-card">
         <div class="card-icon">📖</div>
         <h2>{{ $t('guide.wikiGuide') }}</h2>
@@ -123,7 +118,6 @@
         </div>
       </div>
 
-      <!-- Pro Features -->
       <div class="guide-card pro-card">
         <div class="card-icon">💎</div>
         <h2>{{ $t('guide.proFeatures') }}</h2>
@@ -137,6 +131,80 @@
           <el-button type="primary" style="margin-top: 16px" @click="$router.push('/pro')">
             {{ $t('nav.pro') }} →
           </el-button>
+        </div>
+      </div>
+
+      <div class="guide-card full-width">
+        <div class="card-icon">📋</div>
+        <h2>{{ $t('guide.dailyReportTitle') }}</h2>
+        <div class="card-content">
+          <p class="guide-intro">{{ $t('guide.dailyReportIntro') }}</p>
+          <ul class="feature-list">
+            <li><span class="check">✓</span> {{ $t('guide.dailyReportFeature1') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.dailyReportFeature2') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.dailyReportFeature3') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.dailyReportFeature4') }}</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="guide-card full-width">
+        <div class="card-icon">✨</div>
+        <h2>{{ $t('guide.skillsTitle') }}</h2>
+        <div class="card-content">
+          <p class="guide-intro">{{ $t('guide.skillsIntro') }}</p>
+          <div class="install-steps">
+            <div class="install-step">
+              <div class="step-header">
+                <span class="step-badge">{{ $t('guide.skillsScanLabel') }}</span>
+                <span class="step-label">{{ $t('guide.skillsScanTitle') }}</span>
+              </div>
+              <p class="step-desc">{{ $t('guide.skillsScanDesc') }}</p>
+            </div>
+            <div class="install-step">
+              <div class="step-header">
+                <span class="step-badge">{{ $t('guide.skillsInstallLabel') }}</span>
+                <span class="step-label">{{ $t('guide.skillsInstallTitle') }}</span>
+              </div>
+              <p class="step-desc">{{ $t('guide.skillsInstallDesc') }}</p>
+            </div>
+          </div>
+          <div class="chromadb-features">
+            <h3>{{ $t('guide.skillsPathsTitle') }}</h3>
+            <ul class="feature-list">
+              <li><span class="check">📁</span> ~/.openclaw/skills/</li>
+              <li><span class="check">📁</span> ~/.clawmemory/skills/</li>
+              <li><span class="check">📁</span> {exe_dir}/skills/</li>
+              <li><span class="check">📁</span> {work_dir}/skills/</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="guide-card full-width">
+        <div class="card-icon">📥</div>
+        <h2>{{ $t('guide.memoryImportTitle') }}</h2>
+        <div class="card-content">
+          <p class="guide-intro">{{ $t('guide.memoryImportIntro') }}</p>
+          <ul class="feature-list">
+            <li><span class="check">✓</span> {{ $t('guide.memoryImportFeature1') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.memoryImportFeature2') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.memoryImportFeature3') }}</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="guide-card full-width">
+        <div class="card-icon">⚙️</div>
+        <h2>{{ $t('guide.proFallbackTitle') }}</h2>
+        <div class="card-content">
+          <p class="guide-intro">{{ $t('guide.proFallbackIntro') }}</p>
+          <ul class="feature-list">
+            <li><span class="check">✓</span> {{ $t('guide.proFallbackFeature1') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.proFallbackFeature2') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.proFallbackFeature3') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.proFallbackFeature4') }}</li>
+          </ul>
         </div>
       </div>
     </div>
@@ -199,6 +267,10 @@ function copyCode(code: string) {
   transform: translateY(-2px);
 }
 
+.guide-card.full-width {
+  grid-column: 1 / -1;
+}
+
 .guide-card.highlight {
   background: linear-gradient(135deg, var(--cm-bg-secondary) 0%, rgba(139, 92, 246, 0.05) 100%);
   border-color: rgba(139, 92, 246, 0.2);
@@ -234,7 +306,6 @@ function copyCode(code: string) {
   margin: 0;
 }
 
-/* Steps List */
 .steps-list {
   list-style: none;
   padding: 0;
@@ -271,7 +342,6 @@ function copyCode(code: string) {
   padding-top: 4px;
 }
 
-/* Install Steps */
 .install-steps {
   display: flex;
   flex-direction: column;
@@ -331,7 +401,6 @@ function copyCode(code: string) {
   color: #10B981;
 }
 
-/* ChromaDB Features */
 .chromadb-features h3 {
   font-size: 14px;
   font-weight: 600;
@@ -361,7 +430,6 @@ function copyCode(code: string) {
   font-weight: 700;
 }
 
-/* Layer Explain */
 .layer-explain {
   display: flex;
   flex-direction: column;

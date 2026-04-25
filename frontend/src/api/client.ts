@@ -31,7 +31,13 @@ api.interceptors.response.use(
       let msg = error.response?.data?.detail || error.response?.data?.message || 'Request failed'
       if (typeof msg === 'string') {
         if (msg.includes('non-JSON response') || msg.includes('<html') || msg.includes('Pro server')) {
-          msg = 'Pro 功能暂不可用，授权服务器未就绪'
+          msg = 'Pro 云服务暂不可用，已自动切换为本地模式'
+        }
+        if (msg.includes('Pro license required') || msg.includes('Pro feature not authorized')) {
+          msg = '此功能需要 Pro 授权，当前使用本地基础模式'
+        }
+        if (msg.includes('Pro server unreachable')) {
+          msg = 'Pro 云服务暂不可用，已自动切换为本地模式'
         }
         if (!msg.includes('rate limit')) {
           ElMessage.error(msg)

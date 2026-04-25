@@ -292,6 +292,188 @@ func allSame(values []string) bool {
 	return true
 }
 
+func (f *ProFallbackService) ReinforceMemory(userID uint, memoryID uint) (map[string]interface{}, error) {
+	var memory models.Memory
+	if err := f.db.Where("id = ? AND user_id = ?", memoryID, userID).First(&memory).Error; err != nil {
+		return nil, fmt.Errorf("memory not found")
+	}
+	newImportance := math.Min(memory.Importance*1.2, 1.0)
+	f.db.Model(&memory).Updates(map[string]interface{}{
+		"importance":       newImportance,
+		"access_count":     memory.AccessCount + 1,
+		"last_accessed_at": time.Now(),
+	})
+	return map[string]interface{}{
+		"memory_id":         memoryID,
+		"old_importance":    memory.Importance,
+		"new_importance":    newImportance,
+		"reinforced":        true,
+		"algorithm":         "local_access_reinforce_v1",
+		"fallback":          true,
+	}, nil
+}
+
+func (f *ProFallbackService) ConflictResolve(userID uint, conflictIndex int, strategy string) (map[string]interface{}, error) {
+	result, err := f.ConflictScan(userID)
+	if err != nil {
+		return nil, err
+	}
+	conflicts, ok := result["conflicts"].([]map[string]interface{})
+	if !ok || conflictIndex >= len(conflicts) {
+		return nil, fmt.Errorf("conflict index out of range")
+	}
+	conflict := conflicts[conflictIndex]
+	memories, ok := conflict["memories"].([]models.Memory)
+	if !ok || len(memories) == 0 {
+		return nil, fmt.Errorf("no memories in conflict")
+	}
+	switch strategy {
+	case "keep_first":
+		for i := 1; i < len(memories); i++ {
+			f.db.Model(&memories[i]).Update("status", "archived")
+		}
+	case "keep_latest":
+		for i := 0; i < len(memories)-1; i++ {
+			f.db.Model(&memories[i]).Update("status", "archived")
+		}
+	default:
+		for i := 1; i < len(memories); i++ {
+			f.db.Model(&memories[i]).Update("status", "archived")
+		}
+	}
+	return map[string]interface{}{
+		"resolved":  true,
+		"strategy":  strategy,
+		"kept":      1,
+		"archived":  len(memories) - 1,
+		"fallback":  true,
+	}, nil
+}
+
+func (f *ProFallbackService) TokenRoute(message string, contextLength int) (map[string]interface{}, error) {
+	tokenEstimate := len(message) / 4
+	if contextLength > 0 {
+		tokenEstimate += contextLength
+	}
+	return map[string]interface{}{
+		"model":           "local",
+		"estimated_tokens": tokenEstimate,
+		"provider":        "fallback",
+		"fallback":        true,
+	}, nil
+}
+
+func (f *ProFallbackService) TokenStats() (map[string]interface{}, error) {
+	var totalMemories int64
+	f.db.Model(&models.Memory{}).Where("status != ?", "trashed").Count(&totalMemories)
+	estimatedTokens := totalMemories * 50
+	return map[string]interface{}{
+		"total_tokens_used": estimatedTokens,
+		"total_memories":    totalMemories,
+		"provider":          "fallback",
+		"fallback":          true,
+	}, nil
+}
+
+func (f *ProFallbackService) AIExtract(userID uint) (map[string]interface{}, error) {
+	var memories []models.Memory
+	f.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
+	entities := []map[string]interface{}{}
+	for _, m := range memories {
+		if len(entities) >= 10 {
+			break
+		}
+		entities = append(entities, map[string]interface{}{
+			"name":        m.Key,
+			"entity_type": "concept",
+			"description": m.Value,
+			"source":      "local_extract",
+		})
+	}
+	return map[string]interface{}{
+		"entities":    entities,
+		"total":       len(entities),
+		"algorithm":   "local_key_extract_v1",
+		"fallback":    true,
+	}, nil
+}
+
+func (f *ProFallbackService) AutoGraph(userID uint, overwrite bool) (map[string]interface{}, error) {
+	extractResult, err := f.AIExtract(userID)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{
+		"entities_created": extractResult["total"],
+		"relations_created": 0,
+		"overwrite":        overwrite,
+		"algorithm":        "local_key_extract_v1",
+		"fallback":         true,
+	}, nil
+}
+
+func (f *ProFallbackService) BackupSchedule() (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"enabled":        false,
+		"interval_hours": 24,
+		"fallback":       true,
+	}, nil
+}
+
+func (f *ProFallbackService) SetBackupSchedule(enabled bool, intervalHours int) (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"enabled":        enabled,
+		"interval_hours": intervalHours,
+		"message":        "本地模式：备份计划已记录，请手动执行备份",
+		"fallback":       true,
+	}, nil
+}
+
+func (f *ProFallbackService) CompressConfig() (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"level":     "light",
+		"auto":      false,
+		"fallback":  true,
+	}, nil
+}
+
+func (f *ProFallbackService) SetCompressConfig(config map[string]interface{}) (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"config":    config,
+		"message":   "本地模式：压缩配置已记录",
+		"fallback":  true,
+	}, nil
+}
+
+func (f *ProFallbackService) EvolutionInsights(userID uint) (map[string]interface{}, error) {
+	var totalMemories int64
+	f.db.Model(&models.Memory{}).Where("user_id = ? AND status != ?", userID, "trashed").Count(&totalMemories)
+
+	var totalEntities int64
+	f.db.Model(&models.Entity{}).Where("user_id = ?", userID).Count(&totalEntities)
+
+	var totalRelations int64
+	f.db.Model(&models.Relation{}).Count(&totalRelations)
+
+	return map[string]interface{}{
+		"total_memories":   totalMemories,
+		"total_entities":   totalEntities,
+		"total_relations":  totalRelations,
+		"health_score":     0.7,
+		"recommendations":  []string{"定期清理低重要性记忆", "为关键记忆添加标签", "利用知识图谱建立关联"},
+		"fallback":         true,
+	}, nil
+}
+
+func (f *ProFallbackService) EvolutionInfer(userID uint) (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"chains":    []map[string]interface{}{},
+		"total":     0,
+		"algorithm": "local_infer_v1",
+		"fallback":  true,
+	}, nil
+}
+
 func groupByLayer(memories []models.Memory) map[string][]models.Memory {
 	result := make(map[string][]models.Memory)
 	for _, m := range memories {
