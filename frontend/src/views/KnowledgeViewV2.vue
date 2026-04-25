@@ -1,201 +1,136 @@
 <template>
-  <div class="knowledge-v2">
-    <header class="knowledge-header">
-      <div class="header-content">
-        <div class="header-title">
-          <div class="title-icon">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-            </svg>
-          </div>
-          <div>
-            <h1>{{ $t('knowledge.title') }}</h1>
-            <p class="subtitle">{{ entities.length }} {{ $t('knowledge.entities') }} · {{ relations.length }} {{ $t('knowledge.relations') }}</p>
-          </div>
-        </div>
-        <div class="header-actions">
-          <div class="search-box">
-            <el-icon class="search-icon"><Search /></el-icon>
-            <input v-model="searchQuery" :placeholder="$t('knowledge.searchPlaceholder')" class="search-input" />
-          </div>
-          <button class="cm-btn cm-btn-primary" @click="openCreateDialog">
-            <el-icon><Plus /></el-icon>
-            <span>{{ $t('knowledge.addEntity') }}</span>
-          </button>
-          <button class="cm-btn cm-btn-secondary" @click="showRelationDialog = true">
-            <el-icon><Link /></el-icon>
-            <span>{{ $t('knowledge.addRelation') }}</span>
-          </button>
-        </div>
+  <div class="knowledge-page">
+    <header class="page-header">
+      <div class="header-left">
+        <h1>🕸️ {{ $t('knowledge.title') }}</h1>
+        <p class="subtitle">{{ entities.length }} {{ $t('knowledge.entities') }} · {{ relations.length }} {{ $t('knowledge.relations') }}</p>
       </div>
-      <div class="view-tabs">
-        <button v-for="tab in viewTabs" :key="tab.key" class="tab-btn" :class="{ active: currentView === tab.key }" @click="currentView = tab.key">
-          <el-icon><component :is="tab.icon" /></el-icon>
-          <span>{{ tab.label }}</span>
+      <div class="header-right">
+        <div class="search-box">
+          <el-icon class="search-icon"><Search /></el-icon>
+          <input v-model="searchQuery" :placeholder="$t('knowledge.searchPlaceholder')" class="search-input" />
+        </div>
+        <button class="cm-btn cm-btn-primary" @click="openCreateDialog">
+          <el-icon><Plus /></el-icon>
+          {{ $t('knowledge.addEntity') }}
+        </button>
+        <button class="cm-btn cm-btn-secondary" @click="showRelationDialog = true">
+          <el-icon><Connection /></el-icon>
+          {{ $t('knowledge.addRelation') }}
         </button>
       </div>
     </header>
 
-    <main class="knowledge-content">
-      <div v-if="currentView === 'grid'" class="grid-view">
-        <div class="category-filters">
-          <button v-for="cat in categories" :key="cat.type" class="filter-chip" :class="{ active: selectedCategory === cat.type }" @click="selectedCategory = selectedCategory === cat.type ? '' : cat.type">
-            <span class="chip-icon">{{ cat.icon }}</span>
-            <span>{{ cat.label }}</span>
-            <span class="chip-count">{{ cat.count }}</span>
-          </button>
-        </div>
-        <div class="entities-grid">
-          <div v-for="entity in filteredEntities" :key="entity.id" class="entity-card" @click="openDetail(entity)">
-            <div class="card-top">
-              <div class="entity-avatar" :style="{ background: getAvatarColor(entity.name) }">
-                {{ entity.name.charAt(0).toUpperCase() }}
-              </div>
-              <div class="entity-meta">
-                <h3 class="entity-name">{{ entity.name }}</h3>
-                <span class="entity-type-badge" :class="entity.entity_type">{{ getTypeLabel(entity.entity_type) }}</span>
-              </div>
-            </div>
-            <p class="entity-desc">{{ entity.description || $t('knowledge.noDescription') }}</p>
-            <div class="card-bottom">
-              <div class="relation-info" v-if="getEntityRelations(entity.id).length">
-                <el-icon><Connection /></el-icon>
-                <span>{{ getEntityRelations(entity.id).length }} {{ $t('knowledge.relations') }}</span>
-              </div>
-              <div class="confidence-info" v-if="entity.confidence">
-                <div class="confidence-bar"><div class="confidence-fill" :style="{ width: entity.confidence * 100 + '%' }"></div></div>
-                <span>{{ Math.round(entity.confidence * 100) }}%</span>
-              </div>
-              <div class="card-actions" @click.stop>
-                <button class="card-action-btn" @click="openEditDialog(entity)" :title="$t('common.edit')">
-                  <el-icon><Edit /></el-icon>
-                </button>
-                <button class="card-action-btn danger" @click="confirmDelete(entity.id)" :title="$t('common.delete')">
-                  <el-icon><Delete /></el-icon>
-                </button>
-              </div>
-            </div>
-          </div>
-          <div v-if="!filteredEntities.length" class="empty-state">
-            <div class="empty-icon">◇</div>
-            <p>{{ $t('knowledge.emptyGraph') }}</p>
-            <button class="cm-btn cm-btn-primary" @click="openCreateDialog">{{ $t('knowledge.addEntity') }}</button>
-          </div>
-        </div>
+    <div class="category-bar">
+      <button class="cat-btn" :class="{ active: !selectedCategory }" @click="selectedCategory = ''">
+        {{ $t('knowledge.allCategories') }}
+      </button>
+      <button v-for="cat in categoryStats" :key="cat.type" class="cat-btn" :class="{ active: selectedCategory === cat.type }" @click="selectedCategory = cat.type">
+        <span class="cat-icon">{{ cat.icon }}</span>
+        <span>{{ cat.label }}</span>
+        <span class="cat-count">{{ cat.count }}</span>
+      </button>
+    </div>
+
+    <main class="page-content">
+      <div v-if="loading" class="loading-state">
+        <el-icon class="spin"><Loading /></el-icon>
+        <p>{{ $t('common.loading') }}</p>
       </div>
 
-      <div v-if="currentView === 'graph'" class="graph-view-v2">
-        <div class="graph-toolbar">
-          <div class="toolbar-group">
-            <button class="tool-btn" @click="resetGraph" :title="$t('knowledge.reset')">
-              <el-icon><RefreshRight /></el-icon>
-            </button>
-            <button class="tool-btn" @click="zoomIn" :title="$t('knowledge.zoomIn')">
-              <el-icon><ZoomIn /></el-icon>
-            </button>
-            <button class="tool-btn" @click="zoomOut" :title="$t('knowledge.zoomOut')">
-              <el-icon><ZoomOut /></el-icon>
-            </button>
-          </div>
-          <div class="toolbar-group">
-            <span class="graph-stats">{{ graphData.nodes.length }} {{ $t('knowledge.entities') }} · {{ graphData.edges.length }} {{ $t('knowledge.relations') }}</span>
-          </div>
-        </div>
-        <div ref="graphContainer" class="graph-canvas"></div>
+      <div v-else-if="error" class="error-state">
+        <el-icon><Warning /></el-icon>
+        <p>{{ error }}</p>
+        <button class="cm-btn cm-btn-primary" @click="loadData">{{ $t('common.retry') }}</button>
       </div>
 
-      <div v-if="currentView === 'list'" class="list-view">
-        <div class="list-header">
-          <span class="list-col name">{{ $t('knowledge.name') }}</span>
-          <span class="list-col type">{{ $t('knowledge.type') }}</span>
-          <span class="list-col relations">{{ $t('knowledge.relations') }}</span>
-          <span class="list-col actions">{{ $t('knowledge.actions') }}</span>
-        </div>
-        <div class="list-body">
-          <div v-for="entity in filteredEntities" :key="entity.id" class="list-row" @click="openDetail(entity)">
-            <span class="list-col name">
-              <div class="entity-avatar-small" :style="{ background: getAvatarColor(entity.name) }">{{ entity.name.charAt(0).toUpperCase() }}</div>
-              {{ entity.name }}
-            </span>
-            <span class="list-col type">
-              <span class="type-badge" :class="entity.entity_type">{{ getTypeLabel(entity.entity_type) }}</span>
-            </span>
-            <span class="list-col relations">{{ getEntityRelations(entity.id).length }}</span>
-            <span class="list-col actions" @click.stop>
-              <button class="action-btn" @click="openEditDialog(entity)"><el-icon><Edit /></el-icon></button>
-              <button class="action-btn danger" @click="confirmDelete(entity.id)"><el-icon><Delete /></el-icon></button>
-            </span>
+      <div v-else class="entities-grid">
+        <div v-for="entity in filteredEntities" :key="entity.id" class="entity-card" @click="openDetail(entity)">
+          <div class="card-header">
+            <div class="entity-avatar" :style="{ background: getAvatarColor(entity.name) }">
+              {{ entity.name?.charAt(0)?.toUpperCase() || '?' }}
+            </div>
+            <div class="entity-info">
+              <h3 class="entity-name">{{ entity.name }}</h3>
+              <span class="entity-type" :class="entity.entity_type">{{ getTypeLabel(entity.entity_type) }}</span>
+            </div>
           </div>
+          <p class="entity-desc">{{ entity.description || $t('knowledge.noDescription') }}</p>
+          <div class="card-footer">
+            <span class="relation-count" v-if="getEntityRelations(entity.id).length">
+              <el-icon><Connection /></el-icon>
+              {{ getEntityRelations(entity.id).length }} {{ $t('knowledge.relations') }}
+            </span>
+            <div class="card-actions" @click.stop>
+              <button class="action-btn" @click="openEditDialog(entity)" :title="$t('common.edit')">
+                <el-icon><Edit /></el-icon>
+              </button>
+              <button class="action-btn danger" @click="confirmDelete(entity.id)" :title="$t('common.delete')">
+                <el-icon><Delete /></el-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="!filteredEntities.length && !loading" class="empty-state">
+          <div class="empty-icon">◇</div>
+          <p>{{ $t('knowledge.emptyGraph') }}</p>
+          <button class="cm-btn cm-btn-primary" @click="openCreateDialog">{{ $t('knowledge.addEntity') }}</button>
         </div>
       </div>
     </main>
 
-    <el-drawer v-model="showDetailDrawer" :title="selectedEntity?.name" size="520px" class="entity-drawer">
-      <div v-if="selectedEntity" class="drawer-content">
-        <div class="drawer-header">
-          <div class="entity-avatar-large" :style="{ background: getAvatarColor(selectedEntity.name) }">{{ selectedEntity.name.charAt(0).toUpperCase() }}</div>
-          <div>
-            <h2>{{ selectedEntity.name }}</h2>
-            <span class="type-badge-large" :class="selectedEntity.entity_type">{{ getTypeLabel(selectedEntity.entity_type) }}</span>
+    <el-drawer v-model="detailVisible" :title="detailEntity?.name" size="400px" direction="rtl">
+      <div v-if="detailEntity" class="detail-content">
+        <div class="detail-header">
+          <div class="detail-avatar" :style="{ background: getAvatarColor(detailEntity.name) }">
+            {{ detailEntity.name?.charAt(0)?.toUpperCase() || '?' }}
           </div>
-          <div class="drawer-actions">
-            <button class="cm-btn cm-btn-secondary" @click="openEditDialog(selectedEntity); showDetailDrawer = false">{{ $t('common.edit') }}</button>
-            <button class="cm-btn cm-btn-danger" @click="confirmDelete(selectedEntity.id); showDetailDrawer = false">{{ $t('common.delete') }}</button>
+          <div class="detail-meta">
+            <h2>{{ detailEntity.name }}</h2>
+            <span class="detail-type" :class="detailEntity.entity_type">{{ getTypeLabel(detailEntity.entity_type) }}</span>
           </div>
         </div>
-        <div class="drawer-section">
+        <div class="detail-section">
           <h3>{{ $t('knowledge.description') }}</h3>
-          <p>{{ selectedEntity.description || $t('knowledge.noDescription') }}</p>
+          <p>{{ detailEntity.description || $t('knowledge.noDescription') }}</p>
         </div>
-        <div class="drawer-section">
+        <div class="detail-section" v-if="getEntityRelations(detailEntity.id).length">
           <h3>{{ $t('knowledge.relations') }}</h3>
-          <div class="relation-list" v-if="getEntityRelations(selectedEntity.id).length">
-            <div v-for="rel in getEntityRelations(selectedEntity.id)" :key="rel.id" class="relation-item">
-              <div class="relation-node" :class="{ 'is-source': rel.source_id === selectedEntity.id }">{{ getEntityName(rel.source_id) }}</div>
-              <div class="relation-arrow">
-                <span class="relation-type">{{ rel.relation_type }}</span>
-                <el-icon><ArrowRight /></el-icon>
-              </div>
-              <div class="relation-node" :class="{ 'is-target': rel.target_id === selectedEntity.id }">{{ getEntityName(rel.target_id) }}</div>
-              <button class="action-btn danger" @click="deleteRelation(rel.id)" :title="$t('common.delete')"><el-icon><Delete /></el-icon></button>
-            </div>
-          </div>
-          <p v-else class="empty-hint">{{ $t('knowledge.noRelations') }}</p>
-        </div>
-        <div class="drawer-section" v-if="selectedEntity.properties && selectedEntity.properties !== '{}'">
-          <h3>{{ $t('knowledge.properties') }}</h3>
-          <div class="properties-grid">
-            <div v-for="(value, key) in parseProperties(selectedEntity.properties)" :key="key" class="property-item">
-              <span class="property-key">{{ key }}</span>
-              <span class="property-value">{{ value }}</span>
+          <div class="relation-list">
+            <div v-for="r in getEntityRelations(detailEntity.id)" :key="r.id" class="relation-item">
+              <span class="relation-node" :class="{ source: r.source_id === detailEntity.id }">
+                {{ getEntityName(r.source_id) }}
+              </span>
+              <span class="relation-arrow">→ {{ r.relation_type }} →</span>
+              <span class="relation-node" :class="{ target: r.target_id === detailEntity.id }">
+                {{ getEntityName(r.target_id) }}
+              </span>
             </div>
           </div>
         </div>
       </div>
     </el-drawer>
 
-    <el-dialog v-model="showCreateDialog" :title="$t('knowledge.createEntity')" width="560px">
-      <div class="form-grid">
-        <div class="form-group">
-          <label>{{ $t('knowledge.entityName') }}</label>
-          <input v-model="formData.name" class="cm-input" :placeholder="$t('knowledge.entityNamePlaceholder')" />
-        </div>
-        <div class="form-group">
-          <label>{{ $t('knowledge.entityType') }}</label>
-          <select v-model="formData.entity_type" class="cm-input">
-            <option value="person">{{ $t('knowledge.types.person') }}</option>
-            <option value="organization">{{ $t('knowledge.types.organization') }}</option>
-            <option value="location">{{ $t('knowledge.types.location') }}</option>
-            <option value="concept">{{ $t('knowledge.types.concept') }}</option>
-            <option value="technology">{{ $t('knowledge.types.technology') }}</option>
-            <option value="event">{{ $t('knowledge.types.event') }}</option>
-          </select>
-        </div>
-        <div class="form-group full-width">
-          <label>{{ $t('knowledge.description') }}</label>
-          <textarea v-model="formData.description" class="cm-input" rows="3" :placeholder="$t('knowledge.descriptionPlaceholder')"></textarea>
-        </div>
+    <el-dialog v-model="showCreateDialog" :title="$t('knowledge.addEntity')" width="480px">
+      <div class="form-group">
+        <label>{{ $t('knowledge.entityName') }}</label>
+        <input v-model="formData.name" class="cm-input" :placeholder="$t('knowledge.entityNamePlaceholder')" />
+      </div>
+      <div class="form-group">
+        <label>{{ $t('knowledge.entityType') }}</label>
+        <select v-model="formData.entity_type" class="cm-input">
+          <option value="person">{{ $t('knowledge.types.person') }}</option>
+          <option value="organization">{{ $t('knowledge.types.organization') }}</option>
+          <option value="location">{{ $t('knowledge.types.location') }}</option>
+          <option value="concept">{{ $t('knowledge.types.concept') }}</option>
+          <option value="technology">{{ $t('knowledge.types.technology') }}</option>
+          <option value="event">{{ $t('knowledge.types.event') }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>{{ $t('knowledge.description') }}</label>
+        <textarea v-model="formData.description" class="cm-input" rows="3" :placeholder="$t('knowledge.descriptionPlaceholder')"></textarea>
       </div>
       <template #footer>
         <button class="cm-btn cm-btn-secondary" @click="showCreateDialog = false">{{ $t('common.cancel') }}</button>
@@ -203,27 +138,25 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showEditDialog" :title="$t('knowledge.editEntity')" width="560px">
-      <div class="form-grid">
-        <div class="form-group">
-          <label>{{ $t('knowledge.entityName') }}</label>
-          <input v-model="formData.name" class="cm-input" :placeholder="$t('knowledge.entityNamePlaceholder')" />
-        </div>
-        <div class="form-group">
-          <label>{{ $t('knowledge.entityType') }}</label>
-          <select v-model="formData.entity_type" class="cm-input">
-            <option value="person">{{ $t('knowledge.types.person') }}</option>
-            <option value="organization">{{ $t('knowledge.types.organization') }}</option>
-            <option value="location">{{ $t('knowledge.types.location') }}</option>
-            <option value="concept">{{ $t('knowledge.types.concept') }}</option>
-            <option value="technology">{{ $t('knowledge.types.technology') }}</option>
-            <option value="event">{{ $t('knowledge.types.event') }}</option>
-          </select>
-        </div>
-        <div class="form-group full-width">
-          <label>{{ $t('knowledge.description') }}</label>
-          <textarea v-model="formData.description" class="cm-input" rows="3" :placeholder="$t('knowledge.descriptionPlaceholder')"></textarea>
-        </div>
+    <el-dialog v-model="showEditDialog" :title="$t('knowledge.editEntity')" width="480px">
+      <div class="form-group">
+        <label>{{ $t('knowledge.entityName') }}</label>
+        <input v-model="formData.name" class="cm-input" />
+      </div>
+      <div class="form-group">
+        <label>{{ $t('knowledge.entityType') }}</label>
+        <select v-model="formData.entity_type" class="cm-input">
+          <option value="person">{{ $t('knowledge.types.person') }}</option>
+          <option value="organization">{{ $t('knowledge.types.organization') }}</option>
+          <option value="location">{{ $t('knowledge.types.location') }}</option>
+          <option value="concept">{{ $t('knowledge.types.concept') }}</option>
+          <option value="technology">{{ $t('knowledge.types.technology') }}</option>
+          <option value="event">{{ $t('knowledge.types.event') }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>{{ $t('knowledge.description') }}</label>
+        <textarea v-model="formData.description" class="cm-input" rows="3"></textarea>
       </div>
       <template #footer>
         <button class="cm-btn cm-btn-secondary" @click="showEditDialog = false">{{ $t('common.cancel') }}</button>
@@ -231,28 +164,22 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showRelationDialog" :title="$t('knowledge.addRelation')" width="560px">
-      <div class="form-grid">
-        <div class="form-group">
-          <label>{{ $t('knowledge.sourceEntity') }}</label>
-          <select v-model="relationForm.source_id" class="cm-input">
-            <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name }}</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>{{ $t('knowledge.relationType') }}</label>
-          <input v-model="relationForm.relation_type" class="cm-input" :placeholder="$t('knowledge.relationTypePlaceholder')" />
-        </div>
-        <div class="form-group">
-          <label>{{ $t('knowledge.targetEntity') }}</label>
-          <select v-model="relationForm.target_id" class="cm-input">
-            <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name }}</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>{{ $t('knowledge.description') }}</label>
-          <input v-model="relationForm.description" class="cm-input" />
-        </div>
+    <el-dialog v-model="showRelationDialog" :title="$t('knowledge.addRelation')" width="480px">
+      <div class="form-group">
+        <label>{{ $t('knowledge.sourceEntity') }}</label>
+        <select v-model="relationForm.source_id" class="cm-input">
+          <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>{{ $t('knowledge.relationType') }}</label>
+        <input v-model="relationForm.relation_type" class="cm-input" :placeholder="$t('knowledge.relationTypePlaceholder')" />
+      </div>
+      <div class="form-group">
+        <label>{{ $t('knowledge.targetEntity') }}</label>
+        <select v-model="relationForm.target_id" class="cm-input">
+          <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name }}</option>
+        </select>
       </div>
       <template #footer>
         <button class="cm-btn cm-btn-secondary" @click="showRelationDialog = false">{{ $t('common.cancel') }}</button>
@@ -264,137 +191,148 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Link, Connection, Edit, Delete, RefreshRight, ZoomIn, ZoomOut, ArrowRight, Grid, List } from '@element-plus/icons-vue'
-import { useKnowledgeStore } from '@/stores/knowledge'
+import { Search, Plus, Connection, Edit, Delete, Loading, Warning } from '@element-plus/icons-vue'
+import axios from '../api/client'
+import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-const store = useKnowledgeStore()
 
-const currentView = ref('grid')
+const entities = ref<any[]>([])
+const relations = ref<any[]>([])
+const loading = ref(true)
+const error = ref('')
 const searchQuery = ref('')
 const selectedCategory = ref('')
-const showDetailDrawer = ref(false)
+const detailVisible = ref(false)
+const detailEntity = ref<any>(null)
 const showCreateDialog = ref(false)
 const showEditDialog = ref(false)
 const showRelationDialog = ref(false)
-const selectedEntity = ref<any>(null)
-const editingEntityId = ref<number | null>(null)
-const formData = ref({ name: '', entity_type: 'person', description: '' })
-const relationForm = ref({ source_id: 0, target_id: 0, relation_type: '', description: '' })
+const editingEntity = ref<any>(null)
 
-const viewTabs = [
-  { key: 'grid', label: t('knowledge.gridView'), icon: Grid },
-  { key: 'graph', label: t('knowledge.graphView'), icon: Connection },
-  { key: 'list', label: t('knowledge.listView'), icon: List },
-]
+const formData = ref({ name: '', entity_type: 'concept', description: '' })
+const relationForm = ref({ source_id: 0, target_id: 0, relation_type: '' })
 
-const entities = computed(() => store.entities)
-const relations = computed(() => store.relations)
-
-const typeLabels: Record<string, string> = {
-  person: t('knowledge.types.person'),
-  organization: t('knowledge.types.organization'),
-  location: t('knowledge.types.location'),
-  concept: t('knowledge.types.concept'),
-  technology: t('knowledge.types.technology'),
-  event: t('knowledge.types.event'),
+const typeConfig: Record<string, { icon: string; label: string }> = {
+  person: { icon: '👤', label: t('knowledge.types.person') },
+  organization: { icon: '🏢', label: t('knowledge.types.organization') },
+  location: { icon: '📍', label: t('knowledge.types.location') },
+  concept: { icon: '💡', label: t('knowledge.types.concept') },
+  technology: { icon: '🔧', label: t('knowledge.types.technology') },
+  event: { icon: '📅', label: t('knowledge.types.event') },
 }
 
-function getTypeLabel(type: string) {
-  return typeLabels[type] || type
-}
-
-const categories = computed(() => {
-  const types = [...new Set(entities.value.map((e: any) => e.entity_type))]
-  const icons: Record<string, string> = { person: '👤', organization: '🏢', location: '📍', concept: '💡', technology: '⚡', event: '📅' }
-  return types.map(type => ({
-    type,
-    label: getTypeLabel(type),
-    icon: icons[type] || '📄',
-    count: entities.value.filter((e: any) => e.entity_type === type).length,
-  }))
+const categoryStats = computed(() => {
+  const stats: Record<string, { type: string; icon: string; label: string; count: number }> = {}
+  entities.value.forEach(e => {
+    if (!stats[e.entity_type]) {
+      stats[e.entity_type] = { type: e.entity_type, ...typeConfig[e.entity_type] || { icon: '◇', label: e.entity_type }, count: 0 }
+    }
+    stats[e.entity_type].count++
+  })
+  return Object.values(stats)
 })
 
 const filteredEntities = computed(() => {
   let result = entities.value
+  if (selectedCategory.value) {
+    result = result.filter(e => e.entity_type === selectedCategory.value)
+  }
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
-    result = result.filter((e: any) => e.name.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q))
-  }
-  if (selectedCategory.value) {
-    result = result.filter((e: any) => e.entity_type === selectedCategory.value)
+    result = result.filter(e => e.name?.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q))
   }
   return result
 })
 
-const graphData = computed(() => ({
-  nodes: entities.value.map((e: any) => ({ id: String(e.id), label: e.name, group: e.entity_type, value: getEntityRelations(e.id).length + 1 })),
-  edges: relations.value.map((r: any) => ({ from: String(r.source_id), to: String(r.target_id), label: r.relation_type })),
-}))
-
-function getEntityRelations(entityId: number) {
-  return relations.value.filter((r: any) => r.source_id === entityId || r.target_id === entityId)
-}
-
-function getEntityName(id: number) {
-  return entities.value.find((e: any) => e.id === id)?.name || 'Unknown'
+function getTypeLabel(type: string) {
+  return typeConfig[type]?.label || type
 }
 
 function getAvatarColor(name: string) {
-  const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4']
-  let hash = 0
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  return colors[Math.abs(hash) % colors.length]
+  const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#0ea5e9', '#3b82f6']
+  const idx = name?.charCodeAt(0) % colors.length || 0
+  return colors[idx]
 }
 
-function parseProperties(props: string) {
-  try { return JSON.parse(props) } catch { return {} }
+function getEntityRelations(entityId: number) {
+  return relations.value.filter(r => r.source_id === entityId || r.target_id === entityId)
+}
+
+function getEntityName(id: number) {
+  return entities.value.find(e => e.id === id)?.name || 'Unknown'
+}
+
+async function loadData() {
+  loading.value = true
+  error.value = ''
+  try {
+    const [entRes, relRes] = await Promise.all([
+      axios.get('/knowledge/entities', { params: { page: 1, size: 200 } }),
+      axios.get('/knowledge/relations', { params: { page: 1, size: 200 } }),
+    ])
+    entities.value = entRes.data.items || entRes.data || []
+    relations.value = relRes.data.items || relRes.data || []
+  } catch (e: any) {
+    const msg = e.response?.data?.error || e.response?.data?.detail || t('common.loadFailed')
+    error.value = msg
+    ElMessage.error(msg)
+  } finally {
+    loading.value = false
+  }
 }
 
 function openDetail(entity: any) {
-  selectedEntity.value = entity
-  showDetailDrawer.value = true
+  detailEntity.value = entity
+  detailVisible.value = true
 }
 
 function openCreateDialog() {
-  formData.value = { name: '', entity_type: 'person', description: '' }
+  formData.value = { name: '', entity_type: 'concept', description: '' }
   showCreateDialog.value = true
 }
 
 function openEditDialog(entity: any) {
-  editingEntityId.value = entity.id
+  editingEntity.value = entity
   formData.value = { name: entity.name, entity_type: entity.entity_type, description: entity.description || '' }
   showEditDialog.value = true
 }
 
 async function createEntity() {
-  if (!formData.value.name.trim()) { ElMessage.warning(t('knowledge.fillRequired')); return }
+  if (!formData.value.name) {
+    ElMessage.warning(t('knowledge.nameRequired'))
+    return
+  }
   try {
-    await store.createEntity(formData.value)
+    const { data } = await axios.post('/knowledge/entities', formData.value)
+    entities.value.unshift(data)
     showCreateDialog.value = false
     ElMessage.success(t('common.created'))
-  } catch { ElMessage.error(t('common.failed')) }
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.error || t('common.createFailed'))
+  }
 }
 
 async function updateEntity() {
-  if (!editingEntityId.value) return
+  if (!editingEntity.value) return
   try {
-    await store.updateEntity(editingEntityId.value, formData.value)
+    const { data } = await axios.put(`/knowledge/entities/${editingEntity.value.id}`, formData.value)
+    const idx = entities.value.findIndex(e => e.id === editingEntity.value.id)
+    if (idx >= 0) entities.value[idx] = data
     showEditDialog.value = false
     ElMessage.success(t('common.saved'))
-    if (selectedEntity.value?.id === editingEntityId.value) {
-      selectedEntity.value = { ...selectedEntity.value, ...formData.value }
-    }
-  } catch { ElMessage.error(t('common.failed')) }
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.error || t('common.saveFailed'))
+  }
 }
 
 async function confirmDelete(id: number) {
   try {
-    await ElMessageBox.confirm(t('knowledge.deleteEntityConfirm'), t('common.confirm'), { type: 'warning' })
-    await store.deleteEntity(id)
-    if (selectedEntity.value?.id === id) showDetailDrawer.value = false
+    await ElMessageBox.confirm(t('knowledge.confirmDelete'), t('common.confirm'), { type: 'warning' })
+    await axios.delete(`/knowledge/entities/${id}`)
+    entities.value = entities.value.filter(e => e.id !== id)
+    relations.value = relations.value.filter(r => r.source_id !== id && r.target_id !== id)
     ElMessage.success(t('common.deleted'))
   } catch {}
 }
@@ -405,135 +343,96 @@ async function createRelation() {
     return
   }
   try {
-    await store.createRelation(relationForm.value)
+    const { data } = await axios.post('/knowledge/relations', relationForm.value)
+    relations.value.unshift(data)
     showRelationDialog.value = false
-    relationForm.value = { source_id: 0, target_id: 0, relation_type: '', description: '' }
     ElMessage.success(t('common.created'))
-  } catch { ElMessage.error(t('common.failed')) }
-}
-
-async function deleteRelation(id: number) {
-  try {
-    await store.deleteRelation(id)
-    ElMessage.success(t('common.deleted'))
-  } catch { ElMessage.error(t('common.failed')) }
-}
-
-function resetGraph() {}
-function zoomIn() {}
-function zoomOut() {}
-
-onMounted(async () => {
-  try {
-    await Promise.all([store.fetchEntities(1, 100), store.fetchRelations(1, 100)])
-  } catch (e) {
-    console.error('Failed to load knowledge data:', e)
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.error || t('common.createFailed'))
   }
-})
+}
+
+onMounted(loadData)
 </script>
 
 <style scoped>
-.knowledge-v2 { height: 100%; display: flex; flex-direction: column; }
-.knowledge-header { background: var(--cm-bg-primary); border-bottom: 1px solid var(--cm-border); padding: var(--cm-space-6); }
-.header-content { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--cm-space-4); }
-.header-title { display: flex; align-items: center; gap: var(--cm-space-3); }
-.title-icon { width: 48px; height: 48px; border-radius: var(--cm-radius-lg); background: var(--cm-primary-gradient); color: white; display: flex; align-items: center; justify-content: center; }
-.header-title h1 { font-size: 24px; font-weight: 700; color: var(--cm-text-primary); }
-.subtitle { font-size: 14px; color: var(--cm-text-secondary); margin-top: 2px; }
-.header-actions { display: flex; align-items: center; gap: var(--cm-space-3); }
-.search-box { position: relative; width: 280px; }
-.search-icon { position: absolute; left: var(--cm-space-3); top: 50%; transform: translateY(-50%); color: var(--cm-text-tertiary); }
-.search-input { width: 100%; padding: var(--cm-space-2) var(--cm-space-3) var(--cm-space-2) 36px; border: 1px solid var(--cm-border); border-radius: var(--cm-radius-md); background: var(--cm-bg-secondary); color: var(--cm-text-primary); font-size: 14px; }
-.search-input:focus { outline: none; border-color: var(--cm-primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
-.view-tabs { display: flex; gap: var(--cm-space-1); }
-.tab-btn { display: flex; align-items: center; gap: var(--cm-space-2); padding: var(--cm-space-2) var(--cm-space-4); border: none; background: transparent; color: var(--cm-text-secondary); font-size: 14px; font-weight: 500; border-radius: var(--cm-radius-md); cursor: pointer; }
-.tab-btn:hover { background: var(--cm-bg-tertiary); color: var(--cm-text-primary); }
-.tab-btn.active { background: var(--cm-primary); color: white; }
-.knowledge-content { flex: 1; overflow: auto; padding: var(--cm-space-6); }
-.category-filters { display: flex; gap: var(--cm-space-2); margin-bottom: var(--cm-space-5); flex-wrap: wrap; }
-.filter-chip { display: flex; align-items: center; gap: var(--cm-space-2); padding: var(--cm-space-2) var(--cm-space-3); border: 1px solid var(--cm-border); border-radius: 20px; background: var(--cm-bg-primary); color: var(--cm-text-secondary); font-size: 13px; cursor: pointer; }
-.filter-chip:hover { border-color: var(--cm-primary); color: var(--cm-text-primary); }
-.filter-chip.active { background: var(--cm-primary); border-color: var(--cm-primary); color: white; }
-.chip-icon { font-size: 14px; }
-.chip-count { padding: 1px 6px; background: var(--cm-bg-tertiary); border-radius: 20px; font-size: 11px; font-weight: 600; }
-.filter-chip.active .chip-count { background: rgba(255,255,255,0.2); }
-.entities-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--cm-space-4); }
-.entity-card { background: var(--cm-bg-primary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.2s; }
+.knowledge-page { height: 100%; display: flex; flex-direction: column; background: var(--cm-bg-secondary); }
+
+.page-header { background: var(--cm-bg-primary); padding: 20px 24px; border-bottom: 1px solid var(--cm-border); display: flex; justify-content: space-between; align-items: center; }
+.header-left h1 { font-size: 22px; font-weight: 700; color: var(--cm-text); margin: 0; }
+.subtitle { font-size: 13px; color: var(--cm-text-muted); margin: 4px 0 0; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.search-box { position: relative; }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--cm-text-muted); }
+.search-input { width: 200px; padding: 8px 12px 8px 32px; border: 1px solid var(--cm-border); border-radius: 8px; background: var(--cm-bg); color: var(--cm-text); font-size: 14px; }
+.search-input:focus { outline: none; border-color: var(--cm-primary); }
+
+.category-bar { padding: 12px 24px; display: flex; gap: 8px; flex-wrap: wrap; background: var(--cm-bg-primary); border-bottom: 1px solid var(--cm-border); }
+.cat-btn { display: flex; align-items: center; gap: 6px; padding: 6px 14px; border: 1px solid var(--cm-border); border-radius: 20px; background: var(--cm-bg); color: var(--cm-text-secondary); font-size: 13px; cursor: pointer; }
+.cat-btn:hover { border-color: var(--cm-primary); }
+.cat-btn.active { background: var(--cm-primary); border-color: var(--cm-primary); color: white; }
+.cat-icon { font-size: 14px; }
+.cat-count { padding: 1px 6px; background: var(--cm-bg-tertiary); border-radius: 10px; font-size: 11px; }
+.cat-btn.active .cat-count { background: rgba(255,255,255,0.2); }
+
+.page-content { flex: 1; padding: 24px; overflow: auto; }
+
+.loading-state, .error-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; color: var(--cm-text-muted); }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error-state { color: #f43f5e; }
+
+.entities-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+
+.entity-card { background: var(--cm-bg-primary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s; }
 .entity-card:hover { border-color: var(--cm-primary); box-shadow: 0 4px 12px rgba(0,0,0,0.08); transform: translateY(-2px); }
-.card-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.entity-avatar { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 16px; flex-shrink: 0; }
-.entity-meta { flex: 1; min-width: 0; }
-.entity-name { font-size: 16px; font-weight: 600; color: var(--cm-text-primary); margin: 0 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.entity-type-badge { font-size: 12px; padding: 2px 8px; border-radius: 20px; background: var(--cm-bg-tertiary); color: var(--cm-text-secondary); }
-.entity-desc { font-size: 14px; color: var(--cm-text-secondary); line-height: 1.5; margin: 0 0 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.card-bottom { display: flex; align-items: center; gap: 8px; }
-.relation-info { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--cm-primary); font-weight: 500; }
-.confidence-info { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--cm-text-tertiary); }
-.confidence-bar { width: 60px; height: 4px; background: var(--cm-bg-tertiary); border-radius: 4px; overflow: hidden; }
-.confidence-fill { height: 100%; background: var(--cm-primary-gradient); border-radius: 4px; }
+
+.card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.entity-avatar { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 16px; }
+.entity-info { flex: 1; min-width: 0; }
+.entity-name { font-size: 15px; font-weight: 600; color: var(--cm-text); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entity-type { font-size: 12px; padding: 2px 8px; border-radius: 12px; background: var(--cm-bg-tertiary); color: var(--cm-text-secondary); }
+
+.entity-desc { font-size: 13px; color: var(--cm-text-secondary); line-height: 1.5; margin: 0 0 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.card-footer { display: flex; align-items: center; gap: 8px; }
+.relation-count { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--cm-primary); }
 .card-actions { margin-left: auto; display: flex; gap: 4px; }
-.card-action-btn { width: 28px; height: 28px; border: none; background: transparent; color: var(--cm-text-tertiary); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.card-action-btn:hover { background: var(--cm-bg-tertiary); color: var(--cm-text-primary); }
-.card-action-btn.danger:hover { background: rgba(239,68,68,0.1); color: #ef4444; }
-.empty-state { text-align: center; padding: 60px 20px; grid-column: 1 / -1; }
-.empty-icon { font-size: 48px; color: var(--cm-text-tertiary); margin-bottom: 12px; }
-.empty-state p { color: var(--cm-text-secondary); margin-bottom: 16px; }
-.graph-view-v2 { height: 100%; display: flex; flex-direction: column; }
-.graph-toolbar { display: flex; justify-content: space-between; align-items: center; padding: var(--cm-space-3); background: var(--cm-bg-primary); border: 1px solid var(--cm-border); border-radius: 12px; margin-bottom: var(--cm-space-4); }
-.toolbar-group { display: flex; align-items: center; gap: var(--cm-space-2); }
-.tool-btn { width: 36px; height: 36px; border: none; background: transparent; color: var(--cm-text-secondary); border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.tool-btn:hover { background: var(--cm-bg-tertiary); color: var(--cm-text-primary); }
-.graph-stats { font-size: 13px; color: var(--cm-text-tertiary); }
-.graph-canvas { flex: 1; background: var(--cm-bg-primary); border: 1px solid var(--cm-border); border-radius: 12px; min-height: 400px; }
-.list-view { background: var(--cm-bg-primary); border: 1px solid var(--cm-border); border-radius: 12px; overflow: hidden; }
-.list-header { display: grid; grid-template-columns: 2fr 1fr 100px 100px; gap: var(--cm-space-4); padding: 12px 20px; background: var(--cm-bg-secondary); border-bottom: 1px solid var(--cm-border); font-size: 12px; font-weight: 600; color: var(--cm-text-tertiary); }
-.list-row { display: grid; grid-template-columns: 2fr 1fr 100px 100px; gap: var(--cm-space-4); padding: 12px 20px; align-items: center; border-bottom: 1px solid var(--cm-border); cursor: pointer; }
-.list-row:hover { background: var(--cm-bg-secondary); }
-.list-col.name { display: flex; align-items: center; gap: 10px; font-weight: 500; }
-.entity-avatar-small { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px; }
-.type-badge { font-size: 12px; padding: 2px 10px; border-radius: 20px; background: var(--cm-bg-tertiary); color: var(--cm-text-secondary); }
-.list-col.actions { display: flex; gap: 4px; }
-.action-btn { width: 28px; height: 28px; border: none; background: transparent; color: var(--cm-text-tertiary); border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
-.action-btn:hover { background: var(--cm-bg-tertiary); color: var(--cm-text-primary); }
+.action-btn { width: 28px; height: 28px; border: none; background: transparent; color: var(--cm-text-muted); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.action-btn:hover { background: var(--cm-bg-tertiary); color: var(--cm-text); }
 .action-btn.danger:hover { background: rgba(239,68,68,0.1); color: #ef4444; }
-.drawer-content { padding: var(--cm-space-5); }
-.drawer-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
-.entity-avatar-large { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 24px; flex-shrink: 0; }
-.drawer-header h2 { font-size: 20px; font-weight: 700; margin: 0; }
-.type-badge-large { font-size: 13px; padding: 4px 12px; border-radius: 20px; background: var(--cm-bg-tertiary); color: var(--cm-text-secondary); margin-top: 4px; display: inline-block; }
-.drawer-actions { margin-left: auto; display: flex; gap: 8px; }
-.drawer-section { margin-bottom: 24px; }
-.drawer-section h3 { font-size: 13px; font-weight: 600; color: var(--cm-text-secondary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-.drawer-section p { font-size: 15px; line-height: 1.6; color: var(--cm-text-primary); }
-.empty-hint { font-size: 14px; color: var(--cm-text-tertiary); }
+
+.empty-state { text-align: center; padding: 60px; grid-column: 1 / -1; }
+.empty-icon { font-size: 48px; color: var(--cm-text-muted); margin-bottom: 12px; }
+.empty-state p { color: var(--cm-text-secondary); margin-bottom: 16px; }
+
+.detail-content { padding: 20px; }
+.detail-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+.detail-avatar { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 20px; }
+.detail-meta h2 { font-size: 18px; font-weight: 700; margin: 0; }
+.detail-type { font-size: 12px; padding: 3px 10px; border-radius: 12px; background: var(--cm-bg-tertiary); color: var(--cm-text-secondary); margin-top: 4px; display: inline-block; }
+.detail-section { margin-bottom: 20px; }
+.detail-section h3 { font-size: 13px; font-weight: 600; color: var(--cm-text-muted); margin-bottom: 8px; }
+.detail-section p { font-size: 14px; color: var(--cm-text-secondary); line-height: 1.6; }
 .relation-list { display: flex; flex-direction: column; gap: 8px; }
-.relation-item { display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 8px; }
-.relation-node { padding: 4px 10px; background: var(--cm-bg-primary); border-radius: 6px; font-size: 14px; font-weight: 500; }
-.relation-node.is-source { border-left: 3px solid var(--cm-primary); }
-.relation-node.is-target { border-left: 3px solid #10b981; }
-.relation-arrow { display: flex; align-items: center; gap: 4px; color: var(--cm-text-tertiary); font-size: 12px; }
-.relation-type { font-weight: 600; }
-.properties-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-.property-item { display: flex; flex-direction: column; gap: 2px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 8px; }
-.property-key { font-size: 11px; color: var(--cm-text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
-.property-value { font-size: 14px; color: var(--cm-text-primary); font-weight: 500; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.form-group { display: flex; flex-direction: column; gap: 6px; }
-.form-group.full-width { grid-column: 1 / -1; }
-.form-group label { font-size: 14px; font-weight: 500; color: var(--cm-text-secondary); }
-.cm-input { width: 100%; padding: 8px 12px; border: 1px solid var(--cm-border); border-radius: 8px; background: var(--cm-bg-secondary); color: var(--cm-text-primary); font-size: 14px; }
+.relation-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--cm-bg); border-radius: 8px; font-size: 13px; }
+.relation-node { padding: 3px 8px; background: var(--cm-bg-primary); border-radius: 6px; font-weight: 500; }
+.relation-node.source { border-left: 3px solid var(--cm-primary); }
+.relation-node.target { border-left: 3px solid #10b981; }
+.relation-arrow { color: var(--cm-text-muted); }
+
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--cm-text-secondary); margin-bottom: 6px; }
+.cm-input { width: 100%; padding: 10px 12px; border: 1px solid var(--cm-border); border-radius: 8px; background: var(--cm-bg); color: var(--cm-text); font-size: 14px; }
 .cm-input:focus { outline: none; border-color: var(--cm-primary); }
-.cm-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
-.cm-btn-primary { background: var(--cm-primary); color: white; }
-.cm-btn-primary:hover { opacity: 0.9; }
-.cm-btn-secondary { background: var(--cm-bg-tertiary); color: var(--cm-text-primary); }
-.cm-btn-secondary:hover { opacity: 0.9; }
-.cm-btn-danger { background: #ef4444; color: white; }
-.cm-btn-danger:hover { opacity: 0.9; }
+.cm-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border: 1px solid var(--cm-border); border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.cm-btn-primary { background: var(--cm-primary); border-color: var(--cm-primary); color: white; }
+.cm-btn-secondary { background: var(--cm-bg); color: var(--cm-text-secondary); }
+
 @media (max-width: 768px) {
-  .header-content { flex-direction: column; gap: var(--cm-space-4); align-items: stretch; }
-  .header-actions { flex-wrap: wrap; }
-  .search-box { width: 100%; }
+  .page-header { flex-direction: column; gap: 12px; align-items: stretch; }
+  .header-right { flex-wrap: wrap; }
+  .search-input { width: 100%; }
   .entities-grid { grid-template-columns: 1fr; }
 }
 </style>

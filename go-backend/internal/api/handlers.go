@@ -1849,6 +1849,136 @@ func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+func handleAutoImportMemories(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		homeDir, _ := os.UserHomeDir()
+		searchDirs := []string{}
+		if homeDir != "" {
+			searchDirs = append(searchDirs, filepath.Join(homeDir, ".openclaw"))
+			searchDirs = append(searchDirs, filepath.Join(homeDir, ".clawmemory"))
+			searchDirs = append(searchDirs, filepath.Join(homeDir, ".trae-cn"))
+		}
+
+		cfg := config.Load()
+		if cfg.DataDir != "" {
+			searchDirs = append(searchDirs, cfg.DataDir)
+		}
+
+		wd, _ := os.Getwd()
+		if wd != "" {
+			searchDirs = append(searchDirs, filepath.Join(wd, ".openclaw"))
+			searchDirs = append(searchDirs, filepath.Join(wd, ".clawmemory"))
+			searchDirs = append(searchDirs, filepath.Join(wd, "data"))
+		}
+
+		var imported, skipped, entitiesCreated int
+		var foundFiles []string
+
+		for _, dir := range searchDirs {
+			memFile := filepath.Join(dir, "memories.json")
+			if _, err := os.Stat(memFile); err == nil {
+				foundFiles = append(foundFiles, memFile)
+				content, err := os.ReadFile(memFile)
+				if err != nil {
+					continue
+				}
+				var memories []map[string]interface{}
+				if json.Unmarshal(content, &memories) != nil {
+					continue
+				}
+
+				for _, m := range memories {
+					key, _ := m["key"].(string)
+					contentStr, _ := m["content"].(string)
+					if key == "" || contentStr == "" {
+						skipped++
+						continue
+					}
+
+					var count int64
+					db.Table("memories").Where("key = ?", key).Count(&count)
+					if count > 0 {
+						skipped++
+						continue
+					}
+
+					layer := "knowledge"
+					if l, ok := m["layer"].(string); ok && l != "" {
+						layer = l
+					} else {
+						if strings.Contains(strings.ToLower(contentStr), "偏好") || strings.Contains(strings.ToLower(contentStr), "preference") || strings.Contains(strings.ToLower(contentStr), "我喜欢") || strings.Contains(strings.ToLower(contentStr), "i prefer") {
+							layer = "preference"
+						} else if strings.Contains(strings.ToLower(contentStr), "临时") || strings.Contains(strings.ToLower(contentStr), "temporary") || strings.Contains(strings.ToLower(contentStr), "todo") || strings.Contains(strings.ToLower(contentStr), "待办") {
+							layer = "short_term"
+						} else if strings.Contains(strings.ToLower(contentStr), "私密") || strings.Contains(strings.ToLower(contentStr), "private") || strings.Contains(strings.ToLower(contentStr), "密码") || strings.Contains(strings.ToLower(contentStr), "password") {
+							layer = "private"
+						}
+					}
+
+					importance := 0.5
+					if imp, ok := m["importance"].(float64); ok {
+						importance = imp
+					}
+
+					tags := ""
+					if t, ok := m["tags"].([]interface{}); ok && len(t) > 0 {
+						tagStrs := make([]string, 0)
+						for _, tag := range t {
+							if s, ok := tag.(string); ok {
+								tagStrs = append(tagStrs, s)
+							}
+						}
+						tags = strings.Join(tagStrs, ",")
+					}
+
+					source := "auto_import"
+					if s, ok := m["source"].(string); ok && s != "" {
+						source = s
+					}
+
+					result := db.Exec(`INSERT INTO memories (key, content, layer, importance, tags, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`, key, contentStr, layer, importance, tags, source)
+					if result.Error != nil {
+						skipped++
+						continue
+					}
+					imported++
+
+					if len(contentStr) > 20 && len(contentStr) < 500 {
+						entityType := "concept"
+						if strings.Contains(strings.ToLower(contentStr), "项目") || strings.Contains(strings.ToLower(contentStr), "project") {
+							entityType = "organization"
+						} else if strings.Contains(strings.ToLower(contentStr), "工具") || strings.Contains(strings.ToLower(contentStr), "tool") || strings.Contains(strings.ToLower(contentStr), "软件") {
+							entityType = "technology"
+						} else if strings.Contains(strings.ToLower(contentStr), "人") || strings.Contains(strings.ToLower(contentStr), "person") {
+							entityType = "person"
+						}
+
+						name := key
+						if len(name) > 50 {
+							name = name[:50]
+						}
+
+						var entityCount int64
+						db.Table("entities").Where("name = ?", name).Count(&entityCount)
+						if entityCount == 0 {
+							db.Exec(`INSERT INTO entities (user_id, name, entity_type, description, confidence, extract_method, created_at, updated_at) VALUES (1, ?, ?, ?, 0.8, 'auto_import', datetime('now'), datetime('now'))`, name, entityType, contentStr)
+							entitiesCreated++
+						}
+					}
+				}
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"imported":        imported,
+			"skipped":         skipped,
+			"entities_created": entitiesCreated,
+			"files_found":     foundFiles,
+			"message":         fmt.Sprintf("成功导入 %d 条记忆，创建 %d 个实体", imported, entitiesCreated),
+		})
+	}
+}
+
 func handleListBackups(c *gin.Context) {
 	backupDir := filepath.Join(".", "backups")
 	if _, err := os.Stat(backupDir); os.IsNotExist(err) {
