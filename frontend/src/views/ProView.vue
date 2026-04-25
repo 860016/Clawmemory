@@ -8,9 +8,7 @@
 
     <div class="pro-grid" v-if="isPro">
       <div class="fallback-banner" v-if="isFallback">
-        <span>⚠️ {{ $t('pro.fallbackMode') }}</span>
-        <span class="fallback-desc">{{ $t('pro.usingLocalAlgorithm') }}</span>
-        <el-button size="small" type="primary" text @click="$router.push('/settings')">{{ $t('pro.upgrade') }}</el-button>
+        <span>💡 {{ $t('pro.fallbackMode') }}</span>
       </div>
       <!-- Memory Decay -->
       <div class="pro-card" :class="{ 'section-highlight': activeSection === 'decay' }" id="pro-decay">
@@ -440,7 +438,6 @@ async function loadDecayStats() {
     pruneSuggestions.value = (data.memories || []).filter((m: any) => m.should_prune)
     if (data.fallback) {
       isFallback.value = true
-      ElMessage.info({ message: t('pro.usingLocalAlgorithm'), duration: 3000 })
     }
   } catch (e: any) {
     if (e.response?.status !== 403) ElMessage.error(e.response?.data?.detail || t('common.failed'))

@@ -501,10 +501,11 @@ export default {
     adjustedCount: 'Adjusted importance of {count} memories',
     tags: 'Tags',
     content: 'Content',
-    usingLocalAlgorithm: 'Using local basic algorithm (Pro License not activated, results may be less accurate)',
-    fallbackMode: 'Local Basic Mode',
+    usingLocalAlgorithm: 'Using local algorithm',
+    fallbackMode: 'Local Algorithm Mode',
     proNotActivated: 'Pro Features Not Activated',
     proActivateHint: 'Please enter License Key in Settings to activate Pro features',
+    proApiUnavailable: 'Pro API service temporarily unavailable, switched to local algorithm',
   },
   skills: {
     title: 'Skills Scanner',
