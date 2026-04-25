@@ -10,6 +10,7 @@
       <div class="fallback-banner" v-if="isFallback">
         <span>⚠️ {{ $t('pro.fallbackMode') }}</span>
         <span class="fallback-desc">{{ $t('pro.usingLocalAlgorithm') }}</span>
+        <el-button size="small" type="primary" text @click="$router.push('/settings')">{{ $t('pro.upgrade') }}</el-button>
       </div>
       <!-- Memory Decay -->
       <div class="pro-card" :class="{ 'section-highlight': activeSection === 'decay' }" id="pro-decay">
