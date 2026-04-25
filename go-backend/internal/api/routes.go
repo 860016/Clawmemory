@@ -89,6 +89,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 
 		authorized.GET("/openclaw-skills/scan", handleScanSkills)
 		authorized.GET("/openclaw-skills/detail", handleSkillDetail)
+		authorized.POST("/openclaw-skills/install", handleInstallSkill)
 
 		authorized.GET("/openclaw-memories/scan", handleScanOpenClawMemories)
 		authorized.GET("/openclaw-memories/scan/:agentName", handleScanOpenClawAgent)
