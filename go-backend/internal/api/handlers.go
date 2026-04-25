@@ -1255,36 +1255,23 @@ func handleScanSkills(c *gin.Context) {
 		}
 	}
 
-	homeDir, _ := os.UserHomeDir()
-	if homeDir != "" {
-		addDir(filepath.Join(homeDir, ".openclaw", "skills"))
-		addDir(filepath.Join(homeDir, ".clawmemory", "skills"))
-	}
-
 	cfg := config.Load()
-	if cfg.DataDir != "" {
-		addDir(filepath.Join(cfg.DataDir, "skills"))
-	}
+	addDir(cfg.SkillsDir)
 
 	exe, _ := os.Executable()
 	if exe != "" {
 		addDir(filepath.Join(filepath.Dir(exe), "skills"))
 	}
 
-	wd, _ := os.Getwd()
-	if wd != "" {
-		addDir(filepath.Join(wd, "skills"))
-		addDir(filepath.Join(wd, ".openclaw", "skills"))
-		addDir(filepath.Join(wd, ".clawmemory", "skills"))
+	homeDir, _ := os.UserHomeDir()
+	if homeDir != "" {
+		addDir(filepath.Join(homeDir, ".openclaw", "skills"))
 	}
 
 	globalSkills := make([]map[string]interface{}, 0)
 	workspaceSkills := make([]map[string]interface{}, 0)
 
-	globalDir := ""
-	if homeDir != "" {
-		globalDir, _ = filepath.Abs(filepath.Join(homeDir, ".openclaw", "skills"))
-	}
+	globalDir, _ := filepath.Abs(cfg.SkillsDir)
 
 	for _, dir := range dataDirs {
 		entries, err := os.ReadDir(dir)
@@ -1361,14 +1348,8 @@ func handleInstallSkill(c *gin.Context) {
 		req.Scope = "global"
 	}
 
-	homeDir, _ := os.UserHomeDir()
-	var targetDir string
-	if req.Scope == "global" && homeDir != "" {
-		targetDir = filepath.Join(homeDir, ".openclaw", "skills")
-	} else {
-		wd, _ := os.Getwd()
-		targetDir = filepath.Join(wd, "skills")
-	}
+	cfg := config.Load()
+	targetDir := cfg.SkillsDir
 
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create skills directory"})

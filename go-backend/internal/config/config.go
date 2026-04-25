@@ -11,10 +11,14 @@ type Config struct {
 	RSAPublicKeyPath  string
 	JWTSecret         string
 	DataDir           string
+	SkillsDir         string
+	BackupsDir        string
 }
 
 func Load() *Config {
 	dataDir := getDataDir()
+	skillsDir := getSkillsDir(dataDir)
+	backupsDir := getBackupsDir(dataDir)
 
 	return &Config{
 		DatabasePath:      filepath.Join(dataDir, "clawmemory.db"),
@@ -22,6 +26,8 @@ func Load() *Config {
 		RSAPublicKeyPath:  filepath.Join(dataDir, "keys", "public.pem"),
 		JWTSecret:         getEnv("SECRET_KEY", "clawmemory-default-secret-change-me"),
 		DataDir:           dataDir,
+		SkillsDir:         skillsDir,
+		BackupsDir:        backupsDir,
 	}
 }
 
@@ -43,4 +49,18 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func getSkillsDir(dataDir string) string {
+	if dir := getEnv("SKILLS_DIR", ""); dir != "" {
+		return dir
+	}
+	return filepath.Join(dataDir, "skills")
+}
+
+func getBackupsDir(dataDir string) string {
+	if dir := getEnv("BACKUPS_DIR", ""); dir != "" {
+		return dir
+	}
+	return filepath.Join(dataDir, "backups")
 }
