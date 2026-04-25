@@ -1662,14 +1662,21 @@ func handleScanOpenClawMemories(c *gin.Context) {
 		if len(previews) > 0 {
 			agents := make([]map[string]interface{}, 0)
 			for name, count := range agentCountMap {
-				agentPreviews := make([]memoryPreview, 0)
+				agentPreviews := make([]map[string]interface{}, 0)
 				for _, p := range previews {
 					if p.AgentName == name {
-						agentPreviews = append(agentPreviews, p)
+						agentPreviews = append(agentPreviews, map[string]interface{}{
+							"key":    p.Key,
+							"value":  p.Content,
+							"layer":  p.Layer,
+							"source": p.Source,
+						})
 					}
 				}
 				agents = append(agents, map[string]interface{}{
-					"name":         name,
+					"agent_name":   name,
+					"layout":       "v2",
+					"files":        count,
 					"memory_count": count,
 					"previews":     agentPreviews,
 				})
@@ -1680,7 +1687,6 @@ func handleScanOpenClawMemories(c *gin.Context) {
 				"openclaw_dir":   dir,
 				"agents":         agents,
 				"total_memories": len(previews),
-				"previews":       previews,
 			})
 			return
 		}
@@ -1702,18 +1708,23 @@ func handleScanOpenClawAgent(c *gin.Context) {
 
 		previews, _ := extractMemoriesFromDir(dir)
 
-		filtered := make([]memoryPreview, 0)
+		filtered := make([]map[string]interface{}, 0)
 		for _, p := range previews {
 			if p.AgentName == agentName {
-				filtered = append(filtered, p)
+				filtered = append(filtered, map[string]interface{}{
+					"key":    p.Key,
+					"value":  p.Content,
+					"layer":  p.Layer,
+					"source": p.Source,
+				})
 			}
 		}
 
 		if len(filtered) > 0 {
 			c.JSON(http.StatusOK, gin.H{
-				"agent":    agentName,
-				"memories": filtered,
-				"total":    len(filtered),
+				"agent_name": agentName,
+				"preview":    filtered,
+				"total":      len(filtered),
 			})
 			return
 		}
@@ -1726,6 +1737,7 @@ func handleScanOpenClawAgent(c *gin.Context) {
 
 func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		var req struct {
 			AgentName    string `json:"agent_name"`
 			Layer        string `json:"layer"`
@@ -1745,7 +1757,7 @@ func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
 
 		seenKeys := make(map[string]bool)
 		var existingKeys []string
-		db.Table("memories").Where("status != ?", "trashed").Pluck("key", &existingKeys)
+		db.Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Pluck("key", &existingKeys)
 		for _, k := range existingKeys {
 			seenKeys[k] = true
 		}
@@ -1774,7 +1786,7 @@ func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
 
 				if req.SkipExisting {
 					var count int64
-					db.Table("memories").Where("key = ?", p.Key).Count(&count)
+					db.Table("memories").Where("user_id = ? AND key = ?", userID, p.Key).Count(&count)
 					if count > 0 {
 						skipped++
 						seenKeys[p.Key] = true
@@ -1788,18 +1800,35 @@ func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
 					if err == nil {
 						ext := strings.ToLower(filepath.Ext(p.FilePath))
 						if ext == ".json" {
-							var memories []map[string]interface{}
-							if json.Unmarshal(data, &memories) == nil {
-								for _, m := range memories {
+							var jsonItems []map[string]interface{}
+							if json.Unmarshal(data, &jsonItems) == nil {
+								for _, m := range jsonItems {
 									key, _ := m["key"].(string)
 									if key == "" {
 										key, _ = m["name"].(string)
 									}
 									if key == p.Key {
-										if c, ok := m["content"].(string); ok {
-											fullContent = c
+										if v, ok := m["content"].(string); ok && v != "" {
+											fullContent = v
+										} else if v, ok := m["value"].(string); ok && v != "" {
+											fullContent = v
+										} else if v, ok := m["text"].(string); ok && v != "" {
+											fullContent = v
+										} else if v, ok := m["description"].(string); ok && v != "" {
+											fullContent = v
 										}
 										break
+									}
+								}
+							} else {
+								var single map[string]interface{}
+								if json.Unmarshal(data, &single) == nil {
+									if v, ok := single["content"].(string); ok && v != "" {
+										fullContent = v
+									} else if v, ok := single["value"].(string); ok && v != "" {
+										fullContent = v
+									} else if v, ok := single["text"].(string); ok && v != "" {
+										fullContent = v
 									}
 								}
 							}
@@ -1809,14 +1838,27 @@ func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
 					}
 				}
 
+				if fullContent == "" {
+					errorsCount++
+					continue
+				}
+
 				layer := req.Layer
 				if p.Layer != "" {
 					layer = p.Layer
 				}
 
-				result := db.Exec(`INSERT INTO memories (key, content, layer, importance, tags, source, status, created_at, updated_at)
-					VALUES (?, ?, ?, 0.5, '', ?, 'active', datetime('now'), datetime('now'))`,
-					p.Key, fullContent, layer, p.Source)
+				memory := models.Memory{
+					UserID:     userID,
+					Key:        p.Key,
+					Value:      fullContent,
+					Layer:      layer,
+					Importance: 0.5,
+					Tags:       "",
+					Source:     p.Source,
+					Status:     "active",
+				}
+				result := db.Create(&memory)
 				if result.Error != nil {
 					errorsCount++
 				} else {
@@ -1836,6 +1878,7 @@ func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
 
 func handleAutoImportMemories(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		homeDir, _ := os.UserHomeDir()
 		searchDirs := []string{}
 		if homeDir != "" {
@@ -1869,7 +1912,7 @@ func handleAutoImportMemories(db *gorm.DB) gin.HandlerFunc {
 		seenKeys := make(map[string]bool)
 
 		var existingKeys []string
-		db.Table("memories").Where("status != ?", "trashed").Pluck("key", &existingKeys)
+		db.Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Pluck("key", &existingKeys)
 		for _, k := range existingKeys {
 			seenKeys[k] = true
 		}
@@ -1901,11 +1944,11 @@ func handleAutoImportMemories(db *gorm.DB) gin.HandlerFunc {
 				content := string(data)
 
 				if ext == ".json" {
-					importFromJSON(db, content, seenKeys, &imported, &skipped, &entitiesCreated)
+					importFromJSON(db, userID, content, seenKeys, &imported, &skipped, &entitiesCreated)
 				} else if ext == ".md" {
-					importFromMarkdown(db, path, content, seenKeys, &imported, &skipped, &entitiesCreated)
+					importFromMarkdown(db, userID, path, content, seenKeys, &imported, &skipped, &entitiesCreated)
 				} else if ext == ".txt" {
-					importFromText(db, path, content, seenKeys, &imported, &skipped, &entitiesCreated)
+					importFromText(db, userID, path, content, seenKeys, &imported, &skipped, &entitiesCreated)
 				}
 
 				return nil
@@ -1922,7 +1965,7 @@ func handleAutoImportMemories(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func importFromJSON(db *gorm.DB, content string, seenKeys map[string]bool, imported, skipped, entitiesCreated *int) {
+func importFromJSON(db *gorm.DB, userID uint, content string, seenKeys map[string]bool, imported, skipped, entitiesCreated *int) {
 	var memories []map[string]interface{}
 	if json.Unmarshal([]byte(content), &memories) != nil {
 		var single map[string]interface{}
@@ -1974,7 +2017,17 @@ func importFromJSON(db *gorm.DB, content string, seenKeys map[string]bool, impor
 			source = s
 		}
 
-		result := db.Exec(`INSERT INTO memories (key, content, layer, importance, tags, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`, key, contentStr, layer, importance, tags, source)
+		memory := models.Memory{
+			UserID:     userID,
+			Key:        key,
+			Value:      contentStr,
+			Layer:      layer,
+			Importance: importance,
+			Tags:       tags,
+			Source:     source,
+			Status:     "active",
+		}
+		result := db.Create(&memory)
 		if result.Error != nil {
 			*skipped++
 			continue
@@ -1986,7 +2039,7 @@ func importFromJSON(db *gorm.DB, content string, seenKeys map[string]bool, impor
 	}
 }
 
-func importFromMarkdown(db *gorm.DB, filePath, content string, seenKeys map[string]bool, imported, skipped, entitiesCreated *int) {
+func importFromMarkdown(db *gorm.DB, userID uint, filePath, content string, seenKeys map[string]bool, imported, skipped, entitiesCreated *int) {
 	sections := strings.Split(content, "\n## ")
 	for i, section := range sections {
 		var key, body string
@@ -2023,7 +2076,17 @@ func importFromMarkdown(db *gorm.DB, filePath, content string, seenKeys map[stri
 			relPath = "..." + relPath[len(relPath)-97:]
 		}
 
-		result := db.Exec(`INSERT INTO memories (key, content, layer, importance, tags, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`, key, body, layer, importance, "markdown", source)
+		memory := models.Memory{
+			UserID:     userID,
+			Key:        key,
+			Value:      body,
+			Layer:      layer,
+			Importance: importance,
+			Tags:       "markdown",
+			Source:     source,
+			Status:     "active",
+		}
+		result := db.Create(&memory)
 		if result.Error != nil {
 			*skipped++
 			continue
@@ -2035,7 +2098,7 @@ func importFromMarkdown(db *gorm.DB, filePath, content string, seenKeys map[stri
 	}
 }
 
-func importFromText(db *gorm.DB, filePath, content string, seenKeys map[string]bool, imported, skipped, entitiesCreated *int) {
+func importFromText(db *gorm.DB, userID uint, filePath, content string, seenKeys map[string]bool, imported, skipped, entitiesCreated *int) {
 	lines := strings.Split(content, "\n")
 	var buffer []string
 	var currentKey string
@@ -2047,7 +2110,17 @@ func importFromText(db *gorm.DB, filePath, content string, seenKeys map[string]b
 
 			if !seenKeys[key] {
 				layer := classifyLayer(key, body)
-				result := db.Exec(`INSERT INTO memories (key, content, layer, importance, tags, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`, key, body, layer, 0.4, "text", "auto_import_txt")
+				memory := models.Memory{
+					UserID:     userID,
+					Key:        key,
+					Value:      body,
+					Layer:      layer,
+					Importance: 0.4,
+					Tags:       "text",
+					Source:     "auto_import_txt",
+					Status:     "active",
+				}
+				result := db.Create(&memory)
 				if result.Error == nil {
 					seenKeys[key] = true
 					*imported++
@@ -2085,7 +2158,17 @@ func importFromText(db *gorm.DB, filePath, content string, seenKeys map[string]b
 		key = strings.TrimSuffix(key, filepath.Ext(key))
 		if !seenKeys[key] && len(content) > 10 {
 			layer := classifyLayer(key, content)
-			result := db.Exec(`INSERT INTO memories (key, content, layer, importance, tags, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`, key, content, layer, 0.3, "text", "auto_import_txt")
+			memory := models.Memory{
+				UserID:     userID,
+				Key:        key,
+				Value:      content,
+				Layer:      layer,
+				Importance: 0.3,
+				Tags:       "text",
+				Source:     "auto_import_txt",
+				Status:     "active",
+			}
+			result := db.Create(&memory)
 			if result.Error == nil {
 				seenKeys[key] = true
 				*imported++
