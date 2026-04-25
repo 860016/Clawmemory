@@ -7,8 +7,8 @@
     </div>
 
     <div class="pro-grid" v-if="isPro">
-      <div class="fallback-banner" v-if="isFallback">
-        <span>💡 {{ $t('pro.fallbackMode') }}</span>
+      <div class="mode-banner">
+        <span>⚡ {{ $t('pro.localProMode') }}</span>
       </div>
       <!-- Memory Decay -->
       <div class="pro-card" :class="{ 'section-highlight': activeSection === 'decay' }" id="pro-decay">
@@ -368,7 +368,6 @@ const { t } = useI18n()
 const route = useRoute()
 
 const isPro = ref(false)
-const isFallback = ref(false)
 const loading = ref<Record<string, boolean>>({})
 const activeSection = ref((route.query.section as string) || '')
 
@@ -403,8 +402,7 @@ onMounted(async () => {
     const { data } = await axios.get('/license/info')
     isPro.value = data.tier !== 'oss' && data.active
   } catch {
-    isPro.value = true
-    isFallback.value = true
+    isPro.value = false
   }
   if (isPro.value) {
     loadDecayStats()
@@ -437,12 +435,9 @@ async function loadDecayStats() {
   try {
     const { data } = await proApi.getDecayStats()
     decayStats.value = data
-    pruneSuggestions.value = (data.memories || []).filter((m: any) => m.should_prune)
-    if (data.fallback) {
-      isFallback.value = true
-    }
+    pruneSuggestions.value = data.suggestions || []
   } catch (e: any) {
-    if (e.response?.status !== 403) ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    if (e.response?.status !== 403) ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.decay = false }
 }
 
@@ -453,7 +448,7 @@ async function applyDecay() {
     ElMessage.success(t('pro.decayApplied', { updated: data.updated, deleted: data.auto_deleted }))
     loadDecayStats()
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.applyDecay = false }
 }
 
@@ -462,9 +457,9 @@ async function scanConflicts() {
   try {
     const { data } = await proApi.scanConflicts()
     conflicts.value = data.conflicts
-    conflictSummary.value = data.summary
+    conflictSummary.value = { total: data.total, auto_resolvable: 0, needs_review: data.total }
   } catch (e: any) {
-    if (e.response?.status !== 403) ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    if (e.response?.status !== 403) ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.conflicts = false }
 }
 
@@ -474,7 +469,7 @@ async function resolveConflict(index: number, strategy: string) {
     ElMessage.success(t('pro.conflictResolved'))
     scanConflicts()
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   }
 }
 
@@ -482,9 +477,9 @@ async function loadTokenStats() {
   loading.value.tokenStats = true
   try {
     const { data } = await proApi.getTokenStats()
-    tokenStatData.value = data
+    tokenStatData.value = { total_estimated_tokens: data.total_tokens_used, avg_tokens_per_memory: data.total_memories > 0 ? Math.round(data.total_tokens_used / data.total_memories) : 0 }
   } catch (e: any) {
-    if (e.response?.status !== 403) ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    if (e.response?.status !== 403) ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.tokenStats = false }
 }
 
@@ -493,9 +488,9 @@ async function testRoute() {
   loading.value.route = true
   try {
     const { data } = await proApi.routeToken(testMessage.value)
-    routeResult.value = data
+    routeResult.value = { selected_model: data.model || data.provider, complexity: data.estimated_tokens > 500 ? 'high' : data.estimated_tokens > 200 ? 'medium' : 'low' }
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.route = false }
 }
 
@@ -503,10 +498,10 @@ async function runAiExtract() {
   loading.value.extract = true
   try {
     const { data } = await proApi.aiExtract()
-    extractResult.value = data
-    ElMessage.success(t('pro.extractDone', { entities: data.entities_extracted, relations: data.relations_extracted }))
+    extractResult.value = { entities_extracted: data.total, relations_extracted: 0 }
+    ElMessage.success(t('pro.extractDone', { entities: data.total, relations: 0 }))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.extract = false }
 }
 
@@ -517,7 +512,7 @@ async function runAutoGraph(overwrite: boolean) {
     graphResult.value = data
     ElMessage.success(t('pro.graphDone', { entities: data.entities_created, relations: data.relations_created }))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.graph = false }
 }
 
@@ -533,7 +528,7 @@ async function saveBackupSchedule() {
     await proApi.setBackupSchedule(backupSchedule.value)
     ElMessage.success(t('common.success'))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   }
 }
 
@@ -542,12 +537,8 @@ async function previewCompress() {
   try {
     const { data } = await proApi.compressPreview(compressLevel.value)
     compressPreviewData.value = data
-    if (data.fallback) {
-      isFallback.value = true
-      ElMessage.info({ message: t('pro.usingLocalAlgorithm'), duration: 3000 })
-    }
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.compressPreview = false }
 }
 
@@ -555,10 +546,10 @@ async function applyCompress() {
   loading.value.compressApply = true
   try {
     const { data } = await proApi.compressApply(compressLevel.value)
-    ElMessage.success(t('pro.compressDone', { count: data.compressed_count, ratio: Math.round(data.ratio * 100) }))
+    ElMessage.success(t('pro.compressDone', { count: data.compressed, ratio: Math.round(data.ratio * 100) }))
     compressPreviewData.value = null
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.compressApply = false }
 }
 
@@ -567,7 +558,7 @@ async function saveCompressConfig() {
     await proApi.setCompressConfig(compressConfig.value)
     ElMessage.success(t('common.success'))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   }
 }
 
@@ -575,9 +566,9 @@ async function loadEvolutionInsights() {
   loading.value.insights = true
   try {
     const { data } = await proApi.getEvolutionInsights()
-    evolutionInsights.value = data
+    evolutionInsights.value = { total_memories: data.total_memories, relations_count: data.total_relations, discovered_relations: 0, inferred_chains: 0 }
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.insights = false }
 }
 
@@ -587,12 +578,8 @@ async function runDiscoverRelations() {
     const { data } = await proApi.discoverRelations()
     discoverResult.value = data
     ElMessage.success(t('pro.discoveredCount', { count: data.relations?.length || 0 }))
-    if (data.fallback) {
-      isFallback.value = true
-      ElMessage.info({ message: t('pro.usingLocalAlgorithm'), duration: 3000 })
-    }
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.discover = false }
 }
 
@@ -603,7 +590,7 @@ async function runInferChains() {
     inferResult.value = data
     ElMessage.success(t('pro.inferredCount', { count: data.chains?.length || 0 }))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.infer = false }
 }
 
@@ -611,9 +598,9 @@ async function runImportanceAdjust() {
   loading.value.importance = true
   try {
     const { data } = await proApi.getImportanceAdjustments()
-    ElMessage.success(t('pro.adjustedCount', { count: data.adjusted_count || 0 }))
+    ElMessage.success(t('pro.adjustedCount', { count: data.total || 0 }))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.importance = false }
 }
 
@@ -622,9 +609,9 @@ async function runPrefetch() {
   loading.value.prefetch = true
   try {
     const { data } = await proApi.prefetchMemories(prefetchContext.value)
-    prefetchResult.value = data
+    prefetchResult.value = { matched_count: data.total || 0 }
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('common.failed'))
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
   } finally { loading.value.prefetch = false }
 }
 </script>
@@ -635,8 +622,8 @@ async function runPrefetch() {
 .page-header h1 { font-size: 24px; font-weight: 700; color: var(--cm-text); margin: 0; }
 .pro-badge { background: rgba(16,185,129,0.15); color: #10B981; padding: 2px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
 .pro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 16px; }
-.fallback-banner { grid-column: 1 / -1; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
-.fallback-banner span:first-child { font-weight: 600; color: #D97706; font-size: 14px; }
+.mode-banner { grid-column: 1 / -1; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
+.mode-banner span:first-child { font-weight: 600; color: #3B82F6; font-size: 14px; }
 .fallback-desc { font-size: 12px; color: var(--cm-text-muted); }
 .pro-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; overflow: hidden; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
 .pro-card:hover { border-color: rgba(16,185,129,0.25); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }

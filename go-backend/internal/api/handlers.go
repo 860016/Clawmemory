@@ -669,20 +669,20 @@ func proErrorHandler(c *gin.Context, err error) {
 	c.JSON(http.StatusInternalServerError, gin.H{"detail": err.Error()})
 }
 
+func checkPro(proxy *services.ProProxy, c *gin.Context) bool {
+	if !proxy.IsPro() {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Pro license required", "mode": "local_pro"})
+		return false
+	}
+	return true
+}
+
 func handleProDecayStats(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		userID := middleware.GetUserID(c)
-		if proxy.IsPro() {
-			var memories []map[string]interface{}
-			db.Model(&struct{ ID uint }{}).Table("memories").Where("status != ?", "trashed").Find(&memories)
-			result, err := proxy.GetDecayStats(memories)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.DecayStats(userID)
+		svc := services.NewProLocalService(db)
+		result, err := svc.DecayStats(userID)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -693,18 +693,10 @@ func handleProDecayStats(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc 
 
 func handleProDecayApply(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		userID := middleware.GetUserID(c)
-		if proxy.IsPro() {
-			var memories []map[string]interface{}
-			db.Model(&struct{ ID uint }{}).Table("memories").Where("status != ?", "trashed").Find(&memories)
-			result, err := proxy.ApplyDecay(memories)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.DecayApply(userID)
+		svc := services.NewProLocalService(db)
+		result, err := svc.DecayApply(userID)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -715,20 +707,12 @@ func handleProDecayApply(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc 
 
 func handleProReinforce(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		userID := middleware.GetUserID(c)
 		idStr := c.Param("id")
 		id, _ := strconv.ParseUint(idStr, 10, 64)
-		if proxy.IsPro() {
-			var memory map[string]interface{}
-			db.Table("memories").Where("id = ?", id).First(&memory)
-			result, err := proxy.ReinforceMemory(uint(id), memory)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.ReinforceMemory(userID, uint(id))
+		svc := services.NewProLocalService(db)
+		result, err := svc.ReinforceMemory(userID, uint(id))
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -739,18 +723,10 @@ func handleProReinforce(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 
 func handleProPruneSuggest(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		userID := middleware.GetUserID(c)
-		if proxy.IsPro() {
-			var memories []map[string]interface{}
-			db.Model(&struct{ ID uint }{}).Table("memories").Where("status != ?", "trashed").Find(&memories)
-			result, err := proxy.GetPruneSuggestions(memories)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.PruneSuggest(userID)
+		svc := services.NewProLocalService(db)
+		result, err := svc.PruneSuggest(userID)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -761,18 +737,10 @@ func handleProPruneSuggest(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFun
 
 func handleProConflictScan(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		userID := middleware.GetUserID(c)
-		if proxy.IsPro() {
-			var memories []map[string]interface{}
-			db.Model(&struct{ ID uint }{}).Table("memories").Where("status != ?", "trashed").Find(&memories)
-			result, err := proxy.ScanConflicts(memories)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.ConflictScan(userID)
+		svc := services.NewProLocalService(db)
+		result, err := svc.ConflictScan(userID)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -783,6 +751,7 @@ func handleProConflictScan(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFun
 
 func handleProConflictResolve(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		userID := middleware.GetUserID(c)
 		var req struct {
 			Strategy string `json:"strategy"`
@@ -790,15 +759,8 @@ func handleProConflictResolve(proxy *services.ProProxy, db *gorm.DB) gin.Handler
 		c.ShouldBindJSON(&req)
 		indexStr := c.Param("index")
 		index, _ := strconv.Atoi(indexStr)
-		if proxy.IsPro() {
-			result, err := proxy.ResolveConflict(index, req.Strategy)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.ConflictResolve(userID, index, req.Strategy)
+		svc := services.NewProLocalService(db)
+		result, err := svc.ConflictResolve(userID, index, req.Strategy)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -809,6 +771,7 @@ func handleProConflictResolve(proxy *services.ProProxy, db *gorm.DB) gin.Handler
 
 func handleProTokenRoute(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		message := c.Query("message")
 		contextLength := 0
 		if cl := c.Query("context_length"); cl != "" {
@@ -816,15 +779,8 @@ func handleProTokenRoute(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc 
 				contextLength = n
 			}
 		}
-		if proxy.IsPro() {
-			result, err := proxy.RouteModel(message, contextLength)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.TokenRoute(message, contextLength)
+		svc := services.NewProLocalService(db)
+		result, err := svc.TokenRoute(message, contextLength)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -835,15 +791,9 @@ func handleProTokenRoute(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc 
 
 func handleProTokenStats(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if proxy.IsPro() {
-			result, err := proxy.GetTokenStats()
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.TokenStats()
+		if !checkPro(proxy, c) { return }
+		svc := services.NewProLocalService(db)
+		result, err := svc.TokenStats()
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -854,20 +804,10 @@ func handleProTokenStats(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc 
 
 func handleProAIExtract(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		userID := middleware.GetUserID(c)
-		var req struct {
-			MemoryIDs []uint `json:"memory_ids"`
-		}
-		c.ShouldBindJSON(&req)
-		if proxy.IsPro() {
-			result, err := proxy.AIExtract("", req.MemoryIDs)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.AIExtract(userID)
+		svc := services.NewProLocalService(db)
+		result, err := svc.AIExtract(userID)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -878,20 +818,14 @@ func handleProAIExtract(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 
 func handleProAutoGraph(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		userID := middleware.GetUserID(c)
 		var req struct {
 			Overwrite bool `json:"overwrite"`
 		}
 		c.ShouldBindJSON(&req)
-		if proxy.IsPro() {
-			result, err := proxy.AutoGraph(req.Overwrite)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.AutoGraph(userID, req.Overwrite)
+		svc := services.NewProLocalService(db)
+		result, err := svc.AutoGraph(userID, req.Overwrite)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -902,15 +836,9 @@ func handleProAutoGraph(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 
 func handleProBackupSchedule(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if proxy.IsPro() {
-			result, err := proxy.GetBackupSchedule()
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.BackupSchedule()
+		if !checkPro(proxy, c) { return }
+		svc := services.NewProLocalService(db)
+		result, err := svc.BackupSchedule()
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -921,23 +849,17 @@ func handleProBackupSchedule(proxy *services.ProProxy, db *gorm.DB) gin.HandlerF
 
 func handleProSetBackupSchedule(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		var req struct {
 			Enabled       bool `json:"enabled"`
 			IntervalHours int  `json:"interval_hours"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if proxy.IsPro() {
-			result, err := proxy.SetBackupSchedule(req.Enabled, req.IntervalHours)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.SetBackupSchedule(req.Enabled, req.IntervalHours)
+		svc := services.NewProLocalService(db)
+		result, err := svc.SetBackupSchedule(req.Enabled, req.IntervalHours)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -948,6 +870,7 @@ func handleProSetBackupSchedule(proxy *services.ProProxy, db *gorm.DB) gin.Handl
 
 func handleProCompressPreview(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		var req struct {
 			Level string `json:"level"`
 		}
@@ -956,17 +879,8 @@ func handleProCompressPreview(proxy *services.ProProxy, db *gorm.DB) gin.Handler
 			req.Level = "light"
 		}
 		userID := middleware.GetUserID(c)
-		if proxy.IsPro() {
-			var memories []map[string]interface{}
-			db.Model(&struct{ ID uint }{}).Table("memories").Where("status != ?", "trashed").Find(&memories)
-			result, err := proxy.CompressPreview(memories, req.Level)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.CompressPreview(userID, req.Level)
+		svc := services.NewProLocalService(db)
+		result, err := svc.CompressPreview(userID, req.Level)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -977,29 +891,21 @@ func handleProCompressPreview(proxy *services.ProProxy, db *gorm.DB) gin.Handler
 
 func handleProCompressApply(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		var req struct {
-			Level    string                 `json:"level"`
-			Options  map[string]interface{} `json:"options"`
+			Level   string                 `json:"level"`
+			Options map[string]interface{} `json:"options"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		if req.Level == "" {
 			req.Level = "light"
 		}
 		userID := middleware.GetUserID(c)
-		if proxy.IsPro() {
-			var memories []map[string]interface{}
-			db.Model(&struct{ ID uint }{}).Table("memories").Where("status != ?", "trashed").Find(&memories)
-			result, err := proxy.CompressApply(memories, req.Level, req.Options)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.CompressApply(userID, req.Level)
+		svc := services.NewProLocalService(db)
+		result, err := svc.CompressApply(userID, req.Level)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -1010,15 +916,9 @@ func handleProCompressApply(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFu
 
 func handleProCompressConfig(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if proxy.IsPro() {
-			result, err := proxy.GetCompressConfig()
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.CompressConfig()
+		if !checkPro(proxy, c) { return }
+		svc := services.NewProLocalService(db)
+		result, err := svc.CompressConfig()
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -1029,20 +929,14 @@ func handleProCompressConfig(proxy *services.ProProxy, db *gorm.DB) gin.HandlerF
 
 func handleProSetCompressConfig(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		var req map[string]interface{}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		if proxy.IsPro() {
-			result, err := proxy.SetCompressConfig(req)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.SetCompressConfig(req)
+		svc := services.NewProLocalService(db)
+		result, err := svc.SetCompressConfig(req)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -1053,16 +947,10 @@ func handleProSetCompressConfig(proxy *services.ProProxy, db *gorm.DB) gin.Handl
 
 func handleProEvolutionInsights(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		userID := middleware.GetUserID(c)
-		if proxy.IsPro() {
-			result, err := proxy.GetEvolutionInsights()
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.EvolutionInsights(userID)
+		svc := services.NewProLocalService(db)
+		result, err := svc.EvolutionInsights(userID)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -1073,18 +961,10 @@ func handleProEvolutionInsights(proxy *services.ProProxy, db *gorm.DB) gin.Handl
 
 func handleProEvolutionDiscover(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		userID := middleware.GetUserID(c)
-		if proxy.IsPro() {
-			var memories []map[string]interface{}
-			db.Model(&struct{ ID uint }{}).Table("memories").Where("status != ?", "trashed").Find(&memories)
-			result, err := proxy.DiscoverRelations(memories)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.EvolutionDiscover(userID)
+		svc := services.NewProLocalService(db)
+		result, err := svc.EvolutionDiscover(userID)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -1095,16 +975,10 @@ func handleProEvolutionDiscover(proxy *services.ProProxy, db *gorm.DB) gin.Handl
 
 func handleProEvolutionInfer(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		userID := middleware.GetUserID(c)
-		if proxy.IsPro() {
-			result, err := proxy.InferChains()
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.EvolutionInfer(userID)
+		svc := services.NewProLocalService(db)
+		result, err := svc.EvolutionInfer(userID)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -1115,18 +989,10 @@ func handleProEvolutionInfer(proxy *services.ProProxy, db *gorm.DB) gin.HandlerF
 
 func handleProEvolutionImportance(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		userID := middleware.GetUserID(c)
-		if proxy.IsPro() {
-			var memories []map[string]interface{}
-			db.Model(&struct{ ID uint }{}).Table("memories").Where("status != ?", "trashed").Find(&memories)
-			result, err := proxy.GetImportanceAdjustments(memories)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.EvolutionImportance(userID)
+		svc := services.NewProLocalService(db)
+		result, err := svc.EvolutionImportance(userID)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -1137,20 +1003,14 @@ func handleProEvolutionImportance(proxy *services.ProProxy, db *gorm.DB) gin.Han
 
 func handleProEvolutionPrefetch(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !checkPro(proxy, c) { return }
 		var req struct {
 			Context string `json:"context"`
 		}
 		c.ShouldBindJSON(&req)
 		userID := middleware.GetUserID(c)
-		if proxy.IsPro() {
-			result, err := proxy.PrefetchMemories(req.Context)
-			if err == nil {
-				c.JSON(http.StatusOK, result)
-				return
-			}
-		}
-		fallback := services.NewProFallbackService(db)
-		result, err := fallback.EvolutionPrefetch(userID, req.Context)
+		svc := services.NewProLocalService(db)
+		result, err := svc.EvolutionPrefetch(userID, req.Context)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -1556,147 +1416,271 @@ func handleChromaDBInstall(c *gin.Context) {
 	})
 }
 
-func handleScanOpenClawMemories(c *gin.Context) {
-	homeDir, _ := os.UserHomeDir()
-	openclawDirs := []string{}
+func getOpenClawSearchDirs() []string {
+	dirs := []string{}
 	seenDirs := make(map[string]bool)
 
-	addScanDir := func(d string) {
+	addDir := func(d string) {
 		abs, err := filepath.Abs(d)
 		if err != nil {
 			abs = d
 		}
 		if !seenDirs[abs] {
 			seenDirs[abs] = true
-			openclawDirs = append(openclawDirs, abs)
+			dirs = append(dirs, abs)
 		}
 	}
 
+	homeDir, _ := os.UserHomeDir()
 	if homeDir != "" {
-		addScanDir(filepath.Join(homeDir, ".openclaw"))
-		addScanDir(filepath.Join(homeDir, ".clawmemory"))
-		addScanDir(filepath.Join(homeDir, ".trae-cn"))
-		addScanDir(filepath.Join(homeDir, ".trae"))
+		addDir(filepath.Join(homeDir, ".openclaw"))
+		addDir(filepath.Join(homeDir, ".clawmemory"))
+		addDir(filepath.Join(homeDir, ".trae-cn"))
+		addDir(filepath.Join(homeDir, ".trae"))
 	}
 
 	cfg := config.Load()
 	if cfg.DataDir != "" {
-		addScanDir(cfg.DataDir)
+		addDir(cfg.DataDir)
 	}
 
 	exe, _ := os.Executable()
 	if exe != "" {
-		addScanDir(filepath.Join(filepath.Dir(exe), "openclaw"))
-		addScanDir(filepath.Join(filepath.Dir(exe), "data"))
+		addDir(filepath.Join(filepath.Dir(exe), "openclaw"))
+		addDir(filepath.Join(filepath.Dir(exe), "data"))
 	}
 
 	wd, _ := os.Getwd()
 	if wd != "" {
-		addScanDir(filepath.Join(wd, ".openclaw"))
-		addScanDir(filepath.Join(wd, ".clawmemory"))
-		addScanDir(filepath.Join(wd, "data"))
+		addDir(filepath.Join(wd, ".openclaw"))
+		addDir(filepath.Join(wd, ".clawmemory"))
+		addDir(filepath.Join(wd, "data"))
 	}
 
-	for _, dir := range openclawDirs {
+	return dirs
+}
+
+type memoryPreview struct {
+	Key       string `json:"key"`
+	Content   string `json:"content"`
+	Layer     string `json:"layer"`
+	Source    string `json:"source"`
+	FilePath  string `json:"file_path"`
+	AgentName string `json:"agent_name"`
+}
+
+func extractMemoriesFromDir(dir string) ([]memoryPreview, map[string]int) {
+	var previews []memoryPreview
+	agentCountMap := make(map[string]int)
+
+	filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if name == "node_modules" || name == ".git" || name == "vendor" || name == "__pycache__" || name == ".cache" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		ext := strings.ToLower(filepath.Ext(path))
+		if ext != ".json" && ext != ".md" && ext != ".txt" {
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		content := string(data)
+		relPath, _ := filepath.Rel(dir, path)
+		parts := strings.Split(relPath, string(filepath.Separator))
+		dirAgent := "default"
+		if len(parts) > 1 {
+			dirAgent = parts[0]
+		}
+
+		if ext == ".json" {
+			var memories []map[string]interface{}
+			if json.Unmarshal(data, &memories) == nil {
+				for _, m := range memories {
+					key, _ := m["key"].(string)
+					contentStr, _ := m["content"].(string)
+					if key == "" {
+						if name, ok := m["name"].(string); ok {
+							key = name
+						} else if title, ok := m["title"].(string); ok {
+							key = title
+						}
+					}
+					if contentStr == "" {
+						contentStr, _ = m["value"].(string)
+						if contentStr == "" {
+							contentStr, _ = m["text"].(string)
+							if contentStr == "" {
+								contentStr, _ = m["description"].(string)
+							}
+						}
+					}
+					if key == "" && contentStr == "" {
+						continue
+					}
+					if key == "" {
+						key = contentStr
+						if len(key) > 50 {
+							key = key[:50]
+						}
+					}
+					agent := dirAgent
+					if a, ok := m["agent_name"].(string); ok && a != "" {
+						agent = a
+					}
+					layer := "knowledge"
+					if l, ok := m["layer"].(string); ok && l != "" {
+						layer = l
+					}
+					source := "openclaw"
+					if s, ok := m["source"].(string); ok && s != "" {
+						source = s
+					}
+					preview := contentStr
+					if len(preview) > 100 {
+						preview = preview[:100] + "..."
+					}
+					previews = append(previews, memoryPreview{
+						Key: key, Content: preview, Layer: layer,
+						Source: source, FilePath: path, AgentName: agent,
+					})
+					agentCountMap[agent]++
+				}
+			} else {
+				var single map[string]interface{}
+				if json.Unmarshal(data, &single) == nil {
+					key, _ := single["key"].(string)
+					contentStr, _ := single["content"].(string)
+					if key == "" {
+						key, _ = single["name"].(string)
+					}
+					if contentStr == "" {
+						contentStr, _ = single["value"].(string)
+						if contentStr == "" {
+							contentStr, _ = single["text"].(string)
+						}
+					}
+					if key != "" || contentStr != "" {
+						if key == "" {
+							key = "json_item"
+						}
+						preview := contentStr
+						if len(preview) > 100 {
+							preview = preview[:100] + "..."
+						}
+						previews = append(previews, memoryPreview{
+							Key: key, Content: preview, Layer: "knowledge",
+							Source: "openclaw", FilePath: path, AgentName: dirAgent,
+						})
+						agentCountMap[dirAgent]++
+					}
+				}
+			}
+		} else if ext == ".md" {
+			lines := strings.Split(content, "\n")
+			currentSection := ""
+			currentContent := ""
+			for _, line := range lines {
+				if strings.HasPrefix(line, "# ") {
+					if currentSection != "" || currentContent != "" {
+						key := currentSection
+						if key == "" {
+							key = filepath.Base(path)
+						}
+						preview := strings.TrimSpace(currentContent)
+						if len(preview) > 100 {
+							preview = preview[:100] + "..."
+						}
+						previews = append(previews, memoryPreview{
+							Key: key, Content: preview, Layer: "knowledge",
+							Source: "markdown", FilePath: path, AgentName: dirAgent,
+						})
+						agentCountMap[dirAgent]++
+					}
+					currentSection = strings.TrimSpace(line[2:])
+					currentContent = ""
+				} else {
+					currentContent += line + "\n"
+				}
+			}
+			if currentSection != "" || currentContent != "" {
+				key := currentSection
+				if key == "" {
+					key = filepath.Base(path)
+				}
+				preview := strings.TrimSpace(currentContent)
+				if len(preview) > 100 {
+					preview = preview[:100] + "..."
+				}
+				previews = append(previews, memoryPreview{
+					Key: key, Content: preview, Layer: "knowledge",
+					Source: "markdown", FilePath: path, AgentName: dirAgent,
+				})
+				agentCountMap[dirAgent]++
+			}
+		} else if ext == ".txt" {
+			txtContent := strings.TrimSpace(content)
+			if txtContent != "" {
+				key := filepath.Base(path)
+				preview := txtContent
+				if len(preview) > 100 {
+					preview = preview[:100] + "..."
+				}
+				previews = append(previews, memoryPreview{
+					Key: key, Content: preview, Layer: "knowledge",
+					Source: "text", FilePath: path, AgentName: dirAgent,
+				})
+				agentCountMap[dirAgent]++
+			}
+		}
+
+		return nil
+	})
+
+	return previews, agentCountMap
+}
+
+func handleScanOpenClawMemories(c *gin.Context) {
+	searchDirs := getOpenClawSearchDirs()
+
+	for _, dir := range searchDirs {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			continue
 		}
 
-		agents := make([]map[string]interface{}, 0)
-		agentCountMap := make(map[string]int)
-		totalMemories := 0
-		var foundFiles []string
+		previews, agentCountMap := extractMemoriesFromDir(dir)
 
-		filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-			if err != nil {
-				return nil
-			}
-			if d.IsDir() {
-				name := d.Name()
-				if name == "node_modules" || name == ".git" || name == "vendor" || name == "__pycache__" || name == ".cache" {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-
-			ext := strings.ToLower(filepath.Ext(path))
-			if ext != ".json" && ext != ".md" && ext != ".txt" {
-				return nil
-			}
-
-			foundFiles = append(foundFiles, path)
-
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return nil
-			}
-			content := string(data)
-
-			if ext == ".json" {
-				var memories []map[string]interface{}
-				if json.Unmarshal(data, &memories) == nil {
-					totalMemories += len(memories)
-					for _, m := range memories {
-						agent := "default"
-						if a, ok := m["agent_name"].(string); ok && a != "" {
-							agent = a
-						}
-						agentCountMap[agent]++
-					}
-				} else {
-					totalMemories++
-					relPath, _ := filepath.Rel(dir, path)
-					parts := strings.Split(relPath, string(filepath.Separator))
-					agent := "default"
-					if len(parts) > 1 {
-						agent = parts[0]
-					}
-					agentCountMap[agent]++
-				}
-			} else if ext == ".md" {
-				sections := strings.Count(content, "\n## ") + 1
-				if sections == 0 {
-					sections = 1
-				}
-				totalMemories += sections
-				relPath, _ := filepath.Rel(dir, path)
-				parts := strings.Split(relPath, string(filepath.Separator))
-				agent := "markdown"
-				if len(parts) > 1 {
-					agent = parts[0]
-				}
-				agentCountMap[agent] += sections
-			} else if ext == ".txt" {
-				lines := len(strings.Split(content, "\n"))
-				totalMemories += lines / 3
-				if lines/3 == 0 && lines > 0 {
-					totalMemories++
-				}
-				relPath, _ := filepath.Rel(dir, path)
-				parts := strings.Split(relPath, string(filepath.Separator))
-				agent := "text"
-				if len(parts) > 1 {
-					agent = parts[0]
-				}
-				agentCountMap[agent]++
-			}
-
-			return nil
-		})
-
-		if totalMemories > 0 {
+		if len(previews) > 0 {
+			agents := make([]map[string]interface{}, 0)
 			for name, count := range agentCountMap {
+				agentPreviews := make([]memoryPreview, 0)
+				for _, p := range previews {
+					if p.AgentName == name {
+						agentPreviews = append(agentPreviews, p)
+					}
+				}
 				agents = append(agents, map[string]interface{}{
 					"name":         name,
 					"memory_count": count,
+					"previews":     agentPreviews,
 				})
 			}
+
 			c.JSON(http.StatusOK, gin.H{
 				"found":          true,
 				"openclaw_dir":   dir,
 				"agents":         agents,
-				"total_memories": totalMemories,
-				"files_found":    foundFiles,
+				"total_memories": len(previews),
+				"previews":       previews,
 			})
 			return
 		}
@@ -1709,54 +1693,29 @@ func handleScanOpenClawMemories(c *gin.Context) {
 
 func handleScanOpenClawAgent(c *gin.Context) {
 	agentName := c.Param("agentName")
-	
-	homeDir, _ := os.UserHomeDir()
-	openclawDirs := []string{}
-	if homeDir != "" {
-		openclawDirs = append(openclawDirs, filepath.Join(homeDir, ".openclaw"))
-		openclawDirs = append(openclawDirs, filepath.Join(homeDir, ".clawmemory"))
-	}
+	searchDirs := getOpenClawSearchDirs()
 
-	cfg := config.Load()
-	if cfg.DataDir != "" {
-		openclawDirs = append(openclawDirs, cfg.DataDir)
-	}
+	for _, dir := range searchDirs {
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			continue
+		}
 
-	exe, _ := os.Executable()
-	if exe != "" {
-		openclawDirs = append(openclawDirs, filepath.Join(filepath.Dir(exe), "openclaw"))
-		openclawDirs = append(openclawDirs, filepath.Join(filepath.Dir(exe), "data"))
-	}
+		previews, _ := extractMemoriesFromDir(dir)
 
-	wd, _ := os.Getwd()
-	if wd != "" {
-		openclawDirs = append(openclawDirs, filepath.Join(wd, ".openclaw"))
-		openclawDirs = append(openclawDirs, filepath.Join(wd, ".clawmemory"))
-		openclawDirs = append(openclawDirs, filepath.Join(wd, "data"))
-	}
-
-	for _, dir := range openclawDirs {
-		memFile := filepath.Join(dir, "memories.json")
-		if _, err := os.Stat(memFile); err == nil {
-			content, err := os.ReadFile(memFile)
-			if err != nil {
-				continue
+		filtered := make([]memoryPreview, 0)
+		for _, p := range previews {
+			if p.AgentName == agentName {
+				filtered = append(filtered, p)
 			}
-			var memories []map[string]interface{}
-			if json.Unmarshal(content, &memories) == nil {
-				filtered := make([]map[string]interface{}, 0)
-				for _, m := range memories {
-					if m["agent_name"] == agentName {
-						filtered = append(filtered, m)
-					}
-				}
-				c.JSON(http.StatusOK, gin.H{
-					"agent":          agentName,
-					"memories":       filtered,
-					"total_filtered": len(filtered),
-				})
-				return
-			}
+		}
+
+		if len(filtered) > 0 {
+			c.JSON(http.StatusOK, gin.H{
+				"agent":    agentName,
+				"memories": filtered,
+				"total":    len(filtered),
+			})
+			return
 		}
 	}
 
@@ -1768,126 +1727,109 @@ func handleScanOpenClawAgent(c *gin.Context) {
 func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			AgentName      string `json:"agent_name"`
-			TargetAgentID  *int   `json:"target_agent_id"`
-			Layer          string `json:"layer"`
-			SkipExisting   bool   `json:"skip_existing"`
+			AgentName    string `json:"agent_name"`
+			Layer        string `json:"layer"`
+			SkipExisting bool   `json:"skip_existing"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
-			return
-		}
-		if req.AgentName == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"detail": "agent_name is required"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		if req.Layer == "" {
 			req.Layer = "knowledge"
 		}
 
-		homeDir, _ := os.UserHomeDir()
-		openclawDirs := []string{}
-		if homeDir != "" {
-			openclawDirs = append(openclawDirs, filepath.Join(homeDir, ".openclaw"))
-			openclawDirs = append(openclawDirs, filepath.Join(homeDir, ".clawmemory"))
+		searchDirs := getOpenClawSearchDirs()
+
+		var imported, skipped, errorsCount int
+
+		seenKeys := make(map[string]bool)
+		var existingKeys []string
+		db.Table("memories").Where("status != ?", "trashed").Pluck("key", &existingKeys)
+		for _, k := range existingKeys {
+			seenKeys[k] = true
 		}
 
-		cfg := config.Load()
-		if cfg.DataDir != "" {
-			openclawDirs = append(openclawDirs, cfg.DataDir)
-		}
-
-		exe, _ := os.Executable()
-		if exe != "" {
-			openclawDirs = append(openclawDirs, filepath.Join(filepath.Dir(exe), "openclaw"))
-			openclawDirs = append(openclawDirs, filepath.Join(filepath.Dir(exe), "data"))
-		}
-
-		wd, _ := os.Getwd()
-		if wd != "" {
-			openclawDirs = append(openclawDirs, filepath.Join(wd, ".openclaw"))
-			openclawDirs = append(openclawDirs, filepath.Join(wd, ".clawmemory"))
-			openclawDirs = append(openclawDirs, filepath.Join(wd, "data"))
-		}
-
-		var imported, skipped, errors int
-		for _, dir := range openclawDirs {
-			memFile := filepath.Join(dir, "memories.json")
-			if _, err := os.Stat(memFile); err != nil {
-				continue
-			}
-			content, err := os.ReadFile(memFile)
-			if err != nil {
-				continue
-			}
-			var memories []map[string]interface{}
-			if json.Unmarshal(content, &memories) != nil {
+		for _, dir := range searchDirs {
+			if _, err := os.Stat(dir); os.IsNotExist(err) {
 				continue
 			}
 
-			for _, m := range memories {
-				if m["agent_name"] != req.AgentName {
-					skipped++
+			previews, _ := extractMemoriesFromDir(dir)
+
+			for _, p := range previews {
+				if req.AgentName != "" && p.AgentName != req.AgentName {
 					continue
 				}
 
-				key, _ := m["key"].(string)
-				contentStr, _ := m["content"].(string)
-				if key == "" || contentStr == "" {
-					errors++
+				if p.Key == "" {
+					errorsCount++
+					continue
+				}
+
+				if seenKeys[p.Key] {
+					skipped++
 					continue
 				}
 
 				if req.SkipExisting {
 					var count int64
-					db.Table("memories").Where("key = ?", key).Count(&count)
+					db.Table("memories").Where("key = ?", p.Key).Count(&count)
 					if count > 0 {
 						skipped++
+						seenKeys[p.Key] = true
 						continue
 					}
 				}
 
-				importance := float64(0.5)
-				if imp, ok := m["importance"].(float64); ok {
-					importance = imp
-				} else if imp, ok := m["importance"].(int64); ok {
-					importance = float64(imp)
-				}
-
-				tags := ""
-				if t, ok := m["tags"].([]interface{}); ok && len(t) > 0 {
-					tagStrs := make([]string, 0, len(t))
-					for _, tag := range t {
-						if s, ok := tag.(string); ok {
-							tagStrs = append(tagStrs, s)
+				fullContent := p.Content
+				if strings.HasSuffix(fullContent, "...") {
+					data, err := os.ReadFile(p.FilePath)
+					if err == nil {
+						ext := strings.ToLower(filepath.Ext(p.FilePath))
+						if ext == ".json" {
+							var memories []map[string]interface{}
+							if json.Unmarshal(data, &memories) == nil {
+								for _, m := range memories {
+									key, _ := m["key"].(string)
+									if key == "" {
+										key, _ = m["name"].(string)
+									}
+									if key == p.Key {
+										if c, ok := m["content"].(string); ok {
+											fullContent = c
+										}
+										break
+									}
+								}
+							}
+						} else {
+							fullContent = string(data)
 						}
 					}
-					tags = strings.Join(tagStrs, ",")
-				} else if t, ok := m["tags"].(string); ok {
-					tags = t
 				}
 
-				source := "openclaw"
-				if s, ok := m["source"].(string); ok && s != "" {
-					source = s
+				layer := req.Layer
+				if p.Layer != "" {
+					layer = p.Layer
 				}
 
 				result := db.Exec(`INSERT INTO memories (key, content, layer, importance, tags, source, status, created_at, updated_at)
-					VALUES (?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`,
-					key, contentStr, req.Layer, importance, tags, source)
+					VALUES (?, ?, ?, 0.5, '', ?, 'active', datetime('now'), datetime('now'))`,
+					p.Key, fullContent, layer, p.Source)
 				if result.Error != nil {
-					errors++
+					errorsCount++
 				} else {
 					imported++
+					seenKeys[p.Key] = true
 				}
 			}
-			break
 		}
 
 		c.JSON(http.StatusOK, gin.H{
 			"imported": imported,
 			"skipped":  skipped,
-			"errors":   errors,
+			"errors":   errorsCount,
 		})
 	}
 }
