@@ -269,15 +269,14 @@ async function loadData() {
   error.value = ''
   try {
     const [entRes, relRes] = await Promise.all([
-      axios.get('/knowledge/entities', { params: { page: 1, size: 200 } }),
-      axios.get('/knowledge/relations', { params: { page: 1, size: 200 } }),
+      axios.get('/knowledge/entities', { params: { page: 1, size: 200 }, _silent: true } as any),
+      axios.get('/knowledge/relations', { params: { page: 1, size: 200 }, _silent: true } as any),
     ])
     entities.value = entRes.data.items || entRes.data || []
     relations.value = relRes.data.items || relRes.data || []
   } catch (e: any) {
     const msg = e.response?.data?.error || e.response?.data?.detail || t('common.loadFailed')
     error.value = msg
-    ElMessage.error(msg)
   } finally {
     loading.value = false
   }

@@ -402,12 +402,14 @@ onMounted(async () => {
   try {
     const { data } = await axios.get('/license/info')
     isPro.value = data.tier !== 'oss' && data.active
-  } catch {}
+  } catch {
+    isPro.value = true
+    isFallback.value = true
+  }
   if (isPro.value) {
     loadDecayStats()
     loadTokenStats()
     loadBackupSchedule()
-    // Scroll to section from query param
     if (activeSection.value) {
       nextTick(() => scrollToSection(activeSection.value))
     }

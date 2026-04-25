@@ -285,13 +285,7 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
       { path: '/memories?import=openclaw', label: 'memories.importOpenClaw', icon: Upload },
     ]}
   ],
-  '/knowledge': [
-    { items: [
-      { path: '/knowledge', label: 'knowledge.entities', icon: Grid },
-      { path: '/knowledge?tab=relations', label: 'knowledge.relations', icon: Share },
-      { path: '/knowledge?tab=graph', label: 'knowledge.graphView', icon: Connection },
-    ]}
-  ],
+  '/knowledge': [],
   '/wiki': [
     { items: [
       { path: '/wiki', label: 'wiki.allPages', icon: Document },

@@ -28,7 +28,7 @@ api.interceptors.response.use(
     } else if (status === 405) {
       ElMessage.error('请求方法不允许')
     } else {
-      let msg = error.response?.data?.detail || error.response?.data?.message || 'Request failed'
+      let msg = error.response?.data?.error || error.response?.data?.detail || error.response?.data?.message || '请求失败，请稍后重试'
       if (typeof msg === 'string') {
         if (msg.includes('non-JSON response') || msg.includes('<html') || msg.includes('Pro server')) {
           msg = 'Pro 云服务暂不可用，已自动切换为本地模式'
@@ -39,7 +39,10 @@ api.interceptors.response.use(
         if (msg.includes('Pro server unreachable')) {
           msg = 'Pro 云服务暂不可用，已自动切换为本地模式'
         }
-        if (!msg.includes('rate limit')) {
+        if (msg.includes('missing token') || msg.includes('invalid token')) {
+          msg = '登录已过期，请重新登录'
+        }
+        if (!msg.includes('rate limit') && !error.config?._silent) {
           ElMessage.error(msg)
         }
       }

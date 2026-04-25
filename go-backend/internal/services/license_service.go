@@ -145,6 +145,11 @@ func (lm *LicenseManager) GetLicenseInfo() map[string]interface{} {
 	var license models.License
 	lm.db.Where("status = ?", "active").First(&license)
 
+	if license.Status == "active" {
+		lm.tier = license.Tier
+		json.Unmarshal([]byte(license.Features), &lm.features)
+	}
+
 	allFeatures := []string{
 		"ai_extract", "auto_graph", "unlimited_graph",
 		"auto_decay", "decay_report", "prune_suggest", "reinforce",

@@ -48,23 +48,19 @@ func (p *ProProxy) proxyRequest(path string, body interface{}) (map[string]inter
 
 	var bodyReader io.Reader
 	if body != nil {
-		payload := map[string]interface{}{
-			"license_key": licenseKey,
-		}
-		if m, ok := body.(map[string]interface{}); ok {
-			for k, v := range m {
-				payload[k] = v
-			}
-		}
-		b, _ := json.Marshal(payload)
-		bodyReader = strings.NewReader(string(b))
-	} else {
-		b, _ := json.Marshal(map[string]string{"license_key": licenseKey})
+		b, _ := json.Marshal(body)
 		bodyReader = strings.NewReader(string(b))
 	}
 
 	url := strings.TrimRight(p.cfg.LicenseServerURL, "/") + "/api/v1/pro/" + path
-	resp, err := p.client.Post(url, "application/json", bodyReader)
+	req, err := http.NewRequest("POST", url, bodyReader)
+	if err != nil {
+		return nil, &ProError{Message: fmt.Sprintf("failed to create request: %v", err), Code: http.StatusInternalServerError}
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+licenseKey)
+
+	resp, err := p.client.Do(req)
 	if err != nil {
 		return nil, ErrProServerUnreachable
 	}
@@ -89,6 +85,10 @@ func (p *ProProxy) proxyRequest(path string, body interface{}) (map[string]inter
 	}
 
 	if resp.StatusCode == http.StatusForbidden {
+		return nil, ErrProNotAuthorized
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, ErrProNotAuthorized
 	}
 
