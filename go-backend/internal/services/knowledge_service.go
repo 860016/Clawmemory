@@ -92,3 +92,54 @@ func (s *KnowledgeService) GetGraph() ([]models.Entity, []models.Relation, error
 
 	return entities, relations, nil
 }
+
+func (s *KnowledgeService) GetEntity(id uint) (*models.Entity, error) {
+	var entity models.Entity
+	if err := s.db.Where("id = ? AND user_id = ?", id, 1).First(&entity).Error; err != nil {
+		return nil, err
+	}
+	return &entity, nil
+}
+
+func (s *KnowledgeService) UpdateEntity(id uint, data map[string]interface{}) (*models.Entity, error) {
+	var entity models.Entity
+	if err := s.db.Where("id = ? AND user_id = ?", id, 1).First(&entity).Error; err != nil {
+		return nil, err
+	}
+
+	updates := map[string]interface{}{}
+	if name, ok := data["name"].(string); ok && name != "" {
+		updates["name"] = name
+	}
+	if entityType, ok := data["entity_type"].(string); ok && entityType != "" {
+		updates["entity_type"] = entityType
+	}
+	if desc, ok := data["description"].(string); ok {
+		updates["description"] = desc
+	}
+	if props, ok := data["properties"].(map[string]interface{}); ok {
+		b, _ := json.Marshal(props)
+		updates["properties"] = string(b)
+	}
+	if conf, ok := data["confidence"].(float64); ok {
+		updates["confidence"] = conf
+	}
+
+	if len(updates) > 0 {
+		if err := s.db.Model(&entity).Updates(updates).Error; err != nil {
+			return nil, err
+		}
+	}
+
+	s.db.Where("id = ?", id).First(&entity)
+	return &entity, nil
+}
+
+func (s *KnowledgeService) DeleteEntity(id uint) error {
+	s.db.Where("source_id = ? OR target_id = ?", id, id).Delete(&models.Relation{})
+	return s.db.Where("id = ? AND user_id = ?", id, 1).Delete(&models.Entity{}).Error
+}
+
+func (s *KnowledgeService) DeleteRelation(id uint) error {
+	return s.db.Where("id = ? AND user_id = ?", id, 1).Delete(&models.Relation{}).Error
+}
