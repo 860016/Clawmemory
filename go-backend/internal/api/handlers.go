@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -1298,6 +1299,7 @@ func handleScanSkills(c *gin.Context) {
 				filepath.Join(dir, entry.Name(), "skill.json"),
 				filepath.Join(dir, entry.Name(), "skill.yaml"),
 				filepath.Join(dir, entry.Name(), "skill.yml"),
+				filepath.Join(dir, entry.Name(), "SKILL.md"),
 			}
 			var content []byte
 			var skillFile string
@@ -1313,10 +1315,15 @@ func handleScanSkills(c *gin.Context) {
 			}
 			var skill map[string]interface{}
 			ext := filepath.Ext(skillFile)
+			baseName := filepath.Base(skillFile)
 			if ext == ".json" {
 				json.Unmarshal(content, &skill)
 			} else if ext == ".yaml" || ext == ".yml" {
 				if parsed, err := parseYAML(content); err == nil {
+					skill = parsed
+				}
+			} else if baseName == "SKILL.md" {
+				if parsed, err := parseSKILLMd(content); err == nil {
 					skill = parsed
 				}
 			}
@@ -1341,6 +1348,73 @@ func handleScanSkills(c *gin.Context) {
 	})
 }
 
+func handleInstallSkill(c *gin.Context) {
+	var req struct {
+		RepoURL string `json:"repo_url" binding:"required"`
+		Scope   string `json:"scope"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "repo_url is required"})
+		return
+	}
+	if req.Scope == "" {
+		req.Scope = "global"
+	}
+
+	homeDir, _ := os.UserHomeDir()
+	var targetDir string
+	if req.Scope == "global" && homeDir != "" {
+		targetDir = filepath.Join(homeDir, ".openclaw", "skills")
+	} else {
+		wd, _ := os.Getwd()
+		targetDir = filepath.Join(wd, "skills")
+	}
+
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create skills directory"})
+		return
+	}
+
+	repoURL := req.RepoURL
+	if !strings.HasPrefix(repoURL, "https://") && !strings.HasPrefix(repoURL, "git@") {
+		repoURL = "https://github.com/" + repoURL
+	}
+
+	repoName := repoURL
+	if idx := strings.LastIndex(repoName, "/"); idx >= 0 {
+		repoName = repoName[idx+1:]
+	}
+	if strings.HasSuffix(repoName, ".git") {
+		repoName = repoName[:len(repoName)-4]
+	}
+
+	destPath := filepath.Join(targetDir, repoName)
+	if _, err := os.Stat(destPath); err == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message":   "skill already installed",
+			"skill_dir": repoName,
+			"path":      destPath,
+		})
+		return
+	}
+
+	cmd := exec.Command("git", "clone", "--depth", "1", repoURL, destPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "failed to clone repository: " + string(output),
+			"detail": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "skill installed successfully",
+		"skill_dir": repoName,
+		"path":      destPath,
+	})
+}
+
 func parseYAML(data []byte) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 	lines := strings.Split(string(data), "\n")
@@ -1359,6 +1433,44 @@ func parseYAML(data []byte) (map[string]interface{}, error) {
 			result[key] = val
 		}
 	}
+	return result, nil
+}
+
+func parseSKILLMd(data []byte) (map[string]interface{}, error) {
+	content := string(data)
+	result := make(map[string]interface{})
+
+	if strings.HasPrefix(content, "---") {
+		endIdx := strings.Index(content[3:], "---")
+		if endIdx >= 0 {
+			frontmatter := content[3 : endIdx+3]
+			lines := strings.Split(frontmatter, "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line == "" || strings.HasPrefix(line, "#") {
+					continue
+				}
+				parts := strings.SplitN(line, ":", 2)
+				if len(parts) == 2 {
+					key := strings.TrimSpace(parts[0])
+					val := strings.TrimSpace(parts[1])
+					if strings.HasPrefix(val, "\"") && strings.HasSuffix(val, "\"") {
+						val = val[1 : len(val)-1]
+					}
+					result[key] = val
+				}
+			}
+			bodyStart := endIdx + 6
+			if bodyStart < len(content) {
+				result["body_full"] = strings.TrimSpace(content[bodyStart:])
+			}
+		}
+	}
+
+	if _, ok := result["name"]; !ok {
+		result["name"] = "unknown"
+	}
+
 	return result, nil
 }
 
@@ -1397,6 +1509,7 @@ func handleSkillDetail(c *gin.Context) {
 			filepath.Join(baseDir, skillDir, "skill.json"),
 			filepath.Join(baseDir, skillDir, "skill.yaml"),
 			filepath.Join(baseDir, skillDir, "skill.yml"),
+			filepath.Join(baseDir, skillDir, "SKILL.md"),
 		}
 		for _, skillFile := range skillFiles {
 			content, err := os.ReadFile(skillFile)
@@ -1405,12 +1518,19 @@ func handleSkillDetail(c *gin.Context) {
 			}
 			var skill map[string]interface{}
 			ext := filepath.Ext(skillFile)
+			baseName := filepath.Base(skillFile)
 			if ext == ".json" {
 				if err := json.Unmarshal(content, &skill); err != nil {
 					continue
 				}
 			} else if ext == ".yaml" || ext == ".yml" {
 				if parsed, err := parseYAML(content); err != nil {
+					continue
+				} else {
+					skill = parsed
+				}
+			} else if baseName == "SKILL.md" {
+				if parsed, err := parseSKILLMd(content); err != nil {
 					continue
 				} else {
 					skill = parsed
