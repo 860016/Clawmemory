@@ -11,16 +11,16 @@ import (
 	"gorm.io/gorm"
 )
 
-type ProFallbackService struct {
+type ProLocalService struct {
 	db *gorm.DB
 }
 
-func NewProFallbackService(db *gorm.DB) *ProFallbackService {
-	return &ProFallbackService{db: db}
+func NewProLocalService(db *gorm.DB) *ProLocalService {
+	return &ProLocalService{db: db}
 }
 
-func (f *ProFallbackService) DecayStats(userID uint) (map[string]interface{}, error) {
-	decaySvc := NewDecayService(f.db)
+func (s *ProLocalService) DecayStats(userID uint) (map[string]interface{}, error) {
+	decaySvc := NewDecayService(s.db)
 	stats, err := decaySvc.GetStats(userID)
 	if err != nil {
 		return nil, err
@@ -30,17 +30,17 @@ func (f *ProFallbackService) DecayStats(userID uint) (map[string]interface{}, er
 		"active":   stats.Active,
 		"archived": stats.Archived,
 		"trashed":  stats.Trashed,
-		"fallback": true,
+		"mode":     "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) DecayApply(userID uint) (map[string]interface{}, error) {
-	decaySvc := NewDecayService(f.db)
+func (s *ProLocalService) DecayApply(userID uint) (map[string]interface{}, error) {
+	decaySvc := NewDecayService(s.db)
 	return decaySvc.ApplyDecay(userID)
 }
 
-func (f *ProFallbackService) PruneSuggest(userID uint) (map[string]interface{}, error) {
-	decaySvc := NewDecayService(f.db)
+func (s *ProLocalService) PruneSuggest(userID uint) (map[string]interface{}, error) {
+	decaySvc := NewDecayService(s.db)
 	suggestions, err := decaySvc.GetPruneSuggestions(userID)
 	if err != nil {
 		return nil, err
@@ -48,13 +48,13 @@ func (f *ProFallbackService) PruneSuggest(userID uint) (map[string]interface{}, 
 	return map[string]interface{}{
 		"suggestions": suggestions,
 		"algorithm":   "local_importance_v1",
-		"fallback":    true,
+		"mode":        "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) ConflictScan(userID uint) (map[string]interface{}, error) {
+func (s *ProLocalService) ConflictScan(userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
-	f.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
+	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
 
 	conflicts := []map[string]interface{}{}
 	keyMap := make(map[string][]models.Memory)
@@ -70,10 +70,10 @@ func (f *ProFallbackService) ConflictScan(userID uint) (map[string]interface{}, 
 			}
 			if !allSame(values) {
 				conflict := map[string]interface{}{
-					"key":       key,
-					"count":     len(mems),
-					"memories":  mems,
-					"conflict":  "different_values_same_key",
+					"key":      key,
+					"count":    len(mems),
+					"memories": mems,
+					"conflict": "different_values_same_key",
 				}
 				conflicts = append(conflicts, conflict)
 			}
@@ -81,23 +81,23 @@ func (f *ProFallbackService) ConflictScan(userID uint) (map[string]interface{}, 
 	}
 
 	return map[string]interface{}{
-		"conflicts":  conflicts,
-		"total":      len(conflicts),
-		"algorithm":  "local_key_conflict_v1",
-		"fallback":   true,
+		"conflicts": conflicts,
+		"total":     len(conflicts),
+		"algorithm": "local_key_conflict_v1",
+		"mode":      "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) CompressPreview(userID uint, level string) (map[string]interface{}, error) {
+func (s *ProLocalService) CompressPreview(userID uint, level string) (map[string]interface{}, error) {
 	var memories []models.Memory
-	f.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
+	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
 
 	if len(memories) == 0 {
 		return map[string]interface{}{
-			"original_count": 0,
+			"original_count":   0,
 			"compressed_count": 0,
-			"ratio": 0,
-			"fallback": true,
+			"ratio":            0,
+			"mode":             "local_pro",
 		}, nil
 	}
 
@@ -117,8 +117,8 @@ func (f *ProFallbackService) CompressPreview(userID uint, level string) (map[str
 	preview := []map[string]interface{}{}
 	for layer, mems := range grouped {
 		preview = append(preview, map[string]interface{}{
-			"layer":     layer,
-			"original":  len(mems),
+			"layer":      layer,
+			"original":   len(mems),
 			"compressed": int(float64(len(mems)) * (1 - rate)),
 		})
 	}
@@ -130,20 +130,20 @@ func (f *ProFallbackService) CompressPreview(userID uint, level string) (map[str
 		"level":            level,
 		"preview":          preview,
 		"algorithm":        "local_layer_compress_v1",
-		"fallback":         true,
+		"mode":             "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) CompressApply(userID uint, level string) (map[string]interface{}, error) {
+func (s *ProLocalService) CompressApply(userID uint, level string) (map[string]interface{}, error) {
 	var memories []models.Memory
-	f.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
+	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
 
 	if len(memories) == 0 {
 		return map[string]interface{}{
-			"processed": 0,
+			"processed":  0,
 			"compressed": 0,
-			"ratio": 0,
-			"fallback": true,
+			"ratio":      0,
+			"mode":       "local_pro",
 		}, nil
 	}
 
@@ -169,7 +169,7 @@ func (f *ProFallbackService) CompressApply(userID uint, level string) (map[strin
 
 	for i := 0; i < targetCount && i < len(lowImportance); i++ {
 		m := lowImportance[i]
-		f.db.Model(&m).Updates(map[string]interface{}{
+		s.db.Model(&m).Updates(map[string]interface{}{
 			"status":     "archived",
 			"importance": m.Importance * 0.5,
 		})
@@ -182,15 +182,15 @@ func (f *ProFallbackService) CompressApply(userID uint, level string) (map[strin
 		"ratio":      math.Round(float64(compressed)/float64(len(memories))*100) / 100,
 		"level":      level,
 		"algorithm":  "local_importance_compress_v1",
-		"fallback":   true,
+		"mode":       "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) EvolutionDiscover(userID uint) (map[string]interface{}, error) {
-	recommendSvc := NewRecommendService(f.db)
+func (s *ProLocalService) EvolutionDiscover(userID uint) (map[string]interface{}, error) {
+	recommendSvc := NewRecommendService(s.db)
 
 	var memories []models.Memory
-	f.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
+	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
 
 	relations := []map[string]interface{}{}
 	seen := make(map[string]bool)
@@ -206,12 +206,12 @@ func (f *ProFallbackService) EvolutionDiscover(userID uint) (map[string]interfac
 				if !seen[key] {
 					seen[key] = true
 					relations = append(relations, map[string]interface{}{
-						"source_id":   memories[i].ID,
-						"source_key":  memories[i].Key,
-						"target_id":   rec["id"],
-						"target_key":  rec["key"],
-						"score":       rec["score"],
-						"reason":      rec["reason"],
+						"source_id":  memories[i].ID,
+						"source_key": memories[i].Key,
+						"target_id":  rec["id"],
+						"target_key": rec["key"],
+						"score":      rec["score"],
+						"reason":     rec["reason"],
 					})
 				}
 			}
@@ -219,32 +219,32 @@ func (f *ProFallbackService) EvolutionDiscover(userID uint) (map[string]interfac
 	}
 
 	return map[string]interface{}{
-		"relations":    relations,
-		"total":        len(relations),
-		"algorithm":    "local_token_similarity_v1",
-		"fallback":     true,
+		"relations": relations,
+		"total":     len(relations),
+		"algorithm": "local_token_similarity_v1",
+		"mode":      "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) EvolutionPrefetch(userID uint, context string) (map[string]interface{}, error) {
-	recommendSvc := NewRecommendService(f.db)
+func (s *ProLocalService) EvolutionPrefetch(userID uint, context string) (map[string]interface{}, error) {
+	recommendSvc := NewRecommendService(s.db)
 	result, err := recommendSvc.RecommendByContext(userID, context, 10)
 	if err != nil {
 		return nil, err
 	}
 
 	return map[string]interface{}{
-		"matched":  result["recommendations"],
-		"total":    result["total"],
-		"context":  context,
+		"matched":   result["recommendations"],
+		"total":     result["total"],
+		"context":   context,
 		"algorithm": "local_context_match_v1",
-		"fallback":  true,
+		"mode":      "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) EvolutionImportance(userID uint) (map[string]interface{}, error) {
+func (s *ProLocalService) EvolutionImportance(userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
-	f.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
+	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
 
 	adjustments := []map[string]interface{}{}
 	for _, m := range memories {
@@ -276,45 +276,33 @@ func (f *ProFallbackService) EvolutionImportance(userID uint) (map[string]interf
 		"adjustments": adjustments,
 		"total":       len(adjustments),
 		"algorithm":   "local_time_access_v1",
-		"fallback":    true,
+		"mode":        "local_pro",
 	}, nil
 }
 
-func allSame(values []string) bool {
-	if len(values) <= 1 {
-		return true
-	}
-	for i := 1; i < len(values); i++ {
-		if !strings.EqualFold(values[i], values[0]) {
-			return false
-		}
-	}
-	return true
-}
-
-func (f *ProFallbackService) ReinforceMemory(userID uint, memoryID uint) (map[string]interface{}, error) {
+func (s *ProLocalService) ReinforceMemory(userID uint, memoryID uint) (map[string]interface{}, error) {
 	var memory models.Memory
-	if err := f.db.Where("id = ? AND user_id = ?", memoryID, userID).First(&memory).Error; err != nil {
+	if err := s.db.Where("id = ? AND user_id = ?", memoryID, userID).First(&memory).Error; err != nil {
 		return nil, fmt.Errorf("memory not found")
 	}
 	newImportance := math.Min(memory.Importance*1.2, 1.0)
-	f.db.Model(&memory).Updates(map[string]interface{}{
+	s.db.Model(&memory).Updates(map[string]interface{}{
 		"importance":       newImportance,
 		"access_count":     memory.AccessCount + 1,
 		"last_accessed_at": time.Now(),
 	})
 	return map[string]interface{}{
-		"memory_id":         memoryID,
-		"old_importance":    memory.Importance,
-		"new_importance":    newImportance,
-		"reinforced":        true,
-		"algorithm":         "local_access_reinforce_v1",
-		"fallback":          true,
+		"memory_id":      memoryID,
+		"old_importance": memory.Importance,
+		"new_importance": newImportance,
+		"reinforced":     true,
+		"algorithm":      "local_access_reinforce_v1",
+		"mode":           "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) ConflictResolve(userID uint, conflictIndex int, strategy string) (map[string]interface{}, error) {
-	result, err := f.ConflictScan(userID)
+func (s *ProLocalService) ConflictResolve(userID uint, conflictIndex int, strategy string) (map[string]interface{}, error) {
+	result, err := s.ConflictScan(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -330,54 +318,54 @@ func (f *ProFallbackService) ConflictResolve(userID uint, conflictIndex int, str
 	switch strategy {
 	case "keep_first":
 		for i := 1; i < len(memories); i++ {
-			f.db.Model(&memories[i]).Update("status", "archived")
+			s.db.Model(&memories[i]).Update("status", "archived")
 		}
 	case "keep_latest":
 		for i := 0; i < len(memories)-1; i++ {
-			f.db.Model(&memories[i]).Update("status", "archived")
+			s.db.Model(&memories[i]).Update("status", "archived")
 		}
 	default:
 		for i := 1; i < len(memories); i++ {
-			f.db.Model(&memories[i]).Update("status", "archived")
+			s.db.Model(&memories[i]).Update("status", "archived")
 		}
 	}
 	return map[string]interface{}{
-		"resolved":  true,
-		"strategy":  strategy,
-		"kept":      1,
-		"archived":  len(memories) - 1,
-		"fallback":  true,
+		"resolved": true,
+		"strategy": strategy,
+		"kept":     1,
+		"archived": len(memories) - 1,
+		"mode":     "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) TokenRoute(message string, contextLength int) (map[string]interface{}, error) {
+func (s *ProLocalService) TokenRoute(message string, contextLength int) (map[string]interface{}, error) {
 	tokenEstimate := len(message) / 4
 	if contextLength > 0 {
 		tokenEstimate += contextLength
 	}
 	return map[string]interface{}{
-		"model":           "local",
+		"model":            "local",
 		"estimated_tokens": tokenEstimate,
-		"provider":        "fallback",
-		"fallback":        true,
+		"provider":         "local_pro",
+		"mode":             "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) TokenStats() (map[string]interface{}, error) {
+func (s *ProLocalService) TokenStats() (map[string]interface{}, error) {
 	var totalMemories int64
-	f.db.Model(&models.Memory{}).Where("status != ?", "trashed").Count(&totalMemories)
+	s.db.Model(&models.Memory{}).Where("status != ?", "trashed").Count(&totalMemories)
 	estimatedTokens := totalMemories * 50
 	return map[string]interface{}{
 		"total_tokens_used": estimatedTokens,
 		"total_memories":    totalMemories,
-		"provider":          "fallback",
-		"fallback":          true,
+		"provider":          "local_pro",
+		"mode":              "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) AIExtract(userID uint) (map[string]interface{}, error) {
+func (s *ProLocalService) AIExtract(userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
-	f.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
+	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
 	entities := []map[string]interface{}{}
 	for _, m := range memories {
 		if len(entities) >= 10 {
@@ -391,87 +379,99 @@ func (f *ProFallbackService) AIExtract(userID uint) (map[string]interface{}, err
 		})
 	}
 	return map[string]interface{}{
-		"entities":    entities,
-		"total":       len(entities),
-		"algorithm":   "local_key_extract_v1",
-		"fallback":    true,
+		"entities":  entities,
+		"total":     len(entities),
+		"algorithm": "local_key_extract_v1",
+		"mode":      "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) AutoGraph(userID uint, overwrite bool) (map[string]interface{}, error) {
-	extractResult, err := f.AIExtract(userID)
+func (s *ProLocalService) AutoGraph(userID uint, overwrite bool) (map[string]interface{}, error) {
+	extractResult, err := s.AIExtract(userID)
 	if err != nil {
 		return nil, err
 	}
 	return map[string]interface{}{
-		"entities_created": extractResult["total"],
+		"entities_created":  extractResult["total"],
 		"relations_created": 0,
-		"overwrite":        overwrite,
-		"algorithm":        "local_key_extract_v1",
-		"fallback":         true,
+		"overwrite":         overwrite,
+		"algorithm":         "local_key_extract_v1",
+		"mode":              "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) BackupSchedule() (map[string]interface{}, error) {
+func (s *ProLocalService) BackupSchedule() (map[string]interface{}, error) {
 	return map[string]interface{}{
 		"enabled":        false,
 		"interval_hours": 24,
-		"fallback":       true,
+		"mode":           "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) SetBackupSchedule(enabled bool, intervalHours int) (map[string]interface{}, error) {
+func (s *ProLocalService) SetBackupSchedule(enabled bool, intervalHours int) (map[string]interface{}, error) {
 	return map[string]interface{}{
 		"enabled":        enabled,
 		"interval_hours": intervalHours,
-		"message":        "本地模式：备份计划已记录，请手动执行备份",
-		"fallback":       true,
+		"message":        "备份计划已记录，请手动执行备份",
+		"mode":           "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) CompressConfig() (map[string]interface{}, error) {
+func (s *ProLocalService) CompressConfig() (map[string]interface{}, error) {
 	return map[string]interface{}{
-		"level":     "light",
-		"auto":      false,
-		"fallback":  true,
+		"level": "light",
+		"auto":  false,
+		"mode":  "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) SetCompressConfig(config map[string]interface{}) (map[string]interface{}, error) {
+func (s *ProLocalService) SetCompressConfig(config map[string]interface{}) (map[string]interface{}, error) {
 	return map[string]interface{}{
-		"config":    config,
-		"message":   "本地模式：压缩配置已记录",
-		"fallback":  true,
+		"config":  config,
+		"message": "压缩配置已记录",
+		"mode":    "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) EvolutionInsights(userID uint) (map[string]interface{}, error) {
+func (s *ProLocalService) EvolutionInsights(userID uint) (map[string]interface{}, error) {
 	var totalMemories int64
-	f.db.Model(&models.Memory{}).Where("user_id = ? AND status != ?", userID, "trashed").Count(&totalMemories)
+	s.db.Model(&models.Memory{}).Where("user_id = ? AND status != ?", userID, "trashed").Count(&totalMemories)
 
 	var totalEntities int64
-	f.db.Model(&models.Entity{}).Where("user_id = ?", userID).Count(&totalEntities)
+	s.db.Model(&models.Entity{}).Where("user_id = ?", userID).Count(&totalEntities)
 
 	var totalRelations int64
-	f.db.Model(&models.Relation{}).Count(&totalRelations)
+	s.db.Model(&models.Relation{}).Count(&totalRelations)
 
 	return map[string]interface{}{
-		"total_memories":   totalMemories,
-		"total_entities":   totalEntities,
-		"total_relations":  totalRelations,
-		"health_score":     0.7,
-		"recommendations":  []string{"定期清理低重要性记忆", "为关键记忆添加标签", "利用知识图谱建立关联"},
-		"fallback":         true,
+		"total_memories":  totalMemories,
+		"total_entities":  totalEntities,
+		"total_relations": totalRelations,
+		"health_score":    0.7,
+		"recommendations": []string{"定期清理低重要性记忆", "为关键记忆添加标签", "利用知识图谱建立关联"},
+		"mode":            "local_pro",
 	}, nil
 }
 
-func (f *ProFallbackService) EvolutionInfer(userID uint) (map[string]interface{}, error) {
+func (s *ProLocalService) EvolutionInfer(userID uint) (map[string]interface{}, error) {
 	return map[string]interface{}{
 		"chains":    []map[string]interface{}{},
 		"total":     0,
 		"algorithm": "local_infer_v1",
-		"fallback":  true,
+		"mode":      "local_pro",
 	}, nil
+}
+
+func allSame(values []string) bool {
+	if len(values) <= 1 {
+		return true
+	}
+	for i := 1; i < len(values); i++ {
+		if !strings.EqualFold(values[i], values[0]) {
+			return false
+		}
+	}
+	return true
 }
 
 func groupByLayer(memories []models.Memory) map[string][]models.Memory {
