@@ -176,13 +176,14 @@ func handleLicenseDeactivate(lm *services.LicenseManager) gin.HandlerFunc {
 // Memory handlers
 func handleListMemories(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		svc := services.NewMemoryService(db)
 		layer := c.Query("layer")
 		status := c.Query("status")
 		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 		size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 
-		memories, total, err := svc.List(layer, page, size, status)
+		memories, total, err := svc.List(userID, layer, page, size, status)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -197,6 +198,7 @@ func handleListMemories(db *gorm.DB) gin.HandlerFunc {
 
 func handleCreateMemory(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		var req map[string]interface{}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -204,7 +206,7 @@ func handleCreateMemory(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		svc := services.NewMemoryService(db)
-		memory, err := svc.Create(req)
+		memory, err := svc.Create(userID, req)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -305,12 +307,13 @@ func handleSearchSemantic(db *gorm.DB) gin.HandlerFunc {
 // Knowledge handlers
 func handleListEntities(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		svc := services.NewKnowledgeService(db)
 		entityType := c.Query("type")
 		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 		size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 
-		entities, total, err := svc.ListEntities(entityType, page, size)
+		entities, total, err := svc.ListEntities(userID, entityType, page, size)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -321,6 +324,7 @@ func handleListEntities(db *gorm.DB) gin.HandlerFunc {
 
 func handleCreateEntity(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		var req map[string]interface{}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -328,7 +332,7 @@ func handleCreateEntity(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		svc := services.NewKnowledgeService(db)
-		entity, err := svc.CreateEntity(req)
+		entity, err := svc.CreateEntity(userID, req)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -339,6 +343,7 @@ func handleCreateEntity(db *gorm.DB) gin.HandlerFunc {
 
 func handleListRelations(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		var relations []struct {
 			ID           uint    `json:"id"`
 			SourceID     uint    `json:"source_id"`
@@ -348,13 +353,14 @@ func handleListRelations(db *gorm.DB) gin.HandlerFunc {
 			Confidence   float64 `json:"confidence"`
 			Weight       float64 `json:"weight"`
 		}
-		db.Where("user_id = ?", 1).Find(&relations)
+		db.Where("user_id = ?", userID).Find(&relations)
 		c.JSON(http.StatusOK, gin.H{"items": relations})
 	}
 }
 
 func handleCreateRelation(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		var req map[string]interface{}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -362,7 +368,7 @@ func handleCreateRelation(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		svc := services.NewKnowledgeService(db)
-		relation, err := svc.CreateRelation(req)
+		relation, err := svc.CreateRelation(userID, req)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -373,8 +379,9 @@ func handleCreateRelation(db *gorm.DB) gin.HandlerFunc {
 
 func handleGetGraph(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		svc := services.NewKnowledgeService(db)
-		entities, relations, err := svc.GetGraph()
+		entities, relations, err := svc.GetGraph(userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -389,12 +396,13 @@ func handleGetGraph(db *gorm.DB) gin.HandlerFunc {
 // Wiki handlers
 func handleListWiki(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		svc := services.NewWikiService(db)
 		category := c.Query("category")
 		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 		size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 
-		pages, total, err := svc.List(category, page, size)
+		pages, total, err := svc.List(userID, category, page, size)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -405,9 +413,10 @@ func handleListWiki(db *gorm.DB) gin.HandlerFunc {
 
 func handleGetEntity(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 		svc := services.NewKnowledgeService(db)
-		entity, err := svc.GetEntity(uint(id))
+		entity, err := svc.GetEntity(userID, uint(id))
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "entity not found"})
 			return
@@ -418,6 +427,7 @@ func handleGetEntity(db *gorm.DB) gin.HandlerFunc {
 
 func handleUpdateEntity(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 		var req map[string]interface{}
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -425,7 +435,7 @@ func handleUpdateEntity(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 		svc := services.NewKnowledgeService(db)
-		entity, err := svc.UpdateEntity(uint(id), req)
+		entity, err := svc.UpdateEntity(userID, uint(id), req)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -436,9 +446,10 @@ func handleUpdateEntity(db *gorm.DB) gin.HandlerFunc {
 
 func handleDeleteEntity(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 		svc := services.NewKnowledgeService(db)
-		if err := svc.DeleteEntity(uint(id)); err != nil {
+		if err := svc.DeleteEntity(userID, uint(id)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -448,9 +459,10 @@ func handleDeleteEntity(db *gorm.DB) gin.HandlerFunc {
 
 func handleDeleteRelation(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
 		svc := services.NewKnowledgeService(db)
-		if err := svc.DeleteRelation(uint(id)); err != nil {
+		if err := svc.DeleteRelation(userID, uint(id)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -460,6 +472,7 @@ func handleDeleteRelation(db *gorm.DB) gin.HandlerFunc {
 
 func handleCreateWiki(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		var req map[string]interface{}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -467,7 +480,7 @@ func handleCreateWiki(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		svc := services.NewWikiService(db)
-		page, err := svc.Create(req)
+		page, err := svc.Create(userID, req)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -523,11 +536,12 @@ func handleDeleteWiki(db *gorm.DB) gin.HandlerFunc {
 // Report handlers
 func handleListReports(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		svc := services.NewDailyReportService(db)
 		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 		size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 
-		reports, total, err := svc.List(page, size)
+		reports, total, err := svc.List(userID, page, size)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -538,6 +552,7 @@ func handleListReports(db *gorm.DB) gin.HandlerFunc {
 
 func handleCreateReport(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		var req map[string]interface{}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -545,7 +560,7 @@ func handleCreateReport(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		svc := services.NewDailyReportService(db)
-		report, err := svc.Create(req)
+		report, err := svc.Create(userID, req)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -556,9 +571,10 @@ func handleCreateReport(db *gorm.DB) gin.HandlerFunc {
 
 func handleGetReportByDate(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		date := c.Param("date")
 		svc := services.NewDailyReportService(db)
-		report, err := svc.GetByDate(date)
+		report, err := svc.GetByDate(userID, date)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
@@ -570,14 +586,15 @@ func handleGetReportByDate(db *gorm.DB) gin.HandlerFunc {
 // Stats handlers
 func handleGetStats(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		var memoryCount, entityCount, relationCount, wikiCount int64
-		db.Model(&struct{ ID uint }{}).Table("memories").Where("status != ?", "trashed").Count(&memoryCount)
-		db.Model(&struct{ ID uint }{}).Table("entities").Count(&entityCount)
-		db.Model(&struct{ ID uint }{}).Table("relations").Count(&relationCount)
-		db.Model(&struct{ ID uint }{}).Table("wiki_pages").Count(&wikiCount)
+		db.Model(&struct{ ID uint }{}).Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Count(&memoryCount)
+		db.Model(&struct{ ID uint }{}).Table("entities").Where("user_id = ?", userID).Count(&entityCount)
+		db.Model(&struct{ ID uint }{}).Table("relations").Where("user_id = ?", userID).Count(&relationCount)
+		db.Model(&struct{ ID uint }{}).Table("wiki_pages").Where("user_id = ?", userID).Count(&wikiCount)
 
 		layerStats := make(map[string]int64)
-		rows, _ := db.Raw("SELECT COALESCE(layer, 'knowledge') as layer, COUNT(*) as cnt FROM memories WHERE status != 'trashed' GROUP BY layer").Rows()
+		rows, _ := db.Raw("SELECT COALESCE(layer, 'knowledge') as layer, COUNT(*) as cnt FROM memories WHERE user_id = ? AND status != 'trashed' GROUP BY layer", userID).Rows()
 		for rows.Next() {
 			var layer string
 			var cnt int64
@@ -597,7 +614,7 @@ func handleGetStats(db *gorm.DB) gin.HandlerFunc {
 			CreatedAt time.Time `json:"created_at"`
 		}
 		var recentMemories []RecentMemory
-		db.Table("memories").Where("status != ?", "trashed").Order("created_at desc").Limit(10).Find(&recentMemories)
+		db.Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Order("created_at desc").Limit(10).Find(&recentMemories)
 
 		recentMemoriesJson := make([]map[string]interface{}, 0)
 		for _, m := range recentMemories {
@@ -2035,7 +2052,7 @@ func importFromJSON(db *gorm.DB, userID uint, content string, seenKeys map[strin
 		seenKeys[key] = true
 		*imported++
 
-		tryCreateEntity(db, key, contentStr, entitiesCreated)
+		tryCreateEntity(db, userID, key, contentStr, entitiesCreated)
 	}
 }
 
@@ -2094,7 +2111,7 @@ func importFromMarkdown(db *gorm.DB, userID uint, filePath, content string, seen
 		seenKeys[key] = true
 		*imported++
 
-		tryCreateEntity(db, key, body, entitiesCreated)
+		tryCreateEntity(db, userID, key, body, entitiesCreated)
 	}
 }
 
@@ -2124,7 +2141,7 @@ func importFromText(db *gorm.DB, userID uint, filePath, content string, seenKeys
 				if result.Error == nil {
 					seenKeys[key] = true
 					*imported++
-					tryCreateEntity(db, key, body, entitiesCreated)
+					tryCreateEntity(db, userID, key, body, entitiesCreated)
 				} else {
 					*skipped++
 				}
@@ -2172,7 +2189,7 @@ func importFromText(db *gorm.DB, userID uint, filePath, content string, seenKeys
 			if result.Error == nil {
 				seenKeys[key] = true
 				*imported++
-				tryCreateEntity(db, key, content, entitiesCreated)
+				tryCreateEntity(db, userID, key, content, entitiesCreated)
 			}
 		}
 	}
@@ -2227,7 +2244,7 @@ func extractTags(m map[string]interface{}) string {
 	return ""
 }
 
-func tryCreateEntity(db *gorm.DB, key, content string, entitiesCreated *int) {
+func tryCreateEntity(db *gorm.DB, userID uint, key, content string, entitiesCreated *int) {
 	if len(content) < 10 || len(content) > 2000 {
 		return
 	}
@@ -2255,10 +2272,19 @@ func tryCreateEntity(db *gorm.DB, key, content string, entitiesCreated *int) {
 	}
 
 	var entityCount int64
-	db.Table("entities").Where("name = ?", name).Count(&entityCount)
+	db.Table("entities").Where("user_id = ? AND name = ?", userID, name).Count(&entityCount)
 	if entityCount == 0 {
-		db.Exec(`INSERT INTO entities (user_id, name, entity_type, description, confidence, extract_method, created_at, updated_at) VALUES (1, ?, ?, ?, 0.7, 'auto_import', datetime('now'), datetime('now'))`, name, entityType, content)
-		*entitiesCreated++
+		entity := models.Entity{
+			UserID:        userID,
+			Name:          name,
+			EntityType:    entityType,
+			Description:   content,
+			Confidence:    0.7,
+			ExtractMethod: "auto_import",
+		}
+		if db.Create(&entity).Error == nil {
+			*entitiesCreated++
+		}
 	}
 }
 
@@ -2471,8 +2497,7 @@ func handleImportData(db *gorm.DB) gin.HandlerFunc {
 			for _, m := range memories {
 				if data, ok := m.(map[string]interface{}); ok {
 					svc := services.NewMemoryService(db)
-					data["user_id"] = userID
-					if _, err := svc.Create(data); err == nil {
+					if _, err := svc.Create(userID, data); err == nil {
 						imported++
 					}
 				}
@@ -2483,8 +2508,7 @@ func handleImportData(db *gorm.DB) gin.HandlerFunc {
 			for _, e := range entities {
 				if data, ok := e.(map[string]interface{}); ok {
 					svc := services.NewKnowledgeService(db)
-					data["user_id"] = userID
-					if _, err := svc.CreateEntity(data); err == nil {
+					if _, err := svc.CreateEntity(userID, data); err == nil {
 						imported++
 					}
 				}
@@ -2495,8 +2519,7 @@ func handleImportData(db *gorm.DB) gin.HandlerFunc {
 			for _, w := range wikiPages {
 				if data, ok := w.(map[string]interface{}); ok {
 					svc := services.NewWikiService(db)
-					data["user_id"] = userID
-					if _, err := svc.Create(data); err == nil {
+					if _, err := svc.Create(userID, data); err == nil {
 						imported++
 					}
 				}

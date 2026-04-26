@@ -16,7 +16,7 @@ func NewWikiService(db *gorm.DB) *WikiService {
 	return &WikiService{db: db}
 }
 
-func (s *WikiService) Create(data map[string]interface{}) (*models.WikiPage, error) {
+func (s *WikiService) Create(userID uint, data map[string]interface{}) (*models.WikiPage, error) {
 	tags := "[]"
 	if t, ok := data["tags"].([]string); ok {
 		b, _ := json.Marshal(t)
@@ -24,7 +24,7 @@ func (s *WikiService) Create(data map[string]interface{}) (*models.WikiPage, err
 	}
 
 	page := &models.WikiPage{
-		UserID:    1,
+		UserID:    userID,
 		Title:     getString(data, "title", ""),
 		Content:   getString(data, "content", ""),
 		Category:  getString(data, "category", ""),
@@ -38,11 +38,11 @@ func (s *WikiService) Create(data map[string]interface{}) (*models.WikiPage, err
 	return page, nil
 }
 
-func (s *WikiService) List(category string, page, size int) ([]models.WikiPage, int64, error) {
+func (s *WikiService) List(userID uint, category string, page, size int) ([]models.WikiPage, int64, error) {
 	var pages []models.WikiPage
 	var total int64
 
-	query := s.db.Model(&models.WikiPage{}).Where("user_id = ?", 1)
+	query := s.db.Model(&models.WikiPage{}).Where("user_id = ?", userID)
 	if category != "" {
 		query = query.Where("category = ?", category)
 	}

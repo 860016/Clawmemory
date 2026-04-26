@@ -17,7 +17,7 @@ func NewDailyReportService(db *gorm.DB) *DailyReportService {
 	return &DailyReportService{db: db}
 }
 
-func (s *DailyReportService) Create(data map[string]interface{}) (*models.DailyReport, error) {
+func (s *DailyReportService) Create(userID uint, data map[string]interface{}) (*models.DailyReport, error) {
 	tags := "[]"
 	if t, ok := data["tags"].([]string); ok {
 		b, _ := json.Marshal(t)
@@ -25,7 +25,7 @@ func (s *DailyReportService) Create(data map[string]interface{}) (*models.DailyR
 	}
 
 	report := &models.DailyReport{
-		UserID:  1,
+		UserID:  userID,
 		Date:    getString(data, "date", time.Now().Format("2006-01-02")),
 		Content: getString(data, "content", ""),
 		Summary: getString(data, "summary", ""),
@@ -39,19 +39,19 @@ func (s *DailyReportService) Create(data map[string]interface{}) (*models.DailyR
 	return report, nil
 }
 
-func (s *DailyReportService) List(page, size int) ([]models.DailyReport, int64, error) {
+func (s *DailyReportService) List(userID uint, page, size int) ([]models.DailyReport, int64, error) {
 	var reports []models.DailyReport
 	var total int64
 
-	query := s.db.Model(&models.DailyReport{}).Where("user_id = ?", 1)
+	query := s.db.Model(&models.DailyReport{}).Where("user_id = ?", userID)
 	query.Count(&total)
 	err := query.Order("date DESC").Offset((page - 1) * size).Limit(size).Find(&reports).Error
 	return reports, total, err
 }
 
-func (s *DailyReportService) GetByDate(date string) (*models.DailyReport, error) {
+func (s *DailyReportService) GetByDate(userID uint, date string) (*models.DailyReport, error) {
 	var report models.DailyReport
-	if err := s.db.Where("user_id = ? AND date = ?", 1, date).First(&report).Error; err != nil {
+	if err := s.db.Where("user_id = ? AND date = ?", userID, date).First(&report).Error; err != nil {
 		return nil, err
 	}
 	return &report, nil
