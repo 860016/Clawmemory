@@ -3,6 +3,9 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"clawmemory/internal/models"
@@ -103,6 +106,12 @@ func (s *DailyReportService) Generate(userID uint, date string) (*models.DailyRe
 		}
 	}
 
+	openclawHighlights := s.scanOpenClawDataForDate(date)
+	if memoryCount == 0 && len(openclawHighlights) > 0 {
+		highlights = openclawHighlights
+		memoryCount = int64(len(openclawHighlights))
+	}
+
 	stats := map[string]interface{}{
 		"new_memories":  memoryCount,
 		"new_entities":  entityCount,
@@ -129,6 +138,166 @@ func (s *DailyReportService) Generate(userID uint, date string) (*models.DailyRe
 		return nil, err
 	}
 	return report, nil
+}
+
+func (s *DailyReportService) scanOpenClawDataForDate(date string) []string {
+	var highlights []string
+
+	homeDir, _ := os.UserHomeDir()
+	if homeDir == "" {
+		return highlights
+	}
+
+	searchDirs := []string{
+		filepath.Join(homeDir, ".openclaw"),
+		filepath.Join(homeDir, ".trae"),
+		filepath.Join(homeDir, ".trae-cn"),
+	}
+
+	for _, dir := range searchDirs {
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			continue
+		}
+
+		sessionHighlights := s.scanSessionsForDate(dir, date)
+		highlights = append(highlights, sessionHighlights...)
+
+		memoryHighlights := s.scanWorkspaceMemoryForDate(dir, date)
+		highlights = append(highlights, memoryHighlights...)
+	}
+
+	if len(highlights) > 10 {
+		highlights = highlights[:10]
+	}
+	return highlights
+}
+
+func (s *DailyReportService) scanSessionsForDate(baseDir string, date string) []string {
+	var highlights []string
+
+	agentsDir := filepath.Join(baseDir, "agents")
+	if info, err := os.Stat(agentsDir); err != nil || !info.IsDir() {
+		return highlights
+	}
+
+	agentDirs, _ := os.ReadDir(agentsDir)
+	for _, ad := range agentDirs {
+		if !ad.IsDir() {
+			continue
+		}
+		sessDir := filepath.Join(agentsDir, ad.Name(), "sessions")
+		files, _ := os.ReadDir(sessDir)
+
+		for _, f := range files {
+			if f.IsDir() || !strings.HasSuffix(strings.ToLower(f.Name()), ".jsonl") {
+				continue
+			}
+			path := filepath.Join(sessDir, f.Name())
+			data, err := os.ReadFile(path)
+			if err != nil || len(data) == 0 {
+				continue
+			}
+
+			lines := strings.Split(string(data), "\n")
+			userMessages := []string{}
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				var msg map[string]interface{}
+				if json.Unmarshal([]byte(line), &msg) != nil {
+					continue
+				}
+				msgType, _ := msg["type"].(string)
+				if msgType != "user" && msgType != "human" {
+					continue
+				}
+				text, _ := msg["text"].(string)
+				if text == "" {
+					text, _ = msg["content"].(string)
+				}
+				if text == "" {
+					continue
+				}
+				ts, _ := msg["timestamp"].(string)
+				if ts != "" && strings.HasPrefix(ts, date) {
+					userMessages = append(userMessages, text)
+				} else if ts == "" && len(text) > 5 {
+					userMessages = append(userMessages, text)
+				}
+			}
+
+			for i, msg := range userMessages {
+				if i >= 5 {
+					break
+				}
+				preview := msg
+				if len(preview) > 80 {
+					preview = preview[:80] + "..."
+				}
+				highlights = append(highlights, fmt.Sprintf("会话: %s", preview))
+			}
+		}
+	}
+	return highlights
+}
+
+func (s *DailyReportService) scanWorkspaceMemoryForDate(baseDir string, date string) []string {
+	var highlights []string
+
+	memFile := filepath.Join(baseDir, "workspace", "MEMORY.md")
+	if data, err := os.ReadFile(memFile); err == nil && len(data) > 0 {
+		content := string(data)
+		lines := strings.Split(content, "\n")
+		currentSection := ""
+		for _, line := range lines {
+			if strings.HasPrefix(line, "# ") {
+				currentSection = strings.TrimSpace(line[2:])
+			} else if currentSection != "" && strings.TrimSpace(line) != "" {
+				preview := strings.TrimSpace(line)
+				if len(preview) > 80 {
+					preview = preview[:80] + "..."
+				}
+				highlights = append(highlights, fmt.Sprintf("[%s] %s", currentSection, preview))
+				if len(highlights) >= 3 {
+					return highlights
+				}
+			}
+		}
+	}
+
+	memoryDir := filepath.Join(baseDir, "workspace", "memory")
+	if files, _ := os.ReadDir(memoryDir); len(files) > 0 {
+		for _, f := range files {
+			if f.IsDir() || !strings.HasSuffix(strings.ToLower(f.Name()), ".md") {
+				continue
+			}
+			if strings.HasPrefix(f.Name(), date) {
+				path := filepath.Join(memoryDir, f.Name())
+				data, err := os.ReadFile(path)
+				if err != nil || len(data) == 0 {
+					continue
+				}
+				content := string(data)
+				lines := strings.Split(content, "\n")
+				for _, line := range lines {
+					line = strings.TrimSpace(line)
+					if line != "" && !strings.HasPrefix(line, "# ") {
+						if len(line) > 80 {
+							line = line[:80] + "..."
+						}
+						highlights = append(highlights, fmt.Sprintf("记忆日志: %s", line))
+						if len(highlights) >= 3 {
+							return highlights
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return highlights
 }
 
 func toJSONStr(v interface{}) string {

@@ -1292,6 +1292,20 @@ func handleScanSkills(c *gin.Context) {
 	homeDir, _ := os.UserHomeDir()
 	if homeDir != "" {
 		addDir(filepath.Join(homeDir, ".openclaw", "skills"))
+		addDir(filepath.Join(homeDir, ".openclaw", "workspace", "skills"))
+		addDir(filepath.Join(homeDir, ".agents", "skills"))
+
+		openclawWorkspace := filepath.Join(homeDir, ".openclaw", "workspace")
+		if info, err := os.Stat(openclawWorkspace); err == nil && info.IsDir() {
+			addDir(filepath.Join(openclawWorkspace, "skills"))
+			addDir(filepath.Join(openclawWorkspace, ".agents", "skills"))
+		}
+	}
+
+	wd, _ := os.Getwd()
+	if wd != "" {
+		addDir(filepath.Join(wd, "skills"))
+		addDir(filepath.Join(wd, ".agents", "skills"))
 	}
 
 	globalSkills := make([]map[string]interface{}, 0)
@@ -1639,20 +1653,42 @@ func extractMemoriesFromDir(dir string) ([]memoryPreview, map[string]int) {
 	var previews []memoryPreview
 	agentCountMap := make(map[string]int)
 
+	sessionsDir := filepath.Join(dir, "agents")
+	if info, err := os.Stat(sessionsDir); err == nil && info.IsDir() {
+		previews, agentCountMap = extractSessionMemories(sessionsDir, previews, agentCountMap)
+	}
+
+	memoryDir := filepath.Join(dir, "workspace", "memory")
+	if info, err := os.Stat(memoryDir); err == nil && info.IsDir() {
+		previews, agentCountMap = extractWorkspaceMemory(memoryDir, dir, previews, agentCountMap)
+	}
+
+	memFile := filepath.Join(dir, "workspace", "MEMORY.md")
+	if data, err := os.ReadFile(memFile); err == nil && len(data) > 0 {
+		previews, agentCountMap = parseMarkdownMemory(string(data), memFile, "workspace", previews, agentCountMap)
+	}
+
 	filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if name == "node_modules" || name == ".git" || name == "vendor" || name == "__pycache__" || name == ".cache" {
+			if name == "node_modules" || name == ".git" || name == "vendor" || name == "__pycache__" || name == ".cache" || name == "agents" || name == "dist" || name == "logs" || name == "canvas" || name == "completions" || name == "identity" || name == "devices" || name == "cron" {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 
 		ext := strings.ToLower(filepath.Ext(path))
-		if ext != ".json" && ext != ".md" && ext != ".txt" {
+		if ext != ".json" && ext != ".jsonl" && ext != ".md" && ext != ".txt" {
+			return nil
+		}
+
+		relPath, _ := filepath.Rel(dir, path)
+		if strings.Contains(relPath, string(filepath.Separator)+"agents") ||
+			strings.Contains(relPath, string(filepath.Separator)+"workspace"+string(filepath.Separator)+"memory") ||
+			strings.HasSuffix(relPath, filepath.FromSlash("/workspace/MEMORY.md")) {
 			return nil
 		}
 
@@ -1661,64 +1697,40 @@ func extractMemoriesFromDir(dir string) ([]memoryPreview, map[string]int) {
 			return nil
 		}
 		content := string(data)
-		relPath, _ := filepath.Rel(dir, path)
 		parts := strings.Split(relPath, string(filepath.Separator))
 		dirAgent := "default"
 		if len(parts) > 1 {
 			dirAgent = parts[0]
 		}
 
-		if ext == ".json" {
+		if ext == ".jsonl" {
+			pvs, cnt := parseJSONLSession(content, path, dirAgent)
+			previews = append(previews, pvs...)
+			agentCountMap[dirAgent] += cnt
+		} else if ext == ".json" {
 			var memories []map[string]interface{}
 			if json.Unmarshal(data, &memories) == nil {
 				for _, m := range memories {
 					key, _ := m["key"].(string)
 					contentStr, _ := m["content"].(string)
 					if key == "" {
-						if name, ok := m["name"].(string); ok {
-							key = name
-						} else if title, ok := m["title"].(string); ok {
-							key = title
-						}
+						if name, ok := m["name"].(string); ok { key = name } else if title, ok := m["title"].(string); ok { key = title }
 					}
 					if contentStr == "" {
 						contentStr, _ = m["value"].(string)
-						if contentStr == "" {
-							contentStr, _ = m["text"].(string)
-							if contentStr == "" {
-								contentStr, _ = m["description"].(string)
-							}
-						}
+						if contentStr == "" { contentStr, _ = m["text"].(string); if contentStr == "" { contentStr, _ = m["description"].(string) } }
 					}
-					if key == "" && contentStr == "" {
-						continue
-					}
-					if key == "" {
-						key = contentStr
-						if len(key) > 50 {
-							key = key[:50]
-						}
-					}
+					if key == "" && contentStr == "" { continue }
+					if key == "" { key = contentStr; if len(key) > 50 { key = key[:50] } }
 					agent := dirAgent
-					if a, ok := m["agent_name"].(string); ok && a != "" {
-						agent = a
-					}
+					if a, ok := m["agent_name"].(string); ok && a != "" { agent = a }
 					layer := "knowledge"
-					if l, ok := m["layer"].(string); ok && l != "" {
-						layer = l
-					}
+					if l, ok := m["layer"].(string); ok && l != "" { layer = l }
 					source := "openclaw"
-					if s, ok := m["source"].(string); ok && s != "" {
-						source = s
-					}
+					if s, ok := m["source"].(string); ok && s != "" { source = s }
 					preview := contentStr
-					if len(preview) > 100 {
-						preview = preview[:100] + "..."
-					}
-					previews = append(previews, memoryPreview{
-						Key: key, Content: preview, Layer: layer,
-						Source: source, FilePath: path, AgentName: agent,
-					})
+					if len(preview) > 100 { preview = preview[:100] + "..." }
+					previews = append(previews, memoryPreview{Key: key, Content: preview, Layer: layer, Source: source, FilePath: path, AgentName: agent})
 					agentCountMap[agent]++
 				}
 			} else {
@@ -1726,92 +1738,141 @@ func extractMemoriesFromDir(dir string) ([]memoryPreview, map[string]int) {
 				if json.Unmarshal(data, &single) == nil {
 					key, _ := single["key"].(string)
 					contentStr, _ := single["content"].(string)
-					if key == "" {
-						key, _ = single["name"].(string)
-					}
-					if contentStr == "" {
-						contentStr, _ = single["value"].(string)
-						if contentStr == "" {
-							contentStr, _ = single["text"].(string)
-						}
-					}
+					if key == "" { key, _ = single["name"].(string) }
+					if contentStr == "" { contentStr, _ = single["value"].(string); if contentStr == "" { contentStr, _ = single["text"].(string) } }
 					if key != "" || contentStr != "" {
-						if key == "" {
-							key = "json_item"
-						}
-						preview := contentStr
-						if len(preview) > 100 {
-							preview = preview[:100] + "..."
-						}
-						previews = append(previews, memoryPreview{
-							Key: key, Content: preview, Layer: "knowledge",
-							Source: "openclaw", FilePath: path, AgentName: dirAgent,
-						})
+						if key == "" { key = "json_item" }
+						preview := contentStr; if len(preview) > 100 { preview = preview[:100] + "..." }
+						previews = append(previews, memoryPreview{Key: key, Content: preview, Layer: "knowledge", Source: "openclaw", FilePath: path, AgentName: dirAgent})
 						agentCountMap[dirAgent]++
 					}
 				}
 			}
 		} else if ext == ".md" {
-			lines := strings.Split(content, "\n")
-			currentSection := ""
-			currentContent := ""
-			for _, line := range lines {
-				if strings.HasPrefix(line, "# ") {
-					if currentSection != "" || currentContent != "" {
-						key := currentSection
-						if key == "" {
-							key = filepath.Base(path)
-						}
-						preview := strings.TrimSpace(currentContent)
-						if len(preview) > 100 {
-							preview = preview[:100] + "..."
-						}
-						previews = append(previews, memoryPreview{
-							Key: key, Content: preview, Layer: "knowledge",
-							Source: "markdown", FilePath: path, AgentName: dirAgent,
-						})
-						agentCountMap[dirAgent]++
-					}
-					currentSection = strings.TrimSpace(line[2:])
-					currentContent = ""
-				} else {
-					currentContent += line + "\n"
-				}
-			}
-			if currentSection != "" || currentContent != "" {
-				key := currentSection
-				if key == "" {
-					key = filepath.Base(path)
-				}
-				preview := strings.TrimSpace(currentContent)
-				if len(preview) > 100 {
-					preview = preview[:100] + "..."
-				}
-				previews = append(previews, memoryPreview{
-					Key: key, Content: preview, Layer: "knowledge",
-					Source: "markdown", FilePath: path, AgentName: dirAgent,
-				})
-				agentCountMap[dirAgent]++
-			}
+			previews, agentCountMap = parseMarkdownMemory(content, path, dirAgent, previews, agentCountMap)
 		} else if ext == ".txt" {
 			txtContent := strings.TrimSpace(content)
 			if txtContent != "" {
 				key := filepath.Base(path)
-				preview := txtContent
-				if len(preview) > 100 {
-					preview = preview[:100] + "..."
-				}
-				previews = append(previews, memoryPreview{
-					Key: key, Content: preview, Layer: "knowledge",
-					Source: "text", FilePath: path, AgentName: dirAgent,
-				})
+				preview := txtContent; if len(preview) > 100 { preview = preview[:100] + "..." }
+				previews = append(previews, memoryPreview{Key: key, Content: preview, Layer: "knowledge", Source: "text", FilePath: path, AgentName: dirAgent})
 				agentCountMap[dirAgent]++
 			}
 		}
-
 		return nil
 	})
 
+	return previews, agentCountMap
+}
+
+func extractSessionMemories(sessionsDir string, previews []memoryPreview, agentCountMap map[string]int) ([]memoryPreview, map[string]int) {
+	agentDirs, _ := os.ReadDir(sessionsDir)
+	for _, ad := range agentDirs {
+		if !ad.IsDir() { continue }
+		agentName := ad.Name()
+		sessDir := filepath.Join(sessionsDir, agentName, "sessions")
+		if info, err := os.Stat(sessDir); err != nil || !info.IsDir() { continue }
+		files, _ := os.ReadDir(sessDir)
+		for _, f := range files {
+			if f.IsDir() { continue }
+			ext := strings.ToLower(filepath.Ext(f.Name()))
+			if ext != ".jsonl" { continue }
+			path := filepath.Join(sessDir, f.Name())
+			data, err := os.ReadFile(path)
+			if err != nil || len(data) == 0 { continue }
+			pvs, cnt := parseJSONLSession(string(data), path, agentName)
+			previews = append(previews, pvs...)
+			agentCountMap[agentName] += cnt
+		}
+	}
+	return previews, agentCountMap
+}
+
+func parseJSONLSession(content string, filePath string, agentName string) ([]memoryPreview, int) {
+	var previews []memoryPreview
+	count := 0
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" { continue }
+		var msg map[string]interface{}
+		if json.Unmarshal([]byte(line), &msg) != nil { continue }
+		msgType, _ := msg["type"].(string)
+		text, _ := msg["text"].(string)
+		if text == "" { text, _ = msg["content"].(string) }
+		if text == "" { continue }
+
+		isUserMsg := (msgType == "user" || msgType == "human")
+		role := msgType
+		if role == "" { role, _ = msg["role"].(string); if role == "" { role = "unknown" } }
+
+		key := role + ": "
+		if len(text) > 40 {
+			key += text[:40] + "..."
+		} else {
+			key += text
+		}
+
+		preview := text
+		if len(preview) > 200 { preview = preview[:200] + "..." }
+
+		layer := "episodic"
+		if isUserMsg { layer = "episodic" } else { layer = "semantic" }
+
+		source := "session"
+		if strings.Contains(filePath, "sessions") { source = "openclaw-session" }
+
+		previews = append(previews, memoryPreview{
+			Key: key, Content: preview, Layer: layer,
+			Source: source, FilePath: filePath, AgentName: agentName,
+		})
+		count++
+	}
+	return previews, count
+}
+
+func extractWorkspaceMemory(memoryDir string, baseDir string, previews []memoryPreview, agentCountMap map[string]int) ([]memoryPreview, map[string]int) {
+	files, _ := os.ReadDir(memoryDir)
+	for _, f := range files {
+		if f.IsDir() { continue }
+		ext := strings.ToLower(filepath.Ext(f.Name()))
+		if ext != ".md" { continue }
+		path := filepath.Join(memoryDir, f.Name())
+		data, err := os.ReadFile(path)
+		if err != nil || len(data) == 0 { continue }
+		previews, agentCountMap = parseMarkdownMemory(string(data), path, "workspace", previews, agentCountMap)
+	}
+	return previews, agentCountMap
+}
+
+func parseMarkdownMemory(content string, filePath string, agentName string, previews []memoryPreview, agentCountMap map[string]int) ([]memoryPreview, map[string]int) {
+	lines := strings.Split(content, "\n")
+	currentSection := ""
+	currentContent := ""
+	for _, line := range lines {
+		if strings.HasPrefix(line, "# ") {
+			if currentSection != "" || currentContent != "" {
+				key := currentSection
+				if key == "" { key = filepath.Base(filePath) }
+				preview := strings.TrimSpace(currentContent)
+				if len(preview) > 100 { preview = preview[:100] + "..." }
+				previews = append(previews, memoryPreview{Key: key, Content: preview, Layer: "knowledge", Source: "markdown", FilePath: filePath, AgentName: agentName})
+				agentCountMap[agentName]++
+			}
+			currentSection = strings.TrimSpace(line[2:])
+			currentContent = ""
+		} else {
+			currentContent += line + "\n"
+		}
+	}
+	if currentSection != "" || currentContent != "" {
+		key := currentSection
+		if key == "" { key = filepath.Base(filePath) }
+		preview := strings.TrimSpace(currentContent)
+		if len(preview) > 100 { preview = preview[:100] + "..." }
+		previews = append(previews, memoryPreview{Key: key, Content: preview, Layer: "knowledge", Source: "markdown", FilePath: filePath, AgentName: agentName})
+		agentCountMap[agentName]++
+	}
 	return previews, agentCountMap
 }
 
