@@ -234,8 +234,8 @@ async function handleSearch() {
   if (!searchQuery.value) { searchResults.value = []; return }
   try {
     const { data } = await axios.get('/memories/search/keyword', { params: { q: searchQuery.value, limit: 20 } })
-    // FTS5 returns {id, key, value, layer, source, rank} — normalize to match memory card format
-    searchResults.value = (data || []).map((m: any) => ({
+    const results = data.items || data || []
+    searchResults.value = results.map((m: any) => ({
       ...m,
       importance: m.importance || 0.5,
       tags: m.tags || [],
