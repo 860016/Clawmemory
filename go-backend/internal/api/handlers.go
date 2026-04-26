@@ -140,6 +140,17 @@ func handleResetPassword(authService *services.AuthService) gin.HandlerFunc {
 	}
 }
 
+func handleInstallStatus(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"checks": gin.H{
+				"security_engine": "go",
+			},
+			"version": "1.0.0",
+		})
+	}
+}
+
 // License handlers
 func handleLicenseInfo(lm *services.LicenseManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -399,10 +410,11 @@ func handleListWiki(db *gorm.DB) gin.HandlerFunc {
 		userID := middleware.GetUserID(c)
 		svc := services.NewWikiService(db)
 		category := c.Query("category")
+		status := c.Query("status")
 		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-		size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
+		size, _ := strconv.Atoi(c.DefaultQuery("size", "100"))
 
-		pages, total, err := svc.List(userID, category, page, size)
+		pages, total, err := svc.List(userID, category, status, page, size)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -491,9 +503,10 @@ func handleCreateWiki(db *gorm.DB) gin.HandlerFunc {
 
 func handleGetWiki(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		id, _ := strconv.Atoi(c.Param("id"))
 		svc := services.NewWikiService(db)
-		page, err := svc.Get(uint(id))
+		page, err := svc.Get(userID, uint(id))
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
@@ -504,6 +517,7 @@ func handleGetWiki(db *gorm.DB) gin.HandlerFunc {
 
 func handleUpdateWiki(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		id, _ := strconv.Atoi(c.Param("id"))
 		var req map[string]interface{}
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -512,7 +526,7 @@ func handleUpdateWiki(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		svc := services.NewWikiService(db)
-		page, err := svc.Update(uint(id), req)
+		page, err := svc.Update(userID, uint(id), req)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
@@ -523,13 +537,112 @@ func handleUpdateWiki(db *gorm.DB) gin.HandlerFunc {
 
 func handleDeleteWiki(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		id, _ := strconv.Atoi(c.Param("id"))
 		svc := services.NewWikiService(db)
-		if err := svc.Delete(uint(id)); err != nil {
+		if err := svc.Delete(userID, uint(id)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+	}
+}
+
+func handleWikiCategories(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewWikiService(db)
+		categories, err := svc.GetCategories(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, categories)
+	}
+}
+
+func handleWikiStats(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewWikiService(db)
+		stats, err := svc.GetStats(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, stats)
+	}
+}
+
+func handleWikiSearch(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		q := c.Query("q")
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+		svc := services.NewWikiService(db)
+		pages, err := svc.Search(userID, q, limit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, pages)
+	}
+}
+
+func handleWikiTree(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewWikiService(db)
+		pages, err := svc.GetTree(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, pages)
+	}
+}
+
+func handleWikiMarkComplete(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		id, _ := strconv.Atoi(c.Param("id"))
+		svc := services.NewWikiService(db)
+		if err := svc.MarkComplete(userID, uint(id)); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "marked complete"})
+	}
+}
+
+func handleWikiMarkInProgress(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		id, _ := strconv.Atoi(c.Param("id"))
+		svc := services.NewWikiService(db)
+		if err := svc.MarkInProgress(userID, uint(id)); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "marked in progress"})
+	}
+}
+
+func handleWikiConfig(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"llm_available": false})
+	}
+}
+
+func handleWikiAIExtract(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"message": "AI extraction not available in OSS version"})
+	}
+}
+
+func handleWikiRefine(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"message": "AI refinement not available in OSS version"})
 	}
 }
 
@@ -577,6 +690,28 @@ func handleGetReportByDate(db *gorm.DB) gin.HandlerFunc {
 		report, err := svc.GetByDate(userID, date)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		c.JSON(http.StatusOK, report)
+	}
+}
+
+func handleGenerateReport(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		var req map[string]interface{}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			req = map[string]interface{}{}
+		}
+		date, _ := req["date"].(string)
+		if date == "" {
+			date = time.Now().Format("2006-01-02")
+		}
+
+		svc := services.NewDailyReportService(db)
+		report, err := svc.Generate(userID, date)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, report)
@@ -1038,6 +1173,7 @@ func handleProEvolutionPrefetch(proxy *services.ProProxy, db *gorm.DB) gin.Handl
 
 func handleGetUsageStats(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		days, _ := strconv.Atoi(c.DefaultQuery("days", "30"))
 		if days < 1 {
 			days = 30
@@ -1050,9 +1186,11 @@ func handleGetUsageStats(db *gorm.DB) gin.HandlerFunc {
 			ID        uint      `json:"id"`
 			Key       string    `json:"key"`
 			Layer     string    `json:"layer"`
+			Source    string    `json:"source"`
+			Importance float64  `json:"importance"`
 			CreatedAt time.Time `json:"created_at"`
 		}
-		db.Table("memories").Where("status != ?", "trashed").Order("created_at desc").Find(&memories)
+		db.Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Order("created_at desc").Find(&memories)
 
 		now := time.Now()
 
@@ -1083,16 +1221,27 @@ func handleGetUsageStats(db *gorm.DB) gin.HandlerFunc {
 			if layer == "" {
 				layer = "knowledge"
 			}
-			sourceDist["manual"]++
-			importanceDist["medium"]++
+			source := m.Source
+			if source == "" {
+				source = "manual"
+			}
+			sourceDist[source]++
+
+			if m.Importance >= 0.7 {
+				importanceDist["high"]++
+			} else if m.Importance >= 0.3 {
+				importanceDist["medium"]++
+			} else {
+				importanceDist["low"]++
+			}
 			layerDist[layer]++
 		}
 
-		db.Table("entities").Find(&struct{}{})
+		db.Table("entities").Where("user_id = ?", userID).Find(&struct{}{})
 		var entityCount int64
-		db.Table("entities").Count(&entityCount)
+		db.Table("entities").Where("user_id = ?", userID).Count(&entityCount)
 
-		rows, _ := db.Raw("SELECT entity_type, COUNT(*) as cnt FROM entities GROUP BY entity_type").Rows()
+		rows, _ := db.Raw("SELECT entity_type, COUNT(*) as cnt FROM entities WHERE user_id = ? GROUP BY entity_type", userID).Rows()
 		for rows.Next() {
 			var etype string
 			var cnt int64

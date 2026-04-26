@@ -2,7 +2,10 @@ import axios from './client'
 
 export default {
   listPages(params?: any) {
-    return axios.get('/wiki', { params })
+    return axios.get('/wiki', { params }).then(res => {
+      if (Array.isArray(res.data)) return { ...res, data: res.data }
+      return res
+    })
   },
   getPage(id: number) {
     return axios.get(`/wiki/${id}`)

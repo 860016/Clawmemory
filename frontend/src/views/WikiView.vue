@@ -91,9 +91,9 @@
             <div class="card-title">{{ p.title }}</div>
             <div class="card-summary" v-if="p.summary">{{ p.summary }}</div>
             <div class="card-preview" v-else-if="p.content">{{ getPreview(p.content) }}</div>
-            <div class="card-tags" v-if="p.tags && p.tags.length">
-              <span class="tag" v-for="tag in p.tags.slice(0, 3)" :key="tag">{{ tag }}</span>
-              <span class="tag" v-if="p.tags.length > 3">+{{ p.tags.length - 3 }}</span>
+            <div class="card-tags" v-if="parseTags(p.tags).length">
+              <span class="tag" v-for="tag in parseTags(p.tags).slice(0, 3)" :key="tag">{{ tag }}</span>
+              <span class="tag" v-if="parseTags(p.tags).length > 3">+{{ parseTags(p.tags).length - 3 }}</span>
             </div>
             <div class="card-footer">
               <div class="card-meta">{{ formatTime(p.updated_at) }}</div>
@@ -130,8 +130,8 @@
             <span class="view-date">{{ formatTime(viewingPage.updated_at) }}</span>
           </div>
           <h1 class="view-title">{{ viewingPage.title }}</h1>
-          <div class="view-tags" v-if="viewingPage.tags && viewingPage.tags.length">
-            <span class="tag" v-for="tag in viewingPage.tags" :key="tag">{{ tag }}</span>
+          <div class="view-tags" v-if="parseTags(viewingPage.tags).length">
+            <span class="tag" v-for="tag in parseTags(viewingPage.tags)" :key="tag">{{ tag }}</span>
           </div>
 
           <!-- AI 生成的摘要 -->
@@ -272,6 +272,15 @@ const extractForm = ref({
 
 const pinnedPages = computed(() => pages.value.filter(p => p.is_pinned))
 
+function parseTags(tags: any): string[] {
+  if (!tags) return []
+  if (Array.isArray(tags)) return tags
+  if (typeof tags === 'string') {
+    try { return JSON.parse(tags) } catch { return tags.split(',').map((s: string) => s.trim()).filter(Boolean) }
+  }
+  return []
+}
+
 const renderedContent = computed(() => {
   if (!viewingPage.value?.content) return ''
   return marked(viewingPage.value.content, { breaks: true, gfm: true })
@@ -291,7 +300,7 @@ async function loadPages() {
     if (selectedCategory.value) params.category = selectedCategory.value
     if (selectedStatus.value) params.status = selectedStatus.value
     const { data } = await wikiApi.listPages(params)
-    pages.value = data || []
+    pages.value = data.items || data || []
   } catch { pages.value = [] }
 }
 
@@ -305,7 +314,7 @@ async function loadCategories() {
 async function loadAllPages() {
   try {
     const { data } = await wikiApi.listPages()
-    allPages.value = data || []
+    allPages.value = data.items || data || []
   } catch {}
 }
 
@@ -360,7 +369,7 @@ function editCurrentPage() {
   currentPageId.value = p.id
   pageForm.value = {
     title: p.title, content: p.content || '', category: p.category || '',
-    tagsStr: (p.tags || []).join(', '), parent_id: p.parent_id, is_pinned: p.is_pinned,
+    tagsStr: parseTags(p.tags).join(', '), parent_id: p.parent_id, is_pinned: p.is_pinned,
     status: p.status || 'draft',
   }
   loadAllPages()

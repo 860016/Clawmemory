@@ -243,6 +243,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
+import axios from '../api/client'
 import {
   ArrowLeft, ArrowRight, MagicStick, Loading,
   Document, Connection, Download, Share,
@@ -252,92 +254,85 @@ import {
 
 const { t } = useI18n()
 
-// State
 const currentDate = ref(new Date())
 const selectedReport = ref<any>(null)
 const generating = ref(false)
+const reports = ref<any[]>([])
+const loading = ref(false)
 
-// Mock data - replace with actual store data
-const reports = ref([
-  {
-    id: 1,
-    report_date: '2026-04-23',
-    summary: '今天记录了 15 条新记忆，创建了 3 个知识实体，更新了 Wiki 文档。整体知识管理效率较高。',
-    highlights: [
-      '完成了项目架构设计文档',
-      '整理了 Go 后端迁移方案',
-      '优化了记忆衰减算法',
-    ],
-    knowledge_gained: [
-      '掌握了 Go 的交叉编译技巧',
-      '理解了 Cloudflare Workers 的免费额度限制',
-      '学习了现代化 UI 设计原则',
-    ],
-    pending_tasks: [
-      { text: '完成前端 UI 重构', completed: false },
-      { text: '测试全平台编译', completed: false },
-      { text: '更新文档', completed: true },
-    ],
-    tomorrow_suggestions: [
-      '继续完善知识库功能',
-      '优化日报生成算法',
-      '添加更多数据可视化',
-    ],
-    stats: {
-      new_memories: 15,
-      new_entities: 3,
-      updated_wiki: 2,
-      active_hours: 6,
-    },
-  },
-  {
-    id: 2,
-    report_date: '2026-04-22',
-    summary: '昨天主要进行了代码重构工作，优化了数据库查询性能。',
-    highlights: ['重构了认证模块', '优化了查询性能'],
-    stats: {
-      new_memories: 8,
-      new_entities: 1,
-      updated_wiki: 0,
-      active_hours: 4,
-    },
-  },
-])
+async function loadReports() {
+  loading.value = true
+  try {
+    const dateStr = currentDate.value.toISOString().split('T')[0]
+    const { data } = await axios.get('/reports', { params: { date: dateStr } })
+    const list = data.items || data || []
+    reports.value = list.map(parseReport)
+    if (reports.value.length > 0 && !selectedReport.value) {
+      selectedReport.value = reports.value[0]
+    }
+  } catch {
+    reports.value = []
+  } finally {
+    loading.value = false
+  }
+}
 
-const statsData = computed(() => [
-  {
-    key: 'memories',
-    icon: 'Document',
-    value: reports.value[0]?.stats?.new_memories || 0,
-    label: t('dailyReport.newMemories'),
-    color: 'blue',
-    trend: 12,
-  },
-  {
-    key: 'entities',
-    icon: 'Connection',
-    value: reports.value[0]?.stats?.new_entities || 0,
-    label: t('dailyReport.newEntities'),
-    color: 'purple',
-    trend: 5,
-  },
-  {
-    key: 'wiki',
-    icon: 'DocumentChecked',
-    value: reports.value[0]?.stats?.updated_wiki || 0,
-    label: t('dailyReport.updatedWiki'),
-    color: 'green',
-    trend: -3,
-  },
-  {
-    key: 'hours',
-    icon: 'Timer',
-    value: reports.value[0]?.stats?.active_hours || 0,
-    label: t('dailyReport.activeHours'),
-    color: 'orange',
-    trend: 8,
-  },
-])
+function parseReport(r: any) {
+  const result = { ...r }
+  result.report_date = r.report_date || r.date || ''
+  const jsonFields = ['highlights', 'knowledge_gained', 'pending_tasks', 'tomorrow_suggestions', 'stats']
+  for (const field of jsonFields) {
+    if (typeof r[field] === 'string') {
+      try { result[field] = JSON.parse(r[field]) } catch { result[field] = [] }
+    } else if (!r[field]) {
+      result[field] = []
+    }
+  }
+  if (result.stats && typeof result.stats === 'object') {
+    // keep as is
+  } else if (!result.stats) {
+    result.stats = {}
+  }
+  return result
+}
+
+const statsData = computed(() => {
+  const s = selectedReport.value?.stats || reports.value[0]?.stats || {}
+  return [
+    {
+      key: 'memories',
+      icon: 'Document',
+      value: s.new_memories || 0,
+      label: t('dailyReport.newMemories'),
+      color: 'blue',
+      trend: 12,
+    },
+    {
+      key: 'entities',
+      icon: 'Connection',
+      value: s.new_entities || 0,
+      label: t('dailyReport.newEntities'),
+      color: 'purple',
+      trend: 5,
+    },
+    {
+      key: 'wiki',
+      icon: 'DocumentChecked',
+      value: s.updated_wiki || 0,
+      label: t('dailyReport.updatedWiki'),
+      color: 'green',
+      trend: -3,
+    },
+    {
+      key: 'hours',
+      icon: 'Timer',
+      value: s.active_hours || 0,
+      label: t('dailyReport.activeHours'),
+      color: 'orange',
+      trend: 8,
+    },
+  ]
+})
 
 const formatCurrentDate = computed(() => {
   return currentDate.value.toLocaleDateString('zh-CN', {
@@ -348,33 +343,57 @@ const formatCurrentDate = computed(() => {
   })
 })
 
-// Methods
 function prevDate() {
-  currentDate.value = new Date(currentDate.value.setDate(currentDate.value.getDate() - 1))
+  const d = new Date(currentDate.value)
+  d.setDate(d.getDate() - 1)
+  currentDate.value = d
+  loadReports()
 }
 
 function nextDate() {
-  currentDate.value = new Date(currentDate.value.setDate(currentDate.value.getDate() + 1))
+  const d = new Date(currentDate.value)
+  d.setDate(d.getDate() + 1)
+  currentDate.value = d
+  loadReports()
 }
 
 function selectReport(report: any) {
   selectedReport.value = report
 }
 
-function generateReport() {
+async function generateReport() {
   generating.value = true
-  // TODO: Call API to generate report
-  setTimeout(() => {
+  try {
+    const dateStr = currentDate.value.toISOString().split('T')[0]
+    const { data } = await axios.post('/reports/generate', { date: dateStr })
+    ElMessage.success(t('dailyReport.generated') || 'Report generated')
+    await loadReports()
+    if (data) selectedReport.value = parseReport(data)
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || t('dailyReport.generateFailed') || 'Failed to generate report')
+  } finally {
     generating.value = false
-  }, 2000)
+  }
 }
 
 function exportReport() {
-  // TODO: Export report
+  if (!selectedReport.value) return
+  const blob = new Blob([JSON.stringify(selectedReport.value, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `report-${selectedReport.value.report_date || 'unknown'}.json`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function shareReport() {
-  // TODO: Share report
+  if (!selectedReport.value) return
+  const text = selectedReport.value.summary || ''
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text)
+    ElMessage.success('Copied to clipboard')
+  }
 }
 
 function formatDate(date: string) {
@@ -399,18 +418,16 @@ function truncate(text: string, length: number) {
 
 function statLabel(key: string | number) {
   const labels: Record<string, string> = {
-    new_memories: t('dailyReport.memories'),
-    new_entities: t('dailyReport.entities'),
-    updated_wiki: t('dailyReport.wiki'),
-    active_hours: t('dailyReport.hours'),
+    new_memories: t('dailyReport.newMemories') || 'New Memories',
+    new_entities: t('dailyReport.newEntities') || 'New Entities',
+    updated_wiki: t('dailyReport.updatedWiki') || 'Updated Wiki',
+    active_hours: t('dailyReport.activeHours') || 'Active Hours',
   }
-  return labels[String(key)] || String(key)
+  return labels[key] || key
 }
 
 onMounted(() => {
-  if (reports.value.length > 0) {
-    selectedReport.value = reports.value[0]
-  }
+  loadReports()
 })
 </script>
 

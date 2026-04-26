@@ -71,29 +71,43 @@ type Relation struct {
 
 // WikiPage Wiki页面
 type WikiPage struct {
-	ID         uint           `gorm:"primarykey" json:"id"`
-	UserID     uint           `gorm:"index;not null;default:1" json:"user_id"`
-	Title      string         `gorm:"size:200;not null" json:"title"`
-	Content    string         `gorm:"type:text" json:"content"`
-	Category   string         `gorm:"size:100" json:"category"`
-	Tags       string         `gorm:"type:text" json:"tags"`
-	IsPublic   bool           `gorm:"default:false" json:"is_public"`
-	ViewCount  int            `gorm:"default:0" json:"view_count"`
-	CreatedAt  time.Time      `json:"created_at"`
-	UpdatedAt  time.Time      `json:"updated_at"`
-	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+	ID            uint           `gorm:"primarykey" json:"id"`
+	UserID        uint           `gorm:"index;not null;default:1" json:"user_id"`
+	Title         string         `gorm:"size:200;not null" json:"title"`
+	Content       string         `gorm:"type:text" json:"content"`
+	Category      string         `gorm:"size:100" json:"category"`
+	Tags          string         `gorm:"type:text" json:"tags"`
+	Status        string         `gorm:"size:20;default:draft" json:"status"`
+	Summary       string         `gorm:"type:text" json:"summary"`
+	IsPublic      bool           `gorm:"default:false" json:"is_public"`
+	IsPinned      bool           `gorm:"default:false" json:"is_pinned"`
+	ParentID      *uint          `json:"parent_id"`
+	AIGenerated   bool           `gorm:"default:false" json:"ai_generated"`
+	AIConfidence  float64        `gorm:"default:0" json:"ai_confidence"`
+	KeyDecisions  string         `gorm:"type:text" json:"key_decisions"`
+	ActionItems   string         `gorm:"type:text" json:"action_items"`
+	ViewCount     int            `gorm:"default:0" json:"view_count"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // DailyReport 日报
 type DailyReport struct {
-	ID        uint      `gorm:"primarykey" json:"id"`
-	UserID    uint      `gorm:"index;not null;default:1" json:"user_id"`
-	Date      string    `gorm:"size:20;not null" json:"date"`
-	Content   string    `gorm:"type:text" json:"content"`
-	Summary   string    `gorm:"type:text" json:"summary"`
-	Tags      string    `gorm:"type:text" json:"tags"`
-	Mood      string    `gorm:"size:20" json:"mood"`
-	CreatedAt time.Time `json:"created_at"`
+	ID                 uint      `gorm:"primarykey" json:"id"`
+	UserID             uint      `gorm:"index;not null;default:1" json:"user_id"`
+	Date               string    `gorm:"size:20;not null" json:"date"`
+	ReportDate         string    `gorm:"size:20" json:"report_date"`
+	Content            string    `gorm:"type:text" json:"content"`
+	Summary            string    `gorm:"type:text" json:"summary"`
+	Highlights         string    `gorm:"type:text" json:"highlights"`
+	KnowledgeGained    string    `gorm:"type:text" json:"knowledge_gained"`
+	PendingTasks       string    `gorm:"type:text" json:"pending_tasks"`
+	TomorrowSuggestions string   `gorm:"type:text" json:"tomorrow_suggestions"`
+	Stats              string    `gorm:"type:text" json:"stats"`
+	Tags               string    `gorm:"type:text" json:"tags"`
+	Mood               string    `gorm:"size:20" json:"mood"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 // License 授权
