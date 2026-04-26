@@ -37,7 +37,7 @@ func NewMemoryService(db *gorm.DB) *MemoryService {
 	return &MemoryService{db: db}
 }
 
-func (s *MemoryService) Create(data map[string]interface{}) (*MemoryModel, error) {
+func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*MemoryModel, error) {
 	tags := "[]"
 	if t, ok := data["tags"].([]interface{}); ok {
 		tagStrings := make([]string, len(t))
@@ -49,7 +49,7 @@ func (s *MemoryService) Create(data map[string]interface{}) (*MemoryModel, error
 	}
 
 	memory := &models.Memory{
-		UserID:     1,
+		UserID:     userID,
 		Layer:      getString(data, "layer", "short"),
 		Key:        getString(data, "key", ""),
 		Value:      getString(data, "value", ""),
@@ -74,11 +74,11 @@ func (s *MemoryService) Get(id uint) (*MemoryModel, error) {
 	return toMemoryModel(&memory), nil
 }
 
-func (s *MemoryService) List(layer string, page, size int, status string) ([]*MemoryModel, int64, error) {
+func (s *MemoryService) List(userID uint, layer string, page, size int, status string) ([]*MemoryModel, int64, error) {
 	var memories []models.Memory
 	var total int64
 
-	query := s.db.Model(&models.Memory{}).Where("user_id = ?", 1)
+	query := s.db.Model(&models.Memory{}).Where("user_id = ?", userID)
 
 	if layer != "" {
 		query = query.Where("layer = ?", layer)
