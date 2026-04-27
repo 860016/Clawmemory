@@ -69,7 +69,41 @@ type Relation struct {
 	CreatedAt       time.Time `json:"created_at"`
 }
 
-// WikiPage Wiki页面
+// Project 项目知识
+type Project struct {
+	ID              uint           `gorm:"primarykey" json:"id"`
+	UserID          uint           `gorm:"index;not null;default:1" json:"user_id"`
+	Name            string         `gorm:"size:200;not null" json:"name"`
+	Description     string         `gorm:"type:text" json:"description"`
+	Status          string         `gorm:"size:20;default:active" json:"status"`
+	Category        string         `gorm:"size:100" json:"category"`
+	Tags            string         `gorm:"type:text" json:"tags"`
+	KeyDecisions    string         `gorm:"type:text" json:"key_decisions"`
+	ActionItems     string         `gorm:"type:text" json:"action_items"`
+	Progress        int            `gorm:"default:0" json:"progress"`
+	SourceSessionID string         `gorm:"size:100" json:"source_session_id"`
+	SourceAgent     string         `gorm:"size:100" json:"source_agent"`
+	IsPinned        bool           `gorm:"default:false" json:"is_pinned"`
+	LastDiscussedAt *time.Time     `json:"last_discussed_at"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// ProjectNote 项目笔记
+type ProjectNote struct {
+	ID          uint      `gorm:"primarykey" json:"id"`
+	UserID      uint      `gorm:"index;not null;default:1" json:"user_id"`
+	ProjectID   uint      `gorm:"index;not null" json:"project_id"`
+	Content     string    `gorm:"type:text;not null" json:"content"`
+	NoteType    string    `gorm:"size:30;default:note" json:"note_type"`
+	Source      string    `gorm:"size:50;default:manual" json:"source"`
+	IsKeyPoint  bool      `gorm:"default:false" json:"is_key_point"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// WikiPage Wiki页面 (legacy, kept for migration)
 type WikiPage struct {
 	ID            uint           `gorm:"primarykey" json:"id"`
 	UserID        uint           `gorm:"index;not null;default:1" json:"user_id"`

@@ -189,7 +189,7 @@ import {
   Menu, User, Search, Sunny, Moon, Trophy, SwitchButton,
   DataAnalysis, MagicStick, Upload, Grid, Share,
   TrendCharts, Warning, Cpu, FolderOpened, Lock, Coin, Monitor,
-  DocumentChecked, Star, Timer, Compass
+  DocumentChecked, Star, Timer, Compass, CircleCheck, SuccessFilled
 } from '@element-plus/icons-vue'
 import axios from '../api/client'
 
@@ -252,7 +252,7 @@ const navItems = [
   { path: '/', label: 'nav.dashboard', icon: HomeFilled },
   { path: '/memories', label: 'nav.memories', icon: Collection },
   { path: '/knowledge', label: 'nav.knowledge', icon: Connection },
-  { path: '/wiki', label: 'nav.wiki', icon: Document },
+  { path: '/projects', label: 'nav.projects', icon: Document },
   { path: '/pro', label: 'nav.pro', icon: Promotion },
 ]
 
@@ -286,10 +286,11 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
     ]}
   ],
   '/knowledge': [],
-  '/wiki': [
+  '/projects': [
     { items: [
-      { path: '/wiki', label: 'wiki.allPages', icon: Document },
-      { path: '/wiki?tab=categories', label: 'wiki.categories', icon: FolderOpened },
+      { path: '/projects', label: 'project.allProjects', icon: Document },
+      { path: '/projects?status=active', label: 'project.active', icon: CircleCheck },
+      { path: '/projects?status=completed', label: 'project.completed', icon: SuccessFilled },
     ]}
   ],
   '/pro': [
@@ -334,7 +335,7 @@ const searchResults = computed(() => [
     label: t('nav.memories'),
     items: [
       { id: 1, title: 'Go Backend Migration', description: t('memories.knowledge'), icon: Collection },
-      { id: 2, title: 'UI Design Guide', description: t('wiki.title'), icon: Collection },
+      { id: 2, title: 'UI Design Guide', description: t('project.title'), icon: Collection },
     ]
   },
   {

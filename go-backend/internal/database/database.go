@@ -35,6 +35,8 @@ func Migrate(db *gorm.DB) error {
 		&models.Entity{},
 		&models.Relation{},
 		&models.WikiPage{},
+		&models.Project{},
+		&models.ProjectNote{},
 		&models.DailyReport{},
 		&models.License{},
 		&models.Backup{},

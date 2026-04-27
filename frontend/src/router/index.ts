@@ -13,6 +13,7 @@ const router = createRouter({
         { path: 'knowledge', name: 'knowledge', component: () => import('../views/KnowledgeViewV2.vue') },
         { path: 'skills', redirect: '/?tab=skills' },
         { path: 'wiki', name: 'wiki', component: () => import('../views/WikiView.vue') },
+        { path: 'projects', name: 'projects', component: () => import('../views/ProjectView.vue') },
         { path: 'reports', name: 'reports', component: () => import('../views/DailyReportViewV2.vue') },
         { path: 'docs', name: 'docs', component: () => import('../views/UserGuideView.vue') },
         { path: 'pro', name: 'pro', component: () => import('../views/ProView.vue') },
