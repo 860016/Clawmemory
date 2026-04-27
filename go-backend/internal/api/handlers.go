@@ -2026,7 +2026,27 @@ func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
 					data, err := os.ReadFile(p.FilePath)
 					if err == nil {
 						ext := strings.ToLower(filepath.Ext(p.FilePath))
-						if ext == ".json" {
+						if ext == ".jsonl" {
+							lines := strings.Split(string(data), "\n")
+							for _, line := range lines {
+								line = strings.TrimSpace(line)
+								if line == "" { continue }
+								var msg map[string]interface{}
+								if json.Unmarshal([]byte(line), &msg) != nil { continue }
+								text, _ := msg["text"].(string)
+								if text == "" { text, _ = msg["content"].(string) }
+								key := ""
+								msgType, _ := msg["type"].(string)
+								if text != "" {
+									key = msgType + ": "
+									if len(text) > 40 { key += text[:40] + "..." } else { key += text }
+								}
+								if key == p.Key && text != "" {
+									fullContent = text
+									break
+								}
+							}
+						} else if ext == ".json" {
 							var jsonItems []map[string]interface{}
 							if json.Unmarshal(data, &jsonItems) == nil {
 								for _, m := range jsonItems {
@@ -2058,6 +2078,28 @@ func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
 										fullContent = v
 									}
 								}
+							}
+						} else if ext == ".md" {
+							mdLines := strings.Split(string(data), "\n")
+							curSection := ""
+							curContent := ""
+							for _, l := range mdLines {
+								if strings.HasPrefix(l, "# ") {
+									if curSection == p.Key && curContent != "" {
+										fullContent = strings.TrimSpace(curContent)
+										break
+									}
+									curSection = strings.TrimSpace(l[2:])
+									curContent = ""
+								} else {
+									curContent += l + "\n"
+								}
+							}
+							if curSection == p.Key && fullContent == p.Content {
+								fullContent = strings.TrimSpace(curContent)
+							}
+							if fullContent == p.Content {
+								fullContent = strings.TrimSpace(string(data))
 							}
 						} else {
 							fullContent = string(data)
