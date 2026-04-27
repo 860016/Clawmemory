@@ -83,6 +83,7 @@ export default {
     relationCount: '实体关系',
     preferenceCount: '偏好记忆',
     wikiCount: '知识页面',
+    projectCount: '项目知识',
     layerDistribution: '记忆分层分布',
     licenseStatus: '授权状态',
     recentMemories: '最近记忆',

@@ -229,9 +229,10 @@ func handleCreateMemory(db *gorm.DB) gin.HandlerFunc {
 
 func handleGetMemory(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		id, _ := strconv.Atoi(c.Param("id"))
 		svc := services.NewMemoryService(db)
-		memory, err := svc.Get(uint(id))
+		memory, err := svc.Get(userID, uint(id))
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
@@ -242,6 +243,7 @@ func handleGetMemory(db *gorm.DB) gin.HandlerFunc {
 
 func handleUpdateMemory(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		id, _ := strconv.Atoi(c.Param("id"))
 		var req map[string]interface{}
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -250,7 +252,7 @@ func handleUpdateMemory(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		svc := services.NewMemoryService(db)
-		memory, err := svc.Update(uint(id), req)
+		memory, err := svc.Update(userID, uint(id), req)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
@@ -261,9 +263,10 @@ func handleUpdateMemory(db *gorm.DB) gin.HandlerFunc {
 
 func handleDeleteMemory(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		id, _ := strconv.Atoi(c.Param("id"))
 		svc := services.NewMemoryService(db)
-		if err := svc.Delete(uint(id)); err != nil {
+		if err := svc.Delete(userID, uint(id)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -273,9 +276,10 @@ func handleDeleteMemory(db *gorm.DB) gin.HandlerFunc {
 
 func handleRestoreMemory(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
 		id, _ := strconv.Atoi(c.Param("id"))
 		svc := services.NewMemoryService(db)
-		if err := svc.Restore(uint(id)); err != nil {
+		if err := svc.Restore(userID, uint(id)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -722,11 +726,11 @@ func handleGenerateReport(db *gorm.DB) gin.HandlerFunc {
 func handleGetStats(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		var memoryCount, entityCount, relationCount, wikiCount int64
+		var memoryCount, entityCount, relationCount, projectCount int64
 		db.Model(&struct{ ID uint }{}).Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Count(&memoryCount)
 		db.Model(&struct{ ID uint }{}).Table("entities").Where("user_id = ?", userID).Count(&entityCount)
 		db.Model(&struct{ ID uint }{}).Table("relations").Where("user_id = ?", userID).Count(&relationCount)
-		db.Model(&struct{ ID uint }{}).Table("wiki_pages").Where("user_id = ?", userID).Count(&wikiCount)
+		db.Model(&struct{ ID uint }{}).Table("projects").Where("user_id = ?", userID).Count(&projectCount)
 
 		layerStats := make(map[string]int64)
 		rows, _ := db.Raw("SELECT COALESCE(layer, 'knowledge') as layer, COUNT(*) as cnt FROM memories WHERE user_id = ? AND status != 'trashed' GROUP BY layer", userID).Rows()
@@ -774,7 +778,7 @@ func handleGetStats(db *gorm.DB) gin.HandlerFunc {
 			"memoryCount":    memoryCount,
 			"entityCount":    entityCount,
 			"relationCount":  relationCount,
-			"wikiCount":      wikiCount,
+			"projectCount":  projectCount,
 			"layerStats":     layerStats,
 			"recentMemories": recentMemoriesJson,
 			"license":        licenseInfo,
@@ -2723,6 +2727,14 @@ func handleExportData(db *gorm.DB) gin.HandlerFunc {
 		db.Where("user_id = ?", userID).Find(&wikiPages)
 		exportData["wiki_pages"] = wikiPages
 
+		var projects []models.Project
+		db.Where("user_id = ?", userID).Find(&projects)
+		exportData["projects"] = projects
+
+		var projectNotes []models.ProjectNote
+		db.Where("user_id = ?", userID).Find(&projectNotes)
+		exportData["project_notes"] = projectNotes
+
 		var reports []models.DailyReport
 		db.Where("user_id = ?", userID).Find(&reports)
 		exportData["daily_reports"] = reports
@@ -2771,6 +2783,17 @@ func handleImportData(db *gorm.DB) gin.HandlerFunc {
 			for _, w := range wikiPages {
 				if data, ok := w.(map[string]interface{}); ok {
 					svc := services.NewWikiService(db)
+					if _, err := svc.Create(userID, data); err == nil {
+						imported++
+					}
+				}
+			}
+		}
+
+		if projects, ok := req["projects"].([]interface{}); ok {
+			for _, p := range projects {
+				if data, ok := p.(map[string]interface{}); ok {
+					svc := services.NewProjectService(db)
 					if _, err := svc.Create(userID, data); err == nil {
 						imported++
 					}

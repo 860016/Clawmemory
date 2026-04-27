@@ -298,8 +298,8 @@
         <div class="stat-card">
           <div class="stat-icon-wrap wiki-icon">📖</div>
           <div class="stat-info">
-            <div class="stat-value">{{ stats.wikiCount }}</div>
-            <div class="stat-label">{{ $t('dashboard.wikiCount') }}</div>
+            <div class="stat-value">{{ stats.projectCount }}</div>
+            <div class="stat-label">{{ $t('dashboard.projectCount') }}</div>
           </div>
         </div>
         <div class="stat-card">
@@ -422,7 +422,7 @@ const route = useRoute()
 const activeTab = computed(() => (route.query.tab as string) || '')
 
 const stats = ref<any>({
-  memoryCount: 0, entityCount: 0, relationCount: 0, wikiCount: 0,
+  memoryCount: 0, entityCount: 0, relationCount: 0, projectCount: 0,
   layerStats: {}, recentMemories: [], license: { tier: 'oss', active: false },
   passwordSet: true,
 })

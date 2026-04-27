@@ -66,9 +66,9 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 	return toMemoryModel(memory), nil
 }
 
-func (s *MemoryService) Get(id uint) (*MemoryModel, error) {
+func (s *MemoryService) Get(userID, id uint) (*MemoryModel, error) {
 	var memory models.Memory
-	if err := s.db.First(&memory, id).Error; err != nil {
+	if err := s.db.Where("user_id = ? AND id = ?", userID, id).First(&memory).Error; err != nil {
 		return nil, err
 	}
 	return toMemoryModel(&memory), nil
@@ -103,8 +103,8 @@ func (s *MemoryService) List(userID uint, layer string, page, size int, status s
 	return result, total, err
 }
 
-func (s *MemoryService) Update(id uint, data map[string]interface{}) (*MemoryModel, error) {
-	_, err := s.Get(id)
+func (s *MemoryService) Update(userID, id uint, data map[string]interface{}) (*MemoryModel, error) {
+	_, err := s.Get(userID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -127,18 +127,18 @@ func (s *MemoryService) Update(id uint, data map[string]interface{}) (*MemoryMod
 		}
 	}
 
-	if err := s.db.Model(&models.Memory{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+	if err := s.db.Model(&models.Memory{}).Where("user_id = ? AND id = ?", userID, id).Updates(updates).Error; err != nil {
 		return nil, err
 	}
-	return s.Get(id)
+	return s.Get(userID, id)
 }
 
-func (s *MemoryService) Delete(id uint) error {
-	return s.db.Model(&models.Memory{}).Where("id = ?", id).Update("status", "trashed").Error
+func (s *MemoryService) Delete(userID, id uint) error {
+	return s.db.Model(&models.Memory{}).Where("user_id = ? AND id = ?", userID, id).Update("status", "trashed").Error
 }
 
-func (s *MemoryService) Restore(id uint) error {
-	return s.db.Model(&models.Memory{}).Where("id = ?", id).Update("status", "active").Error
+func (s *MemoryService) Restore(userID, id uint) error {
+	return s.db.Model(&models.Memory{}).Where("user_id = ? AND id = ?", userID, id).Update("status", "active").Error
 }
 
 func (s *MemoryService) SearchKeyword(userID uint, q string, limit int) ([]*MemoryModel, error) {

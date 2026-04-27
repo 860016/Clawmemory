@@ -85,6 +85,7 @@ export default {
     relationCount: 'Relations',
     preferenceCount: 'Preferences',
     wikiCount: 'Wiki Pages',
+    projectCount: 'Projects',
     layerDistribution: 'Memory Layer Distribution',
     licenseStatus: 'License Status',
     recentMemories: 'Recent Memories',
