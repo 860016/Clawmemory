@@ -351,9 +351,9 @@ func (s *ProLocalService) TokenRoute(message string, contextLength int) (map[str
 	}, nil
 }
 
-func (s *ProLocalService) TokenStats() (map[string]interface{}, error) {
+func (s *ProLocalService) TokenStats(userID uint) (map[string]interface{}, error) {
 	var totalMemories int64
-	s.db.Model(&models.Memory{}).Where("status != ?", "trashed").Count(&totalMemories)
+	s.db.Model(&models.Memory{}).Where("user_id = ? AND status != ?", userID, "trashed").Count(&totalMemories)
 	estimatedTokens := totalMemories * 50
 	return map[string]interface{}{
 		"total_tokens_used": estimatedTokens,
@@ -441,7 +441,7 @@ func (s *ProLocalService) EvolutionInsights(userID uint) (map[string]interface{}
 	s.db.Model(&models.Entity{}).Where("user_id = ?", userID).Count(&totalEntities)
 
 	var totalRelations int64
-	s.db.Model(&models.Relation{}).Count(&totalRelations)
+	s.db.Model(&models.Relation{}).Where("user_id = ?", userID).Count(&totalRelations)
 
 	return map[string]interface{}{
 		"total_memories":  totalMemories,

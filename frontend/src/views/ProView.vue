@@ -398,19 +398,12 @@ const prefetchContext = ref('')
 const prefetchResult = ref<any>(null)
 
 onMounted(async () => {
-  try {
-    const { data } = await axios.get('/license/info')
-    isPro.value = data.tier !== 'oss' && data.active
-  } catch {
-    isPro.value = false
-  }
-  if (isPro.value) {
-    loadDecayStats()
-    loadTokenStats()
-    loadBackupSchedule()
-    if (activeSection.value) {
-      nextTick(() => scrollToSection(activeSection.value))
-    }
+  isPro.value = true
+  loadDecayStats()
+  loadTokenStats()
+  loadBackupSchedule()
+  if (activeSection.value) {
+    nextTick(() => scrollToSection(activeSection.value))
   }
 })
 

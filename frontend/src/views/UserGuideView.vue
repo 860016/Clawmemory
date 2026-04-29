@@ -53,6 +53,10 @@
                 <code>pip install chromadb</code>
                 <el-button text size="small" @click="copyCode('pip install chromadb')">📋 {{ $t('common.copy') }}</el-button>
               </div>
+              <div class="code-block">
+                <code>chroma run --host 0.0.0.0 --port 8000</code>
+                <el-button text size="small" @click="copyCode('chroma run --host 0.0.0.0 --port 8000')">📋 {{ $t('common.copy') }}</el-button>
+              </div>
             </div>
           </div>
           <div class="chromadb-features">
@@ -93,6 +97,47 @@
       </div>
 
       <div class="guide-card">
+        <div class="card-icon">🎯</div>
+        <h2>{{ $t('guide.smartLoadTitle') }}</h2>
+        <div class="card-content">
+          <p class="guide-intro">{{ $t('guide.smartLoadIntro') }}</p>
+          <div class="load-levels">
+            <div class="level-item">
+              <span class="level-badge summary">summary</span>
+              <span class="level-desc">{{ $t('guide.smartLoadSummary') }}</span>
+            </div>
+            <div class="level-item">
+              <span class="level-badge standard">standard</span>
+              <span class="level-desc">{{ $t('guide.smartLoadStandard') }}</span>
+            </div>
+            <div class="level-item">
+              <span class="level-badge full">full</span>
+              <span class="level-desc">{{ $t('guide.smartLoadFull') }}</span>
+            </div>
+          </div>
+          <ul class="feature-list">
+            <li><span class="check">✓</span> {{ $t('guide.smartLoadFeature1') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.smartLoadFeature2') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.smartLoadFeature3') }}</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="guide-card">
+        <div class="card-icon">📌</div>
+        <h2>{{ $t('guide.reinforceTitle') }}</h2>
+        <div class="card-content">
+          <p class="guide-intro">{{ $t('guide.reinforceIntro') }}</p>
+          <ul class="feature-list">
+            <li><span class="check">✓</span> {{ $t('guide.reinforceFeature1') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.reinforceFeature2') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.reinforceFeature3') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.reinforceFeature4') }}</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="guide-card">
         <div class="card-icon">🕸️</div>
         <h2>{{ $t('guide.knowledgeGraph') }}</h2>
         <div class="card-content">
@@ -118,16 +163,41 @@
         </div>
       </div>
 
-      <div class="guide-card pro-card">
+      <div class="guide-card full-width pro-card">
         <div class="card-icon">💎</div>
         <h2>{{ $t('guide.proFeatures') }}</h2>
         <div class="card-content">
-          <ul class="feature-list">
-            <li><span class="check">✓</span> {{ $t('guide.proFeature1') }}</li>
-            <li><span class="check">✓</span> {{ $t('guide.proFeature2') }}</li>
-            <li><span class="check">✓</span> {{ $t('guide.proFeature3') }}</li>
-            <li><span class="check">✓</span> {{ $t('guide.proFeature4') }}</li>
-          </ul>
+          <div class="pro-sections">
+            <div class="pro-section">
+              <h3>{{ $t('guide.proLocalTitle') }}</h3>
+              <p class="section-desc">{{ $t('guide.proLocalDesc') }}</p>
+              <ul class="feature-list">
+                <li><span class="check">✓</span> {{ $t('guide.proDecayTitle') }}: {{ $t('guide.proDecayDesc') }}</li>
+                <li><span class="check">✓</span> {{ $t('guide.proConflictTitle') }}: {{ $t('guide.proConflictDesc') }}</li>
+                <li><span class="check">✓</span> {{ $t('guide.proRouterTitle') }}: {{ $t('guide.proRouterDesc') }}</li>
+              </ul>
+            </div>
+            <div class="pro-section">
+              <h3>{{ $t('guide.proCloudTitle') }}</h3>
+              <p class="section-desc">{{ $t('guide.proCloudDesc') }}</p>
+              <ul class="feature-list">
+                <li><span class="check">✓</span> {{ $t('guide.proExtractTitle') }}: {{ $t('guide.proExtractDesc') }}</li>
+                <li><span class="check">✓</span> {{ $t('guide.proTrendTitle') }}: {{ $t('guide.proTrendDesc') }}</li>
+                <li><span class="check">✓</span> {{ $t('guide.proReportTitle') }}: {{ $t('guide.proReportDesc') }}</li>
+              </ul>
+            </div>
+          </div>
+          <div class="pro-models">
+            <h3>{{ $t('guide.proModelsTitle') }}</h3>
+            <div class="model-grid">
+              <div class="model-item">OpenAI: GPT-4o / GPT-4-turbo</div>
+              <div class="model-item">Anthropic: Claude 3.5 Sonnet</div>
+              <div class="model-item">DeepSeek: Chat / Reasoner</div>
+              <div class="model-item">Moonshot: v1-8k/32k/128k</div>
+              <div class="model-item">Zhipu: GLM-4 / Flash / Air</div>
+              <div class="model-item">Qwen: Max / Plus / Turbo</div>
+            </div>
+          </div>
           <el-button type="primary" style="margin-top: 16px" @click="$router.push('/pro')">
             {{ $t('nav.pro') }} →
           </el-button>
@@ -478,6 +548,94 @@ function copyCode(code: string) {
   margin: 0;
 }
 
+.load-levels {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.level-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.level-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 70px;
+  text-align: center;
+}
+
+.level-badge.summary {
+  background: rgba(230, 162, 60, 0.15);
+  color: #e6a23c;
+}
+
+.level-badge.standard {
+  background: rgba(6, 182, 212, 0.15);
+  color: #06b6d4;
+}
+
+.level-badge.full {
+  background: rgba(103, 194, 79, 0.15);
+  color: #67c23a;
+}
+
+.level-desc {
+  font-size: 13px;
+  color: var(--cm-text-secondary);
+}
+
+.pro-sections {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.pro-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cm-text);
+  margin: 0 0 8px;
+}
+
+.section-desc {
+  font-size: 12px;
+  color: var(--cm-text-muted);
+  margin: 0 0 12px;
+}
+
+.pro-models {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--cm-border);
+}
+
+.pro-models h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cm-text);
+  margin: 0 0 12px;
+}
+
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.model-item {
+  padding: 6px 10px;
+  background: var(--cm-bg);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--cm-text-secondary);
+  border: 1px solid var(--cm-border);
+}
+
 @media (max-width: 768px) {
   .user-guide-page {
     padding: 16px;
@@ -493,6 +651,12 @@ function copyCode(code: string) {
   }
   .guide-card h2 {
     font-size: 16px;
+  }
+  .pro-sections {
+    grid-template-columns: 1fr;
+  }
+  .model-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -527,6 +691,9 @@ function copyCode(code: string) {
   }
   .code-block .el-button {
     justify-content: center;
+  }
+  .model-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

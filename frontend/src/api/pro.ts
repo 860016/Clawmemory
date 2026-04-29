@@ -24,7 +24,7 @@ export default {
   },
 
   routeToken(message: string, contextLength = 0) {
-    return axios.post('/pro/token/route', null, {
+    return axios.get('/pro/token/route', {
       params: { message, context_length: contextLength },
     })
   },

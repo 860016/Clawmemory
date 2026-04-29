@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"os/exec"
@@ -127,7 +128,36 @@ func handleRegister(authService *services.AuthService) gin.HandlerFunc {
 func handleResetPassword(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			Username    string `json:"username"`
+			NewPassword string `json:"new_password"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if req.NewPassword == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password is required"})
+			return
+		}
+
+		var user models.User
+		if err := authService.FindFirstUser(&user); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no user found"})
+			return
+		}
+
+		if err := authService.ChangePassword(user.ID, "", req.NewPassword); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "密码重置成功"})
+	}
+}
+
+func handleChangePassword(authService *services.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		var req struct {
 			OldPassword string `json:"old_password"`
 			NewPassword string `json:"new_password"`
 		}
@@ -135,8 +165,15 @@ func handleResetPassword(authService *services.AuthService) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-
-		c.JSON(http.StatusOK, gin.H{"message": "密码重置成功"})
+		if req.NewPassword == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password is required"})
+			return
+		}
+		if err := authService.ChangePassword(userID, req.OldPassword, req.NewPassword); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "密码修改成功"})
 	}
 }
 
@@ -309,14 +346,76 @@ func handleSearchSemantic(db *gorm.DB) gin.HandlerFunc {
 		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 		userID := middleware.GetUserID(c)
 
+		chromaSvc := services.NewChromaDBService(db)
+		if chromaSvc.IsAvailable() {
+			results, err := chromaSvc.Search(userID, q, limit)
+			if err == nil && len(results) > 0 {
+				enriched := enrichChromaResults(db, userID, results, limit)
+				c.JSON(http.StatusOK, gin.H{"items": enriched, "engine": "chromadb"})
+				return
+			}
+		}
+
 		svc := services.NewSearchService(db)
 		memories, err := svc.SemanticSearch(userID, q, limit)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"items": memories})
+		c.JSON(http.StatusOK, gin.H{"items": memories, "engine": "tfidf"})
 	}
+}
+
+func enrichChromaResults(db *gorm.DB, userID uint, chromaResults []map[string]interface{}, limit int) []map[string]interface{} {
+	memIDs := make([]uint, 0, len(chromaResults))
+	for _, r := range chromaResults {
+		if memIDStr, ok := r["memory_id"].(string); ok {
+			var id uint
+			fmt.Sscanf(memIDStr, "%d", &id)
+			if id > 0 {
+				memIDs = append(memIDs, id)
+			}
+		}
+	}
+
+	if len(memIDs) == 0 {
+		return chromaResults
+	}
+
+	var memories []models.Memory
+	db.Where("user_id = ? AND id IN ?", userID, memIDs).Find(&memories)
+
+	memMap := make(map[uint]models.Memory)
+	for _, m := range memories {
+		memMap[m.ID] = m
+	}
+
+	enriched := make([]map[string]interface{}, 0, len(chromaResults))
+	for _, r := range chromaResults {
+		if memIDStr, ok := r["memory_id"].(string); ok {
+			var id uint
+			fmt.Sscanf(memIDStr, "%d", &id)
+			if m, found := memMap[id]; found {
+				item := map[string]interface{}{
+					"id":         m.ID,
+					"key":        m.Key,
+					"value":      m.Value,
+					"layer":      m.Layer,
+					"importance": m.Importance,
+					"source":     m.Source,
+					"status":     m.Status,
+					"created_at": m.CreatedAt.Format("2006-01-02 15:04:05"),
+					"updated_at": m.UpdatedAt.Format("2006-01-02 15:04:05"),
+				}
+				if score, ok := r["score"].(float64); ok {
+					item["score"] = math.Round(score*1000) / 1000
+				}
+				enriched = append(enriched, item)
+			}
+		}
+	}
+
+	return enriched
 }
 
 // Knowledge handlers
@@ -826,10 +925,6 @@ func proErrorHandler(c *gin.Context, err error) {
 }
 
 func checkPro(proxy *services.ProProxy, c *gin.Context) bool {
-	if !proxy.IsPro() {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Pro license required", "mode": "local_pro"})
-		return false
-	}
 	return true
 }
 
@@ -948,8 +1043,9 @@ func handleProTokenRoute(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc 
 func handleProTokenStats(proxy *services.ProProxy, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !checkPro(proxy, c) { return }
+		userID := middleware.GetUserID(c)
 		svc := services.NewProLocalService(db)
-		result, err := svc.TokenStats()
+		result, err := svc.TokenStats(userID)
 		if err != nil {
 			proErrorHandler(c, err)
 			return
@@ -1586,18 +1682,77 @@ func handleSkillDetail(c *gin.Context) {
 	c.JSON(http.StatusNotFound, gin.H{"error": "skill not found"})
 }
 
-func handleChromaDBStatus(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"available": false,
-		"reason":    "ChromaDB integration is not available in Go backend",
-	})
+func handleChromaDBStatus(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		svc := services.NewChromaDBService(db)
+		status := svc.GetStatus()
+		c.JSON(http.StatusOK, status)
+	}
 }
 
-func handleChromaDBInstall(c *gin.Context) {
-	c.JSON(http.StatusBadRequest, gin.H{
-		"success": false,
-		"message": "ChromaDB integration is not available in Go backend. This feature requires Python backend.",
-	})
+func handleChromaDBInstall(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		svc := services.NewChromaDBService(db)
+		result := svc.Install()
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func handleChromaDBSync(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewChromaDBService(db)
+		count, err := svc.SyncMemories(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"synced": count, "message": fmt.Sprintf("Synced %d memories to ChromaDB", count)})
+	}
+}
+
+func handleSmartLoad(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		query := c.Query("q")
+		tokenBudget, _ := strconv.Atoi(c.DefaultQuery("token_budget", "2000"))
+		loadLevel := c.DefaultQuery("load_level", "auto")
+
+		svc := services.NewSmartLoadService(db)
+		result, err := svc.SmartLoad(userID, query, tokenBudget, loadLevel)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func handleReinforceMemory(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		id, _ := strconv.Atoi(c.Param("id"))
+
+		svc := services.NewSmartLoadService(db)
+		if err := svc.ReinforceMemory(userID, uint(id)); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "memory not found"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "memory reinforced", "memory_id": id})
+	}
+}
+
+func handleGenerateSummaries(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewSmartLoadService(db)
+		count, err := svc.BatchGenerateSummaries(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"generated": count, "message": fmt.Sprintf("Generated summaries for %d memories", count)})
+	}
 }
 
 func getOpenClawSearchDirs() []string {

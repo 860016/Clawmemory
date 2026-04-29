@@ -421,7 +421,7 @@ async function loadDecaySettings() {
 async function loadDecayStats() {
   try {
     const { data } = await axios.get('/memories/decay/stats')
-    decayStats.value = data.stats
+    decayStats.value = data.stats || data
   } catch {}
 }
 

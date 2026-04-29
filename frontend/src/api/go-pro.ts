@@ -18,7 +18,7 @@ export const proApi = {
     }),
 
   routeModel: (text: string, contextLength = 0) =>
-    axios.post('/pro/token/route', null, {
+    axios.get('/pro/token/route', {
       params: { message: text, context_length: contextLength },
     }),
   getTokenStats: () => axios.get('/pro/token/stats'),

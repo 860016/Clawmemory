@@ -13,8 +13,12 @@ export const memoryApi = {
   searchSemantic: (q: string, limit?: number) =>
     api.get('/memories/search/semantic', { params: { q, limit } }),
 
-  // OpenClaw memory import (Go 版暂不支持)
-  scanOpenClaw: () => Promise.resolve({ data: [] }),
-  scanOpenClawAgent: (_agentName: string) => Promise.resolve({ data: [] }),
-  importOpenClaw: (_data: any) => Promise.resolve({ data: { imported: 0 } }),
+  smartLoad: (params: { q?: string; token_budget?: number; load_level?: string }) =>
+    api.get('/memories/smart-load', { params }),
+  reinforce: (id: number) => api.post(`/memories/${id}/reinforce`),
+  generateSummaries: () => api.post('/memories/generate-summaries'),
+
+  scanOpenClaw: () => api.get('/openclaw-memories/scan'),
+  scanOpenClawAgent: (agentName: string) => api.get(`/openclaw-memories/scan/${agentName}`),
+  importOpenClaw: (data: any) => api.post('/openclaw-memories/import', data),
 }

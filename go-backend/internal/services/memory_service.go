@@ -15,22 +15,24 @@ type MemoryService struct {
 
 // MemoryModel 用于返回的记忆模型
 type MemoryModel struct {
-	ID             uint       `json:"id"`
-	UserID         uint       `json:"user_id"`
-	Layer          string     `json:"layer"`
-	Key            string     `json:"key"`
-	Value          string     `json:"value"`
-	Importance     float64    `json:"importance"`
-	AccessCount    int        `json:"access_count"`
-	LastAccessedAt *time.Time `json:"last_accessed_at"`
-	IsEncrypted    bool       `json:"is_encrypted"`
-	Tags           string     `json:"tags"`
-	Source         string     `json:"source"`
-	Status         string     `json:"status"`
-	TrashedAt      *time.Time `json:"trashed_at"`
-	DecayStage     int        `json:"decay_stage"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID              uint       `json:"id"`
+	UserID          uint       `json:"user_id"`
+	Layer           string     `json:"layer"`
+	Key             string     `json:"key"`
+	Value           string     `json:"value"`
+	Summary         string     `json:"summary"`
+	Importance      float64    `json:"importance"`
+	AccessCount     int        `json:"access_count"`
+	LastAccessedAt  *time.Time `json:"last_accessed_at"`
+	IsEncrypted     bool       `json:"is_encrypted"`
+	Tags            []string   `json:"tags"`
+	Source          string     `json:"source"`
+	Status          string     `json:"status"`
+	TrashedAt       *time.Time `json:"trashed_at"`
+	DecayStage      int        `json:"decay_stage"`
+	ReinforceCount  int        `json:"reinforce_count"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 func NewMemoryService(db *gorm.DB) *MemoryService {
@@ -55,6 +57,7 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 		Value:      getString(data, "value", ""),
 		Importance: getFloat(data, "importance", 0.5),
 		Tags:       tags,
+		Summary:    generateSummary(getString(data, "key", ""), getString(data, "value", "")),
 		Source:     getString(data, "source", "manual"),
 		Status:     "active",
 		DecayStage: 0,
@@ -104,7 +107,7 @@ func (s *MemoryService) List(userID uint, layer string, page, size int, status s
 }
 
 func (s *MemoryService) Update(userID, id uint, data map[string]interface{}) (*MemoryModel, error) {
-	_, err := s.Get(userID, id)
+	existing, err := s.Get(userID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -112,6 +115,19 @@ func (s *MemoryService) Update(userID, id uint, data map[string]interface{}) (*M
 	updates := map[string]interface{}{}
 	if v, ok := data["value"]; ok {
 		updates["value"] = v
+		key := existing.Key
+		if k, ok2 := data["key"]; ok2 {
+			key = k.(string)
+		}
+		updates["summary"] = generateSummary(key, v.(string))
+	}
+	if v, ok := data["key"]; ok {
+		updates["key"] = v
+		value := existing.Value
+		if val, ok2 := data["value"]; ok2 {
+			value = val.(string)
+		}
+		updates["summary"] = generateSummary(v.(string), value)
 	}
 	if v, ok := data["importance"]; ok {
 		updates["importance"] = v
@@ -162,22 +178,31 @@ func (s *MemoryService) IncrementAccess(id uint) error {
 }
 
 func toMemoryModel(m *models.Memory) *MemoryModel {
+	var tags []string
+	if m.Tags != "" {
+		json.Unmarshal([]byte(m.Tags), &tags)
+	}
+	if tags == nil {
+		tags = []string{}
+	}
 	return &MemoryModel{
-		ID:             m.ID,
-		UserID:         m.UserID,
-		Layer:          m.Layer,
-		Key:            m.Key,
-		Value:          m.Value,
-		Importance:     m.Importance,
-		AccessCount:    m.AccessCount,
-		LastAccessedAt: m.LastAccessedAt,
-		IsEncrypted:    m.IsEncrypted,
-		Tags:           m.Tags,
-		Source:         m.Source,
-		Status:         m.Status,
-		TrashedAt:      m.TrashedAt,
-		DecayStage:     m.DecayStage,
-		CreatedAt:      m.CreatedAt,
-		UpdatedAt:      m.UpdatedAt,
+		ID:              m.ID,
+		UserID:          m.UserID,
+		Layer:           m.Layer,
+		Key:             m.Key,
+		Value:           m.Value,
+		Summary:         m.Summary,
+		Importance:      m.Importance,
+		AccessCount:     m.AccessCount,
+		LastAccessedAt:  m.LastAccessedAt,
+		IsEncrypted:     m.IsEncrypted,
+		Tags:            tags,
+		Source:          m.Source,
+		Status:          m.Status,
+		TrashedAt:       m.TrashedAt,
+		DecayStage:      m.DecayStage,
+		ReinforceCount:  m.ReinforceCount,
+		CreatedAt:       m.CreatedAt,
+		UpdatedAt:       m.UpdatedAt,
 	}
 }

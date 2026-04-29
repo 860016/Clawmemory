@@ -42,6 +42,7 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 	archived := 0
 	trashed := 0
 	adjusted := 0
+	reinforced := 0
 
 	for i := range memories {
 		m := &memories[i]
@@ -54,19 +55,28 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 		newStatus := m.Status
 		newDecayStage := m.DecayStage
 
-		if daysSinceAccess > 60 {
+		effectiveThreshold1 := 15.0 + float64(m.ReinforceCount)*3.0
+		effectiveThreshold2 := 30.0 + float64(m.ReinforceCount)*5.0
+		effectiveThreshold3 := 60.0 + float64(m.ReinforceCount)*8.0
+
+		if m.ReinforceCount >= 5 {
+			reinforced++
+			continue
+		}
+
+		if daysSinceAccess > effectiveThreshold3 {
 			newImportance = m.Importance * 0.3
 			newStatus = "trashed"
 			newDecayStage = 3
 			trashedNow := now
 			m.TrashedAt = &trashedNow
 			trashed++
-		} else if daysSinceAccess > 30 {
+		} else if daysSinceAccess > effectiveThreshold2 {
 			newImportance = m.Importance * 0.7
 			newStatus = "archived"
 			newDecayStage = 2
 			archived++
-		} else if daysSinceAccess > 15 {
+		} else if daysSinceAccess > effectiveThreshold1 {
 			newImportance = m.Importance * 0.9
 			newDecayStage = 1
 			adjusted++
@@ -92,7 +102,8 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 		"archived":    archived,
 		"trashed":     trashed,
 		"adjusted":    adjusted,
-		"algorithm":   "local_time_decay_v1",
+		"reinforced":  reinforced,
+		"algorithm":   "smart_decay_v2",
 	}, nil
 }
 

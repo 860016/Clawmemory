@@ -131,12 +131,12 @@ func (s *KnowledgeService) UpdateEntity(userID uint, id uint, data map[string]in
 		}
 	}
 
-	s.db.Where("id = ?", id).First(&entity)
+	s.db.Where("id = ? AND user_id = ?", id, userID).First(&entity)
 	return &entity, nil
 }
 
 func (s *KnowledgeService) DeleteEntity(userID uint, id uint) error {
-	s.db.Where("source_id = ? OR target_id = ?", id, id).Delete(&models.Relation{})
+	s.db.Where("(source_id = ? OR target_id = ?) AND user_id = ?", id, id, userID).Delete(&models.Relation{})
 	return s.db.Where("id = ? AND user_id = ?", id, userID).Delete(&models.Entity{}).Error
 }
 

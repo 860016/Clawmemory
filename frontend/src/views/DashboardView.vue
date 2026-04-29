@@ -336,16 +336,34 @@
                 <span class="feature-text">{{ $t('dashboard.chromadbFeature3') }}</span>
               </div>
             </div>
-            <div class="chromadb-actions">
-              <el-button type="primary" @click="installChromaDB" :loading="installing" v-if="!chromadbInstalled">
-                {{ $t('dashboard.installChromaDB') }}
-              </el-button>
-              <el-button type="success" disabled v-else>
-                ✓ {{ $t('dashboard.chromadbReady') }}
+            <div class="chromadb-actions" v-if="!chromadbInstalled">
+              <div class="chromadb-install-steps">
+                <p style="margin: 0 0 8px; font-size: 13px; color: var(--cm-text-secondary)">
+                  {{ $t('dashboard.chromadbManualSteps') }}
+                </p>
+                <div class="code-step">
+                  <code>pip install chromadb</code>
+                  <el-button text size="small" @click="copyText('pip install chromadb')">📋</el-button>
+                </div>
+                <div class="code-step">
+                  <code>chroma run --host 0.0.0.0 --port 8000</code>
+                  <el-button text size="small" @click="copyText('chroma run --host 0.0.0.0 --port 8000')">📋</el-button>
+                </div>
+              </div>
+              <el-button type="primary" @click="checkChromaDB" :loading="installing" style="margin-top: 12px">
+                {{ $t('dashboard.checkChromaDB') }}
               </el-button>
               <el-button text @click="$router.push('/docs')">
                 {{ $t('dashboard.viewGuide') }} →
               </el-button>
+            </div>
+            <div class="chromadb-actions" v-else>
+              <el-button type="success" @click="syncChromaDB" :loading="syncing">
+                🔄 {{ $t('dashboard.syncChromaDB') }}
+              </el-button>
+              <el-tag type="info" size="small" v-if="chromadbMemoryCount > 0">
+                {{ chromadbMemoryCount }} memories indexed
+              </el-tag>
             </div>
           </div>
         </div>
@@ -465,18 +483,27 @@ const layerLabels: Record<string, string> = {
 
 // ChromaDB state
 const chromadbInstalled = ref(false)
+const chromadbMemoryCount = ref(0)
 const installing = ref(false)
+const syncing = ref(false)
 
 onMounted(async () => {
   try {
     const { data } = await axios.get('/stats')
     stats.value = data
   } catch {}
+  loadChromaDBStatus()
+})
+
+async function loadChromaDBStatus() {
   try {
     const { data } = await axios.get('/chromadb/status')
     chromadbInstalled.value = data.available
+    if (data.available && data.memoryCount) {
+      chromadbMemoryCount.value = data.memoryCount
+    }
   } catch {}
-})
+}
 
 // Auto-scan skills when switching to skills tab
 watch(activeTab, (tab) => {
@@ -500,21 +527,43 @@ async function scanSkills() {
   }
 }
 
-async function installChromaDB() {
+async function checkChromaDB() {
   installing.value = true
   try {
-    const { data } = await axios.post('/chromadb/install')
-    if (data.success) {
+    const { data } = await axios.get('/chromadb/status')
+    if (data.available) {
       chromadbInstalled.value = true
+      chromadbMemoryCount.value = data.memoryCount || 0
       ElMessage.success(t('dashboard.installSuccess'))
     } else {
-      ElMessage.error(data.message || t('dashboard.installFailed'))
+      ElMessage.warning(data.reason || t('dashboard.chromadbNotInstalled'))
     }
   } catch (e: any) {
     ElMessage.error(e.response?.data?.detail || t('dashboard.installFailed'))
   } finally {
     installing.value = false
   }
+}
+
+async function syncChromaDB() {
+  syncing.value = true
+  try {
+    const { data } = await axios.post('/chromadb/sync')
+    chromadbMemoryCount.value = data.synced || 0
+    ElMessage.success(t('dashboard.syncSuccess', { count: data.synced }))
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.error || t('dashboard.syncFailed'))
+  } finally {
+    syncing.value = false
+  }
+}
+
+function copyText(text: string) {
+  navigator.clipboard.writeText(text).then(() => {
+    ElMessage.success(t('common.copied'))
+  }).catch(() => {
+    ElMessage.error(t('common.copyFailed'))
+  })
 }
 
 async function showSkillDetail(skill: any) {
@@ -756,7 +805,10 @@ function formatNumber(n: number) {
 .feature-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--cm-bg); border-radius: 8px; border: 1px solid var(--cm-border); }
 .feature-icon { font-size: 18px; }
 .feature-text { font-size: 13px; color: var(--cm-text-secondary); }
-.chromadb-actions { display: flex; gap: 8px; align-items: center; }
+.chromadb-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.chromadb-install-steps { width: 100%; }
+.code-step { display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 6px 12px; background: var(--cm-bg); border: 1px solid var(--cm-border); border-radius: 6px; }
+.code-step code { font-size: 13px; color: var(--cm-primary); flex: 1; }
 
 .chart-card { min-height: 300px; }
 .chart-container { width: 100%; min-height: 220px; }

@@ -111,6 +111,10 @@ func (s *AuthService) GetUserByID(userID uint) (*models.User, error) {
 	return &user, nil
 }
 
+func (s *AuthService) FindFirstUser(user *models.User) error {
+	return s.db.First(user).Error
+}
+
 func (s *AuthService) Login(username, password string) (string, error) {
 	var user models.User
 	if err := s.db.Where("username = ?", username).First(&user).Error; err != nil {
@@ -130,8 +134,10 @@ func (s *AuthService) ChangePassword(userID uint, oldPassword, newPassword strin
 		return err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldPassword)); err != nil {
-		return errors.New("invalid old password")
+	if oldPassword != "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldPassword)); err != nil {
+			return errors.New("invalid old password")
+		}
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)

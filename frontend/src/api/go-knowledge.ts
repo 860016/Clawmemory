@@ -20,7 +20,7 @@ export const knowledgeApi = {
   getStats: () => api.get('/stats'),
 
   // AI 提取（Pro 功能）
-  aiExtract: (_data: any) => Promise.reject(new Error('Pro feature not available')),
+  aiExtract: (data: any) => api.post('/pro/ai/extract', data),
 
   // 消歧
   disambiguate: (_name: string) => Promise.resolve({ data: [] }),

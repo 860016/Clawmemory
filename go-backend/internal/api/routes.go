@@ -23,7 +23,6 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		public.POST("/auth/login", handleLogin(authService))
 		public.POST("/auth/register", handleRegister(authService))
 		public.POST("/auth/reset-password", handleResetPassword(authService))
-		public.POST("/auth/change-password", handleResetPassword(authService))
 		public.GET("/install-status", handleInstallStatus(db))
 		public.GET("/license/info", handleLicenseInfo(licenseManager))
 		public.POST("/license/activate", handleLicenseActivate(licenseManager))
@@ -34,6 +33,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	authorized.Use(middleware.Auth(cfg))
 	{
 		authorized.GET("/auth/me", handleGetMe(authService))
+		authorized.POST("/auth/change-password", handleChangePassword(authService))
 
 		authorized.GET("/memories", handleListMemories(db))
 		authorized.POST("/memories", handleCreateMemory(db))
@@ -113,6 +113,10 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 
 		authorized.GET("/memories/recommend", handleMemoryRecommend(db))
 
+		authorized.GET("/memories/smart-load", handleSmartLoad(db))
+		authorized.POST("/memories/:id/reinforce", handleReinforceMemory(db))
+		authorized.POST("/memories/generate-summaries", handleGenerateSummaries(db))
+
 		authorized.GET("/openclaw-skills/scan", handleScanSkills)
 		authorized.GET("/openclaw-skills/detail", handleSkillDetail)
 		authorized.POST("/openclaw-skills/install", handleInstallSkill)
@@ -122,8 +126,9 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.POST("/openclaw-memories/import", handleImportOpenClawMemories(db))
 		authorized.POST("/memories/auto-import", handleAutoImportMemories(db))
 
-		authorized.GET("/chromadb/status", handleChromaDBStatus)
-		authorized.POST("/chromadb/install", handleChromaDBInstall)
+		authorized.GET("/chromadb/status", handleChromaDBStatus(db))
+		authorized.POST("/chromadb/install", handleChromaDBInstall(db))
+		authorized.POST("/chromadb/sync", handleChromaDBSync(db))
 
 		authorized.GET("/backups", handleListBackups)
 		authorized.POST("/backups", handleCreateBackup)
@@ -136,7 +141,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 			pro.GET("/prune-suggest", handleProPruneSuggest(proProxy, db))
 			pro.GET("/conflicts/scan", handleProConflictScan(proProxy, db))
 			pro.POST("/conflicts/resolve/:index", handleProConflictResolve(proProxy, db))
-			pro.POST("/token/route", handleProTokenRoute(proProxy, db))
+			pro.GET("/token/route", handleProTokenRoute(proProxy, db))
 			pro.GET("/token/stats", handleProTokenStats(proProxy, db))
 			pro.POST("/ai/extract", handleProAIExtract(proProxy, db))
 			pro.POST("/auto-graph", handleProAutoGraph(proProxy, db))

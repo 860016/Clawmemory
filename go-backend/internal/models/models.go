@@ -28,10 +28,12 @@ type Memory struct {
 	LastAccessedAt *time.Time    `json:"last_accessed_at"`
 	IsEncrypted   bool           `gorm:"default:false" json:"is_encrypted"`
 	Tags          string         `gorm:"type:text" json:"tags"`
+	Summary       string         `gorm:"size:500" json:"summary"`
 	Source        string         `gorm:"size:50;default:manual" json:"source"`
 	Status        string         `gorm:"size:20;default:active;index" json:"status"`
 	TrashedAt     *time.Time     `json:"trashed_at"`
 	DecayStage    int            `gorm:"default:0" json:"decay_stage"`
+	ReinforceCount int           `gorm:"default:0" json:"reinforce_count"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
 }

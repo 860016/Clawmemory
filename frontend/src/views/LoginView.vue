@@ -57,23 +57,12 @@
     <el-dialog v-model="showForgotDialog" :title="$t('login.forgotPassword')" width="440px" :close-on-click-modal="false">
       <div v-if="!resetMessage">
         <el-alert type="info" :closable="false" style="margin-bottom: 16px">
-          <template #title>{{ $t('login.forgotStep1Title') }}</template>
-          <p style="margin: 8px 0 0; font-size: 13px; color: var(--cm-text-muted)">{{ $t('login.forgotStep1Desc') }}</p>
-        </el-alert>
-        <div class="cli-code">
-          <code>python -m app.utils.reset_password</code>
-          <el-button text type="primary" size="small" @click="copyCliCommand" style="margin-left: 8px">
-            {{ $t('login.copy') }}
-          </el-button>
-        </div>
-        <el-divider>{{ $t('login.or') }}</el-divider>
-        <el-alert type="warning" :closable="false" style="margin-bottom: 12px">
           <template #title>{{ $t('login.forgotStep2Title') }}</template>
           <p style="margin: 8px 0 0; font-size: 13px; color: var(--cm-text-muted)">{{ $t('login.forgotStep2Desc') }}</p>
         </el-alert>
         <div class="reset-token-section">
-          <el-input v-model="resetToken" :placeholder="$t('login.resetTokenPlaceholder')" size="large" />
-          <el-button type="primary" @click="handleResetWithToken" :loading="loading" size="large" style="margin-top: 12px; width: 100%">
+          <el-input v-model="newPassword" type="password" show-password :placeholder="$t('login.newPasswordPlaceholder')" size="large" />
+          <el-button type="primary" @click="handleResetPassword" :loading="loading" size="large" style="margin-top: 12px; width: 100%">
             {{ $t('login.resetPassword') }}
           </el-button>
         </div>
@@ -83,7 +72,7 @@
         <p style="margin: 12px 0 0; color: var(--cm-text); font-weight: 600">{{ resetMessage }}</p>
       </div>
       <template #footer>
-        <el-button @click="showForgotDialog = false; resetMessage = ''; resetToken = ''">{{ $t('common.cancel') }}</el-button>
+        <el-button @click="showForgotDialog = false; resetMessage = ''; newPassword = ''">{{ $t('common.cancel') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -96,7 +85,6 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { SuccessFilled } from '@element-plus/icons-vue'
 import axios from '../api/client'
-import { authApi } from '../api/auth'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -106,7 +94,7 @@ const loading = ref(false)
 const passwordSet = ref(true)
 const resetMessage = ref('')
 const showForgotDialog = ref(false)
-const resetToken = ref('')
+const newPassword = ref('')
 
 onMounted(async () => {
   try {
@@ -115,12 +103,6 @@ onMounted(async () => {
   } catch (e) {
     console.error('Failed to check init status:', e)
     passwordSet.value = false
-  }
-  // Auto-fill reset token from URL
-  const token = route.query.token as string
-  if (token) {
-    resetToken.value = token
-    showForgotDialog.value = true
   }
 })
 
@@ -174,41 +156,21 @@ async function handleSetPassword() {
   }
 }
 
-async function handleForgotPassword() {
-  loading.value = true
-  try {
-    await authApi.resetPassword()
-    resetMessage.value = t('login.resetSuccess')
-    passwordSet.value = false
-    password.value = ''
-  } catch {
-    ElMessage.error(t('login.resetFailed'))
-  } finally {
-    loading.value = false
-  }
-}
-
-async function handleResetWithToken() {
-  if (!resetToken.value) {
-    ElMessage.warning(t('login.resetTokenRequired'))
+async function handleResetPassword() {
+  if (!newPassword.value || newPassword.value.length < 4) {
+    ElMessage.warning(t('login.passwordTooShort'))
     return
   }
   loading.value = true
   try {
-    await authApi.resetPasswordWithToken(resetToken.value)
+    await axios.post('/auth/reset-password', { new_password: newPassword.value })
     resetMessage.value = t('login.resetSuccess')
-    passwordSet.value = false
-    password.value = ''
+    password.value = newPassword.value
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('login.resetFailed'))
+    ElMessage.error(e.response?.data?.error || t('login.resetFailed'))
   } finally {
     loading.value = false
   }
-}
-
-function copyCliCommand() {
-  navigator.clipboard.writeText('python -m app.utils.reset_password')
-  ElMessage.success(t('login.copied'))
 }
 </script>
 

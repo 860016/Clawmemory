@@ -13,9 +13,14 @@
     </div>
 
     <div class="toolbar">
-      <el-input v-model="searchQuery" :placeholder="$t('memories.searchPlaceholder')" clearable @keyup.enter="handleSearch" @clear="searchResults = []" class="search-input">
+      <el-input v-model="searchQuery" :placeholder="$t('memories.searchPlaceholder')" clearable @keyup.enter="handleSearch" @clear="searchResults = []; smartLoadResult = null" class="search-input">
         <template #prefix><el-icon><Search /></el-icon></template>
       </el-input>
+      <el-select v-model="searchMode" style="width: 130px" @change="searchResults = []; smartLoadResult = null">
+        <el-option :label="$t('memories.searchKeyword')" value="keyword" />
+        <el-option :label="$t('memories.searchSemantic')" value="semantic" />
+        <el-option :label="$t('memories.searchSmart')" value="smart" />
+      </el-select>
       <el-radio-group v-model="currentLayer" @change="loadMemories" size="default">
         <el-radio-button label="">{{ $t('memories.all') }}</el-radio-button>
         <el-radio-button label="preference">{{ $t('memories.preference') }}</el-radio-button>
@@ -25,18 +30,34 @@
       </el-radio-group>
     </div>
 
+    <div v-if="smartLoadResult" class="smart-load-info">
+      <div class="smart-load-header">
+        <span>{{ $t('memories.smartLoadInfo', { count: smartLoadResult.memories.length, tokens: smartLoadResult.total_tokens, budget: smartLoadResult.token_budget }) }}</span>
+        <el-tag size="small" :type="smartLoadResult.engine === 'smart_v1' ? 'success' : 'info'">{{ smartLoadResult.engine }}</el-tag>
+      </div>
+      <div v-if="smartLoadResult.suggestions?.length" class="smart-suggestions">
+        <span v-for="(s, i) in smartLoadResult.suggestions" :key="i" class="suggestion-item">{{ s }}</span>
+      </div>
+    </div>
+
     <div v-if="searchResults.length" class="search-results">
       <div class="section-title">{{ $t('memories.searchResults') }} ({{ searchResults.length }})</div>
-      <div class="memory-card" v-for="m in searchResults" :key="'s'+m.id">
+      <div class="memory-card" v-for="m in searchResults" :key="'s'+m.id" :class="{ 'smart-summary': m.load_level === 'summary', 'smart-full': m.load_level === 'full' }">
         <div class="card-top">
           <span class="layer-tag" :class="m.layer">{{ layerLabels[m.layer] || m.layer }}</span>
           <span class="importance" :class="importanceClass(m.importance)">{{ (m.importance * 100).toFixed(0) }}%</span>
+          <el-tag v-if="m.load_level" size="small" :type="m.load_level === 'full' ? 'success' : m.load_level === 'summary' ? 'warning' : 'info'" class="load-level-tag">
+            {{ m.load_level }}
+          </el-tag>
+          <span v-if="m.score" class="score-badge">{{ m.score.toFixed(2) }}</span>
         </div>
         <div class="card-key">{{ m.key }}</div>
-        <div class="card-value">{{ m.value }}</div>
+        <div class="card-value" v-if="m.value">{{ m.value }}</div>
+        <div class="card-summary" v-else-if="m.summary">{{ m.summary }} <el-tag size="small" type="info">{{$t('memories.summaryTag')}}</el-tag></div>
         <div class="card-footer">
-          <span class="card-meta">{{ m.source }} · {{ formatTime(m.updated_at) }}</span>
+          <span class="card-meta">{{ m.source }} · {{ formatTime(m.updated_at || m.created_at) }}</span>
           <div class="card-actions">
+            <el-button text size="small" type="success" @click="reinforceMemory(m.id)" :title="$t('memories.reinforceTip')">📌</el-button>
             <el-button text size="small" @click="editMemory(m)">{{ $t('common.edit') }}</el-button>
             <el-button text size="small" type="danger" @click="deleteMemory(m.id)">{{ $t('common.delete') }}</el-button>
           </div>
@@ -49,15 +70,18 @@
         <div class="card-top">
           <span class="layer-tag" :class="m.layer">{{ layerLabels[m.layer] || m.layer }}</span>
           <span class="importance" :class="importanceClass(m.importance)">{{ (m.importance * 100).toFixed(0) }}%</span>
+          <el-tag v-if="m.reinforce_count > 0" size="small" type="success" class="reinforce-badge">📌 {{ m.reinforce_count }}</el-tag>
         </div>
         <div class="card-key">{{ m.key }}</div>
         <div class="card-value">{{ truncate(m.value, 200) }}</div>
+        <div class="card-summary-line" v-if="m.summary && m.summary !== m.value">💡 {{ m.summary }}</div>
         <div class="card-tags" v-if="m.tags && m.tags.length">
           <span class="tag" v-for="t in m.tags" :key="t">{{ t }}</span>
         </div>
         <div class="card-footer">
           <span class="card-meta">{{ m.source }} · {{ formatTime(m.updated_at) }}</span>
           <div class="card-actions">
+            <el-button text size="small" type="success" @click="reinforceMemory(m.id)" :title="$t('memories.reinforceTip')">📌</el-button>
             <el-button text size="small" @click="editMemory(m)">{{ $t('common.edit') }}</el-button>
             <el-button text size="small" type="danger" @click="deleteMemory(m.id)">{{ $t('common.delete') }}</el-button>
           </div>
@@ -175,6 +199,8 @@ const route = useRoute()
 const memories = ref<any[]>([])
 const searchResults = ref<any[]>([])
 const searchQuery = ref('')
+const searchMode = ref('keyword')
+const smartLoadResult = ref<any>(null)
 const currentLayer = ref('')
 const currentPage = ref(1)
 const pageSize = 20
@@ -231,9 +257,33 @@ async function loadMemories() {
 }
 
 async function handleSearch() {
-  if (!searchQuery.value) { searchResults.value = []; return }
+  if (!searchQuery.value) { searchResults.value = []; smartLoadResult.value = null; return }
+
+  if (searchMode.value === 'smart') {
+    try {
+      const { data } = await axios.get('/memories/smart-load', {
+        params: { q: searchQuery.value, token_budget: 2000, load_level: 'auto' }
+      })
+      smartLoadResult.value = data
+      searchResults.value = (data.memories || []).map((m: any) => ({
+        ...m,
+        importance: m.importance || 0.5,
+        tags: m.tags || [],
+        updated_at: m.updated_at || m.created_at || new Date().toISOString(),
+      }))
+    } catch {
+      smartLoadResult.value = null
+      const q = searchQuery.value.toLowerCase()
+      searchResults.value = memories.value.filter(m =>
+        m.key?.toLowerCase().includes(q) || m.value?.toLowerCase().includes(q)
+      )
+    }
+    return
+  }
+
+  const endpoint = searchMode.value === 'semantic' ? '/memories/search/semantic' : '/memories/search/keyword'
   try {
-    const { data } = await axios.get('/memories/search/keyword', { params: { q: searchQuery.value, limit: 20 } })
+    const { data } = await axios.get(endpoint, { params: { q: searchQuery.value, limit: 20 } })
     const results = data.items || data || []
     searchResults.value = results.map((m: any) => ({
       ...m,
@@ -241,12 +291,23 @@ async function handleSearch() {
       tags: m.tags || [],
       updated_at: m.updated_at || new Date().toISOString(),
     }))
+    smartLoadResult.value = null
   } catch {
-    // Fallback: client-side filter
     const q = searchQuery.value.toLowerCase()
     searchResults.value = memories.value.filter(m =>
       m.key?.toLowerCase().includes(q) || m.value?.toLowerCase().includes(q)
     )
+  }
+}
+
+async function reinforceMemory(id: number) {
+  try {
+    await axios.post(`/memories/${id}/reinforce`)
+    ElMessage.success(t('memories.reinforced'))
+    await loadMemories()
+    if (searchResults.value.length) handleSearch()
+  } catch {
+    ElMessage.error(t('common.failed'))
   }
 }
 
@@ -380,6 +441,17 @@ async function handleImport(agentName: string) {
 .card-meta { font-size: 11px; color: var(--cm-text-placeholder); }
 .card-actions { display: flex; gap: 4px; }
 .pagination { display: flex; justify-content: center; margin-top: 20px; }
+.smart-load-info { background: var(--cm-bg-secondary, #f5f7fa); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; }
+.smart-load-header { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.smart-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.suggestion-item { background: var(--cm-bg-tertiary, #e4e7ed); border-radius: 4px; padding: 2px 8px; font-size: 12px; color: var(--cm-text-secondary); }
+.load-level-tag { margin-left: 4px; }
+.score-badge { font-size: 11px; color: var(--cm-text-secondary); margin-left: 4px; background: var(--cm-bg-tertiary, #e4e7ed); padding: 1px 6px; border-radius: 4px; }
+.reinforce-badge { margin-left: 4px; }
+.card-summary-line { font-size: 12px; color: var(--cm-text-secondary); margin-top: 4px; }
+.smart-summary { border-left: 3px solid #e6a23c; }
+.smart-full { border-left: 3px solid #67c23a; }
+.card-summary { font-size: 13px; color: var(--cm-text-secondary); }
 .import-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 0; }
 .loading-spin { animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

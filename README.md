@@ -16,12 +16,17 @@ ClawMemory 是一款现代化的 AI 记忆管理工具，支持知识图谱、�
 | 智能日报 | ✓ | ✓ |
 | 本地数据导出/导入 | ✓ | ✓ |
 | 全文搜索 + 语义搜索 | ✓ | ✓ |
-| 记忆衰减算法 (本地) | 基础 | 高级 |
-| 冲突检测 (本地) | 基础 | 高级 |
-| Token 智能路由 (本地) | 基础 | 高级 |
-| AI 提取/摘要 (云端) | - | ✓ |
-| 趋势分析 (云端) | - | ✓ |
-| 报告生成 (云端) | - | ✓ |
+| ChromaDB 向量搜索 | ✓ | ✓ |
+| 智能记忆加载 (Token 预算控制) | ✓ | ✓ |
+| 记忆强化机制 | ✓ | ✓ |
+| OpenClaw 记忆导入 | ✓ | ✓ |
+| 技能系统 | ✓ | ✓ |
+| 记忆衰减算法 | 基础 | 高级 |
+| 冲突检测 | 基础 | 高级 |
+| Token 智能路由 | 基础 | 高级 |
+| AI 提取/摘要 | - | ✓ |
+| 趋势分析 | - | ✓ |
+| 报告生成 | - | ✓ |
 
 ### 🤖 支持的 AI 模型 (Pro 云端功能)
 
@@ -167,6 +172,9 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - `GET /api/v1/memories/:id` - 详情
 - `PUT /api/v1/memories/:id` - 更新
 - `DELETE /api/v1/memories/:id` - 删除
+- `GET /api/v1/memories/smart-load` - 智能加载
+- `POST /api/v1/memories/:id/reinforce` - 强化记忆
+- `POST /api/v1/memories/generate-summaries` - 生成摘要
 
 ### 知识图谱
 - `GET /api/v1/knowledge/entities` - 实体列表
@@ -183,10 +191,13 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 
 ## 📝 更新日志
 
-### v2.0 (2026-04-24)
+### v2.0 (2026-04-29)
 - 🎨 全新现代化 UI (知识图谱/日报/主布局)
 - 🤖 AI 提取/摘要 (支持国内外 7+ 主流模型)
 - 📊 批量路由、趋势分析、报告生成
+- 🧠 智能记忆加载 (Token 预算控制)
+- 📌 记忆强化机制 (防止重要记忆衰减)
+- 🔍 ChromaDB 向量搜索支持
 - 🌍 完善国际化 (中文/英文)
 - 🚀 Go 高性能后端 (全平台编译)
 - ☁️ Pro 云端 API 方案

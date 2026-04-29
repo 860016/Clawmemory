@@ -264,8 +264,8 @@ async function loadReports() {
   loading.value = true
   try {
     const dateStr = currentDate.value.toISOString().split('T')[0]
-    const { data } = await axios.get('/reports', { params: { date: dateStr } })
-    const list = data.items || data || []
+    const { data } = await axios.get(`/reports/${dateStr}`)
+    const list = Array.isArray(data) ? data : (data.items || [data])
     reports.value = list.map(parseReport)
     if (reports.value.length > 0 && !selectedReport.value) {
       selectedReport.value = reports.value[0]
