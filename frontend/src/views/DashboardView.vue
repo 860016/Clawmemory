@@ -433,7 +433,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import axios from '../api/client'
+import axios from '../api/go-client'
 
 const { t } = useI18n()
 const route = useRoute()

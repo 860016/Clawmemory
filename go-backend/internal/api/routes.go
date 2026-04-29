@@ -22,7 +22,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		public.POST("/auth/set-password", handleSetPassword(authService))
 		public.POST("/auth/login", handleLogin(authService))
 		public.POST("/auth/register", handleRegister(authService))
-		public.POST("/auth/reset-password", handleResetPassword(authService))
+		public.POST("/auth/forgot-password", handleForgotPassword(authService))
 		public.GET("/install-status", handleInstallStatus(db))
 		public.GET("/license/info", handleLicenseInfo(licenseManager))
 		public.POST("/license/activate", handleLicenseActivate(licenseManager))
@@ -34,6 +34,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	{
 		authorized.GET("/auth/me", handleGetMe(authService))
 		authorized.POST("/auth/change-password", handleChangePassword(authService))
+		authorized.POST("/auth/reset-password", handleResetPassword(authService))
 
 		authorized.GET("/memories", handleListMemories(db))
 		authorized.POST("/memories", handleCreateMemory(db))
@@ -132,6 +133,9 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 
 		authorized.GET("/backups", handleListBackups)
 		authorized.POST("/backups", handleCreateBackup)
+		authorized.GET("/backups/:filename", handleDownloadBackup(db))
+		authorized.POST("/backups/:filename/restore", handleRestoreBackup(db))
+		authorized.DELETE("/backups/:filename", handleDeleteBackup(db))
 
 		pro := authorized.Group("/pro")
 		{

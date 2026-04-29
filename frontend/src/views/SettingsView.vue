@@ -237,7 +237,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import axios from '../api/client'
+import axios from '../api/go-client'
 import { setLocale, getLocale } from '../i18n'
 
 const { t } = useI18n()
@@ -254,7 +254,7 @@ const newPassword = ref('')
 const settingPassword = ref(false)
 const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
-const appVersion = ref('2.8.2')
+const appVersion = ref('2.9.0')
 
 const decayEnabled = ref(false)
 const decayLoading = ref(false)
@@ -406,7 +406,7 @@ async function handleSetPassword() {
       await axios.post('/auth/set-password', { password: newPassword.value })
     }
     ElMessage.success(t('settings.passwordSet')); showPasswordDialog.value = false; oldPassword.value = ''; newPassword.value = ''; passwordSet.value = true
-  } catch (e: any) { ElMessage.error(e.response?.data?.detail || t('common.failed')) }
+  } catch (e: any) { ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('common.failed')) }
   finally { settingPassword.value = false }
 }
 

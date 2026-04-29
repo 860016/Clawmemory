@@ -1,4 +1,4 @@
-import api from './client'
+import api from './go-client'
 
 export const memoryApi = {
   list: (params?: { layer?: string; page?: number; size?: number }) => api.get('/memories', { params }),

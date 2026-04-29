@@ -361,7 +361,7 @@ import { ref, onMounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import axios from '../api/client'
+import axios from '../api/go-client'
 import proApi from '../api/pro'
 
 const { t } = useI18n()

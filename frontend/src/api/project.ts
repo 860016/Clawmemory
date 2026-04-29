@@ -1,4 +1,4 @@
-import axios from './client'
+import axios from './go-client'
 
 export default {
   list(params?: any) {

@@ -84,7 +84,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { SuccessFilled } from '@element-plus/icons-vue'
-import axios from '../api/client'
+import axios from '../api/go-client'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -163,7 +163,7 @@ async function handleResetPassword() {
   }
   loading.value = true
   try {
-    await axios.post('/auth/reset-password', { new_password: newPassword.value })
+    await axios.post('/auth/forgot-password', { new_password: newPassword.value, confirm: true })
     resetMessage.value = t('login.resetSuccess')
     password.value = newPassword.value
   } catch (e: any) {

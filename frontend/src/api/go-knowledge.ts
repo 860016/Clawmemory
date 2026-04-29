@@ -23,5 +23,6 @@ export const knowledgeApi = {
   aiExtract: (data: any) => api.post('/pro/ai/extract', data),
 
   // 消歧
-  disambiguate: (_name: string) => Promise.resolve({ data: [] }),
+  disambiguate: (name: string) =>
+    api.get('/knowledge/entities', { params: { type: name } }),
 }

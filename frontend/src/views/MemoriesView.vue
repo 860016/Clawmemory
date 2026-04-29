@@ -192,7 +192,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Upload, Loading } from '@element-plus/icons-vue'
-import axios from '../api/client'
+import axios from '../api/go-client'
 
 const { t } = useI18n()
 const route = useRoute()

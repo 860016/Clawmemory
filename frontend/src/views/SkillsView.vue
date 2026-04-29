@@ -92,7 +92,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { MagicStick, Loading } from '@element-plus/icons-vue'
-import axios from '../api/client'
+import axios from '../api/go-client'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()

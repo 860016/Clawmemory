@@ -223,7 +223,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Connection, Edit, Delete, Loading } from '@element-plus/icons-vue'
-import axios from '../api/client'
+import axios from '../api/go-client'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()

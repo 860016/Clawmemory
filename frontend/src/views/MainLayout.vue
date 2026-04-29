@@ -191,7 +191,7 @@ import {
   TrendCharts, Warning, Cpu, FolderOpened, Lock, Coin, Monitor,
   DocumentChecked, Star, Timer, Compass, CircleCheck, SuccessFilled
 } from '@element-plus/icons-vue'
-import axios from '../api/client'
+import axios from '../api/go-client'
 
 const { t } = useI18n()
 const route = useRoute()

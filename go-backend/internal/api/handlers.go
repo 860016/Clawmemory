@@ -63,6 +63,7 @@ func handleSetPassword(authService *services.AuthService) gin.HandlerFunc {
 func handleLogin(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
+			Username string `json:"username"`
 			Password string `json:"password" binding:"required"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -70,7 +71,11 @@ func handleLogin(authService *services.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		token, err := authService.LoginWithPassword(req.Password)
+		if req.Username == "" {
+			req.Username = "admin"
+		}
+
+		token, err := authService.Login(req.Username, req.Password)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"detail": err.Error()})
 			return
@@ -128,6 +133,7 @@ func handleRegister(authService *services.AuthService) gin.HandlerFunc {
 func handleResetPassword(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
+			OldPassword string `json:"old_password"`
 			NewPassword string `json:"new_password"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -136,6 +142,43 @@ func handleResetPassword(authService *services.AuthService) gin.HandlerFunc {
 		}
 		if req.NewPassword == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password is required"})
+			return
+		}
+		if len(req.NewPassword) < 4 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password too short"})
+			return
+		}
+
+		userID := middleware.GetUserID(c)
+		if err := authService.ChangePassword(userID, req.OldPassword, req.NewPassword); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "密码重置成功"})
+	}
+}
+
+func handleForgotPassword(authService *services.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			NewPassword string `json:"new_password"`
+			Confirm     bool   `json:"confirm"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if !req.Confirm {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "confirm is required"})
+			return
+		}
+		if req.NewPassword == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password is required"})
+			return
+		}
+		if len(req.NewPassword) < 4 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password too short"})
 			return
 		}
 
@@ -250,6 +293,13 @@ func handleCreateMemory(db *gorm.DB) gin.HandlerFunc {
 		var req map[string]interface{}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		key, _ := req["key"].(string)
+		value, _ := req["value"].(string)
+		if key == "" || value == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "key and value are required"})
 			return
 		}
 
@@ -925,6 +975,10 @@ func proErrorHandler(c *gin.Context, err error) {
 }
 
 func checkPro(proxy *services.ProProxy, c *gin.Context) bool {
+	if !proxy.IsPro() {
+		c.JSON(http.StatusForbidden, gin.H{"detail": "Pro license required"})
+		return false
+	}
 	return true
 }
 
@@ -2700,7 +2754,8 @@ func tryCreateEntity(db *gorm.DB, userID uint, key, content string, entitiesCrea
 }
 
 func handleListBackups(c *gin.Context) {
-	backupDir := filepath.Join(".", "backups")
+	userID := middleware.GetUserID(c)
+	backupDir := filepath.Join(".", "backups", fmt.Sprintf("%d", userID))
 	if _, err := os.Stat(backupDir); os.IsNotExist(err) {
 		c.JSON(http.StatusOK, gin.H{"backups": []interface{}{}})
 		return
@@ -2729,7 +2784,8 @@ func handleListBackups(c *gin.Context) {
 }
 
 func handleCreateBackup(c *gin.Context) {
-	backupDir := filepath.Join(".", "backups")
+	userID := middleware.GetUserID(c)
+	backupDir := filepath.Join(".", "backups", fmt.Sprintf("%d", userID))
 	os.MkdirAll(backupDir, 0755)
 
 	timestamp := time.Now().Format("20060102_150405")
@@ -2778,6 +2834,76 @@ func handleCreateBackup(c *gin.Context) {
 		"path":     backupPath,
 		"size":     fi.Size(),
 	})
+}
+
+func handleDownloadBackup(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		filename := c.Param("filename")
+		backupPath := filepath.Join(".", "backups", fmt.Sprintf("%d", userID), filename)
+
+		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "backup not found"})
+			return
+		}
+
+		c.FileAttachment(backupPath, filename)
+	}
+}
+
+func handleRestoreBackup(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		filename := c.Param("filename")
+		backupPath := filepath.Join(".", "backups", fmt.Sprintf("%d", userID), filename)
+
+		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "backup not found"})
+			return
+		}
+
+		src, err := os.Open(backupPath)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot read backup file"})
+			return
+		}
+		defer src.Close()
+
+		dbPath := filepath.Join(".", "data", "clawmemory.db")
+		dst, err := os.Create(dbPath)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot write database file"})
+			return
+		}
+		defer dst.Close()
+
+		if _, err := io.Copy(dst, src); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "backup restored successfully", "filename": filename})
+	}
+}
+
+func handleDeleteBackup(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		filename := c.Param("filename")
+		backupPath := filepath.Join(".", "backups", fmt.Sprintf("%d", userID), filename)
+
+		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "backup not found"})
+			return
+		}
+
+		if err := os.Remove(backupPath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot delete backup file"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "backup deleted", "filename": filename})
+	}
 }
 
 func handleDecayStats(db *gorm.DB) gin.HandlerFunc {
@@ -2895,7 +3021,7 @@ func handleExportData(db *gorm.DB) gin.HandlerFunc {
 		exportData["daily_reports"] = reports
 
 		exportData["exported_at"] = time.Now().Format(time.RFC3339)
-		exportData["version"] = "2.8.2"
+		exportData["version"] = "2.9.0"
 
 		c.JSON(http.StatusOK, exportData)
 	}

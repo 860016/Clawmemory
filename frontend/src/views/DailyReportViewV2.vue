@@ -244,7 +244,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import axios from '../api/client'
+import axios from '../api/go-client'
 import {
   ArrowLeft, ArrowRight, MagicStick, Loading,
   Document, Connection, Download, Share,

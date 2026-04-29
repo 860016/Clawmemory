@@ -26,9 +26,17 @@ api.interceptors.response.use(
     } else if (status === 403) {
       // 403 由具体页面处理
     } else {
-      const msg = error.response?.data?.error || error.response?.data?.message || 'Request failed'
-      if (typeof msg === 'string' && !msg.includes('rate limit')) {
-        ElMessage.error(msg)
+      let msg = error.response?.data?.error || error.response?.data?.detail || error.response?.data?.message || 'Request failed'
+      if (typeof msg === 'string') {
+        if (msg.includes('Pro license required') || msg.includes('Pro feature not authorized')) {
+          msg = '此功能需要 Pro 授权'
+        }
+        if (msg.includes('missing token') || msg.includes('invalid token')) {
+          msg = '登录已过期，请重新登录'
+        }
+        if (!msg.includes('rate limit') && !error.config?._silent) {
+          ElMessage.error(msg)
+        }
       }
     }
     return Promise.reject(error)

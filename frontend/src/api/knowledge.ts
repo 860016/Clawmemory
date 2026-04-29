@@ -1,4 +1,4 @@
-import api from './client'
+import api from './go-client'
 
 export const knowledgeApi = {
   listEntities: (params?: { page?: number; size?: number }) => api.get('/knowledge/entities', { params }),

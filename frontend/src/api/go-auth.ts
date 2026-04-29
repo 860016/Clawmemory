@@ -9,6 +9,6 @@ export const authApi = {
   getMe: () => axios.get('/auth/me'),
   resetPassword: (data: { old_password: string; new_password: string }) =>
     axios.post('/auth/reset-password', data),
-  resetPasswordWithToken: (_token: string) =>
-    Promise.resolve({ data: { message: '请使用旧密码重置' } }),
+  changePassword: (data: { old_password: string; new_password: string }) =>
+    axios.post('/auth/change-password', data),
 }
