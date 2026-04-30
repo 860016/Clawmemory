@@ -57,10 +57,6 @@
           </button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="settings">
-                <el-icon><Setting /></el-icon>
-                {{ $t('nav.settings') }}
-              </el-dropdown-item>
               <el-dropdown-item command="logout" divided>
                 <el-icon><SwitchButton /></el-icon>
                 {{ $t('common.logout') }}
@@ -254,6 +250,7 @@ const navItems = [
   { path: '/knowledge', label: 'nav.knowledge', icon: Connection },
   { path: '/projects', label: 'nav.projects', icon: Document },
   { path: '/pro', label: 'nav.pro', icon: Promotion },
+  { path: '/settings', label: 'nav.settings', icon: Setting },
 ]
 
 function isNavActive(path: string) {
@@ -268,7 +265,6 @@ function isSubNavActive(item: { path: string }) {
   return route.path === item.path && !Object.keys(route.query).length
 }
 
-// Sub-navigation
 const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: string; label: string; icon?: any }> }>> = {
   '/': [
     { items: [
@@ -298,7 +294,8 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
     { items: [
       { path: '/pro?section=decay', label: 'pro.decay', icon: TrendCharts },
       { path: '/pro?section=conflicts', label: 'pro.conflicts', icon: Warning },
-      { path: '/pro?section=router', label: 'pro.tokenRouter', icon: Cpu },
+      { path: '/pro?section=router', label: 'pro.smartRouter', icon: Cpu },
+      { path: '/pro?section=tokenStats', label: 'pro.tokenStats', icon: Coin },
       { path: '/pro?section=extract', label: 'pro.aiExtract', icon: MagicStick },
       { path: '/pro?section=graph', label: 'pro.autoGraph', icon: Connection },
     ]}
@@ -358,8 +355,6 @@ function handleUserCommand(command: string) {
   if (command === 'logout') {
     localStorage.removeItem('token')
     router.push('/login')
-  } else if (command === 'settings') {
-    router.push('/settings')
   }
 }
 </script>
@@ -574,7 +569,7 @@ function handleUserCommand(command: string) {
 
 /* ===== Sidebar ===== */
 .sidebar-v2 {
-  width: 240px;
+  width: 180px;
   flex-shrink: 0;
   background: var(--cm-bg-primary);
   border-right: 1px solid var(--cm-border);
@@ -585,7 +580,7 @@ function handleUserCommand(command: string) {
 }
 
 .sidebar-v2.collapsed {
-  width: 64px;
+  width: 56px;
 }
 
 .sidebar-inner {

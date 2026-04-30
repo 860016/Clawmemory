@@ -1877,28 +1877,7 @@ func getOpenClawSearchDirs() []string {
 
 	homeDir, _ := os.UserHomeDir()
 	if homeDir != "" {
-		addDir(filepath.Join(homeDir, ".openclaw"))
-		addDir(filepath.Join(homeDir, ".clawmemory"))
-		addDir(filepath.Join(homeDir, ".trae-cn"))
-		addDir(filepath.Join(homeDir, ".trae"))
-	}
-
-	cfg := config.Load()
-	if cfg.DataDir != "" {
-		addDir(cfg.DataDir)
-	}
-
-	exe, _ := os.Executable()
-	if exe != "" {
-		addDir(filepath.Join(filepath.Dir(exe), "openclaw"))
-		addDir(filepath.Join(filepath.Dir(exe), "data"))
-	}
-
-	wd, _ := os.Getwd()
-	if wd != "" {
-		addDir(filepath.Join(wd, ".openclaw"))
-		addDir(filepath.Join(wd, ".clawmemory"))
-		addDir(filepath.Join(wd, "data"))
+		addDir(filepath.Join(homeDir, ".openclaw", "workspace"))
 	}
 
 	return dirs
@@ -1917,114 +1896,15 @@ func extractMemoriesFromDir(dir string) ([]memoryPreview, map[string]int) {
 	var previews []memoryPreview
 	agentCountMap := make(map[string]int)
 
-	sessionsDir := filepath.Join(dir, "agents")
-	if info, err := os.Stat(sessionsDir); err == nil && info.IsDir() {
-		previews, agentCountMap = extractSessionMemories(sessionsDir, previews, agentCountMap)
-	}
-
-	memoryDir := filepath.Join(dir, "workspace", "memory")
-	if info, err := os.Stat(memoryDir); err == nil && info.IsDir() {
-		previews, agentCountMap = extractWorkspaceMemory(memoryDir, dir, previews, agentCountMap)
-	}
-
-	memFile := filepath.Join(dir, "workspace", "MEMORY.md")
+	memFile := filepath.Join(dir, "MEMORY.md")
 	if data, err := os.ReadFile(memFile); err == nil && len(data) > 0 {
 		previews, agentCountMap = parseMarkdownMemory(string(data), memFile, "workspace", previews, agentCountMap)
 	}
 
-	filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			name := d.Name()
-			if name == "node_modules" || name == ".git" || name == "vendor" || name == "__pycache__" || name == ".cache" || name == "agents" || name == "dist" || name == "logs" || name == "canvas" || name == "completions" || name == "identity" || name == "devices" || name == "cron" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		ext := strings.ToLower(filepath.Ext(path))
-		if ext != ".json" && ext != ".jsonl" && ext != ".md" && ext != ".txt" {
-			return nil
-		}
-
-		relPath, _ := filepath.Rel(dir, path)
-		if strings.Contains(relPath, string(filepath.Separator)+"agents") ||
-			strings.Contains(relPath, string(filepath.Separator)+"workspace"+string(filepath.Separator)+"memory") ||
-			strings.HasSuffix(relPath, filepath.FromSlash("/workspace/MEMORY.md")) {
-			return nil
-		}
-
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		content := string(data)
-		parts := strings.Split(relPath, string(filepath.Separator))
-		dirAgent := "default"
-		if len(parts) > 1 {
-			dirAgent = parts[0]
-		}
-
-		if ext == ".jsonl" {
-			pvs, cnt := parseJSONLSession(content, path, dirAgent)
-			previews = append(previews, pvs...)
-			agentCountMap[dirAgent] += cnt
-		} else if ext == ".json" {
-			var memories []map[string]interface{}
-			if json.Unmarshal(data, &memories) == nil {
-				for _, m := range memories {
-					key, _ := m["key"].(string)
-					contentStr, _ := m["content"].(string)
-					if key == "" {
-						if name, ok := m["name"].(string); ok { key = name } else if title, ok := m["title"].(string); ok { key = title }
-					}
-					if contentStr == "" {
-						contentStr, _ = m["value"].(string)
-						if contentStr == "" { contentStr, _ = m["text"].(string); if contentStr == "" { contentStr, _ = m["description"].(string) } }
-					}
-					if key == "" && contentStr == "" { continue }
-					if key == "" { key = contentStr; if len(key) > 50 { key = key[:50] } }
-					agent := dirAgent
-					if a, ok := m["agent_name"].(string); ok && a != "" { agent = a }
-					layer := "knowledge"
-					if l, ok := m["layer"].(string); ok && l != "" { layer = l }
-					source := "openclaw"
-					if s, ok := m["source"].(string); ok && s != "" { source = s }
-					preview := contentStr
-					if len(preview) > 100 { preview = preview[:100] + "..." }
-					previews = append(previews, memoryPreview{Key: key, Content: preview, Layer: layer, Source: source, FilePath: path, AgentName: agent})
-					agentCountMap[agent]++
-				}
-			} else {
-				var single map[string]interface{}
-				if json.Unmarshal(data, &single) == nil {
-					key, _ := single["key"].(string)
-					contentStr, _ := single["content"].(string)
-					if key == "" { key, _ = single["name"].(string) }
-					if contentStr == "" { contentStr, _ = single["value"].(string); if contentStr == "" { contentStr, _ = single["text"].(string) } }
-					if key != "" || contentStr != "" {
-						if key == "" { key = "json_item" }
-						preview := contentStr; if len(preview) > 100 { preview = preview[:100] + "..." }
-						previews = append(previews, memoryPreview{Key: key, Content: preview, Layer: "knowledge", Source: "openclaw", FilePath: path, AgentName: dirAgent})
-						agentCountMap[dirAgent]++
-					}
-				}
-			}
-		} else if ext == ".md" {
-			previews, agentCountMap = parseMarkdownMemory(content, path, dirAgent, previews, agentCountMap)
-		} else if ext == ".txt" {
-			txtContent := strings.TrimSpace(content)
-			if txtContent != "" {
-				key := filepath.Base(path)
-				preview := txtContent; if len(preview) > 100 { preview = preview[:100] + "..." }
-				previews = append(previews, memoryPreview{Key: key, Content: preview, Layer: "knowledge", Source: "text", FilePath: path, AgentName: dirAgent})
-				agentCountMap[dirAgent]++
-			}
-		}
-		return nil
-	})
+	memoryDir := filepath.Join(dir, "memory")
+	if info, err := os.Stat(memoryDir); err == nil && info.IsDir() {
+		previews, agentCountMap = extractWorkspaceMemory(memoryDir, dir, previews, agentCountMap)
+	}
 
 	return previews, agentCountMap
 }
@@ -2415,29 +2295,7 @@ func handleAutoImportMemories(db *gorm.DB) gin.HandlerFunc {
 		homeDir, _ := os.UserHomeDir()
 		searchDirs := []string{}
 		if homeDir != "" {
-			searchDirs = append(searchDirs, filepath.Join(homeDir, ".openclaw"))
-			searchDirs = append(searchDirs, filepath.Join(homeDir, ".clawmemory"))
-			searchDirs = append(searchDirs, filepath.Join(homeDir, ".trae-cn"))
-			searchDirs = append(searchDirs, filepath.Join(homeDir, ".trae"))
-		}
-
-		cfg := config.Load()
-		if cfg.DataDir != "" {
-			searchDirs = append(searchDirs, cfg.DataDir)
-		}
-
-		wd, _ := os.Getwd()
-		if wd != "" {
-			searchDirs = append(searchDirs, filepath.Join(wd, ".openclaw"))
-			searchDirs = append(searchDirs, filepath.Join(wd, ".clawmemory"))
-			searchDirs = append(searchDirs, filepath.Join(wd, "data"))
-		}
-
-		exe, _ := os.Executable()
-		if exe != "" {
-			exeDir := filepath.Dir(exe)
-			searchDirs = append(searchDirs, exeDir)
-			searchDirs = append(searchDirs, filepath.Join(exeDir, "data"))
+			searchDirs = append(searchDirs, filepath.Join(homeDir, ".openclaw", "workspace"))
 		}
 
 		var imported, skipped, entitiesCreated int
@@ -2451,41 +2309,36 @@ func handleAutoImportMemories(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		for _, dir := range searchDirs {
-			filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-				if err != nil {
-					return nil
-				}
-				if d.IsDir() {
-					name := d.Name()
-					if name == "node_modules" || name == ".git" || name == "vendor" || name == "__pycache__" || name == ".cache" {
-						return filepath.SkipDir
+			memFile := filepath.Join(dir, "MEMORY.md")
+			if data, err := os.ReadFile(memFile); err == nil && len(data) > 0 {
+				foundFiles = append(foundFiles, memFile)
+				importFromMarkdown(db, userID, memFile, string(data), seenKeys, &imported, &skipped, &entitiesCreated)
+			}
+
+			memoryDir := filepath.Join(dir, "memory")
+			if files, err := os.ReadDir(memoryDir); err == nil {
+				for _, f := range files {
+					if f.IsDir() {
+						continue
 					}
-					return nil
+					ext := strings.ToLower(filepath.Ext(f.Name()))
+					if ext != ".md" && ext != ".txt" {
+						continue
+					}
+					path := filepath.Join(memoryDir, f.Name())
+					data, err := os.ReadFile(path)
+					if err != nil || len(data) == 0 {
+						continue
+					}
+					foundFiles = append(foundFiles, path)
+					content := string(data)
+					if ext == ".md" {
+						importFromMarkdown(db, userID, path, content, seenKeys, &imported, &skipped, &entitiesCreated)
+					} else if ext == ".txt" {
+						importFromText(db, userID, path, content, seenKeys, &imported, &skipped, &entitiesCreated)
+					}
 				}
-
-				ext := strings.ToLower(filepath.Ext(path))
-				if ext != ".json" && ext != ".md" && ext != ".txt" {
-					return nil
-				}
-
-				foundFiles = append(foundFiles, path)
-
-				data, err := os.ReadFile(path)
-				if err != nil {
-					return nil
-				}
-				content := string(data)
-
-				if ext == ".json" {
-					importFromJSON(db, userID, content, seenKeys, &imported, &skipped, &entitiesCreated)
-				} else if ext == ".md" {
-					importFromMarkdown(db, userID, path, content, seenKeys, &imported, &skipped, &entitiesCreated)
-				} else if ext == ".txt" {
-					importFromText(db, userID, path, content, seenKeys, &imported, &skipped, &entitiesCreated)
-				}
-
-				return nil
-			})
+			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{
@@ -3091,7 +2944,7 @@ func handleExportData(db *gorm.DB) gin.HandlerFunc {
 		exportData["daily_reports"] = reports
 
 		exportData["exported_at"] = time.Now().Format(time.RFC3339)
-		exportData["version"] = "2.9.1"
+		exportData["version"] = "2.10.0"
 
 		c.JSON(http.StatusOK, exportData)
 	}

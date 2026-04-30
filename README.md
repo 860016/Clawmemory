@@ -337,20 +337,46 @@ ClawMemory/                      # 安装根目录
 
 ## 🤖 OpenClaw 集成说明
 
-ClawMemory 可以作为 OpenClaw 的主要记忆管理工具。安装完成后，需要将其添加到 OpenClaw 的 AGENTS.md 配置中。
+ClawMemory 可以作为 OpenClaw 的主要记忆管理工具，通过 API 联动实现对话自动记忆。
 
-### 安装目录
+### ⚠️ 安装目录要求
 
-ClawMemory 默认安装目录：
+**必须安装在持久化目录中，禁止安装在临时目录（如 `/tmp`）！**
 
-| 平台 | 默认目录 |
-|------|----------|
-| **Windows** | `C:\Users\<用户名>\ClawMemory\` 或自定义路径 |
-| **Linux/macOS** | `~/clawmemory/` 或 `/opt/clawmemory/` |
+| 平台 | 推荐安装目录 | ❌ 禁止目录 |
+|------|-------------|------------|
+| **Windows** | `C:\Users\<用户名>\ClawMemory\` | `%TEMP%%`、`C:\Windows\Temp\` |
+| **Linux/macOS** | `~/clawmemory/` 或 `/opt/clawmemory/` | `/tmp/`、`/var/tmp/` |
 
-### 配置 OpenClaw AGENTS.md
+> 💡 **原因**: 临时目录会在系统重启或清理时被删除，导致数据丢失。ClawMemory 的数据库、配置、备份都存储在安装目录下。
 
-安装 ClawMemory 后，需要在 OpenClaw 的 `AGENTS.md` 中添加配置：
+### 第一步：安装并启动 ClawMemory
+
+```bash
+# 1. 克隆到持久化目录
+git clone https://github.com/860016/Clawmemory.git ~/clawmemory
+cd ~/clawmemory
+
+# 2. 一键安装
+bash install.sh   # Linux/macOS
+# 或
+powershell -ExecutionPolicy Bypass -File install.ps1  # Windows
+
+# 3. 启动服务
+./start.sh   # Linux/macOS
+# 或
+start.bat    # Windows
+```
+
+### 第二步：注册管理员账号
+
+1. 打开浏览器访问 `http://localhost:8765`
+2. 首次访问需注册管理员账号
+3. 登录后即可使用 ClawMemory
+
+### 第三步：配置 OpenClaw 连接 ClawMemory
+
+安装 ClawMemory 后，需要在 OpenClaw 的 `AGENTS.md` 中添加配置，让 OpenClaw 自动将对话记忆存入 ClawMemory。
 
 **OpenClaw AGENTS.md 位置**：
 - Windows: `C:\Users\<用户名>\.openclaw\AGENTS.md`
@@ -365,10 +391,43 @@ ClawMemory 默认安装目录：
 - **地址**: http://localhost:8765
 - **功能**: 记忆管理、知识图谱、智能日报、向量搜索
 - **API 端点**: 
+  - 创建记忆: POST /api/v1/memories
   - 记忆列表: GET /api/v1/memories
   - 智能加载: GET /api/v1/memories/smart-load
   - 知识图谱: GET /api/v1/knowledge/graph
 ```
+
+配置完成后，OpenClaw 会通过 API 自动将对话记忆存入 ClawMemory。
+
+### 第四步：导入 OpenClaw 已有记忆
+
+如果你之前使用 OpenClaw 的本地记忆，可以在 ClawMemory 中一键导入。
+
+**扫描范围（仅此目录）**：
+
+| 平台 | 扫描目录 |
+|------|----------|
+| **Windows** | `C:\Users\<用户名>\.openclaw\workspace\` |
+| **Linux/macOS** | `~/.openclaw/workspace/` |
+
+> ⚠️ **注意**: 扫描功能**只扫描** `~/.openclaw/workspace/` 目录，不会扫描其他位置。
+
+该目录下的文件结构：
+
+```
+~/.openclaw/workspace/
+├── MEMORY.md          # 长期记忆（会被导入）
+└── memory/            # 日常记忆文件目录（会被导入）
+```
+
+**导入方式**：
+1. 登录 ClawMemory 网页
+2. 进入设置页面
+3. 点击「扫描 / 导入 OpenClaw 记忆」
+4. 系统会自动扫描 `~/.openclaw/workspace/` 目录下的 `MEMORY.md` 和 `memory/` 文件
+5. 确认扫描结果中的路径指向 `~/.openclaw/workspace/` 后完成导入
+
+> 💡 **提示**: 如果扫描结果为空或路径不对，请确认 `~/.openclaw/workspace/` 目录下存在 `MEMORY.md` 或 `memory/` 文件。
 
 ### 局域网访问
 
@@ -384,6 +443,7 @@ ClawMemory 默认监听 `0.0.0.0`，支持局域网访问：
 | 目录 | 说明 |
 |------|------|
 | `~/.openclaw/` | OpenClaw 默认数据目录 |
+| `~/.openclaw/workspace/` | OpenClaw 记忆文件（MEMORY.md + memory/） |
 | `./data/` | ClawMemory 安装目录下的数据目录 |
 
 ClawMemory 会自动扫描以下目录中的技能：

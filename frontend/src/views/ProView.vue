@@ -1,20 +1,35 @@
 <template>
   <div class="pro-page">
-    <div class="page-header">
-      <h1>🚀 {{ $t('pro.title') }}</h1>
-      <span class="pro-badge" v-if="isPro">PRO</span>
-      <el-button v-else type="primary" size="small" @click="$router.push('/settings')">{{ $t('pro.upgrade') }}</el-button>
+    <div class="page-hero">
+      <div class="hero-content">
+        <h1>🚀 {{ $t('pro.title') }}</h1>
+        <span class="pro-badge" v-if="isPro">PRO</span>
+      </div>
     </div>
 
     <div class="pro-grid" v-if="isPro">
       <div class="mode-banner">
         <span>⚡ {{ $t('pro.localProMode') }}</span>
       </div>
+
       <!-- Memory Decay -->
       <div class="pro-card" :class="{ 'section-highlight': activeSection === 'decay' }" id="pro-decay">
         <div class="card-header">
           <span class="card-icon">📉</span>
           <span class="card-title">{{ $t('pro.decay') }}</span>
+          <div class="card-help" @mouseenter="showHelp.decay = true" @mouseleave="showHelp.decay = false">
+            <span class="help-icon">ⓘ</span>
+            <div class="help-popup" v-if="showHelp.decay">
+              <div class="help-title">{{ $t('pro.decay') }}</div>
+              <div class="help-text">{{ $t('pro.decayHelp') }}</div>
+              <div class="help-stages">
+                <div class="help-stage"><span class="stage-dot green"></span>{{ $t('pro.decayStage1') }}</div>
+                <div class="help-stage"><span class="stage-dot yellow"></span>{{ $t('pro.decayStage2') }}</div>
+                <div class="help-stage"><span class="stage-dot orange"></span>{{ $t('pro.decayStage3') }}</div>
+                <div class="help-stage"><span class="stage-dot red"></span>{{ $t('pro.decayStage4') }}</div>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="card-body">
           <div class="stats-row" v-if="decayStats">
@@ -32,10 +47,13 @@
             </div>
           </div>
           <div class="card-actions">
-            <el-button size="small" @click="loadDecayStats" :loading="loading.decay">{{ $t('pro.refreshStats') }}</el-button>
-            <el-button size="small" type="primary" @click="applyDecay" :loading="loading.applyDecay">{{ $t('pro.applyDecay') }}</el-button>
+            <button class="btn-secondary" @click="loadDecayStats" :disabled="loading.decay">
+              {{ loading.decay ? '...' : $t('pro.refreshStats') }}
+            </button>
+            <button class="btn-primary" @click="applyDecay" :disabled="loading.applyDecay">
+              {{ loading.applyDecay ? '...' : $t('pro.applyDecay') }}
+            </button>
           </div>
-          <!-- Prune suggestions -->
           <div v-if="pruneSuggestions.length" class="prune-section">
             <div class="sub-title">{{ $t('pro.pruneSuggestions') }} ({{ pruneSuggestions.length }})</div>
             <div class="prune-list">
@@ -50,10 +68,17 @@
       </div>
 
       <!-- Conflict Scan -->
-      <div class="pro-card">
+      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'conflicts' }" id="pro-conflicts">
         <div class="card-header">
           <span class="card-icon">⚠️</span>
           <span class="card-title">{{ $t('pro.conflicts') }}</span>
+          <div class="card-help" @mouseenter="showHelp.conflicts = true" @mouseleave="showHelp.conflicts = false">
+            <span class="help-icon">ⓘ</span>
+            <div class="help-popup" v-if="showHelp.conflicts">
+              <div class="help-title">{{ $t('pro.conflicts') }}</div>
+              <div class="help-text">{{ $t('pro.conflictsHelp') }}</div>
+            </div>
+          </div>
         </div>
         <div class="card-body">
           <div class="stats-row" v-if="conflictSummary">
@@ -71,7 +96,9 @@
             </div>
           </div>
           <div class="card-actions">
-            <el-button size="small" @click="scanConflicts" :loading="loading.conflicts">{{ $t('pro.scanConflicts') }}</el-button>
+            <button class="btn-secondary" @click="scanConflicts" :disabled="loading.conflicts">
+              {{ loading.conflicts ? '...' : $t('pro.scanConflicts') }}
+            </button>
           </div>
           <div v-if="conflicts.length" class="conflict-list">
             <div v-for="(c, i) in conflicts.slice(0, 10)" :key="i" class="conflict-item">
@@ -85,20 +112,55 @@
                 <el-tag size="small" :type="c.severity === 'high' ? 'danger' : c.severity === 'medium' ? 'warning' : 'info'">
                   {{ c.severity }}
                 </el-tag>
-                <el-button v-if="c.severity === 'low'" size="small" type="primary" text @click="resolveConflict(i, 'merge')">
+                <button v-if="c.severity === 'low'" class="btn-primary btn-sm" @click="resolveConflict(i, 'merge')">
                   {{ $t('pro.merge') }}
-                </el-button>
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Token Stats & Router -->
-      <div class="pro-card">
+      <!-- Smart Router -->
+      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'router' }" id="pro-router">
         <div class="card-header">
           <span class="card-icon">🧠</span>
-          <span class="card-title">{{ $t('pro.tokenRouter') }}</span>
+          <span class="card-title">{{ $t('pro.smartRouter') }}</span>
+          <div class="card-help" @mouseenter="showHelp.router = true" @mouseleave="showHelp.router = false">
+            <span class="help-icon">ⓘ</span>
+            <div class="help-popup" v-if="showHelp.router">
+              <div class="help-title">{{ $t('pro.smartRouter') }}</div>
+              <div class="help-text">{{ $t('pro.smartRouterHelp') }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p class="card-desc">{{ $t('pro.smartRouterDesc') }}</p>
+          <div class="router-test">
+            <el-input v-model="testMessage" :placeholder="$t('pro.testMessage')" size="small" />
+            <button class="btn-primary" @click="testRoute" :disabled="loading.route">
+              {{ loading.route ? '...' : $t('pro.testRoute') }}
+            </button>
+          </div>
+          <div v-if="routeResult" class="route-result">
+            <div class="route-model">{{ $t('pro.selectedModel') }}: <strong>{{ routeResult.selected_model }}</strong></div>
+            <div class="route-complexity">{{ $t('pro.complexity') }}: {{ routeResult.complexity }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Token Stats -->
+      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'tokenStats' }" id="pro-tokenStats">
+        <div class="card-header">
+          <span class="card-icon">📊</span>
+          <span class="card-title">{{ $t('pro.tokenStats') }}</span>
+          <div class="card-help" @mouseenter="showHelp.tokenStats = true" @mouseleave="showHelp.tokenStats = false">
+            <span class="help-icon">ⓘ</span>
+            <div class="help-popup" v-if="showHelp.tokenStats">
+              <div class="help-title">{{ $t('pro.tokenStats') }}</div>
+              <div class="help-text">{{ $t('pro.tokenStatsHelp') }}</div>
+            </div>
+          </div>
         </div>
         <div class="card-body">
           <div class="stats-row" v-if="tokenStatData">
@@ -112,29 +174,32 @@
             </div>
           </div>
           <div class="card-actions">
-            <el-button size="small" @click="loadTokenStats" :loading="loading.tokenStats">{{ $t('pro.refreshTokens') }}</el-button>
-          </div>
-          <div class="router-test">
-            <el-input v-model="testMessage" :placeholder="$t('pro.testMessage')" size="small" />
-            <el-button size="small" type="primary" @click="testRoute" :loading="loading.route">{{ $t('pro.testRoute') }}</el-button>
-          </div>
-          <div v-if="routeResult" class="route-result">
-            <div class="route-model">{{ $t('pro.selectedModel') }}: <strong>{{ routeResult.selected_model }}</strong></div>
-            <div class="route-complexity">{{ $t('pro.complexity') }}: {{ routeResult.complexity }}</div>
+            <button class="btn-secondary" @click="loadTokenStats" :disabled="loading.tokenStats">
+              {{ loading.tokenStats ? '...' : $t('pro.refreshTokens') }}
+            </button>
           </div>
         </div>
       </div>
 
       <!-- AI Extract -->
-      <div class="pro-card">
+      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'extract' }" id="pro-extract">
         <div class="card-header">
           <span class="card-icon">🔍</span>
           <span class="card-title">{{ $t('pro.aiExtract') }}</span>
+          <div class="card-help" @mouseenter="showHelp.extract = true" @mouseleave="showHelp.extract = false">
+            <span class="help-icon">ⓘ</span>
+            <div class="help-popup" v-if="showHelp.extract">
+              <div class="help-title">{{ $t('pro.aiExtract') }}</div>
+              <div class="help-text">{{ $t('pro.aiExtractHelp') }}</div>
+            </div>
+          </div>
         </div>
         <div class="card-body">
           <p class="card-desc">{{ $t('pro.aiExtractDesc') }}</p>
           <div class="card-actions">
-            <el-button size="small" type="primary" @click="runAiExtract" :loading="loading.extract">{{ $t('pro.runExtract') }}</el-button>
+            <button class="btn-primary" @click="runAiExtract" :disabled="loading.extract">
+              {{ loading.extract ? '...' : $t('pro.runExtract') }}
+            </button>
           </div>
           <div v-if="extractResult" class="extract-result">
             <div class="stat-item">
@@ -154,12 +219,23 @@
         <div class="card-header">
           <span class="card-icon">🕸️</span>
           <span class="card-title">{{ $t('pro.autoGraph') }}</span>
+          <div class="card-help" @mouseenter="showHelp.graph = true" @mouseleave="showHelp.graph = false">
+            <span class="help-icon">ⓘ</span>
+            <div class="help-popup" v-if="showHelp.graph">
+              <div class="help-title">{{ $t('pro.autoGraph') }}</div>
+              <div class="help-text">{{ $t('pro.autoGraphHelp') }}</div>
+            </div>
+          </div>
         </div>
         <div class="card-body">
           <p class="card-desc">{{ $t('pro.autoGraphDesc') }}</p>
           <div class="card-actions">
-            <el-button size="small" @click="runAutoGraph(false)" :loading="loading.graph">{{ $t('pro.generateGraph') }}</el-button>
-            <el-button size="small" type="danger" @click="runAutoGraph(true)" :loading="loading.graph">{{ $t('pro.regenerateGraph') }}</el-button>
+            <button class="btn-secondary" @click="runAutoGraph(false)" :disabled="loading.graph">
+              {{ loading.graph ? '...' : $t('pro.generateGraph') }}
+            </button>
+            <button class="btn-danger" @click="runAutoGraph(true)" :disabled="loading.graph">
+              {{ loading.graph ? '...' : $t('pro.regenerateGraph') }}
+            </button>
           </div>
           <div v-if="graphResult" class="graph-result">
             <div class="stat-item">
@@ -179,6 +255,13 @@
         <div class="card-header">
           <span class="card-icon">💾</span>
           <span class="card-title">{{ $t('pro.autoBackup') }}</span>
+          <div class="card-help" @mouseenter="showHelp.backup = true" @mouseleave="showHelp.backup = false">
+            <span class="help-icon">ⓘ</span>
+            <div class="help-popup" v-if="showHelp.backup">
+              <div class="help-title">{{ $t('pro.autoBackup') }}</div>
+              <div class="help-text">{{ $t('pro.autoBackupHelp') }}</div>
+            </div>
+          </div>
         </div>
         <div class="card-body">
           <div class="backup-schedule">
@@ -204,6 +287,13 @@
         <div class="card-header">
           <span class="card-icon">🗜️</span>
           <span class="card-title">{{ $t('pro.compress') }}</span>
+          <div class="card-help" @mouseenter="showHelp.compress = true" @mouseleave="showHelp.compress = false">
+            <span class="help-icon">ⓘ</span>
+            <div class="help-popup" v-if="showHelp.compress">
+              <div class="help-title">{{ $t('pro.compress') }}</div>
+              <div class="help-text">{{ $t('pro.compressHelp') }}</div>
+            </div>
+          </div>
         </div>
         <div class="card-body">
           <p class="card-desc">{{ $t('pro.compressDesc') }}</p>
@@ -225,8 +315,12 @@
             </div>
           </div>
           <div class="card-actions">
-            <el-button size="small" @click="previewCompress" :loading="loading.compressPreview">{{ $t('pro.previewCompress') }}</el-button>
-            <el-button size="small" type="primary" @click="applyCompress" :loading="loading.compressApply">{{ $t('pro.applyCompress') }}</el-button>
+            <button class="btn-secondary" @click="previewCompress" :disabled="loading.compressPreview">
+              {{ loading.compressPreview ? '...' : $t('pro.previewCompress') }}
+            </button>
+            <button class="btn-primary" @click="applyCompress" :disabled="loading.compressApply">
+              {{ loading.compressApply ? '...' : $t('pro.applyCompress') }}
+            </button>
           </div>
           <div v-if="compressPreviewData" class="compress-result">
             <div class="stats-row">
@@ -272,14 +366,29 @@
         <div class="card-header">
           <span class="card-icon">🧬</span>
           <span class="card-title">{{ $t('pro.evolution') }}</span>
+          <div class="card-help" @mouseenter="showHelp.evolution = true" @mouseleave="showHelp.evolution = false">
+            <span class="help-icon">ⓘ</span>
+            <div class="help-popup" v-if="showHelp.evolution">
+              <div class="help-title">{{ $t('pro.evolution') }}</div>
+              <div class="help-text">{{ $t('pro.evolutionHelp') }}</div>
+            </div>
+          </div>
         </div>
         <div class="card-body">
           <p class="card-desc">{{ $t('pro.evolutionDesc') }}</p>
           <div class="evolution-actions">
-            <el-button size="small" @click="loadEvolutionInsights" :loading="loading.insights">{{ $t('pro.evolutionInsights') }}</el-button>
-            <el-button size="small" @click="runDiscoverRelations" :loading="loading.discover">{{ $t('pro.discoverRelations') }}</el-button>
-            <el-button size="small" @click="runInferChains" :loading="loading.infer">{{ $t('pro.inferChains') }}</el-button>
-            <el-button size="small" @click="runImportanceAdjust" :loading="loading.importance">{{ $t('pro.importanceAdjust') }}</el-button>
+            <button class="btn-secondary" @click="loadEvolutionInsights" :disabled="loading.insights">
+              {{ loading.insights ? '...' : $t('pro.evolutionInsights') }}
+            </button>
+            <button class="btn-secondary" @click="runDiscoverRelations" :disabled="loading.discover">
+              {{ loading.discover ? '...' : $t('pro.discoverRelations') }}
+            </button>
+            <button class="btn-secondary" @click="runInferChains" :disabled="loading.infer">
+              {{ loading.infer ? '...' : $t('pro.inferChains') }}
+            </button>
+            <button class="btn-secondary" @click="runImportanceAdjust" :disabled="loading.importance">
+              {{ loading.importance ? '...' : $t('pro.importanceAdjust') }}
+            </button>
           </div>
           <div v-if="evolutionInsights" class="evolution-insights">
             <div class="stats-row">
@@ -335,7 +444,9 @@
             </div>
             <div class="router-test">
               <el-input v-model="prefetchContext" :placeholder="$t('pro.prefetchPlaceholder')" size="small" />
-              <el-button size="small" type="primary" @click="runPrefetch" :loading="loading.prefetch">{{ $t('pro.prefetch') }}</el-button>
+              <button class="btn-primary" @click="runPrefetch" :disabled="loading.prefetch">
+                {{ loading.prefetch ? '...' : $t('pro.prefetch') }}
+              </button>
             </div>
             <div v-if="prefetchResult" class="prefetch-result">
               <span class="prefetch-count">{{ $t('pro.prefetchMatched', { count: prefetchResult.matched_count }) }}</span>
@@ -346,18 +457,32 @@
 
     </div>
 
-    <!-- Not Pro -->
-    <div v-else class="pro-upsell">
-      <div class="upsell-icon">🚀</div>
-      <h2>{{ $t('pro.unlockPro') }}</h2>
-      <p>{{ $t('pro.upsellDesc') }}</p>
-      <el-button type="primary" @click="$router.push('/settings')">{{ $t('pro.viewPricing') }}</el-button>
+    <!-- Not Pro - blurred overlay -->
+    <div v-else class="pro-locked" @click="$router.push('/settings')">
+      <div class="locked-content">
+        <div class="locked-cards">
+          <div class="locked-card" v-for="i in 6" :key="i">
+            <div class="locked-card-header"></div>
+            <div class="locked-card-body">
+              <div class="locked-line w80"></div>
+              <div class="locked-line w60"></div>
+              <div class="locked-line w40"></div>
+            </div>
+          </div>
+        </div>
+        <div class="locked-overlay">
+          <div class="locked-icon">🔒</div>
+          <h2>{{ $t('pro.unlockPro') }}</h2>
+          <p>{{ $t('pro.upsellDesc') }}</p>
+          <button class="btn-primary btn-lg" @click.stop="$router.push('/settings')">{{ $t('pro.viewPricing') }}</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, reactive, onMounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -370,6 +495,10 @@ const route = useRoute()
 const isPro = ref(false)
 const loading = ref<Record<string, boolean>>({})
 const activeSection = ref((route.query.section as string) || '')
+const showHelp = reactive<Record<string, boolean>>({
+  decay: false, conflicts: false, router: false, tokenStats: false,
+  extract: false, graph: false, backup: false, compress: false, evolution: false,
+})
 
 const decayStats = ref<any>(null)
 const pruneSuggestions = ref<any[]>([])
@@ -398,10 +527,17 @@ const prefetchContext = ref('')
 const prefetchResult = ref<any>(null)
 
 onMounted(async () => {
-  isPro.value = true
-  loadDecayStats()
-  loadTokenStats()
-  loadBackupSchedule()
+  try {
+    const { data } = await axios.get('/license/info')
+    isPro.value = data.tier === 'pro' || data.active === true
+  } catch {
+    isPro.value = false
+  }
+  if (isPro.value) {
+    loadDecayStats()
+    loadTokenStats()
+    loadBackupSchedule()
+  }
   if (activeSection.value) {
     nextTick(() => scrollToSection(activeSection.value))
   }
@@ -610,210 +746,492 @@ async function runPrefetch() {
 </script>
 
 <style scoped>
-.pro-page { padding: 28px; }
-.page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
-.page-header h1 { font-size: 24px; font-weight: 700; color: var(--cm-text); margin: 0; }
-.pro-badge { background: rgba(16,185,129,0.15); color: #10B981; padding: 2px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
-.pro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 16px; }
-.mode-banner { grid-column: 1 / -1; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
-.mode-banner span:first-child { font-weight: 600; color: #3B82F6; font-size: 14px; }
-.fallback-desc { font-size: 12px; color: var(--cm-text-muted); }
-.pro-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; overflow: hidden; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
-.pro-card:hover { border-color: rgba(16,185,129,0.25); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-.pro-card.section-highlight { border-color: #10B981; box-shadow: 0 0 0 2px rgba(16,185,129,0.2); transition: all 0.3s ease; }
-.card-header { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--cm-border); }
-.card-icon { font-size: 18px; }
-.card-title { font-size: 15px; font-weight: 600; color: var(--cm-text); }
-.card-body { padding: 16px 18px; }
-.card-desc { color: var(--cm-text-muted); font-size: 13px; margin: 0 0 12px; }
-.card-actions { display: flex; gap: 8px; margin-top: 12px; }
-.stats-row { display: flex; gap: 20px; }
-.stat-item { display: flex; flex-direction: column; align-items: center; }
-.stat-value { font-size: 22px; font-weight: 700; color: var(--cm-text); }
+.pro-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--cm-bg-secondary, #f5f5f5);
+}
+
+.page-hero {
+  background: var(--cm-bg-primary, #fff);
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--cm-border, #e5e5e5);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hero-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hero-content h1 {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--cm-text, #1a1a1a);
+  margin: 0;
+}
+
+.pro-badge {
+  background: rgba(16,185,129,0.15);
+  color: #10B981;
+  padding: 2px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pro-grid {
+  flex: 1;
+  padding: 24px 28px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 16px;
+  align-content: start;
+}
+
+.mode-banner {
+  grid-column: 1 / -1;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.mode-banner span:first-child {
+  font-weight: 600;
+  color: #3B82F6;
+  font-size: 14px;
+}
+
+.pro-card {
+  background: var(--cm-bg-primary, #fff);
+  border: 1px solid var(--cm-border, #e5e5e5);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+.pro-card:hover {
+  border-color: var(--cm-primary, #6366f1);
+  box-shadow: 0 8px 24px rgba(99,102,241,0.12);
+  transform: translateY(-2px);
+}
+
+.pro-card.section-highlight {
+  border-color: var(--cm-primary, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.2);
+  transition: all 0.3s ease;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--cm-border, #e5e5e5);
+  position: relative;
+}
+
+.card-icon {
+  font-size: 18px;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cm-text, #1a1a1a);
+  flex: 1;
+}
+
+.card-help {
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.help-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--cm-bg-tertiary, #f0f0f0);
+  color: var(--cm-text-secondary, #666);
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.card-help:hover .help-icon {
+  background: var(--cm-primary, #6366f1);
+  color: #fff;
+}
+
+.help-popup {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  width: 300px;
+  background: var(--cm-bg-primary, #fff);
+  border: 1px solid var(--cm-border, #e5e5e5);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.15);
+  z-index: 100;
+  font-size: 13px;
+}
+
+.help-title {
+  font-weight: 600;
+  color: var(--cm-text, #1a1a1a);
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.help-text {
+  color: var(--cm-text-secondary, #666);
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.help-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.help-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--cm-text-secondary, #666);
+}
+
+.stage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.stage-dot.green { background: #22c55e; }
+.stage-dot.yellow { background: #eab308; }
+.stage-dot.orange { background: #f97316; }
+.stage-dot.red { background: #ef4444; }
+
+.card-body {
+  padding: 16px 18px;
+}
+
+.card-desc {
+  color: var(--cm-text-secondary, #666);
+  font-size: 13px;
+  margin: 0 0 12px;
+  line-height: 1.6;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background: var(--cm-primary, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary.btn-sm {
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.btn-primary.btn-lg {
+  padding: 12px 28px;
+  font-size: 16px;
+  border-radius: 12px;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background: var(--cm-bg, #fafafa);
+  color: var(--cm-text, #1a1a1a);
+  border: 1px solid var(--cm-border, #e5e5e5);
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  border-color: var(--cm-primary, #6366f1);
+  color: var(--cm-primary, #6366f1);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background: rgba(239,68,68,0.08);
+  color: #ef4444;
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background: rgba(239,68,68,0.15);
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.stats-row {
+  display: flex;
+  gap: 20px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--cm-text, #1a1a1a);
+}
+
 .stat-value.warn { color: #d29922; }
 .stat-value.danger { color: #f85149; }
-.stat-label { font-size: 11px; color: var(--cm-text-muted); margin-top: 2px; }
+.stat-value.success { color: #10B981; }
+.stat-label {
+  font-size: 11px;
+  color: var(--cm-text-muted, #999);
+  margin-top: 2px;
+}
+
 .prune-section { margin-top: 14px; }
 .sub-title { font-size: 13px; color: var(--cm-text-muted); margin-bottom: 8px; }
 .prune-list { max-height: 150px; overflow-y: auto; }
 .prune-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12px; color: var(--cm-text-secondary); }
 .prune-key { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prune-imp { color: #d29922; font-weight: 600; }
+
 .conflict-list { margin-top: 12px; }
-.conflict-item { padding: 8px 0; border-bottom: 1px solid var(--cm-border); }
+.conflict-item { padding: 8px 0; border-bottom: 1px solid var(--cm-border, #e5e5e5); }
 .conflict-key { font-size: 13px; font-weight: 600; color: var(--cm-text); }
 .conflict-values { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-size: 12px; color: var(--cm-text-muted); }
 .vs { color: #d29922; font-weight: 600; }
 .val-a, .val-b { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .conflict-meta { display: flex; align-items: center; gap: 8px; }
+
 .router-test { display: flex; gap: 8px; margin-top: 12px; }
 .router-test .el-input { flex: 1; }
 .route-result { margin-top: 10px; font-size: 13px; color: var(--cm-text-secondary); }
 .route-model { margin-bottom: 4px; }
 .route-model strong { color: #10B981; }
+
 .extract-result, .graph-result { display: flex; gap: 20px; margin-top: 12px; }
-.backup-schedule .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; color: var(--cm-text); font-size: 14px; }
+
+.backup-schedule .setting-item,
+.auto-compress-setting .setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  color: var(--cm-text);
+  font-size: 14px;
+}
+
 .compress-levels { display: flex; gap: 10px; margin: 12px 0; }
-.level-option { flex: 1; padding: 10px 8px; border: 2px solid var(--cm-border); border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.2s ease; }
-.level-option:hover { border-color: rgba(16,185,129,0.4); }
-.level-option.active { border-color: #10B981; background: rgba(16,185,129,0.08); }
+.level-option {
+  flex: 1;
+  padding: 10px 8px;
+  border: 2px solid var(--cm-border, #e5e5e5);
+  border-radius: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.level-option:hover { border-color: rgba(99,102,241,0.4); }
+.level-option.active { border-color: var(--cm-primary, #6366f1); background: rgba(99,102,241,0.08); }
 .level-name { font-size: 14px; font-weight: 600; color: var(--cm-text); }
-.level-rate { font-size: 18px; font-weight: 700; color: #10B981; margin: 4px 0; }
+.level-rate { font-size: 18px; font-weight: 700; color: var(--cm-primary, #6366f1); margin: 4px 0; }
 .level-desc { font-size: 11px; color: var(--cm-text-muted); }
+
 .compress-result { margin-top: 12px; }
 .compress-details { margin-top: 10px; }
 .compress-detail-item { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; color: var(--cm-text-secondary); }
-.detail-action { background: rgba(16,185,129,0.1); color: #10B981; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+.detail-action { background: rgba(99,102,241,0.1); color: var(--cm-primary, #6366f1); padding: 1px 6px; border-radius: 4px; font-size: 11px; }
 .detail-target { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.auto-compress-setting { margin-top: 14px; border-top: 1px solid var(--cm-border); padding-top: 10px; }
-.auto-compress-setting .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; color: var(--cm-text); font-size: 14px; }
+
+.auto-compress-setting { margin-top: 14px; border-top: 1px solid var(--cm-border, #e5e5e5); padding-top: 10px; }
+
 .evolution-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .evolution-insights { margin-top: 12px; }
-.stat-value.success { color: #10B981; }
+
 .discover-result { margin-top: 12px; }
 .discover-list { max-height: 200px; overflow-y: auto; }
 .discover-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 12px; color: var(--cm-text-secondary); }
 .discover-source, .discover-target { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-.discover-type { color: #10B981; font-weight: 600; font-size: 11px; }
+.discover-type { color: var(--cm-primary, #6366f1); font-weight: 600; font-size: 11px; }
 .discover-arrow { color: var(--cm-text-muted); }
+
 .infer-result { margin-top: 12px; }
 .chain-list { max-height: 200px; overflow-y: auto; }
-.chain-item { padding: 8px 0; border-bottom: 1px solid var(--cm-border); }
+.chain-item { padding: 8px 0; border-bottom: 1px solid var(--cm-border, #e5e5e5); }
 .chain-nodes { font-size: 12px; color: var(--cm-text-secondary); }
 .chain-node { font-weight: 500; }
-.chain-arrow { color: #10B981; font-weight: 600; }
-.chain-conclusion { font-size: 13px; color: #10B981; font-weight: 600; margin-top: 4px; }
-.prefetch-section { margin-top: 14px; border-top: 1px solid var(--cm-border); padding-top: 10px; }
+.chain-arrow { color: var(--cm-primary, #6366f1); font-weight: 600; }
+.chain-conclusion { font-size: 13px; color: var(--cm-primary, #6366f1); font-weight: 600; margin-top: 4px; }
+
+.prefetch-section { margin-top: 14px; border-top: 1px solid var(--cm-border, #e5e5e5); padding-top: 10px; }
 .prefetch-result { margin-top: 8px; }
-.prefetch-count { font-size: 13px; color: #10B981; font-weight: 500; }
-.progress-bar { position: relative; height: 20px; background: var(--cm-border); border-radius: 10px; margin-top: 12px; overflow: hidden; }
-.progress-fill { height: 100%; background: linear-gradient(90deg, #10B981, #059669); transition: width 0.3s ease; border-radius: 10px; }
-.progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 600; color: var(--cm-text); }
-.pro-upsell { text-align: center; padding: 80px 20px; }
-.upsell-icon { font-size: 48px; margin-bottom: 16px; }
-.pro-upsell h2 { color: var(--cm-text); margin: 0 0 12px; }
-.pro-upsell p { color: var(--cm-text-muted); margin-bottom: 20px; }
+.prefetch-count { font-size: 13px; color: var(--cm-primary, #6366f1); font-weight: 500; }
+
+/* ===== Pro Locked (Not Activated) ===== */
+.pro-locked {
+  flex: 1;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.locked-content {
+  position: relative;
+  height: 100%;
+  padding: 28px;
+}
+
+.locked-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  filter: blur(6px);
+  opacity: 0.4;
+  pointer-events: none;
+  user-select: none;
+}
+
+.locked-card {
+  background: var(--cm-bg-primary, #fff);
+  border: 1px solid var(--cm-border, #e5e5e5);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.locked-card-header {
+  height: 48px;
+  background: var(--cm-bg-secondary, #f5f5f5);
+  border-bottom: 1px solid var(--cm-border, #e5e5e5);
+}
+
+.locked-card-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.locked-line {
+  height: 12px;
+  background: var(--cm-bg-tertiary, #f0f0f0);
+  border-radius: 6px;
+}
+
+.locked-line.w80 { width: 80%; }
+.locked-line.w60 { width: 60%; }
+.locked-line.w40 { width: 40%; }
+
+.locked-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 10;
+}
+
+.locked-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.locked-overlay h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--cm-text, #1a1a1a);
+  margin: 0 0 12px;
+}
+
+.locked-overlay p {
+  color: var(--cm-text-secondary, #666);
+  margin-bottom: 24px;
+  max-width: 400px;
+  line-height: 1.6;
+}
+
 @media (max-width: 768px) {
   .pro-grid {
     grid-template-columns: 1fr;
-  }
-  .pro-page {
     padding: 16px;
   }
-  .pro-card {
-    padding: 16px;
-  }
-  .pro-card h2 {
-    font-size: 16px;
-  }
-  .pro-card h3 {
-    font-size: 14px;
-  }
-  .feature-grid {
-    grid-template-columns: 1fr;
-  }
-  .feature-item {
-    padding: 12px;
-  }
-  .feature-icon {
-    width: 36px;
-    height: 36px;
-    font-size: 18px;
-  }
-  .feature-name {
-    font-size: 14px;
-  }
-  .feature-desc {
-    font-size: 12px;
-  }
-  .pro-upsell {
-    padding: 40px 16px;
-  }
-  .upsell-icon {
-    font-size: 40px;
-  }
-  .pro-upsell h2 {
-    font-size: 20px;
-  }
-  .pro-upsell p {
-    font-size: 14px;
-  }
-  .conflict-values {
-    flex-direction: column;
-  }
-  .router-test {
-    flex-direction: column;
-  }
-  .router-test .el-button {
-    width: 100%;
-  }
-  .extract-result,
-  .graph-result {
-    flex-direction: column;
-    gap: 12px;
-  }
-  .progress-bar {
-    height: 18px;
-  }
-  .progress-text {
-    font-size: 10px;
-  }
+  .page-hero { padding: 16px; }
+  .locked-cards { grid-template-columns: 1fr; }
+  .compress-levels { flex-direction: column; }
+  .router-test { flex-direction: column; }
+  .conflict-values { flex-direction: column; }
+  .extract-result, .graph-result { flex-direction: column; gap: 12px; }
 }
 
 @media (max-width: 480px) {
-  .pro-page {
-    padding: 12px;
-  }
-  .pro-card {
-    padding: 14px;
-    border-radius: 10px;
-  }
-  .pro-card h2 {
-    font-size: 15px;
-  }
-  .pro-card h3 {
-    font-size: 13px;
-  }
-  .feature-item {
-    padding: 10px;
-  }
-  .feature-icon {
-    width: 32px;
-    height: 32px;
-    font-size: 16px;
-  }
-  .feature-name {
-    font-size: 13px;
-  }
-  .feature-desc {
-    font-size: 11px;
-  }
-  .pro-upsell {
-    padding: 30px 12px;
-  }
-  .upsell-icon {
-    font-size: 36px;
-  }
-  .pro-upsell h2 {
-    font-size: 18px;
-  }
-  .pro-upsell p {
-    font-size: 13px;
-  }
-  .conflict-key {
-    font-size: 12px;
-  }
-  .conflict-values {
-    font-size: 11px;
-  }
-  .conflict-meta {
-    font-size: 11px;
-  }
-  .route-result {
-    font-size: 12px;
-  }
-  .backup-schedule .setting-item {
-    font-size: 13px;
-  }
+  .pro-grid { padding: 12px; }
+  .page-hero { padding: 12px; }
+  .hero-content h1 { font-size: 20px; }
+  .help-popup { width: 240px; right: -10px; }
 }
 </style>
