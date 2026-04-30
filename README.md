@@ -36,9 +36,10 @@ ClawMemory 是一款现代化的 AI 记忆管理工具，支持知识图谱、�
 | 组件 | 最低版本 | 说明 |
 |------|----------|------|
 | **Go** | 1.21+ | 后端必需 |
-| Node.js | 18+ | 仅重新构建前端时需要 |
 
 **支持平台**: Windows / macOS / Linux (x86_64 + ARM64)
+
+> 💡 **提示**: 前端已预编译，无需安装 Node.js，直接运行安装脚本即可。
 
 ### 一键安装
 
@@ -225,31 +226,24 @@ bash install.sh
 
 ### 🎯 安装流程（自动完成）
 
-安装脚本会自动执行以下 6 个步骤：
+安装脚本会自动执行以下 5 个步骤：
 
 ```
-[1/6] 检查环境依赖...
+[1/5] 检查环境依赖...
       ✓ Go 环境 (必需)
-      ✓ Node.js (可选，用于构建前端)
       ✓ Git (可选，用于技能安装)
 
-[2/6] 构建前端...
-      ✓ npm install
-      ✓ npm run build
-      ✓ 复制到 go-backend/frontend_dist/
+[2/5] 检查前端文件...
+      ✓ 前端已预编译，跳过构建
 
-[3/6] 编译 Go 后端...
+[3/5] 编译 Go 后端...
       ✓ go build -o clawmemory.exe ./cmd/server
 
-[4/6] 配置环境...
+[4/5] 配置环境...
       ✓ 创建 .env 配置文件
       ✓ 创建统一目录结构 (data/skills, data/backups)
 
-[5/6] 生成启动脚本...
-      ✓ start.bat / start.sh
-      ✓ stop.bat / stop.sh
-
-[6/6] 验证安装...
+[5/5] 验证安装...
       ✓ 检查所有关键文件
       ✓ 安装完成!
 ```
@@ -333,7 +327,65 @@ ClawMemory/                      # 安装根目录
 ### 💡 提示
 
 - ✅ **统一目录**: 所有数据、技能、备份统一存储在 `data/` 目录下
-- ✅ **自动检测**: 自动检测 Go/Node.js/Git 环境
+- ✅ **自动检测**: 自动检测 Go/Git 环境
 - ✅ **完整验证**: 安装完成后自动验证所有关键文件
 - ✅ **跨平台**: 支持 Windows / Linux / macOS (x86_64 + ARM64)
 - ✅ **升级友好**: 使用 `--upgrade` 参数可保留配置和数据
+- ✅ **前端预编译**: 前端已预编译，无需安装 Node.js
+
+---
+
+## 🤖 OpenClaw 集成说明
+
+ClawMemory 可以作为 OpenClaw 的主要记忆管理工具。安装完成后，需要将其添加到 OpenClaw 的 AGENTS.md 配置中。
+
+### 安装目录
+
+ClawMemory 默认安装目录：
+
+| 平台 | 默认目录 |
+|------|----------|
+| **Windows** | `C:\Users\<用户名>\ClawMemory\` 或自定义路径 |
+| **Linux/macOS** | `~/clawmemory/` 或 `/opt/clawmemory/` |
+
+### 配置 OpenClaw AGENTS.md
+
+安装 ClawMemory 后，需要在 OpenClaw 的 `AGENTS.md` 中添加配置：
+
+**OpenClaw AGENTS.md 位置**：
+- Windows: `C:\Users\<用户名>\.openclaw\AGENTS.md`
+- Linux/macOS: `~/.openclaw/AGENTS.md`
+
+**添加以下内容到 AGENTS.md**：
+
+```markdown
+## ClawMemory - 主要记忆管理工具
+
+- **类型**: memory
+- **地址**: http://localhost:8765
+- **功能**: 记忆管理、知识图谱、智能日报、向量搜索
+- **API 端点**: 
+  - 记忆列表: GET /api/v1/memories
+  - 智能加载: GET /api/v1/memories/smart-load
+  - 知识图谱: GET /api/v1/knowledge/graph
+```
+
+### 局域网访问
+
+ClawMemory 默认监听 `0.0.0.0`，支持局域网访问：
+
+- 本机访问: `http://localhost:8765`
+- 局域网访问: `http://<你的IP>:8765`
+
+> 💡 **提示**: 如需修改端口，可在 `.env` 文件中设置 `PORT=端口号`
+
+### 数据目录说明
+
+| 目录 | 说明 |
+|------|------|
+| `~/.openclaw/` | OpenClaw 默认数据目录 |
+| `./data/` | ClawMemory 安装目录下的数据目录 |
+
+ClawMemory 会自动扫描以下目录中的技能：
+- `~/.openclaw/skills/` (OpenClaw 默认目录)
+- `./data/skills/` (ClawMemory 安装目录)

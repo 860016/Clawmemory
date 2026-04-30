@@ -66,7 +66,7 @@ if ($Upgrade) { Write-Info "模式: 升级 (保留配置和数据)" }
 if ($AutoStart) { Write-Info "自动启动: 是" }
 Write-Host ""
 
-$totalSteps = 6
+$totalSteps = 5
 
 Write-Step 1 $totalSteps "检查环境依赖..."
 Write-Host ""
@@ -102,48 +102,17 @@ try {
     Write-Info "Git 未安装 (可选，用于技能安装)"
 }
 
-Write-Step 2 $totalSteps "构建前端..."
+Write-Step 2 $totalSteps "检查前端文件..."
 Write-Host ""
 
 $frontendReady = Test-Path "$InstallDir\go-backend\frontend_dist\index.html"
 
-if ($RebuildFrontend -or (-not $frontendReady)) {
-    if ($hasNode) {
-        Write-Info "开始构建前端..."
-        Set-Location "$InstallDir\frontend"
-
-        try {
-            npm install --prefer-offline --no-audit --no-fund 2>$null
-            Write-Success "npm install 完成"
-            
-            npm run build 2>&1 | ForEach-Object { 
-                if ($_ -match "(error|Error|ERROR)") { Write-Error $_ }
-                elseif ($_ -match "(built|warning|✓)") { Write-Success $_ }
-            }
-            
-            if (Test-Path "$InstallDir\frontend\dist") {
-                if (Test-Path "$InstallDir\go-backend\frontend_dist") {
-                    Remove-Item "$InstallDir\go-backend\frontend_dist" -Recurse -Force
-                }
-                Copy-Item -Path "$InstallDir\frontend\dist" -Destination "$InstallDir\go-backend\frontend_dist" -Recurse -Force
-                Write-Success "前端已复制到 go-backend/frontend_dist"
-            }
-        } catch {
-            Write-Error "前端构建失败: $_"
-            Write-Info "将使用预构建版本（如果存在）"
-        }
-
-        Set-Location "$InstallDir"
-    } else {
-        if ($frontendReady) {
-            Write-Success "使用预构建的前端文件"
-        } else {
-            Write-Warning "未找到 Node.js 且无预构建前端"
-            Write-Info "前端功能可能不可用"
-        }
-    }
+if ($frontendReady) {
+    Write-Success "前端已预编译，跳过构建"
 } else {
-    Write-Success "前端已就绪 (跳过构建)"
+    Write-Error "前端文件缺失，请确保 go-backend/frontend_dist/ 目录存在"
+    Write-Info "前端已预编译，无需手动构建"
+    exit 1
 }
 
 Write-Step 3 $totalSteps "编译 Go 后端..."
@@ -172,7 +141,7 @@ try {
 
 Set-Location "$InstallDir"
 
-Write-Step 4 $totalSteps "配置环境..."
+Write-Step 3 $totalSteps "配置环境..."
 Write-Host ""
 
 if (-not (Test-Path $EnvFile)) {
@@ -213,7 +182,7 @@ foreach ($dir in $dirsToCreate) {
     Write-Success "$($dir.Name): $($dir.Path)"
 }
 
-Write-Step 5 $totalSteps "生成启动脚本..."
+Write-Step 4 $totalSteps "生成启动脚本..."
 Write-Host ""
 
 $startBatContent = @"
@@ -254,7 +223,7 @@ Set-Content -Path "$InstallDir\stop.bat" -Value $stopBatContent -Encoding ASCII
 Write-Success "start.bat - 启动脚本已生成"
 Write-Success "stop.bat  - 停止脚本已生成"
 
-Write-Step 6 $totalSteps "验证安装..."
+Write-Step 5 $totalSteps "验证安装..."
 Write-Host ""
 
 $checks = @(

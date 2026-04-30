@@ -62,7 +62,7 @@ BACKUPS_DIR="$DATA_DIR/backups"
 ENV_FILE="$INSTALL_DIR/go-backend/.env"
 EXE_FILE="$INSTALL_DIR/go-backend/clawmemory"
 
-TOTAL_STEPS=6
+TOTAL_STEPS=5
 
 print_step() {
     echo ""
@@ -126,45 +126,15 @@ else
     print_info "Git 未安装 (可选，用于技能安装)"
 fi
 
-print_step 2 "构建前端..."
+print_step 2 "检查前端文件..."
 echo ""
 
-FRONTEND_READY=false
 if [ -f "$INSTALL_DIR/go-backend/frontend_dist/index.html" ]; then
-    FRONTEND_READY=true
-fi
-
-if [ ! "$FRONTEND_READY" = true ] || [ "$1" = "--rebuild" ]; then
-    if [ "$HAS_NODE" = true ]; then
-        print_info "开始构建前端..."
-        cd "$INSTALL_DIR/frontend"
-        
-        npm install --prefer-offline --no-audit --no-fund 2>/dev/null || true
-        print_success "npm install 完成"
-        
-        if npm run build 2>&1; then
-            print_success "npm run build 完成"
-        else
-            print_error "前端构建失败，将使用预构建版本（如果存在）"
-        fi
-        
-        if [ -d "$INSTALL_DIR/frontend/dist" ]; then
-            rm -rf "$INSTALL_DIR/go-backend/frontend_dist" 2>/dev/null || true
-            cp -r "$INSTALL_DIR/frontend/dist" "$INSTALL_DIR/go-backend/frontend_dist"
-            print_success "前端已复制到 go-backend/frontend_dist"
-        fi
-        
-        cd "$INSTALL_DIR"
-    else
-        if [ "$FRONTEND_READY" = true ]; then
-            print_success "使用预构建的前端文件"
-        else
-            print_warning "未找到 Node.js 且无预构建前端"
-            print_info "前端功能可能不可用"
-        fi
-    fi
+    print_success "前端已预编译，跳过构建"
 else
-    print_success "前端已就绪 (跳过构建)"
+    print_error "前端文件缺失，请确保 go-backend/frontend_dist/ 目录存在"
+    print_info "前端已预编译，无需手动构建"
+    exit 1
 fi
 
 print_step 3 "编译 Go 后端..."
@@ -186,7 +156,7 @@ fi
 
 cd "$INSTALL_DIR"
 
-print_step 4 "配置环境..."
+print_step 3 "配置环境..."
 echo ""
 
 if [ ! -f "$ENV_FILE" ]; then
@@ -224,7 +194,7 @@ create_dir "$BACKUPS_DIR" "备份目录"
 create_dir "$DATA_DIR/keys" "密钥目录"
 create_dir "$DATA_DIR/uploads" "上传目录"
 
-print_step 5 "生成启动脚本..."
+print_step 4 "生成启动脚本..."
 echo ""
 
 cat > "$INSTALL_DIR/start.sh" << EOF
@@ -253,7 +223,7 @@ chmod +x "$INSTALL_DIR/stop.sh"
 print_success "start.sh - 启动脚本已生成"
 print_success "stop.sh  - 停止脚本已生成"
 
-print_step 6 "验证安装..."
+print_step 5 "验证安装..."
 echo ""
 
 check_file() {
