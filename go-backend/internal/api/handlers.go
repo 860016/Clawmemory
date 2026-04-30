@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,7 +19,7 @@ import (
 	"clawmemory/internal/services"
 
 	"github.com/gin-gonic/gin"
-	_ "modernc.org/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -2061,58 +2060,47 @@ func parseMarkdownMemory(content string, filePath string, agentName string, prev
 }
 
 func extractSqliteMemories(dbPath string, previews []memoryPreview, agentCountMap map[string]int) ([]memoryPreview, map[string]int) {
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		return previews, agentCountMap
 	}
-	defer db.Close()
-
-	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table'")
-	if err != nil {
-		return previews, agentCountMap
+	sqlDB, _ := db.DB()
+	if sqlDB != nil {
+		defer sqlDB.Close()
 	}
 
-	var tables []string
-	for rows.Next() {
-		var name string
-		if rows.Scan(&name) == nil {
-			tables = append(tables, name)
-		}
+	type TableName struct {
+		Name string
 	}
-	rows.Close()
+	var tables []TableName
+	db.Raw("SELECT name FROM sqlite_master WHERE type='table'").Scan(&tables)
 
 	agentName := filepath.Base(filepath.Dir(dbPath))
 	if agentName == "" || agentName == "." {
 		agentName = "sqlite-" + filepath.Base(dbPath)
 	}
 
-	for _, table := range tables {
-		colRows, err := db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
-		if err != nil {
-			continue
+	for _, t := range tables {
+		type ColInfo struct {
+			CID       int
+			Name      string
+			Type      string
+			NotNull   int
+			DfltValue interface{}
+			PK        int
 		}
-		var cols []string
-		for colRows.Next() {
-			var cid int
-			var name, ctype string
-			var notnull int
-			var dfltValue interface{}
-			var pk int
-			if colRows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk) == nil {
-				cols = append(cols, name)
-			}
-		}
-		colRows.Close()
+		var cols []ColInfo
+		db.Raw(fmt.Sprintf("PRAGMA table_info(%s)", t.Name)).Scan(&cols)
 
 		keyCol := ""
 		valueCol := ""
 		for _, c := range cols {
-			cl := strings.ToLower(c)
+			cl := strings.ToLower(c.Name)
 			if keyCol == "" && (cl == "key" || cl == "name" || cl == "title" || cl == "id") {
-				keyCol = c
+				keyCol = c.Name
 			}
 			if valueCol == "" && (cl == "value" || cl == "content" || cl == "text" || cl == "description" || cl == "body" || cl == "message") {
-				valueCol = c
+				valueCol = c.Name
 			}
 		}
 
@@ -2120,29 +2108,27 @@ func extractSqliteMemories(dbPath string, previews []memoryPreview, agentCountMa
 			continue
 		}
 
-		dataRows, err := db.Query(fmt.Sprintf("SELECT %s, %s FROM %s LIMIT 200", keyCol, valueCol, table))
-		if err != nil {
-			continue
+		type KV struct {
+			Key   string
+			Value string
 		}
-		for dataRows.Next() {
-			var key, value string
-			if dataRows.Scan(&key, &value) != nil {
+		var kvPairs []KV
+		db.Raw(fmt.Sprintf("SELECT %s as key, %s as value FROM %s LIMIT 200", keyCol, valueCol, t.Name)).Scan(&kvPairs)
+
+		for _, kv := range kvPairs {
+			if kv.Key == "" || kv.Value == "" {
 				continue
 			}
-			if key == "" || value == "" {
-				continue
-			}
-			preview := value
+			preview := kv.Value
 			if len(preview) > 200 {
 				preview = preview[:200] + "..."
 			}
 			previews = append(previews, memoryPreview{
-				Key: key, Content: preview, Layer: "knowledge",
+				Key: kv.Key, Content: preview, Layer: "knowledge",
 				Source: "sqlite", FilePath: dbPath, AgentName: agentName,
 			})
 			agentCountMap[agentName]++
 		}
-		dataRows.Close()
 	}
 
 	return previews, agentCountMap

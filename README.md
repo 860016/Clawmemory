@@ -1,4 +1,4 @@
-# ClawMemory v2.9.1 — AI 记忆管理工具
+# ClawMemory v2.11.0 — AI 记忆管理工具
 
 ClawMemory 是一款现代化的 AI 记忆管理工具，支持知识图谱、智能日报、记忆衰减分析、冲突检测等高级功能。
 
@@ -155,6 +155,15 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 ---
 
 ## 📝 更新日志
+
+### v2.11.0 (2026-04-30)
+- 🐛 修复：SQLite 驱动注册冲突（modernc.org/sqlite 与 glebarez/go-sqlite 同名注册）
+- 🔐 新增：终端命令重置密码 `./clawmemory --reset-password NEW_PASSWORD`
+- 🔐 新增：`./clawmemory --version` 查看版本号
+- 📋 新增：设置页面显示版本号、检查更新、更新说明
+- 🔄 新增：GitHub Releases 版本更新检查 API
+- 🔒 改进：忘记密码 API 增加用户名验证
+- 📦 统一版本号管理（config.AppVersion）
 
 ### v2.9.1 (2026-04-30)
 - 🔒 安全加固：密码重置验证、备份路径遍历防护
