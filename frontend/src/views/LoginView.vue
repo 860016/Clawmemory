@@ -114,7 +114,7 @@ async function handleLogin() {
     localStorage.setItem('token', data.access_token)
     router.push('/')
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('login.wrongPassword'))
+    ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('login.wrongPassword'))
   } finally {
     loading.value = false
   }
@@ -136,7 +136,7 @@ async function handleSetPassword() {
       ElMessage.error(t('common.failed'))
     }
   } catch (e: any) {
-    const detail = e.response?.data?.detail || ''
+    const detail = e.response?.data?.error || e.response?.data?.detail || ''
     console.error('Set password error:', detail, e.response?.status)
     if (detail === 'password already set') {
       try {
@@ -146,7 +146,7 @@ async function handleSetPassword() {
         router.push('/')
         return
       } catch (loginErr: any) {
-        ElMessage.error(loginErr.response?.data?.detail || t('login.wrongPassword'))
+        ElMessage.error(loginErr.response?.data?.error || loginErr.response?.data?.detail || t('login.wrongPassword'))
       }
     } else {
       ElMessage.error(detail || t('common.failed'))

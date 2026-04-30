@@ -1,7 +1,7 @@
 import api from './go-client'
 
 export const memoryApi = {
-  list: (params?: { layer?: string; page?: number; size?: number; status?: string }) =>
+  list: (params?: { layer?: string; page?: number; size?: number; status?: string; memory_type?: string }) =>
     api.get('/memories', { params }),
   create: (data: any) => api.post('/memories', data),
   get: (id: number) => api.get(`/memories/${id}`),
@@ -17,8 +17,22 @@ export const memoryApi = {
     api.get('/memories/smart-load', { params }),
   reinforce: (id: number) => api.post(`/memories/${id}/reinforce`),
   generateSummaries: () => api.post('/memories/generate-summaries'),
+  verify: (id: number) => api.post(`/memories/${id}/verify`),
+  extract: (content: string) => api.post('/memories/extract', { content }),
+  extractAndSave: (content: string, autoSave: boolean = false) =>
+    api.post('/memories/extract-and-save', { content, auto_save: autoSave }),
+  scanSecrets: (content: string) => api.post('/memories/scan-secrets', { content }),
 
   scanOpenClaw: () => api.get('/openclaw-memories/scan'),
   scanOpenClawAgent: (agentName: string) => api.get(`/openclaw-memories/scan/${agentName}`),
   importOpenClaw: (data: any) => api.post('/openclaw-memories/import', data),
+}
+
+export const sessionMemoryApi = {
+  list: (params?: { session_id?: string; status?: string }) =>
+    api.get('/session-memories', { params }),
+  create: (data: any) => api.post('/session-memories', data),
+  get: (id: number) => api.get(`/session-memories/${id}`),
+  update: (id: number, data: any) => api.put(`/session-memories/${id}`, data),
+  delete: (id: number) => api.delete(`/session-memories/${id}`),
 }

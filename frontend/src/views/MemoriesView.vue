@@ -3,6 +3,9 @@
     <div class="page-header">
       <h1>🧠 {{ $t('memories.title') }}</h1>
       <div class="header-actions">
+        <el-button @click="showExtractDialog = true">
+          <el-icon><MagicStick /></el-icon> {{ $t('memories.extractMemory') }}
+        </el-button>
         <el-button @click="handleOpenClawScan">
           <el-icon><Upload /></el-icon> {{ $t('memories.importOpenClaw') }}
         </el-button>
@@ -28,6 +31,14 @@
         <el-radio-button label="short_term">{{ $t('memories.shortTerm') }}</el-radio-button>
         <el-radio-button label="private">{{ $t('memories.private') }}</el-radio-button>
       </el-radio-group>
+      <el-select v-model="currentMemoryType" @change="loadMemories" :placeholder="$t('memories.memoryType')" clearable style="width: 140px">
+        <el-option :label="$t('memories.all')" value="" />
+        <el-option label="Knowledge" value="knowledge" />
+        <el-option label="Feedback" value="feedback" />
+        <el-option label="Project" value="project" />
+        <el-option label="Reference" value="reference" />
+        <el-option label="User" value="user" />
+      </el-select>
     </div>
 
     <div v-if="smartLoadResult" class="smart-load-info">
@@ -70,7 +81,9 @@
         <div class="card-top">
           <span class="layer-tag" :class="m.layer">{{ layerLabels[m.layer] || m.layer }}</span>
           <span class="importance" :class="importanceClass(m.importance)">{{ (m.importance * 100).toFixed(0) }}%</span>
+          <el-tag v-if="m.memory_type && m.memory_type !== 'knowledge'" size="small" class="type-tag">{{ m.memory_type }}</el-tag>
           <el-tag v-if="m.reinforce_count > 0" size="small" type="success" class="reinforce-badge">📌 {{ m.reinforce_count }}</el-tag>
+          <span v-if="m.verified_at" class="verified-badge" :title="$t('memories.verifiedAt', { date: m.verified_at })">✅</span>
         </div>
         <div class="card-key">{{ m.key }}</div>
         <div class="card-value">{{ truncate(m.value, 200) }}</div>
@@ -78,10 +91,14 @@
         <div class="card-tags" v-if="m.tags && m.tags.length">
           <span class="tag" v-for="t in m.tags" :key="t">{{ t }}</span>
         </div>
+        <div class="card-freshness" v-if="getFreshness(m)">
+          <span class="freshness-tag" :class="getFreshness(m!)!.level">{{ getFreshness(m!)!.label }}</span>
+        </div>
         <div class="card-footer">
           <span class="card-meta">{{ m.source }} · {{ formatTime(m.updated_at) }}</span>
           <div class="card-actions">
             <el-button text size="small" type="success" @click="reinforceMemory(m.id)" :title="$t('memories.reinforceTip')">📌</el-button>
+            <el-button text size="small" type="primary" @click="verifyMemory(m.id)" :title="$t('memories.verifyTip')">✅</el-button>
             <el-button text size="small" @click="editMemory(m)">{{ $t('common.edit') }}</el-button>
             <el-button text size="small" type="danger" @click="deleteMemory(m.id)">{{ $t('common.delete') }}</el-button>
           </div>
@@ -101,6 +118,15 @@
             <el-option :label="$t('memories.knowledge') + ' (knowledge)'" value="knowledge" />
             <el-option :label="$t('memories.shortTerm') + ' (short_term)'" value="short_term" />
             <el-option :label="$t('memories.private') + ' (private)'" value="private" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="$t('memories.memoryType')">
+          <el-select v-model="form.memory_type" style="width: 100%">
+            <el-option label="Knowledge" value="knowledge" />
+            <el-option label="User" value="user" />
+            <el-option label="Feedback" value="feedback" />
+            <el-option label="Project" value="project" />
+            <el-option label="Reference" value="reference" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('memories.titleField')">
@@ -183,6 +209,45 @@
         </div>
       </div>
     </el-dialog>
+
+    <!-- Extract Memory Dialog -->
+    <el-dialog v-model="showExtractDialog" :title="$t('memories.extractTitle')" width="700px" class="custom-dialog">
+      <el-input v-model="extractContent" type="textarea" :rows="8" :placeholder="$t('memories.extractPlaceholder')" />
+      <div v-if="extractResult" style="margin-top: 16px">
+        <el-divider content-position="left">{{ $t('memories.extractedCount', { count: extractResult.count }) }}</el-divider>
+        <div v-if="extractResult.warnings?.length" style="margin-bottom: 12px">
+          <el-alert v-for="(w, i) in extractResult.warnings" :key="i" :title="w" type="warning" show-icon :closable="false" style="margin-bottom: 4px" />
+        </div>
+        <div v-for="(em, idx) in extractResult.memories" :key="idx" class="extract-item">
+          <div class="extract-item-header">
+            <el-tag size="small">{{ em.layer }}</el-tag>
+            <el-tag size="small" type="info">{{ em.memory_type }}</el-tag>
+            <span class="extract-reason">{{ em.reason }}</span>
+          </div>
+          <div class="extract-item-key">{{ em.key }}</div>
+          <div class="extract-item-value">{{ truncate(em.value, 150) }}</div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showExtractDialog = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="info" @click="handleExtract" :loading="extracting">{{ $t('memories.extractBtn') }}</el-button>
+        <el-button type="primary" @click="handleExtractAndSave" :loading="extracting" v-if="extractResult?.count > 0">{{ $t('memories.extractAndSave') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Secret Warning Dialog -->
+    <el-dialog v-model="showSecretWarning" :title="$t('memories.secretWarningTitle')" width="500px">
+      <el-alert type="error" show-icon :closable="false" style="margin-bottom: 12px">
+        <template #title>{{ $t('memories.secretWarningMsg') }}</template>
+      </el-alert>
+      <div v-for="(match, idx) in secretMatches" :key="idx" style="margin-bottom: 8px">
+        <el-tag :type="match.severity === 'high' ? 'danger' : 'warning'" size="small">{{ match.description }}</el-tag>
+      </div>
+      <template #footer>
+        <el-button @click="showSecretWarning = false; pendingSaveData = null">{{ $t('common.cancel') }}</el-button>
+        <el-button type="warning" @click="forceSaveWithSecret">{{ $t('memories.saveAnyway') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -191,8 +256,9 @@ import { ref, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Upload, Loading } from '@element-plus/icons-vue'
+import { Plus, Search, Upload, Loading, MagicStick } from '@element-plus/icons-vue'
 import axios from '../api/go-client'
+import { memoryApi } from '../api/go-memories'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -202,6 +268,7 @@ const searchQuery = ref('')
 const searchMode = ref('keyword')
 const smartLoadResult = ref<any>(null)
 const currentLayer = ref('')
+const currentMemoryType = ref('')
 const currentPage = ref(1)
 const pageSize = 20
 const total = ref(0)
@@ -217,7 +284,7 @@ const scanError = ref('')
 const previewData = ref<any>(null)
 const importing = ref(false)
 
-const form = ref({ layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '' })
+const form = ref({ layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '', memory_type: 'knowledge' })
 
 const layerLabels: Record<string, string> = {
   preference: t('memories.preference'),
@@ -225,6 +292,14 @@ const layerLabels: Record<string, string> = {
   short_term: t('memories.shortTerm'),
   private: t('memories.private'),
 }
+
+const showExtractDialog = ref(false)
+const extractContent = ref('')
+const extractResult = ref<any>(null)
+const extracting = ref(false)
+const showSecretWarning = ref(false)
+const secretMatches = ref<any[]>([])
+const pendingSaveData = ref<any>(null)
 
 onMounted(() => {
   loadMemories()
@@ -242,7 +317,7 @@ watch(() => route.query.import, (val) => {
 
 function openAddDialog() {
   editingMemory.value = null
-  form.value = { layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '' }
+  form.value = { layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '', memory_type: 'knowledge' }
   showAddDialog.value = true
 }
 
@@ -250,6 +325,7 @@ async function loadMemories() {
   try {
     const params: any = { page: currentPage.value, size: pageSize }
     if (currentLayer.value) params.layer = currentLayer.value
+    if (currentMemoryType.value) params.memory_type = currentMemoryType.value
     const { data } = await axios.get('/memories', { params })
     memories.value = data.items || []
     total.value = data.total || 0
@@ -313,7 +389,7 @@ async function reinforceMemory(id: number) {
 
 function editMemory(m: any) {
   editingMemory.value = m
-  form.value = { layer: m.layer, key: m.key, value: m.value, importance: Math.round(m.importance * 100), tagsStr: (m.tags || []).join(', ') }
+  form.value = { layer: m.layer, key: m.key, value: m.value, importance: Math.round(m.importance * 100), tagsStr: (m.tags || []).join(', '), memory_type: m.memory_type || 'knowledge' }
   showAddDialog.value = true
 }
 
@@ -321,15 +397,19 @@ async function saveMemory() {
   if (!form.value.key || !form.value.value) { ElMessage.warning(t('memories.fillRequired')); return }
   saving.value = true
   try {
-    const payload: any = { layer: form.value.layer, key: form.value.key, value: form.value.value, importance: form.value.importance / 100, tags: form.value.tagsStr ? form.value.tagsStr.split(',').map((s: string) => s.trim()).filter(Boolean) : [] }
-    if (editingMemory.value) await axios.put(`/memories/${editingMemory.value.id}`, payload)
-    else await axios.post('/memories', payload)
-    ElMessage.success(t('common.success'))
-    showAddDialog.value = false
-    editingMemory.value = null
-    searchResults.value = []
-    await loadMemories()
-  } catch (e: any) { ElMessage.error(e.response?.data?.detail || t('common.failed')) }
+    const payload: any = { layer: form.value.layer, key: form.value.key, value: form.value.value, importance: form.value.importance / 100, tags: form.value.tagsStr ? form.value.tagsStr.split(',').map((s: string) => s.trim()).filter(Boolean) : [], memory_type: form.value.memory_type }
+    try {
+      const { data: scanResult } = await memoryApi.scanSecrets(form.value.key + ' ' + form.value.value)
+      if (scanResult?.found) {
+        secretMatches.value = scanResult.matches || []
+        pendingSaveData.value = payload
+        showSecretWarning.value = true
+        saving.value = false
+        return
+      }
+    } catch {}
+    await doSaveMemory(payload)
+  } catch (e: any) { ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('common.failed')) }
   finally { saving.value = false }
 }
 
@@ -366,7 +446,7 @@ async function handleScan() {
     const { data } = await axios.get('/openclaw-memories/scan')
     scanResult.value = data
   } catch (e: any) {
-    scanError.value = e.response?.data?.detail || t('memories.scanFailed')
+    scanError.value = e.response?.data?.error || e.response?.data?.detail || t('memories.scanFailed')
   } finally {
     scanning.value = false
   }
@@ -408,6 +488,77 @@ async function handleImport(agentName: string) {
     importing.value = false
   }
 }
+
+async function verifyMemory(id: number) {
+  try {
+    await memoryApi.verify(id)
+    ElMessage.success(t('memories.verified'))
+    await loadMemories()
+  } catch {
+    ElMessage.error(t('common.failed'))
+  }
+}
+
+async function handleExtract() {
+  if (!extractContent.value) return
+  extracting.value = true
+  try {
+    const { data } = await memoryApi.extract(extractContent.value)
+    extractResult.value = data
+  } catch {
+    ElMessage.error(t('common.failed'))
+  } finally {
+    extracting.value = false
+  }
+}
+
+async function handleExtractAndSave() {
+  if (!extractContent.value) return
+  extracting.value = true
+  try {
+    const { data } = await memoryApi.extractAndSave(extractContent.value, true)
+    ElMessage.success(t('memories.extractSaved', { count: data.saved }))
+    showExtractDialog.value = false
+    extractContent.value = ''
+    extractResult.value = null
+    await loadMemories()
+  } catch {
+    ElMessage.error(t('common.failed'))
+  } finally {
+    extracting.value = false
+  }
+}
+
+function getFreshness(m: any): { level: string; label: string } | null {
+  if (!m.updated_at) return null
+  const days = (Date.now() - new Date(m.updated_at).getTime()) / (1000 * 60 * 60 * 24)
+  if (days <= 1) return { level: 'fresh', label: t('memories.freshnessFresh') }
+  if (days <= 7) return { level: 'recent', label: t('memories.freshnessRecent') }
+  if (days <= 30) return { level: 'aging', label: t('memories.freshnessAging') }
+  return { level: 'stale', label: t('memories.freshnessStale') }
+}
+
+function forceSaveWithSecret() {
+  showSecretWarning.value = false
+  if (pendingSaveData.value) {
+    doSaveMemory(pendingSaveData.value)
+    pendingSaveData.value = null
+  }
+}
+
+async function doSaveMemory(payload: any) {
+  saving.value = true
+  try {
+    if (editingMemory.value) await axios.put(`/memories/${editingMemory.value.id}`, payload)
+    else await axios.post('/memories', payload)
+    ElMessage.success(t('common.success'))
+    showAddDialog.value = false
+    editingMemory.value = null
+    searchResults.value = []
+    await loadMemories()
+  } catch (e: any) { ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('common.failed')) }
+  finally { saving.value = false }
+}
 </script>
 
 <style scoped>
@@ -438,6 +589,19 @@ async function handleImport(agentName: string) {
 .card-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
 .tag { padding: 1px 8px; background: var(--cm-border); border-radius: 4px; font-size: 11px; color: var(--cm-text-muted); }
 .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--cm-border); }
+.type-tag { background: rgba(139,92,246,0.15); color: #8b5cf6; border: none; }
+.verified-badge { font-size: 12px; }
+.card-freshness { margin-top: 6px; }
+.freshness-tag { padding: 1px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+.freshness-tag.fresh { background: rgba(16,185,129,0.15); color: #10B981; }
+.freshness-tag.recent { background: rgba(6,182,212,0.15); color: #06b6d4; }
+.freshness-tag.aging { background: rgba(255,193,7,0.15); color: #ffc107; }
+.freshness-tag.stale { background: rgba(239,68,68,0.15); color: #ef4444; }
+.extract-item { padding: 10px; border: 1px solid var(--cm-border); border-radius: 8px; margin-bottom: 8px; }
+.extract-item-header { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+.extract-reason { font-size: 11px; color: var(--cm-text-muted); }
+.extract-item-key { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+.extract-item-value { font-size: 12px; color: var(--cm-text-muted); }
 .card-meta { font-size: 11px; color: var(--cm-text-placeholder); }
 .card-actions { display: flex; gap: 4px; }
 .pagination { display: flex; justify-content: center; margin-top: 20px; }

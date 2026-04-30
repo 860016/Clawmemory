@@ -31,6 +31,8 @@ type MemoryModel struct {
 	TrashedAt       *time.Time `json:"trashed_at"`
 	DecayStage      int        `json:"decay_stage"`
 	ReinforceCount  int        `json:"reinforce_count"`
+	MemoryType      string     `json:"memory_type"`
+	VerifiedAt      *time.Time `json:"verified_at"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 }
@@ -59,6 +61,7 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 		Tags:       tags,
 		Summary:    generateSummary(getString(data, "key", ""), getString(data, "value", "")),
 		Source:     getString(data, "source", "manual"),
+		MemoryType: getString(data, "memory_type", "knowledge"),
 		Status:     "active",
 		DecayStage: 0,
 	}
@@ -66,7 +69,7 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 	if err := s.db.Create(memory).Error; err != nil {
 		return nil, err
 	}
-	return toMemoryModel(memory), nil
+	return ToMemoryModel(memory), nil
 }
 
 func (s *MemoryService) Get(userID, id uint) (*MemoryModel, error) {
@@ -74,10 +77,10 @@ func (s *MemoryService) Get(userID, id uint) (*MemoryModel, error) {
 	if err := s.db.Where("user_id = ? AND id = ?", userID, id).First(&memory).Error; err != nil {
 		return nil, err
 	}
-	return toMemoryModel(&memory), nil
+	return ToMemoryModel(&memory), nil
 }
 
-func (s *MemoryService) List(userID uint, layer string, page, size int, status string) ([]*MemoryModel, int64, error) {
+func (s *MemoryService) List(userID uint, layer string, page, size int, status string, memoryType ...string) ([]*MemoryModel, int64, error) {
 	var memories []models.Memory
 	var total int64
 
@@ -85,6 +88,10 @@ func (s *MemoryService) List(userID uint, layer string, page, size int, status s
 
 	if layer != "" {
 		query = query.Where("layer = ?", layer)
+	}
+
+	if len(memoryType) > 0 && memoryType[0] != "" {
+		query = query.Where("memory_type = ?", memoryType[0])
 	}
 
 	if status != "" {
@@ -101,7 +108,7 @@ func (s *MemoryService) List(userID uint, layer string, page, size int, status s
 
 	result := make([]*MemoryModel, len(memories))
 	for i, m := range memories {
-		result[i] = toMemoryModel(&m)
+		result[i] = ToMemoryModel(&m)
 	}
 	return result, total, err
 }
@@ -131,6 +138,9 @@ func (s *MemoryService) Update(userID, id uint, data map[string]interface{}) (*M
 	}
 	if v, ok := data["importance"]; ok {
 		updates["importance"] = v
+	}
+	if v, ok := data["memory_type"]; ok {
+		updates["memory_type"] = v
 	}
 	if v, ok := data["tags"]; ok {
 		if tags, ok := v.([]interface{}); ok {
@@ -165,7 +175,7 @@ func (s *MemoryService) SearchKeyword(userID uint, q string, limit int) ([]*Memo
 
 	result := make([]*MemoryModel, len(memories))
 	for i, m := range memories {
-		result[i] = toMemoryModel(&m)
+		result[i] = ToMemoryModel(&m)
 	}
 	return result, err
 }
@@ -177,7 +187,7 @@ func (s *MemoryService) IncrementAccess(id uint) error {
 	}).Error
 }
 
-func toMemoryModel(m *models.Memory) *MemoryModel {
+func ToMemoryModel(m *models.Memory) *MemoryModel {
 	var tags []string
 	if m.Tags != "" {
 		json.Unmarshal([]byte(m.Tags), &tags)
@@ -202,6 +212,8 @@ func toMemoryModel(m *models.Memory) *MemoryModel {
 		TrashedAt:       m.TrashedAt,
 		DecayStage:      m.DecayStage,
 		ReinforceCount:  m.ReinforceCount,
+		MemoryType:      m.MemoryType,
+		VerifiedAt:      m.VerifiedAt,
 		CreatedAt:       m.CreatedAt,
 		UpdatedAt:       m.UpdatedAt,
 	}

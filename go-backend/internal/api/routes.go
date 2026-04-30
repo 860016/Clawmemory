@@ -117,6 +117,16 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.GET("/memories/smart-load", handleSmartLoad(db))
 		authorized.POST("/memories/:id/reinforce", handleReinforceMemory(db))
 		authorized.POST("/memories/generate-summaries", handleGenerateSummaries(db))
+		authorized.POST("/memories/extract", handleExtractMemories(db))
+		authorized.POST("/memories/extract-and-save", handleExtractAndSave(db))
+		authorized.POST("/memories/:id/verify", handleVerifyMemory(db))
+		authorized.POST("/memories/scan-secrets", handleScanSecrets(db))
+
+		authorized.GET("/session-memories", handleListSessionMemories(db))
+		authorized.POST("/session-memories", handleCreateSessionMemory(db))
+		authorized.GET("/session-memories/:id", handleGetSessionMemory(db))
+		authorized.PUT("/session-memories/:id", handleUpdateSessionMemory(db))
+		authorized.DELETE("/session-memories/:id", handleDeleteSessionMemory(db))
 
 		authorized.GET("/openclaw-skills/scan", handleScanSkills)
 		authorized.GET("/openclaw-skills/detail", handleSkillDetail)

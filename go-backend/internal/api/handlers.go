@@ -26,7 +26,7 @@ func handleInitStatus(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		passwordSet, err := authService.CheckInitStatus()
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"detail": "failed to check init status"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check init status"})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
@@ -41,18 +41,18 @@ func handleSetPassword(authService *services.AuthService) gin.HandlerFunc {
 			Password string `json:"password" binding:"required"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
 		if len(req.Password) < 4 {
-			c.JSON(http.StatusBadRequest, gin.H{"detail": "password too short"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "password too short"})
 			return
 		}
 
 		token, err := authService.SetPassword(req.Password)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -67,7 +67,7 @@ func handleLogin(authService *services.AuthService) gin.HandlerFunc {
 			Password string `json:"password" binding:"required"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"detail": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -77,7 +77,7 @@ func handleLogin(authService *services.AuthService) gin.HandlerFunc {
 
 		token, err := authService.Login(req.Username, req.Password)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"detail": err.Error()})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -89,13 +89,13 @@ func handleGetMe(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, exists := c.Get("user_id")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"detail": "unauthorized"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
 
 		user, err := authService.GetUserByID(userID.(uint))
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"detail": "user not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 			return
 		}
 
@@ -161,6 +161,16 @@ func handleResetPassword(authService *services.AuthService) gin.HandlerFunc {
 
 func handleForgotPassword(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		passwordSet, err := authService.CheckInitStatus()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check init status"})
+			return
+		}
+		if !passwordSet {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no password set yet, please set a password first"})
+			return
+		}
+
 		var req struct {
 			NewPassword string `json:"new_password"`
 			Confirm     bool   `json:"confirm"`
@@ -193,7 +203,7 @@ func handleForgotPassword(authService *services.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": "密码重置成功"})
+		c.JSON(http.StatusOK, gin.H{"message": "password reset successful"})
 	}
 }
 
@@ -271,10 +281,11 @@ func handleListMemories(db *gorm.DB) gin.HandlerFunc {
 		svc := services.NewMemoryService(db)
 		layer := c.Query("layer")
 		status := c.Query("status")
+		memoryType := c.Query("memory_type")
 		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 		size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 
-		memories, total, err := svc.List(userID, layer, page, size, status)
+		memories, total, err := svc.List(userID, layer, page, size, status, memoryType)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -303,6 +314,8 @@ func handleCreateMemory(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		secretResult := services.ScanSecrets(key + " " + value)
+
 		svc := services.NewMemoryService(db)
 		memory, err := svc.Create(userID, req)
 		if err != nil {
@@ -310,7 +323,11 @@ func handleCreateMemory(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusCreated, memory)
+		response := gin.H{"memory": memory}
+		if secretResult.Found {
+			response["secret_warning"] = secretResult
+		}
+		c.JSON(http.StatusCreated, response)
 	}
 }
 
@@ -338,13 +355,24 @@ func handleUpdateMemory(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		var secretResult *services.SecretScanResult
+		if value, ok := req["value"].(string); ok {
+			key, _ := req["key"].(string)
+			secretResult = services.ScanSecrets(key + " " + value)
+		}
+
 		svc := services.NewMemoryService(db)
 		memory, err := svc.Update(userID, uint(id), req)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 			return
 		}
-		c.JSON(http.StatusOK, memory)
+
+		response := gin.H{"memory": memory}
+		if secretResult != nil && secretResult.Found {
+			response["secret_warning"] = secretResult
+		}
+		c.JSON(http.StatusOK, response)
 	}
 }
 
@@ -446,16 +474,39 @@ func enrichChromaResults(db *gorm.DB, userID uint, chromaResults []map[string]in
 			var id uint
 			fmt.Sscanf(memIDStr, "%d", &id)
 			if m, found := memMap[id]; found {
+				var tags []string
+				if m.Tags != "" {
+					json.Unmarshal([]byte(m.Tags), &tags)
+				}
+				if tags == nil {
+					tags = []string{}
+				}
 				item := map[string]interface{}{
-					"id":         m.ID,
-					"key":        m.Key,
-					"value":      m.Value,
-					"layer":      m.Layer,
-					"importance": m.Importance,
-					"source":     m.Source,
-					"status":     m.Status,
-					"created_at": m.CreatedAt.Format("2006-01-02 15:04:05"),
-					"updated_at": m.UpdatedAt.Format("2006-01-02 15:04:05"),
+					"id":              m.ID,
+					"key":             m.Key,
+					"value":           m.Value,
+					"layer":           m.Layer,
+					"importance":      m.Importance,
+					"source":          m.Source,
+					"status":          m.Status,
+					"summary":         m.Summary,
+					"tags":            tags,
+					"memory_type":     m.MemoryType,
+					"decay_stage":     m.DecayStage,
+					"reinforce_count": m.ReinforceCount,
+					"access_count":    m.AccessCount,
+					"is_encrypted":    m.IsEncrypted,
+					"created_at":      m.CreatedAt.Format("2006-01-02 15:04:05"),
+					"updated_at":      m.UpdatedAt.Format("2006-01-02 15:04:05"),
+				}
+				if m.VerifiedAt != nil {
+					item["verified_at"] = m.VerifiedAt.Format("2006-01-02 15:04:05")
+				}
+				if m.TrashedAt != nil {
+					item["trashed_at"] = m.TrashedAt.Format("2006-01-02 15:04:05")
+				}
+				if m.LastAccessedAt != nil {
+					item["last_accessed_at"] = m.LastAccessedAt.Format("2006-01-02 15:04:05")
 				}
 				if score, ok := r["score"].(float64); ok {
 					item["score"] = math.Round(score*1000) / 1000
@@ -968,15 +1019,15 @@ func handleUpdateSettings(db *gorm.DB) gin.HandlerFunc {
 
 func proErrorHandler(c *gin.Context, err error) {
 	if proErr, ok := err.(*services.ProError); ok {
-		c.JSON(proErr.Code, gin.H{"detail": proErr.Message})
+		c.JSON(proErr.Code, gin.H{"error": proErr.Message})
 		return
 	}
-	c.JSON(http.StatusInternalServerError, gin.H{"detail": err.Error()})
+	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 }
 
 func checkPro(proxy *services.ProProxy, c *gin.Context) bool {
 	if !proxy.IsPro() {
-		c.JSON(http.StatusForbidden, gin.H{"detail": "Pro license required"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Pro license required"})
 		return false
 	}
 	return true
@@ -2840,6 +2891,10 @@ func handleDownloadBackup(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 		filename := c.Param("filename")
+		if strings.Contains(filename, "..") || strings.ContainsAny(filename, "/\\") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid filename"})
+			return
+		}
 		backupPath := filepath.Join(".", "backups", fmt.Sprintf("%d", userID), filename)
 
 		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
@@ -2855,6 +2910,10 @@ func handleRestoreBackup(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 		filename := c.Param("filename")
+		if strings.Contains(filename, "..") || strings.ContainsAny(filename, "/\\") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid filename"})
+			return
+		}
 		backupPath := filepath.Join(".", "backups", fmt.Sprintf("%d", userID), filename)
 
 		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
@@ -2869,7 +2928,10 @@ func handleRestoreBackup(db *gorm.DB) gin.HandlerFunc {
 		}
 		defer src.Close()
 
-		dbPath := filepath.Join(".", "data", "clawmemory.db")
+		dbPath := "clawmemory.db"
+		if envDb := os.Getenv("DB_PATH"); envDb != "" {
+			dbPath = envDb
+		}
 		dst, err := os.Create(dbPath)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot write database file"})
@@ -2890,6 +2952,10 @@ func handleDeleteBackup(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 		filename := c.Param("filename")
+		if strings.Contains(filename, "..") || strings.ContainsAny(filename, "/\\") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid filename"})
+			return
+		}
 		backupPath := filepath.Join(".", "backups", fmt.Sprintf("%d", userID), filename)
 
 		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
@@ -2994,7 +3060,11 @@ func handleExportData(db *gorm.DB) gin.HandlerFunc {
 
 		var memories []models.Memory
 		db.Where("user_id = ?", userID).Find(&memories)
-		exportData["memories"] = memories
+		memoryModels := make([]*services.MemoryModel, 0, len(memories))
+		for i := range memories {
+			memoryModels = append(memoryModels, services.ToMemoryModel(&memories[i]))
+		}
+		exportData["memories"] = memoryModels
 
 		var entities []models.Entity
 		db.Where("user_id = ?", userID).Find(&entities)
@@ -3021,7 +3091,7 @@ func handleExportData(db *gorm.DB) gin.HandlerFunc {
 		exportData["daily_reports"] = reports
 
 		exportData["exported_at"] = time.Now().Format(time.RFC3339)
-		exportData["version"] = "2.9.0"
+		exportData["version"] = "2.9.1"
 
 		c.JSON(http.StatusOK, exportData)
 	}
@@ -3385,6 +3455,262 @@ func getString(m map[string]interface{}, key, def string) string {
 		return v
 	}
 	return def
+}
+
+func handleExtractMemories(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Content string `json:"content" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "content is required"})
+			return
+		}
+
+		userID := middleware.GetUserID(c)
+		svc := services.NewExtractionService(db, userID)
+		result := svc.ExtractFromConversation(req.Content)
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func handleExtractAndSave(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Content  string `json:"content" binding:"required"`
+			AutoSave bool   `json:"auto_save"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "content is required"})
+			return
+		}
+
+		userID := middleware.GetUserID(c)
+		svc := services.NewExtractionService(db, userID)
+		result := svc.ExtractFromConversation(req.Content)
+
+		if req.AutoSave && result.Count > 0 {
+			saved := 0
+			for _, em := range result.Memories {
+				data := map[string]interface{}{
+					"key":         em.Key,
+					"value":       em.Value,
+					"layer":       em.Layer,
+					"memory_type": em.MemoryType,
+					"importance":  em.Importance,
+					"tags":        em.Tags,
+					"source":      em.Source,
+				}
+				memSvc := services.NewMemoryService(db)
+				if _, err := memSvc.Create(userID, data); err == nil {
+					saved++
+				}
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"extracted": result.Count,
+				"saved":     saved,
+				"memories":  result.Memories,
+				"warnings":  result.Warnings,
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func handleVerifyMemory(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		id, _ := strconv.Atoi(c.Param("id"))
+
+		var memory models.Memory
+		if err := db.Where("id = ? AND user_id = ?", id, userID).First(&memory).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "memory not found"})
+			return
+		}
+
+		now := time.Now()
+		memory.VerifiedAt = &now
+		memory.ReinforceCount++
+		if err := db.Save(&memory).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":          memory.ID,
+			"verified_at": memory.VerifiedAt.Format("2006-01-02 15:04:05"),
+			"message":     "memory verified successfully",
+		})
+	}
+}
+
+func handleScanSecrets(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Content string `json:"content" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "content is required"})
+			return
+		}
+
+		result := services.ScanSecrets(req.Content)
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func handleCreateSessionMemory(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		var data map[string]interface{}
+		if err := c.ShouldBindJSON(&data); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		session := models.SessionMemory{
+			UserID:        userID,
+			SessionID:     getString(data, "session_id", ""),
+			Title:         getString(data, "title", ""),
+			CurrentState:  getString(data, "current_state", ""),
+			TaskSpec:      getString(data, "task_spec", ""),
+			FilesAndFuncs: getString(data, "files_and_funcs", ""),
+			Workflow:      getString(data, "workflow", ""),
+			Errors:        getString(data, "errors", ""),
+			Docs:          getString(data, "docs", ""),
+			Learnings:     getString(data, "learnings", ""),
+			KeyResults:    getString(data, "key_results", ""),
+			Worklog:       getString(data, "worklog", ""),
+			Status:        getString(data, "status", "active"),
+		}
+
+		if v, ok := data["token_count"].(float64); ok {
+			session.TokenCount = int(v)
+		}
+		if v, ok := data["compressed_from"].(string); ok {
+			session.CompressedFrom = v
+		}
+
+		if err := db.Create(&session).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, session)
+	}
+}
+
+func handleListSessionMemories(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		sessionID := c.Query("session_id")
+		status := c.Query("status")
+
+		var sessions []models.SessionMemory
+		query := db.Where("user_id = ?", userID)
+		if sessionID != "" {
+			query = query.Where("session_id = ?", sessionID)
+		}
+		if status != "" {
+			query = query.Where("status = ?", status)
+		}
+		query.Order("updated_at DESC").Find(&sessions)
+
+		c.JSON(http.StatusOK, gin.H{"items": sessions})
+	}
+}
+
+func handleGetSessionMemory(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		id, _ := strconv.Atoi(c.Param("id"))
+
+		var session models.SessionMemory
+		if err := db.Where("id = ? AND user_id = ?", id, userID).First(&session).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "session memory not found"})
+			return
+		}
+		c.JSON(http.StatusOK, session)
+	}
+}
+
+func handleUpdateSessionMemory(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		id, _ := strconv.Atoi(c.Param("id"))
+		var data map[string]interface{}
+		if err := c.ShouldBindJSON(&data); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var session models.SessionMemory
+		if err := db.Where("id = ? AND user_id = ?", id, userID).First(&session).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "session memory not found"})
+			return
+		}
+
+		updatables := []string{
+			"title", "current_state", "task_spec", "files_and_funcs",
+			"workflow", "errors", "docs", "learnings", "key_results",
+			"worklog", "status", "session_id", "compressed_from",
+		}
+		for _, field := range updatables {
+			if v, ok := data[field].(string); ok {
+				switch field {
+				case "title":
+					session.Title = v
+				case "current_state":
+					session.CurrentState = v
+				case "task_spec":
+					session.TaskSpec = v
+				case "files_and_funcs":
+					session.FilesAndFuncs = v
+				case "workflow":
+					session.Workflow = v
+				case "errors":
+					session.Errors = v
+				case "docs":
+					session.Docs = v
+				case "learnings":
+					session.Learnings = v
+				case "key_results":
+					session.KeyResults = v
+				case "worklog":
+					session.Worklog = v
+				case "status":
+					session.Status = v
+				case "session_id":
+					session.SessionID = v
+				case "compressed_from":
+					session.CompressedFrom = v
+				}
+			}
+		}
+		if v, ok := data["token_count"].(float64); ok {
+			session.TokenCount = int(v)
+		}
+
+		if err := db.Save(&session).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, session)
+	}
+}
+
+func handleDeleteSessionMemory(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		id, _ := strconv.Atoi(c.Param("id"))
+
+		if err := db.Where("id = ? AND user_id = ?", id, userID).Delete(&models.SessionMemory{}).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+	}
 }
 
 func toJSONStr(v interface{}) string {

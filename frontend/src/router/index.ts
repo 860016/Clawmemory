@@ -10,6 +10,7 @@ const router = createRouter({
       children: [
         { path: '', name: 'dashboard', component: () => import('../views/DashboardView.vue') },
         { path: 'memories', name: 'memories', component: () => import('../views/MemoriesView.vue') },
+        { path: 'session-memories', name: 'session-memories', component: () => import('../views/SessionMemoryView.vue') },
         { path: 'knowledge', name: 'knowledge', component: () => import('../views/KnowledgeViewV2.vue') },
         { path: 'skills', redirect: '/?tab=skills' },
         { path: 'wiki', name: 'wiki', component: () => import('../views/WikiView.vue') },

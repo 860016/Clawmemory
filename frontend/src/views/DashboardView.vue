@@ -539,7 +539,7 @@ async function checkChromaDB() {
       ElMessage.warning(data.reason || t('dashboard.chromadbNotInstalled'))
     }
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || t('dashboard.installFailed'))
+    ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('dashboard.installFailed'))
   } finally {
     installing.value = false
   }

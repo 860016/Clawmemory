@@ -254,7 +254,7 @@ const newPassword = ref('')
 const settingPassword = ref(false)
 const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
-const appVersion = ref('2.9.0')
+const appVersion = ref('2.9.1')
 
 const decayEnabled = ref(false)
 const decayLoading = ref(false)
@@ -377,7 +377,7 @@ async function activateLicense() {
       ElMessage.error(data.message || t('common.failed'))
     }
   } catch (e: any) {
-    const detail = e.response?.data?.detail
+    const detail = e.response?.data?.error || e.response?.data?.detail
     if (typeof detail === 'string') {
       ElMessage.error(detail)
     } else {

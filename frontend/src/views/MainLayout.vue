@@ -189,7 +189,7 @@ import {
   Menu, User, Search, Sunny, Moon, Trophy, SwitchButton,
   DataAnalysis, MagicStick, Upload, Grid, Share,
   TrendCharts, Warning, Cpu, FolderOpened, Lock, Coin, Monitor,
-  DocumentChecked, Star, Timer, Compass, CircleCheck, SuccessFilled
+  DocumentChecked, Star, Timer, Compass, CircleCheck, SuccessFilled, Memo
 } from '@element-plus/icons-vue'
 import axios from '../api/go-client'
 
@@ -283,6 +283,7 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
     { items: [
       { path: '/memories', label: 'memories.all', icon: Collection },
       { path: '/memories?import=openclaw', label: 'memories.importOpenClaw', icon: Upload },
+      { path: '/session-memories', label: 'sessionMemory.title', icon: Memo },
     ]}
   ],
   '/knowledge': [],

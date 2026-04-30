@@ -1,4 +1,4 @@
-# ClawMemory v2.0 — AI 记忆管理工具
+# ClawMemory v2.9.1 — AI 记忆管理工具
 
 ClawMemory 是一款现代化的 AI 记忆管理工具，支持知识图谱、智能日报、记忆衰减分析、冲突检测等高级功能。
 
@@ -8,35 +8,24 @@ ClawMemory 是一款现代化的 AI 记忆管理工具，支持知识图谱、�
 
 ## ✨ 核心特性
 
-| 特性 | 开源版 | Pro 版 |
-|------|--------|--------|
-| 记忆管理 | ✓ | ✓ |
-| 知识图谱 (网格/图谱/列表三视图) | ✓ | ✓ |
-| Wiki 知识库 | ✓ | ✓ |
-| 智能日报 | ✓ | ✓ |
-| 本地数据导出/导入 | ✓ | ✓ |
-| 全文搜索 + 语义搜索 | ✓ | ✓ |
-| ChromaDB 向量搜索 | ✓ | ✓ |
-| 智能记忆加载 (Token 预算控制) | ✓ | ✓ |
-| 记忆强化机制 | ✓ | ✓ |
-| OpenClaw 记忆导入 | ✓ | ✓ |
-| 技能系统 | ✓ | ✓ |
-| 记忆衰减算法 | 基础 | 高级 |
-| 冲突检测 | 基础 | 高级 |
-| Token 智能路由 | 基础 | 高级 |
-| AI 提取/摘要 | - | ✓ |
-| 趋势分析 | - | ✓ |
-| 报告生成 | - | ✓ |
-
-### 🤖 支持的 AI 模型 (Pro 云端功能)
-
-- **OpenAI**: GPT-4o / GPT-4o-mini / GPT-4-turbo / GPT-3.5-turbo
-- **Anthropic**: Claude 3.5 Sonnet / Claude 3 Opus / Claude 3 Haiku
-- **DeepSeek**: DeepSeek-Chat / DeepSeek-Reasoner
-- **月之暗面 (Moonshot)**: moonshot-v1-8k/32k/128k
-- **智谱 (Zhipu)**: GLM-4 / GLM-4-Flash / GLM-4-Air
-- **通义千问 (Qwen)**: Qwen-Max / Qwen-Plus / Qwen-Turbo
-- **自定义**: 任意 OpenAI 兼容 API
+- 记忆管理
+- 知识图谱 (网格/图谱/列表三视图)
+- Wiki 知识库
+- 智能日报
+- 本地数据导出/导入
+- 全文搜索 + 语义搜索
+- ChromaDB 向量搜索
+- 智能记忆加载 (Token 预算控制)
+- 记忆强化机制
+- OpenClaw 记忆导入
+- 技能系统
+- 记忆衰减算法
+- 冲突检测
+- Token 智能路由
+- AI 提取/摘要
+- 趋势分析
+- 报告生成
+- Pro 高级功能
 
 ---
 
@@ -73,26 +62,6 @@ powershell -ExecutionPolicy Bypass -File install.ps1
 
 ---
 
-## 🔐 激活流程
-
-```
-用户输入授权码 → Go后端调用授权服务器 → RSA签名验证 → 保存到本地数据库 → 激活成功
-```
-
-激活后，Pro 功能分为两种运行方式：
-
-### 本地功能（无需联网）
-- 记忆衰减计算
-- 冲突检测
-- Token 智能路由
-
-### 云端功能（需要联网）
-- AI 提取/摘要
-- 趋势分析
-- 报告生成
-
----
-
 ## 🏗️ 架构
 
 ```
@@ -103,10 +72,6 @@ clawmemory/
 │   │   ├── api/              # HTTP API
 │   │   ├── services/         # 业务逻辑
 │   │   └── models/           # 数据模型
-│   ├── pro/                  # Pro 本地功能 (开源)
-│   │   ├── decay/            # 记忆衰减算法
-│   │   ├── conflict/         # 冲突检测
-│   │   └── router/           # Token 路由
 │   ├── frontend_dist/        # 前端构建产物
 │   └── go.mod
 ├── frontend/                 # Vue3 前端源码
@@ -128,7 +93,6 @@ clawmemory/
 | `SECRET_KEY` | (自动生成) | JWT 密钥 |
 | `PORT` | `8765` | 监听端口 |
 | `DATA_DIR` | `./data` | 数据目录 |
-| `LICENSE_SERVER_URL` | `https://auth.bestu.top` | 授权服务器 |
 
 ---
 
@@ -191,6 +155,11 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 
 ## 📝 更新日志
 
+### v2.9.1 (2026-04-30)
+- 🔒 安全加固：密码重置验证、备份路径遍历防护
+- 🐛 修复：ChromaDB 搜索结果字段补全、导出数据格式修正
+- 🔗 前后端一致性：错误响应字段统一为 `error`
+
 ### v2.0 (2026-04-29)
 - 🎨 全新现代化 UI (知识图谱/日报/主布局)
 - 🤖 AI 提取/摘要 (支持国内外 7+ 主流模型)
@@ -200,15 +169,13 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - 🔍 ChromaDB 向量搜索支持
 - 🌍 完善国际化 (中文/英文)
 - 🚀 Go 高性能后端 (全平台编译)
-- ☁️ Pro 云端 API 方案
 - 🔒 移除 Python 后端和 Docker，简化架构
 
 ---
 
 ## 📄 许可证
 
-- 开源版: MIT License
-- Pro 版: 商业授权，联系 [auth.bestu.top](https://auth.bestu.top)
+MIT License
 
 ---
 
@@ -304,7 +271,6 @@ git clone https://github.com/860016/Clawmemory.git && cd Clawmemory && bash inst
 | 参数 | 说明 | 示例 |
 |------|------|------|
 | `--port=PORT` | 自定义端口 | `--port=3000` |
-| `--license-server=URL` | 自定义授权服务器 | `--license-server=https://auth.example.com` |
 | `--install-path=PATH` | 自定义安装路径 | `--install-path=/opt/clawmemory` |
 | `--auto-start` | 安装后自动启动 | `--auto-start` |
 | `--upgrade` | 升级模式（保留配置） | `--upgrade` |

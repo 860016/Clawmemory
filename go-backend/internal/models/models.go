@@ -34,6 +34,8 @@ type Memory struct {
 	TrashedAt     *time.Time     `json:"trashed_at"`
 	DecayStage    int            `gorm:"default:0" json:"decay_stage"`
 	ReinforceCount int           `gorm:"default:0" json:"reinforce_count"`
+	MemoryType    string         `gorm:"size:20;default:knowledge" json:"memory_type"`
+	VerifiedAt    *time.Time     `json:"verified_at"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
 }
@@ -178,4 +180,26 @@ type Backup struct {
 	Size      int64     `json:"size"`
 	Type      string    `gorm:"size:20" json:"type"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+// SessionMemory 会话记忆 - 上下文压缩专用
+type SessionMemory struct {
+	ID              uint      `gorm:"primarykey" json:"id"`
+	UserID          uint      `gorm:"index;not null;default:1" json:"user_id"`
+	SessionID       string    `gorm:"size:100;index" json:"session_id"`
+	Title           string    `gorm:"size:200" json:"title"`
+	CurrentState    string    `gorm:"type:text" json:"current_state"`
+	TaskSpec        string    `gorm:"type:text" json:"task_spec"`
+	FilesAndFuncs   string    `gorm:"type:text" json:"files_and_funcs"`
+	Workflow        string    `gorm:"type:text" json:"workflow"`
+	Errors          string    `gorm:"type:text" json:"errors"`
+	Docs            string    `gorm:"type:text" json:"docs"`
+	Learnings       string    `gorm:"type:text" json:"learnings"`
+	KeyResults      string    `gorm:"type:text" json:"key_results"`
+	Worklog         string    `gorm:"type:text" json:"worklog"`
+	TokenCount      int       `gorm:"default:0" json:"token_count"`
+	CompressedFrom  string    `gorm:"size:100" json:"compressed_from"`
+	Status          string    `gorm:"size:20;default:active" json:"status"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }

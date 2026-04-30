@@ -38,6 +38,7 @@ type LoadedMemory struct {
 	Value          string          `json:"value,omitempty"`
 	Summary        string          `json:"summary"`
 	Layer          string          `json:"layer"`
+	MemoryType     string          `json:"memory_type"`
 	Importance     float64         `json:"importance"`
 	Tags           []string        `json:"tags"`
 	Source         string          `json:"source"`
@@ -45,6 +46,10 @@ type LoadedMemory struct {
 	LoadLevel      MemoryLoadLevel `json:"load_level"`
 	RelatedIDs     []uint          `json:"related_ids,omitempty"`
 	EstimatedTokens int            `json:"estimated_tokens"`
+	Freshness      string          `json:"freshness"`
+	FreshnessWarning string        `json:"freshness_warning,omitempty"`
+	VerifiedAt     string          `json:"verified_at,omitempty"`
+	VerificationWarning string     `json:"verification_warning,omitempty"`
 	CreatedAt      string          `json:"created_at"`
 }
 
@@ -164,44 +169,11 @@ func (s *SmartLoadService) allocateByBudget(scored []scoredMemory, tokenBudget i
 		summary := s.getOrGenerateSummary(m)
 
 		var level MemoryLoadLevel
-		var mem LoadedMemory
-
 		switch loadLevel {
 		case "summary":
 			level = LoadLevelSummary
-			estTokens := estimateTokenCount(m.Key) + estimateTokenCount(summary)
-			mem = LoadedMemory{
-				ID:              m.ID,
-				Key:             m.Key,
-				Summary:         summary,
-				Layer:           m.Layer,
-				Importance:      m.Importance,
-				Tags:            parseTagsSlice(m.Tags),
-				Source:          m.Source,
-				Score:           math.Round(sm.Score*1000) / 1000,
-				LoadLevel:       level,
-				EstimatedTokens: estTokens,
-				CreatedAt:       m.CreatedAt.Format("2006-01-02 15:04:05"),
-			}
-
 		case "full":
 			level = LoadLevelFull
-			estTokens := estimateTokenCount(m.Key) + estimateTokenCount(m.Value)
-			mem = LoadedMemory{
-				ID:              m.ID,
-				Key:             m.Key,
-				Value:           m.Value,
-				Summary:         summary,
-				Layer:           m.Layer,
-				Importance:      m.Importance,
-				Tags:            parseTagsSlice(m.Tags),
-				Source:          m.Source,
-				Score:           math.Round(sm.Score*1000) / 1000,
-				LoadLevel:       level,
-				EstimatedTokens: estTokens,
-				CreatedAt:       m.CreatedAt.Format("2006-01-02 15:04:05"),
-			}
-
 		default:
 			if sm.Score >= 0.6 {
 				level = LoadLevelFull
@@ -210,30 +182,38 @@ func (s *SmartLoadService) allocateByBudget(scored []scoredMemory, tokenBudget i
 			} else {
 				level = LoadLevelSummary
 			}
+		}
 
-			var value string
-			estTokens := estimateTokenCount(m.Key)
-			if level == LoadLevelFull || level == LoadLevelStandard {
-				value = m.Value
-				estTokens += estimateTokenCount(m.Value)
-			} else {
-				estTokens += estimateTokenCount(summary)
-			}
+		var value string
+		estTokens := estimateTokenCount(m.Key)
+		if level == LoadLevelFull || level == LoadLevelStandard {
+			value = m.Value
+			estTokens += estimateTokenCount(m.Value)
+		} else {
+			estTokens += estimateTokenCount(summary)
+		}
 
-			mem = LoadedMemory{
-				ID:              m.ID,
-				Key:             m.Key,
-				Value:           value,
-				Summary:         summary,
-				Layer:           m.Layer,
-				Importance:      m.Importance,
-				Tags:            parseTagsSlice(m.Tags),
-				Source:          m.Source,
-				Score:           math.Round(sm.Score*1000) / 1000,
-				LoadLevel:       level,
-				EstimatedTokens: estTokens,
-				CreatedAt:       m.CreatedAt.Format("2006-01-02 15:04:05"),
-			}
+		freshness, freshnessWarning := computeFreshness(m.UpdatedAt)
+		verifiedAt, verificationWarning := computeVerification(m)
+
+		mem := LoadedMemory{
+			ID:                   m.ID,
+			Key:                  m.Key,
+			Value:                value,
+			Summary:              summary,
+			Layer:                m.Layer,
+			MemoryType:           m.MemoryType,
+			Importance:           m.Importance,
+			Tags:                 parseTagsSlice(m.Tags),
+			Source:               m.Source,
+			Score:                math.Round(sm.Score*1000) / 1000,
+			LoadLevel:            level,
+			EstimatedTokens:      estTokens,
+			Freshness:            freshness,
+			FreshnessWarning:     freshnessWarning,
+			VerifiedAt:           verifiedAt,
+			VerificationWarning:  verificationWarning,
+			CreatedAt:            m.CreatedAt.Format("2006-01-02 15:04:05"),
 		}
 
 		if remainingBudget-mem.EstimatedTokens < 0 && len(result) > 0 {
@@ -244,6 +224,36 @@ func (s *SmartLoadService) allocateByBudget(scored []scoredMemory, tokenBudget i
 	}
 
 	return result
+}
+
+func computeFreshness(updatedAt time.Time) (string, string) {
+	days := time.Since(updatedAt).Hours() / 24
+
+	switch {
+	case days <= 1:
+		return "fresh", ""
+	case days <= 7:
+		return "recent", ""
+	case days <= 30:
+		return "aging", fmt.Sprintf("This memory is %d days old. Verify before relying on it.", int(days))
+	default:
+		return "stale", fmt.Sprintf("This memory is %d days old and may be outdated. Memories are point-in-time observations, not live state. Verify against current context before asserting as fact.", int(days))
+	}
+}
+
+func computeVerification(m models.Memory) (string, string) {
+	if m.VerifiedAt == nil {
+		if time.Since(m.CreatedAt).Hours()/24 > 7 {
+			return "", "This memory has never been verified. Consider verifying before use."
+		}
+		return "", ""
+	}
+
+	daysSinceVerify := time.Since(*m.VerifiedAt).Hours() / 24
+	if daysSinceVerify > 30 {
+		return m.VerifiedAt.Format("2006-01-02"), fmt.Sprintf("Last verified %d days ago. Content may have changed since verification.", int(daysSinceVerify))
+	}
+	return m.VerifiedAt.Format("2006-01-02"), ""
 }
 
 func (s *SmartLoadService) getOrGenerateSummary(m models.Memory) string {
