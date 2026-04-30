@@ -10,9 +10,9 @@
           <el-icon><Search /></el-icon>
           <input v-model="searchQuery" :placeholder="$t('knowledge.searchPlaceholder')" />
         </div>
-        <button class="btn-primary" @click="openCreateDialog">
+        <el-button type="primary" @click="openCreateDialog">
           <el-icon><Plus /></el-icon> {{ $t('knowledge.addEntity') }}
-        </button>
+        </el-button>
       </div>
     </div>
 
@@ -34,7 +34,7 @@
       <div v-else-if="error" class="state-block error">
         <div class="error-icon">⚠️</div>
         <p>{{ error }}</p>
-        <button class="btn-primary" @click="loadData">{{ $t('common.retry') }}</button>
+        <el-button type="primary" @click="loadData">{{ $t('common.retry') }}</el-button>
       </div>
 
       <div v-else-if="filteredEntities.length" class="cards-grid">
@@ -79,7 +79,7 @@
         </div>
         <h3>{{ $t('knowledge.emptyGraph') }}</h3>
         <p>{{ $t('knowledge.emptyHint') }}</p>
-        <button class="btn-primary" @click="openCreateDialog">{{ $t('knowledge.addEntity') }}</button>
+        <el-button type="primary" @click="openCreateDialog">{{ $t('knowledge.addEntity') }}</el-button>
       </div>
     </div>
 
@@ -132,12 +132,12 @@
           </div>
         </div>
         <div class="drawer-actions">
-          <button class="btn-secondary" @click="openEditDialog(detailEntity); detailVisible = false">
+          <el-button @click="openEditDialog(detailEntity); detailVisible = false">
             <el-icon><Edit /></el-icon> {{ $t('common.edit') }}
-          </button>
-          <button class="btn-danger" @click="confirmDelete(detailEntity.id); detailVisible = false">
+          </el-button>
+          <el-button type="danger" @click="confirmDelete(detailEntity.id); detailVisible = false">
             <el-icon><Delete /></el-icon> {{ $t('common.delete') }}
-          </button>
+          </el-button>
         </div>
       </div>
     </el-drawer>
@@ -163,8 +163,8 @@
         <textarea v-model="formData.description" class="field-input" rows="3" :placeholder="$t('knowledge.descriptionPlaceholder')"></textarea>
       </div>
       <template #footer>
-        <button class="btn-secondary" @click="showCreateDialog = false">{{ $t('common.cancel') }}</button>
-        <button class="btn-primary" @click="createEntity">{{ $t('common.create') }}</button>
+        <el-button @click="showCreateDialog = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="createEntity">{{ $t('common.create') }}</el-button>
       </template>
     </el-dialog>
 
@@ -189,8 +189,8 @@
         <textarea v-model="formData.description" class="field-input" rows="3"></textarea>
       </div>
       <template #footer>
-        <button class="btn-secondary" @click="showEditDialog = false">{{ $t('common.cancel') }}</button>
-        <button class="btn-primary" @click="updateEntity">{{ $t('common.save') }}</button>
+        <el-button @click="showEditDialog = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="updateEntity">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
 
@@ -212,8 +212,8 @@
         </select>
       </div>
       <template #footer>
-        <button class="btn-secondary" @click="showRelationDialog = false">{{ $t('common.cancel') }}</button>
-        <button class="btn-primary" @click="createRelation">{{ $t('common.create') }}</button>
+        <el-button @click="showRelationDialog = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="createRelation">{{ $t('common.create') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -660,56 +660,6 @@ onMounted(loadData)
 .card-time {
   font-size: 11px;
   color: var(--cm-text-muted, #999);
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 18px;
-  background: var(--cm-primary, #6366f1);
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 18px;
-  background: var(--cm-bg, #fafafa);
-  color: var(--cm-text, #1a1a1a);
-  border: 1px solid var(--cm-border, #e5e5e5);
-  border-radius: 10px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-secondary:hover {
-  border-color: var(--cm-primary, #6366f1);
-}
-.btn-danger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 18px;
-  background: rgba(239,68,68,0.08);
-  color: #ef4444;
-  border: 1px solid rgba(239,68,68,0.2);
-  border-radius: 10px;
-  font-size: 14px;
-  cursor: pointer;
-}
-.btn-danger:hover {
-  background: rgba(239,68,68,0.15);
 }
 
 .drawer-header {

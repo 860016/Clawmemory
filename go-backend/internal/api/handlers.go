@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,6 +20,7 @@ import (
 	"clawmemory/internal/services"
 
 	"github.com/gin-gonic/gin"
+	_ "modernc.org/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -1877,7 +1879,22 @@ func getOpenClawSearchDirs() []string {
 
 	homeDir, _ := os.UserHomeDir()
 	if homeDir != "" {
-		addDir(filepath.Join(homeDir, ".openclaw", "workspace"))
+		addDir(filepath.Join(homeDir, ".openclaw"))
+		addDir(filepath.Join(homeDir, ".clawmemory"))
+	}
+
+	exePath, _ := os.Executable()
+	if exePath != "" {
+		exeDir := filepath.Dir(exePath)
+		addDir(filepath.Join(exeDir, "openclaw"))
+		addDir(filepath.Join(exeDir, "data"))
+	}
+
+	wd, _ := os.Getwd()
+	if wd != "" {
+		addDir(filepath.Join(wd, ".openclaw"))
+		addDir(filepath.Join(wd, ".clawmemory"))
+		addDir(filepath.Join(wd, "data"))
 	}
 
 	return dirs
@@ -1904,6 +1921,19 @@ func extractMemoriesFromDir(dir string) ([]memoryPreview, map[string]int) {
 	memoryDir := filepath.Join(dir, "memory")
 	if info, err := os.Stat(memoryDir); err == nil && info.IsDir() {
 		previews, agentCountMap = extractWorkspaceMemory(memoryDir, dir, previews, agentCountMap)
+	}
+
+	sessionsDir := filepath.Join(dir, "agents")
+	if info, err := os.Stat(sessionsDir); err == nil && info.IsDir() {
+		previews, agentCountMap = extractSessionMemories(sessionsDir, previews, agentCountMap)
+	}
+
+	sqliteFiles, _ := filepath.Glob(filepath.Join(dir, "*.db"))
+	sqliteFiles2, _ := filepath.Glob(filepath.Join(dir, "*.sqlite"))
+	sqliteFiles3, _ := filepath.Glob(filepath.Join(dir, "*.sqlite3"))
+	allSqlite := append(append(sqliteFiles, sqliteFiles2...), sqliteFiles3...)
+	for _, dbFile := range allSqlite {
+		previews, agentCountMap = extractSqliteMemories(dbFile, previews, agentCountMap)
 	}
 
 	return previews, agentCountMap
@@ -2020,47 +2050,146 @@ func parseMarkdownMemory(content string, filePath string, agentName string, prev
 	return previews, agentCountMap
 }
 
+func extractSqliteMemories(dbPath string, previews []memoryPreview, agentCountMap map[string]int) ([]memoryPreview, map[string]int) {
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return previews, agentCountMap
+	}
+	defer db.Close()
+
+	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table'")
+	if err != nil {
+		return previews, agentCountMap
+	}
+
+	var tables []string
+	for rows.Next() {
+		var name string
+		if rows.Scan(&name) == nil {
+			tables = append(tables, name)
+		}
+	}
+	rows.Close()
+
+	agentName := filepath.Base(filepath.Dir(dbPath))
+	if agentName == "" || agentName == "." {
+		agentName = "sqlite-" + filepath.Base(dbPath)
+	}
+
+	for _, table := range tables {
+		colRows, err := db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+		if err != nil {
+			continue
+		}
+		var cols []string
+		for colRows.Next() {
+			var cid int
+			var name, ctype string
+			var notnull int
+			var dfltValue interface{}
+			var pk int
+			if colRows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk) == nil {
+				cols = append(cols, name)
+			}
+		}
+		colRows.Close()
+
+		keyCol := ""
+		valueCol := ""
+		for _, c := range cols {
+			cl := strings.ToLower(c)
+			if keyCol == "" && (cl == "key" || cl == "name" || cl == "title" || cl == "id") {
+				keyCol = c
+			}
+			if valueCol == "" && (cl == "value" || cl == "content" || cl == "text" || cl == "description" || cl == "body" || cl == "message") {
+				valueCol = c
+			}
+		}
+
+		if keyCol == "" || valueCol == "" {
+			continue
+		}
+
+		dataRows, err := db.Query(fmt.Sprintf("SELECT %s, %s FROM %s LIMIT 200", keyCol, valueCol, table))
+		if err != nil {
+			continue
+		}
+		for dataRows.Next() {
+			var key, value string
+			if dataRows.Scan(&key, &value) != nil {
+				continue
+			}
+			if key == "" || value == "" {
+				continue
+			}
+			preview := value
+			if len(preview) > 200 {
+				preview = preview[:200] + "..."
+			}
+			previews = append(previews, memoryPreview{
+				Key: key, Content: preview, Layer: "knowledge",
+				Source: "sqlite", FilePath: dbPath, AgentName: agentName,
+			})
+			agentCountMap[agentName]++
+		}
+		dataRows.Close()
+	}
+
+	return previews, agentCountMap
+}
+
 func handleScanOpenClawMemories(c *gin.Context) {
 	searchDirs := getOpenClawSearchDirs()
+
+	var allPreviews []memoryPreview
+	agentCountMap := make(map[string]int)
+	var foundDirs []string
 
 	for _, dir := range searchDirs {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			continue
 		}
 
-		previews, agentCountMap := extractMemoriesFromDir(dir)
-
+		previews, acm := extractMemoriesFromDir(dir)
 		if len(previews) > 0 {
-			agents := make([]map[string]interface{}, 0)
-			for name, count := range agentCountMap {
-				agentPreviews := make([]map[string]interface{}, 0)
-				for _, p := range previews {
-					if p.AgentName == name {
-						agentPreviews = append(agentPreviews, map[string]interface{}{
-							"key":    p.Key,
-							"value":  p.Content,
-							"layer":  p.Layer,
-							"source": p.Source,
-						})
-					}
-				}
-				agents = append(agents, map[string]interface{}{
-					"agent_name":   name,
-					"layout":       "v2",
-					"files":        count,
-					"memory_count": count,
-					"previews":     agentPreviews,
-				})
+			allPreviews = append(allPreviews, previews...)
+			for name, count := range acm {
+				agentCountMap[name] += count
 			}
-
-			c.JSON(http.StatusOK, gin.H{
-				"found":          true,
-				"openclaw_dir":   dir,
-				"agents":         agents,
-				"total_memories": len(previews),
-			})
-			return
+			foundDirs = append(foundDirs, dir)
 		}
+	}
+
+	if len(allPreviews) > 0 {
+		agents := make([]map[string]interface{}, 0)
+		for name, count := range agentCountMap {
+			agentPreviews := make([]map[string]interface{}, 0)
+			for _, p := range allPreviews {
+				if p.AgentName == name {
+					agentPreviews = append(agentPreviews, map[string]interface{}{
+						"key":    p.Key,
+						"value":  p.Content,
+						"layer":  p.Layer,
+						"source": p.Source,
+					})
+				}
+			}
+			agents = append(agents, map[string]interface{}{
+				"agent_name":   name,
+				"layout":       "v2",
+				"files":        count,
+				"memory_count": count,
+				"previews":     agentPreviews,
+			})
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"found":          true,
+			"openclaw_dir":   strings.Join(foundDirs, ", "),
+			"agents":         agents,
+			"total_memories": len(allPreviews),
+		})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -2072,6 +2201,8 @@ func handleScanOpenClawAgent(c *gin.Context) {
 	agentName := c.Param("agentName")
 	searchDirs := getOpenClawSearchDirs()
 
+	var allFiltered []map[string]interface{}
+
 	for _, dir := range searchDirs {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			continue
@@ -2079,10 +2210,9 @@ func handleScanOpenClawAgent(c *gin.Context) {
 
 		previews, _ := extractMemoriesFromDir(dir)
 
-		filtered := make([]map[string]interface{}, 0)
 		for _, p := range previews {
 			if p.AgentName == agentName {
-				filtered = append(filtered, map[string]interface{}{
+				allFiltered = append(allFiltered, map[string]interface{}{
 					"key":    p.Key,
 					"value":  p.Content,
 					"layer":  p.Layer,
@@ -2090,15 +2220,15 @@ func handleScanOpenClawAgent(c *gin.Context) {
 				})
 			}
 		}
+	}
 
-		if len(filtered) > 0 {
-			c.JSON(http.StatusOK, gin.H{
-				"agent_name": agentName,
-				"preview":    filtered,
-				"total":      len(filtered),
-			})
-			return
-		}
+	if len(allFiltered) > 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"agent_name": agentName,
+			"preview":    allFiltered,
+			"total":      len(allFiltered),
+		})
+		return
 	}
 
 	c.JSON(http.StatusNotFound, gin.H{

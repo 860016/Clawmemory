@@ -47,12 +47,12 @@
             </div>
           </div>
           <div class="card-actions">
-            <button class="btn-secondary" @click="loadDecayStats" :disabled="loading.decay">
-              {{ loading.decay ? '...' : $t('pro.refreshStats') }}
-            </button>
-            <button class="btn-primary" @click="applyDecay" :disabled="loading.applyDecay">
-              {{ loading.applyDecay ? '...' : $t('pro.applyDecay') }}
-            </button>
+            <el-button @click="loadDecayStats" :disabled="loading.decay" :loading="loading.decay">
+              {{ $t('pro.refreshStats') }}
+            </el-button>
+            <el-button type="primary" @click="applyDecay" :disabled="loading.applyDecay" :loading="loading.applyDecay">
+              {{ $t('pro.applyDecay') }}
+            </el-button>
           </div>
           <div v-if="pruneSuggestions.length" class="prune-section">
             <div class="sub-title">{{ $t('pro.pruneSuggestions') }} ({{ pruneSuggestions.length }})</div>
@@ -96,9 +96,9 @@
             </div>
           </div>
           <div class="card-actions">
-            <button class="btn-secondary" @click="scanConflicts" :disabled="loading.conflicts">
-              {{ loading.conflicts ? '...' : $t('pro.scanConflicts') }}
-            </button>
+            <el-button @click="scanConflicts" :disabled="loading.conflicts" :loading="loading.conflicts">
+              {{ $t('pro.scanConflicts') }}
+            </el-button>
           </div>
           <div v-if="conflicts.length" class="conflict-list">
             <div v-for="(c, i) in conflicts.slice(0, 10)" :key="i" class="conflict-item">
@@ -112,9 +112,9 @@
                 <el-tag size="small" :type="c.severity === 'high' ? 'danger' : c.severity === 'medium' ? 'warning' : 'info'">
                   {{ c.severity }}
                 </el-tag>
-                <button v-if="c.severity === 'low'" class="btn-primary btn-sm" @click="resolveConflict(i, 'merge')">
+                <el-button v-if="c.severity === 'low'" size="small" type="primary" @click="resolveConflict(i, 'merge')">
                   {{ $t('pro.merge') }}
-                </button>
+                </el-button>
               </div>
             </div>
           </div>
@@ -138,9 +138,9 @@
           <p class="card-desc">{{ $t('pro.smartRouterDesc') }}</p>
           <div class="router-test">
             <el-input v-model="testMessage" :placeholder="$t('pro.testMessage')" size="small" />
-            <button class="btn-primary" @click="testRoute" :disabled="loading.route">
-              {{ loading.route ? '...' : $t('pro.testRoute') }}
-            </button>
+            <el-button type="primary" @click="testRoute" :disabled="loading.route" :loading="loading.route">
+              {{ $t('pro.testRoute') }}
+            </el-button>
           </div>
           <div v-if="routeResult" class="route-result">
             <div class="route-model">{{ $t('pro.selectedModel') }}: <strong>{{ routeResult.selected_model }}</strong></div>
@@ -174,9 +174,9 @@
             </div>
           </div>
           <div class="card-actions">
-            <button class="btn-secondary" @click="loadTokenStats" :disabled="loading.tokenStats">
-              {{ loading.tokenStats ? '...' : $t('pro.refreshTokens') }}
-            </button>
+            <el-button @click="loadTokenStats" :disabled="loading.tokenStats" :loading="loading.tokenStats">
+              {{ $t('pro.refreshTokens') }}
+            </el-button>
           </div>
         </div>
       </div>
@@ -197,9 +197,9 @@
         <div class="card-body">
           <p class="card-desc">{{ $t('pro.aiExtractDesc') }}</p>
           <div class="card-actions">
-            <button class="btn-primary" @click="runAiExtract" :disabled="loading.extract">
-              {{ loading.extract ? '...' : $t('pro.runExtract') }}
-            </button>
+            <el-button type="primary" @click="runAiExtract" :disabled="loading.extract" :loading="loading.extract">
+              {{ $t('pro.runExtract') }}
+            </el-button>
           </div>
           <div v-if="extractResult" class="extract-result">
             <div class="stat-item">
@@ -230,12 +230,12 @@
         <div class="card-body">
           <p class="card-desc">{{ $t('pro.autoGraphDesc') }}</p>
           <div class="card-actions">
-            <button class="btn-secondary" @click="runAutoGraph(false)" :disabled="loading.graph">
-              {{ loading.graph ? '...' : $t('pro.generateGraph') }}
-            </button>
-            <button class="btn-danger" @click="runAutoGraph(true)" :disabled="loading.graph">
-              {{ loading.graph ? '...' : $t('pro.regenerateGraph') }}
-            </button>
+            <el-button @click="runAutoGraph(false)" :disabled="loading.graph" :loading="loading.graph">
+              {{ $t('pro.generateGraph') }}
+            </el-button>
+            <el-button type="danger" @click="runAutoGraph(true)" :disabled="loading.graph" :loading="loading.graph">
+              {{ $t('pro.regenerateGraph') }}
+            </el-button>
           </div>
           <div v-if="graphResult" class="graph-result">
             <div class="stat-item">
@@ -315,12 +315,12 @@
             </div>
           </div>
           <div class="card-actions">
-            <button class="btn-secondary" @click="previewCompress" :disabled="loading.compressPreview">
-              {{ loading.compressPreview ? '...' : $t('pro.previewCompress') }}
-            </button>
-            <button class="btn-primary" @click="applyCompress" :disabled="loading.compressApply">
-              {{ loading.compressApply ? '...' : $t('pro.applyCompress') }}
-            </button>
+            <el-button @click="previewCompress" :disabled="loading.compressPreview" :loading="loading.compressPreview">
+              {{ $t('pro.previewCompress') }}
+            </el-button>
+            <el-button type="primary" @click="applyCompress" :disabled="loading.compressApply" :loading="loading.compressApply">
+              {{ $t('pro.applyCompress') }}
+            </el-button>
           </div>
           <div v-if="compressPreviewData" class="compress-result">
             <div class="stats-row">
@@ -377,18 +377,18 @@
         <div class="card-body">
           <p class="card-desc">{{ $t('pro.evolutionDesc') }}</p>
           <div class="evolution-actions">
-            <button class="btn-secondary" @click="loadEvolutionInsights" :disabled="loading.insights">
-              {{ loading.insights ? '...' : $t('pro.evolutionInsights') }}
-            </button>
-            <button class="btn-secondary" @click="runDiscoverRelations" :disabled="loading.discover">
-              {{ loading.discover ? '...' : $t('pro.discoverRelations') }}
-            </button>
-            <button class="btn-secondary" @click="runInferChains" :disabled="loading.infer">
-              {{ loading.infer ? '...' : $t('pro.inferChains') }}
-            </button>
-            <button class="btn-secondary" @click="runImportanceAdjust" :disabled="loading.importance">
-              {{ loading.importance ? '...' : $t('pro.importanceAdjust') }}
-            </button>
+            <el-button @click="loadEvolutionInsights" :disabled="loading.insights" :loading="loading.insights">
+              {{ $t('pro.evolutionInsights') }}
+            </el-button>
+            <el-button @click="runDiscoverRelations" :disabled="loading.discover" :loading="loading.discover">
+              {{ $t('pro.discoverRelations') }}
+            </el-button>
+            <el-button @click="runInferChains" :disabled="loading.infer" :loading="loading.infer">
+              {{ $t('pro.inferChains') }}
+            </el-button>
+            <el-button @click="runImportanceAdjust" :disabled="loading.importance" :loading="loading.importance">
+              {{ $t('pro.importanceAdjust') }}
+            </el-button>
           </div>
           <div v-if="evolutionInsights" class="evolution-insights">
             <div class="stats-row">
@@ -444,9 +444,9 @@
             </div>
             <div class="router-test">
               <el-input v-model="prefetchContext" :placeholder="$t('pro.prefetchPlaceholder')" size="small" />
-              <button class="btn-primary" @click="runPrefetch" :disabled="loading.prefetch">
-                {{ loading.prefetch ? '...' : $t('pro.prefetch') }}
-              </button>
+              <el-button type="primary" @click="runPrefetch" :disabled="loading.prefetch" :loading="loading.prefetch">
+                {{ $t('pro.prefetch') }}
+              </el-button>
             </div>
             <div v-if="prefetchResult" class="prefetch-result">
               <span class="prefetch-count">{{ $t('pro.prefetchMatched', { count: prefetchResult.matched_count }) }}</span>
@@ -474,7 +474,7 @@
           <div class="locked-icon">🔒</div>
           <h2>{{ $t('pro.unlockPro') }}</h2>
           <p>{{ $t('pro.upsellDesc') }}</p>
-          <button class="btn-primary btn-lg" @click.stop="$router.push('/settings')">{{ $t('pro.viewPricing') }}</button>
+          <el-button type="primary" size="large" @click.stop="$router.push('/settings')">{{ $t('pro.viewPricing') }}</el-button>
         </div>
       </div>
     </div>
@@ -942,91 +942,6 @@ async function runPrefetch() {
   display: flex;
   gap: 8px;
   margin-top: 12px;
-}
-
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 18px;
-  background: var(--cm-primary, #6366f1);
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.btn-primary.btn-sm {
-  padding: 4px 12px;
-  font-size: 12px;
-  border-radius: 8px;
-}
-
-.btn-primary.btn-lg {
-  padding: 12px 28px;
-  font-size: 16px;
-  border-radius: 12px;
-}
-
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 18px;
-  background: var(--cm-bg, #fafafa);
-  color: var(--cm-text, #1a1a1a);
-  border: 1px solid var(--cm-border, #e5e5e5);
-  border-radius: 10px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-secondary:hover {
-  border-color: var(--cm-primary, #6366f1);
-  color: var(--cm-primary, #6366f1);
-}
-
-.btn-secondary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-danger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 18px;
-  background: rgba(239,68,68,0.08);
-  color: #ef4444;
-  border: 1px solid rgba(239,68,68,0.2);
-  border-radius: 10px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-danger:hover {
-  background: rgba(239,68,68,0.15);
-}
-
-.btn-danger:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .stats-row {
