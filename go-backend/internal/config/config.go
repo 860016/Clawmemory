@@ -5,6 +5,12 @@ import (
 	"path/filepath"
 )
 
+const (
+	AppVersion    = "2.10.1"
+	GitHubRepo    = "860016/Clawmemory"
+	GitHubRepoURL = "https://github.com/860016/Clawmemory"
+)
+
 type Config struct {
 	DatabasePath      string
 	LicenseServerURL  string

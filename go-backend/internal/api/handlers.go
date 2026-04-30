@@ -174,6 +174,7 @@ func handleForgotPassword(authService *services.AuthService) gin.HandlerFunc {
 		}
 
 		var req struct {
+			Username    string `json:"username"`
 			NewPassword string `json:"new_password"`
 			Confirm     bool   `json:"confirm"`
 		}
@@ -183,6 +184,10 @@ func handleForgotPassword(authService *services.AuthService) gin.HandlerFunc {
 		}
 		if !req.Confirm {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "confirm is required"})
+			return
+		}
+		if req.Username == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "username is required", "hint": "use terminal command: ./clawmemory --reset-password NEW_PASSWORD"})
 			return
 		}
 		if req.NewPassword == "" {
@@ -196,7 +201,12 @@ func handleForgotPassword(authService *services.AuthService) gin.HandlerFunc {
 
 		var user models.User
 		if err := authService.FindFirstUser(&user); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "no user found"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no user found", "hint": "use terminal command: ./clawmemory --reset-password NEW_PASSWORD"})
+			return
+		}
+
+		if user.Username != req.Username {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "username mismatch", "hint": "use terminal command: ./clawmemory --reset-password NEW_PASSWORD"})
 			return
 		}
 
@@ -238,7 +248,7 @@ func handleInstallStatus(db *gorm.DB) gin.HandlerFunc {
 			"checks": gin.H{
 				"security_engine": "go",
 			},
-			"version": "1.0.0",
+			"version": config.AppVersion,
 		})
 	}
 }
@@ -3074,10 +3084,63 @@ func handleExportData(db *gorm.DB) gin.HandlerFunc {
 		exportData["daily_reports"] = reports
 
 		exportData["exported_at"] = time.Now().Format(time.RFC3339)
-		exportData["version"] = "2.10.0"
+		exportData["version"] = config.AppVersion
 
 		c.JSON(http.StatusOK, exportData)
 	}
+}
+
+func handleCheckUpdate(c *gin.Context) {
+	type GitHubRelease struct {
+		TagName string `json:"tag_name"`
+		HTMLURL string `json:"html_url"`
+		Body    string `json:"body"`
+	}
+
+	resp, err := http.Get("https://api.github.com/repos/" + config.GitHubRepo + "/releases/latest")
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"current_version": config.AppVersion,
+			"latest_version":  config.AppVersion,
+			"has_update":      false,
+			"error":           "failed to check update",
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		c.JSON(http.StatusOK, gin.H{
+			"current_version": config.AppVersion,
+			"latest_version":  config.AppVersion,
+			"has_update":      false,
+			"error":           "github api error",
+		})
+		return
+	}
+
+	var release GitHubRelease
+	if json.NewDecoder(resp.Body).Decode(&release) != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"current_version": config.AppVersion,
+			"latest_version":  config.AppVersion,
+			"has_update":      false,
+			"error":           "failed to parse release",
+		})
+		return
+	}
+
+	latestVer := strings.TrimPrefix(release.TagName, "v")
+	hasUpdate := latestVer != "" && latestVer != config.AppVersion && latestVer > config.AppVersion
+
+	c.JSON(http.StatusOK, gin.H{
+		"current_version": config.AppVersion,
+		"latest_version":  latestVer,
+		"has_update":      hasUpdate,
+		"download_url":    release.HTMLURL,
+		"release_notes":   release.Body,
+		"github_repo":     config.GitHubRepoURL,
+	})
 }
 
 func handleImportData(db *gorm.DB) gin.HandlerFunc {

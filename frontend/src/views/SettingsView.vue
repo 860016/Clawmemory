@@ -206,11 +206,38 @@
         <div class="card-title">◇ {{ $t('settings.system') }}</div>
         <div class="setting-item">
           <span>{{ $t('settings.version') }}</span>
-          <span class="setting-desc">{{ appVersion }}</span>
+          <span class="setting-desc">
+            v{{ appVersion }}
+            <el-tag v-if="updateInfo.has_update" type="success" size="small" style="margin-left: 8px">
+              🆕 v{{ updateInfo.latest_version }}
+            </el-tag>
+            <el-tag v-else-if="updateInfo.checked" type="info" size="small" style="margin-left: 8px">
+              ✓ {{ $t('settings.upToDate') }}
+            </el-tag>
+          </span>
+        </div>
+        <div class="setting-item" v-if="updateInfo.has_update">
+          <span>{{ $t('settings.newVersion') }}</span>
+          <span class="setting-desc">
+            v{{ updateInfo.latest_version }}
+            <a :href="updateInfo.download_url" target="_blank" class="update-link">{{ $t('settings.downloadUpdate') }}</a>
+          </span>
+        </div>
+        <div class="setting-item" v-if="updateInfo.release_notes">
+          <span>{{ $t('settings.releaseNotes') }}</span>
+          <span class="setting-desc release-notes">{{ updateInfo.release_notes }}</span>
         </div>
         <div class="setting-item">
           <span>{{ $t('settings.coreEngine') }}</span>
           <span class="setting-desc">{{ coreEngine }}</span>
+        </div>
+        <div class="setting-item">
+          <span>{{ $t('settings.checkUpdate') }}</span>
+          <el-button size="small" @click="checkForUpdate" :loading="updateChecking">{{ $t('settings.checkNow') }}</el-button>
+        </div>
+        <div class="setting-item">
+          <span>{{ $t('settings.resetPasswordTip') }}</span>
+          <span class="setting-desc code-hint">./clawmemory --reset-password NEW_PASSWORD</span>
         </div>
       </div>
     </div>
@@ -254,7 +281,9 @@ const newPassword = ref('')
 const settingPassword = ref(false)
 const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
-const appVersion = ref('2.9.1')
+const appVersion = ref('2.10.1')
+const updateInfo = ref<any>({ checked: false, has_update: false, latest_version: '', download_url: '', release_notes: '' })
+const updateChecking = ref(false)
 
 const decayEnabled = ref(false)
 const decayLoading = ref(false)
@@ -333,6 +362,24 @@ async function loadInitStatus() {
 
 async function loadInstallStatus() {
   try { const { data } = await axios.get('/install-status'); coreEngine.value = data.checks?.security_engine || 'python'; if (data.version) appVersion.value = data.version } catch {}
+}
+
+async function checkForUpdate() {
+  updateChecking.value = true
+  try {
+    const { data } = await axios.get('/check-update')
+    updateInfo.value = {
+      checked: true,
+      has_update: data.has_update || false,
+      latest_version: data.latest_version || '',
+      download_url: data.download_url || '',
+      release_notes: data.release_notes || '',
+    }
+  } catch {
+    updateInfo.value.checked = true
+  } finally {
+    updateChecking.value = false
+  }
 }
 
 async function exportData() {
@@ -510,6 +557,10 @@ async function scanDedup() {
 .status-text { font-size: 13px; color: var(--cm-text); margin-bottom: 8px; }
 .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--cm-border); font-size: 14px; color: var(--cm-text); }
 .setting-desc { color: var(--cm-text-muted); font-size: 13px; }
+.update-link { color: var(--cm-primary, #6366f1); text-decoration: none; margin-left: 8px; font-weight: 500; }
+.update-link:hover { text-decoration: underline; }
+.release-notes { max-width: 400px; white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.5; }
+.code-hint { font-family: monospace; background: var(--cm-bg, #f5f5f5); padding: 4px 8px; border-radius: 4px; font-size: 12px; color: var(--cm-text); user-select: all; }
 .backup-list { margin-top: 12px; border-top: 1px solid var(--cm-border); padding-top: 8px; max-height: 200px; overflow-y: auto; }
 .backup-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--cm-border); }
 .backup-item:last-child { border-bottom: none; }

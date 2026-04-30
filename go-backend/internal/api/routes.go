@@ -24,6 +24,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		public.POST("/auth/register", handleRegister(authService))
 		public.POST("/auth/forgot-password", handleForgotPassword(authService))
 		public.GET("/install-status", handleInstallStatus(db))
+		public.GET("/check-update", handleCheckUpdate)
 		public.GET("/license/info", handleLicenseInfo(licenseManager))
 		public.POST("/license/activate", handleLicenseActivate(licenseManager))
 		public.POST("/license/deactivate", handleLicenseDeactivate(licenseManager))

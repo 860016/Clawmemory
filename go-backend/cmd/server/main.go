@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -10,13 +12,26 @@ import (
 	"clawmemory/internal/config"
 	"clawmemory/internal/database"
 	"clawmemory/internal/middleware"
+	"clawmemory/internal/models"
 	"clawmemory/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 func main() {
+	resetPassword := flag.String("reset-password", "", "Reset admin password")
+	showVersion := flag.Bool("version", false, "Show version info")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("ClawMemory v%s\n", config.AppVersion)
+		fmt.Printf("GitHub: %s\n", config.GitHubRepoURL)
+		os.Exit(0)
+	}
+
 	exe, _ := os.Executable()
 	exeDir := filepath.Dir(exe)
 
@@ -41,6 +56,11 @@ func main() {
 
 	if err := database.Migrate(db); err != nil {
 		log.Fatal("Failed to migrate database:", err)
+	}
+
+	if *resetPassword != "" {
+		resetAdminPassword(db, *resetPassword)
+		os.Exit(0)
 	}
 
 	services.Init(db)
@@ -75,8 +95,34 @@ func main() {
 		host = "0.0.0.0"
 	}
 	addr := host + ":" + port
-	log.Printf("Server starting on %s", addr)
+	log.Printf("ClawMemory v%s starting on %s", config.AppVersion, addr)
 	if err := r.Run(addr); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
+}
+
+func resetAdminPassword(db *gorm.DB, newPassword string) {
+	if len(newPassword) < 4 {
+		log.Fatal("Error: password must be at least 4 characters")
+	}
+
+	var user models.User
+	if err := db.First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			log.Fatal("Error: no user found in database. Please start the server first to create an account.")
+		}
+		log.Fatal("Error: failed to query user:", err)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		log.Fatal("Error: failed to hash password:", err)
+	}
+
+	if err := db.Model(&user).Update("password", string(hashedPassword)).Error; err != nil {
+		log.Fatal("Error: failed to update password:", err)
+	}
+
+	fmt.Printf("✅ Password for user '%s' has been reset successfully.\n", user.Username)
+	fmt.Println("Please restart the server without --reset-password flag.")
 }
