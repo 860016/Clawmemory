@@ -6,17 +6,18 @@ import (
 	"time"
 
 	"clawmemory/internal/config"
+	"clawmemory/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 )
 
-// CORS 跨域中间件
 func CORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -27,7 +28,6 @@ func CORS() gin.HandlerFunc {
 	}
 }
 
-// Logger 日志中间件
 func Logger() gin.HandlerFunc {
 	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
 		return param.TimeStamp.Format(time.RFC3339) + " " +
@@ -36,9 +36,22 @@ func Logger() gin.HandlerFunc {
 	})
 }
 
-// Auth JWT 认证中间件
-func Auth(cfg *config.Config) gin.HandlerFunc {
+func Auth(cfg *config.Config, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		apiKeyHeader := c.GetHeader("X-API-Key")
+		if apiKeyHeader != "" {
+			svc := services.NewAPIKeyService(db)
+			apiKey, err := svc.Validate(apiKeyHeader)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+				return
+			}
+			c.Set("user_id", apiKey.UserID)
+			c.Set("auth_method", "apikey")
+			c.Next()
+			return
+		}
+
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing token"})
@@ -63,7 +76,27 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
-// GetUserID 从上下文获取用户ID
+func APIKeyAuth(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		apiKeyHeader := c.GetHeader("X-API-Key")
+		if apiKeyHeader == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing API key"})
+			return
+		}
+
+		svc := services.NewAPIKeyService(db)
+		apiKey, err := svc.Validate(apiKeyHeader)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.Set("user_id", apiKey.UserID)
+		c.Set("auth_method", "apikey")
+		c.Next()
+	}
+}
+
 func GetUserID(c *gin.Context) uint {
 	userID, _ := c.Get("user_id")
 	if id, ok := userID.(uint); ok {

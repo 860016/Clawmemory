@@ -41,6 +41,7 @@ func Migrate(db *gorm.DB) error {
 		&models.License{},
 		&models.Backup{},
 		&models.Setting{},
+		&models.APIKey{},
 		&models.SessionMemory{},
 	)
 }

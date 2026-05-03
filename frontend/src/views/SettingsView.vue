@@ -83,6 +83,38 @@
         </div>
       </div>
 
+      <!-- API 密钥 -->
+      <div class="settings-card">
+        <div class="card-title">🔑 {{ $t('settings.apiKeys') }}</div>
+        <p class="setting-desc" style="margin-bottom: 12px">{{ $t('settings.apiKeysDesc') }}</p>
+        <div class="api-key-list" v-if="apiKeys.length > 0">
+          <div class="api-key-item" v-for="key in apiKeys" :key="key.id">
+            <div class="api-key-info">
+              <span class="api-key-name">{{ key.name }}</span>
+              <span class="api-key-prefix">{{ key.key_prefix }}••••••••</span>
+              <span class="api-key-time">{{ key.last_used_at ? t('settings.apiKeyLastUsed') + ': ' + key.last_used_at.substring(0, 10) : t('settings.apiKeyNeverUsed') }}</span>
+            </div>
+            <el-button type="danger" plain size="small" @click="deleteApiKey(key.id)">{{ t('settings.apiKeyDelete') }}</el-button>
+          </div>
+        </div>
+        <div v-else class="setting-item">
+          <span class="setting-desc">{{ $t('settings.apiKeyNoKeys') }}</span>
+        </div>
+        <div class="setting-item" style="margin-top: 12px">
+          <el-button type="primary" size="small" @click="showApiKeyDialog = true">{{ $t('settings.createApiKey') }}</el-button>
+        </div>
+        <div class="api-usage-hint" style="margin-top: 12px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
+          <div style="font-weight: 600; margin-bottom: 6px">{{ $t('settings.apiKeyUsage') }}</div>
+          <div style="color: var(--cm-text-muted); margin-bottom: 6px">{{ $t('settings.apiKeyUsageDesc') }}</div>
+          <code style="display: block; padding: 8px; background: var(--cm-bg); border-radius: 4px; font-size: 11px; word-break: break-all; color: var(--cm-accent)">
+            curl -X POST http://localhost:8765/api/v1/external/memories \<br>
+            &nbsp;&nbsp;-H "X-API-Key: YOUR_KEY" \<br>
+            &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+            &nbsp;&nbsp;-d '{"key":"topic","value":"content"}'
+          </code>
+        </div>
+      </div>
+
       <!-- 数据管理 -->
       <div class="settings-card" :class="{ 'section-highlight': activeSection === 'data' }" id="settings-data">
         <div class="card-title">💾 {{ $t('settings.data') }}</div>
@@ -256,6 +288,30 @@
         <el-button type="primary" @click="handleSetPassword" :loading="settingPassword">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="showApiKeyDialog" :title="$t('settings.createApiKey')" width="460px" :close-on-click-modal="false">
+      <div v-if="!newApiKeyRaw">
+        <el-form label-position="top">
+          <el-form-item :label="$t('settings.apiKeyName')">
+            <el-input v-model="newApiKeyName" :placeholder="$t('settings.apiKeyNamePlaceholder')" />
+          </el-form-item>
+        </el-form>
+      </div>
+      <div v-else>
+        <el-alert type="warning" :closable="false" style="margin-bottom: 12px">
+          <template #title>{{ $t('settings.apiKeyCreatedWarning') }}</template>
+        </el-alert>
+        <div style="padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-family: monospace; font-size: 13px; word-break: break-all; color: var(--cm-accent)">
+          {{ newApiKeyRaw }}
+        </div>
+        <el-button type="primary" size="small" style="margin-top: 8px" @click="copyApiKey">{{ $t('settings.apiKeyCopy') }}</el-button>
+      </div>
+      <template #footer>
+        <el-button @click="showApiKeyDialog = false; newApiKeyRaw = ''">{{ $t('common.cancel') }}</el-button>
+        <el-button v-if="!newApiKeyRaw" type="primary" @click="createApiKey" :loading="creatingApiKey">{{ $t('settings.createApiKey') }}</el-button>
+        <el-button v-else type="primary" @click="showApiKeyDialog = false; newApiKeyRaw = ''">{{ $t('common.confirm') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -281,10 +337,16 @@ const newPassword = ref('')
 const settingPassword = ref(false)
 const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
-const appVersion = ref('2.11.0')
+const appVersion = ref('2.12.0')
 const updateInfo = ref<any>({ checked: false, has_update: false, latest_version: '', download_url: '', release_notes: '' })
 const updateChecking = ref(false)
 const cliResetCommand = ref(navigator.platform.toLowerCase().includes('win') ? 'clawmemory.exe --reset-password NEW_PASSWORD' : './clawmemory --reset-password NEW_PASSWORD')
+
+const apiKeys = ref<any[]>([])
+const showApiKeyDialog = ref(false)
+const newApiKeyName = ref('')
+const newApiKeyRaw = ref('')
+const creatingApiKey = ref(false)
 
 const decayEnabled = ref(false)
 const decayLoading = ref(false)
@@ -327,7 +389,7 @@ const featureLabels: Record<string, string> = {
 }
 
 onMounted(async () => {
-  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats()])
+  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys()])
   if (activeSection.value) {
     nextTick(() => scrollToSection(activeSection.value))
   }
@@ -355,6 +417,49 @@ function changeLocale(locale: 'zh' | 'en') {
 
 async function loadLicense() {
   try { const { data } = await axios.get('/license/info'); license.value = data } catch {}
+}
+
+async function loadApiKeys() {
+  try {
+    const { data } = await axios.get('/api-keys')
+    apiKeys.value = data.items || []
+  } catch {}
+}
+
+async function createApiKey() {
+  if (!newApiKeyName.value.trim()) {
+    ElMessage.warning(t('settings.apiKeyName'))
+    return
+  }
+  creatingApiKey.value = true
+  try {
+    const { data } = await axios.post('/api-keys', { name: newApiKeyName.value.trim() })
+    newApiKeyRaw.value = data.key
+    ElMessage.success(t('settings.apiKeyCreated'))
+    await loadApiKeys()
+  } catch (e: any) {
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } finally {
+    creatingApiKey.value = false
+  }
+}
+
+async function deleteApiKey(id: number) {
+  try {
+    await ElMessageBox.confirm(t('settings.apiKeyDeleteConfirm'), t('common.confirm'), { type: 'warning' })
+  } catch { return }
+  try {
+    await axios.delete(`/api-keys/${id}`)
+    ElMessage.success(t('common.success'))
+    await loadApiKeys()
+  } catch (e: any) {
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  }
+}
+
+function copyApiKey() {
+  navigator.clipboard.writeText(newApiKeyRaw.value)
+  ElMessage.success(t('settings.apiKeyCopied'))
 }
 
 async function loadInitStatus() {
@@ -692,4 +797,10 @@ async function scanDedup() {
 .dedup-item { display: flex; gap: 8px; font-size: 12px; padding: 2px 0; }
 .dedup-id { color: var(--cm-text-muted); }
 .dedup-value { color: var(--cm-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
+.api-key-list { display: flex; flex-direction: column; gap: 8px; }
+.api-key-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--cm-bg); border: 1px solid var(--cm-border); border-radius: 8px; }
+.api-key-info { display: flex; flex-direction: column; gap: 2px; }
+.api-key-name { font-size: 14px; font-weight: 500; color: var(--cm-text); }
+.api-key-prefix { font-family: monospace; font-size: 12px; color: var(--cm-text-muted); }
+.api-key-time { font-size: 11px; color: var(--cm-text-muted); }
 </style>

@@ -3775,3 +3775,168 @@ func toJSONStr(v interface{}) string {
 		return string(b)
 	}
 }
+
+func handleListAPIKeys(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewAPIKeyService(db)
+		keys, err := svc.List(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"items": keys})
+	}
+}
+
+func handleCreateAPIKey(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		var req struct {
+			Name string `json:"name" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+			return
+		}
+
+		svc := services.NewAPIKeyService(db)
+		apiKey, rawKey, err := svc.Create(userID, req.Name)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusCreated, gin.H{
+			"id":         apiKey.ID,
+			"name":       apiKey.Name,
+			"key_prefix": apiKey.KeyPrefix,
+			"key":        rawKey,
+			"created_at": apiKey.CreatedAt,
+			"message":    "please save the API key securely, it will not be shown again",
+		})
+	}
+}
+
+func handleDeleteAPIKey(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		id, _ := strconv.Atoi(c.Param("id"))
+
+		svc := services.NewAPIKeyService(db)
+		if err := svc.Delete(userID, uint(id)); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+	}
+}
+
+func handleExternalCreateMemory(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		var data map[string]interface{}
+		if err := c.ShouldBindJSON(&data); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		key, _ := data["key"].(string)
+		value, _ := data["value"].(string)
+		if key == "" || value == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "key and value are required"})
+			return
+		}
+
+		source, _ := data["source"].(string)
+		if source == "" {
+			source = "openclaw"
+		}
+
+		svc := services.NewMemoryService(db)
+		memory, err := svc.Create(userID, map[string]interface{}{
+			"key":         key,
+			"value":       value,
+			"layer":       getString(data, "layer", "episodic"),
+			"importance":  data["importance"],
+			"source":      source,
+			"memory_type": getString(data, "memory_type", "knowledge"),
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusCreated, memory)
+	}
+}
+
+func handleExternalBatchCreateMemories(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		var req struct {
+			Memories []map[string]interface{} `json:"memories" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		svc := services.NewMemoryService(db)
+		var created, errorsCount int
+
+		for _, m := range req.Memories {
+			key, _ := m["key"].(string)
+			value, _ := m["value"].(string)
+			if key == "" || value == "" {
+				errorsCount++
+				continue
+			}
+
+			source, _ := m["source"].(string)
+			if source == "" {
+				source = "openclaw"
+			}
+
+			_, err := svc.Create(userID, map[string]interface{}{
+				"key":         key,
+				"value":       value,
+				"layer":       getString(m, "layer", "episodic"),
+				"importance":  m["importance"],
+				"source":      source,
+				"memory_type": getString(m, "memory_type", "knowledge"),
+			})
+			if err != nil {
+				errorsCount++
+				continue
+			}
+			created++
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"created": created,
+			"errors":  errorsCount,
+			"total":   len(req.Memories),
+		})
+	}
+}
+
+func handleExternalSearchMemories(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		q := c.Query("q")
+		if q == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "q is required"})
+			return
+		}
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+		svc := services.NewMemoryService(db)
+		memories, err := svc.SearchKeyword(userID, q, limit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"items": memories})
+	}
+}

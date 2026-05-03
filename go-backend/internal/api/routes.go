@@ -31,7 +31,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	}
 
 	authorized := r.Group("/api/v1")
-	authorized.Use(middleware.Auth(cfg))
+	authorized.Use(middleware.Auth(cfg, db))
 	{
 		authorized.GET("/auth/me", handleGetMe(authService))
 		authorized.POST("/auth/change-password", handleChangePassword(authService))
@@ -95,6 +95,10 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 
 		authorized.GET("/settings", handleGetSettings(db))
 		authorized.PUT("/settings", handleUpdateSettings(db))
+
+		authorized.GET("/api-keys", handleListAPIKeys(db))
+		authorized.POST("/api-keys", handleCreateAPIKey(db))
+		authorized.DELETE("/api-keys/:id", handleDeleteAPIKey(db))
 
 		authorized.GET("/memories/decay/stats", handleDecayStats(db))
 		authorized.POST("/memories/decay/apply", handleDecayApply(db))
@@ -174,5 +178,13 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 			pro.POST("/evolution/importance", handleProEvolutionImportance(proProxy, db))
 			pro.POST("/evolution/prefetch", handleProEvolutionPrefetch(proProxy, db))
 		}
+	}
+
+	external := r.Group("/api/v1/external")
+	external.Use(middleware.APIKeyAuth(db))
+	{
+		external.POST("/memories", handleExternalCreateMemory(db))
+		external.POST("/memories/batch", handleExternalBatchCreateMemories(db))
+		external.GET("/memories/search", handleExternalSearchMemories(db))
 	}
 }

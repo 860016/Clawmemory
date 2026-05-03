@@ -182,7 +182,17 @@ type Backup struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// SessionMemory 会话记忆 - 上下文压缩专用
+// APIKey API 密钥 - 供外部应用（如 OpenClaw）调用
+type APIKey struct {
+	ID        uint       `gorm:"primarykey" json:"id"`
+	UserID    uint       `gorm:"index;not null" json:"user_id"`
+	Name      string     `gorm:"size:100;not null" json:"name"`
+	KeyHash   string     `gorm:"size:64;not null;uniqueIndex" json:"-"`
+	KeyPrefix string     `gorm:"size:8;not null" json:"key_prefix"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+	ExpiresAt *time.Time  `json:"expires_at"`
+	CreatedAt time.Time   `json:"created_at"`
+}
 type SessionMemory struct {
 	ID              uint      `gorm:"primarykey" json:"id"`
 	UserID          uint      `gorm:"index;not null;default:1" json:"user_id"`

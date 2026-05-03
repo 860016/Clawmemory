@@ -152,9 +152,27 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - `POST /api/v1/license/activate` - 激活授权
 - `POST /api/v1/license/deactivate` - 停用授权
 
+### API 密钥管理
+- `GET /api/v1/api-keys` - 列表
+- `POST /api/v1/api-keys` - 创建（返回完整密钥，仅一次）
+- `DELETE /api/v1/api-keys/:id` - 删除
+
+### 外部 API（供 OpenClaw 等外部应用调用，需 X-API-Key 请求头）
+- `POST /api/v1/external/memories` - 写入单条记忆
+- `POST /api/v1/external/memories/batch` - 批量写入记忆
+- `GET /api/v1/external/memories/search?q=keyword` - 搜索记忆
+
 ---
 
 ## 📝 更新日志
+
+### v2.12.0 (2026-05-03)
+- 🔑 新增：API Key 认证机制，支持外部应用安全调用 ClawMemory API
+- 🤖 新增：外部 API 端点（`/api/v1/external/memories`），供 OpenClaw 自动写入记忆
+- 📦 新增：批量写入记忆 API（`/api/v1/external/memories/batch`）
+- 🔍 新增：外部记忆搜索 API（`/api/v1/external/memories/search`）
+- 🎨 新增：设置页面 API 密钥管理界面（生成/复制/删除）
+- 🌍 新增：API Key 相关中英文翻译
 
 ### v2.11.0 (2026-04-30)
 - 🐛 修复：SQLite 驱动注册冲突（modernc.org/sqlite 与 glebarez/go-sqlite 同名注册）
@@ -383,7 +401,13 @@ start.bat    # Windows
 2. 首次访问需注册管理员账号
 3. 登录后即可使用 ClawMemory
 
-### 第三步：配置 OpenClaw 连接 ClawMemory
+### 第三步：创建 API 密钥（用于 OpenClaw 自动记录）
+
+1. 登录 ClawMemory 网页 → 设置 → API 密钥
+2. 点击「创建密钥」，输入名称如 `OpenClaw 自动记录`
+3. **立即复制并保存密钥**（关闭后无法再次查看！）
+
+### 第四步：配置 OpenClaw 连接 ClawMemory
 
 安装 ClawMemory 后，需要在 OpenClaw 的 `AGENTS.md` 中添加配置，让 OpenClaw 自动将对话记忆存入 ClawMemory。
 
@@ -398,17 +422,40 @@ start.bat    # Windows
 
 - **类型**: memory
 - **地址**: http://localhost:8765
+- **API Key**: <你创建的 API 密钥>
 - **功能**: 记忆管理、知识图谱、智能日报、向量搜索
 - **API 端点**: 
-  - 创建记忆: POST /api/v1/memories
+  - 自动记录对话: POST /api/v1/external/memories (请求头 X-API-Key)
+  - 批量写入: POST /api/v1/external/memories/batch
+  - 搜索记忆: GET /api/v1/external/memories/search?q=关键词
   - 记忆列表: GET /api/v1/memories
   - 智能加载: GET /api/v1/memories/smart-load
   - 知识图谱: GET /api/v1/knowledge/graph
 ```
 
-配置完成后，OpenClaw 会通过 API 自动将对话记忆存入 ClawMemory。
+配置完成后，OpenClaw 会通过 API Key 自动将对话记忆存入 ClawMemory。
 
-### 第四步：导入 OpenClaw 已有记忆
+**自动记录请求示例**：
+
+```bash
+# 写入单条记忆
+curl -X POST http://localhost:8765/api/v1/external/memories \
+  -H "X-API-Key: cm你的密钥" \
+  -H "Content-Type: application/json" \
+  -d '{"key":"用户偏好","value":"喜欢深色主题","source":"openclaw"}'
+
+# 批量写入
+curl -X POST http://localhost:8765/api/v1/external/memories/batch \
+  -H "X-API-Key: cm你的密钥" \
+  -H "Content-Type: application/json" \
+  -d '{"memories":[{"key":"topic1","value":"content1"},{"key":"topic2","value":"content2"}]}'
+
+# 搜索记忆
+curl "http://localhost:8765/api/v1/external/memories/search?q=关键词" \
+  -H "X-API-Key: cm你的密钥"
+```
+
+### 第五步：导入 OpenClaw 已有记忆
 
 如果你之前使用 OpenClaw 的本地记忆，可以在 ClawMemory 中一键导入。
 
