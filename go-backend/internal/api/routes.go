@@ -25,14 +25,14 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		public.POST("/auth/forgot-password", handleForgotPassword(authService))
 		public.GET("/install-status", handleInstallStatus(db))
 		public.GET("/check-update", handleCheckUpdate)
-		public.GET("/license/info", handleLicenseInfo(licenseManager))
 		public.POST("/license/activate", handleLicenseActivate(licenseManager))
-		public.POST("/license/deactivate", handleLicenseDeactivate(licenseManager))
 	}
 
 	authorized := r.Group("/api/v1")
 	authorized.Use(middleware.Auth(cfg, db), middleware.JWTRateLimit())
 	{
+		authorized.GET("/license/info", handleLicenseInfo(proProxy))
+		authorized.POST("/license/deactivate", handleLicenseDeactivate(licenseManager))
 		authorized.GET("/auth/me", handleGetMe(authService))
 		authorized.POST("/auth/change-password", handleChangePassword(authService))
 		authorized.POST("/auth/reset-password", handleResetPassword(authService))

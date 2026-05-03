@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
 	"time"
 
@@ -415,25 +416,102 @@ func (s *ProLocalService) TokenStats(userID uint) (map[string]interface{}, error
 	}, nil
 }
 
+func inferEntityType(key, value string) string {
+	k := strings.ToLower(key)
+	v := strings.ToLower(value)
+
+	personPatterns := []string{"user", "name", "author", "developer", "person", "people", "member", "colleague", "friend", "manager", "boss", "同事", "用户", "开发者", "经理"}
+	for _, p := range personPatterns {
+		if strings.Contains(k, p) {
+			return "person"
+		}
+	}
+
+	orgPatterns := []string{"company", "organization", "team", "org", "department", "group", "公司", "团队", "组织", "部门"}
+	for _, p := range orgPatterns {
+		if strings.Contains(k, p) {
+			return "organization"
+		}
+	}
+
+	locationPatterns := []string{"location", "address", "city", "country", "place", "server", "host", "ip", "url", "endpoint", "地址", "位置", "城市"}
+	for _, p := range locationPatterns {
+		if strings.Contains(k, p) {
+			return "location"
+		}
+	}
+
+	techPatterns := []string{"tech", "tool", "framework", "library", "language", "database", "api", "sdk", "package", "plugin", "version", "config", "技术", "工具", "框架", "库"}
+	for _, p := range techPatterns {
+		if strings.Contains(k, p) {
+			return "technology"
+		}
+	}
+
+	eventPatterns := []string{"event", "meeting", "deadline", "schedule", "task", "todo", "plan", "milestone", "release", "deploy", "事件", "会议", "任务", "计划"}
+	for _, p := range eventPatterns {
+		if strings.Contains(k, p) {
+			return "event"
+		}
+	}
+
+	if strings.Contains(v, "http://") || strings.Contains(v, "https://") || strings.Contains(v, "github.com") {
+		return "location"
+	}
+
+	if strings.Contains(v, "v1.") || strings.Contains(v, "v2.") || regexpCheck(`^\d+\.\d+`, v) {
+		return "technology"
+	}
+
+	return "concept"
+}
+
+func regexpCheck(pattern, s string) bool {
+	matched, _ := regexp.MatchString(pattern, s)
+	return matched
+}
+
 func (s *ProLocalService) AIExtract(userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
 	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
+
 	entities := []map[string]interface{}{}
+	seen := make(map[string]bool)
+
 	for _, m := range memories {
+		name := strings.TrimSpace(m.Key)
+		if name == "" || len(name) < 2 || len(name) > 100 {
+			continue
+		}
+		if seen[strings.ToLower(name)] {
+			continue
+		}
+		seen[strings.ToLower(name)] = true
+
+		entityType := inferEntityType(name, m.Value)
+		description := m.Value
+		if len(description) > 500 {
+			description = description[:500]
+		}
+
 		entities = append(entities, map[string]interface{}{
-			"name":           m.Key,
-			"entity_type":    "concept",
-			"description":    m.Value,
-			"source":         "local_extract",
-			"extract_method": "auto",
-			"confidence":     m.Importance,
-			"source_memory_id": m.ID,
+			"name":             name,
+			"entity_type":      entityType,
+			"description":      description,
+			"extract_method":   "auto",
+			"confidence":       m.Importance,
+			"source_memory_id": float64(m.ID),
 		})
 	}
+
+	if len(entities) > 200 {
+		entities = entities[:200]
+	}
+
 	return map[string]interface{}{
 		"entities":  entities,
 		"total":     len(entities),
-		"algorithm": "local_key_extract_v1",
+		"algorithm": "local_key_extract_v2",
 		"mode":      "local_pro",
 	}, nil
 }

@@ -296,9 +296,15 @@ func parsePublicKey(data []byte) *rsa.PublicKey {
 }
 
 func getDeviceFingerprint() string {
-	// 简化实现，实际应该使用机器码等
 	hostname, _ := os.Hostname()
-	return fmt.Sprintf("fp_%s_%d", hostname, time.Now().Unix())
+	username := os.Getenv("USERNAME")
+	if username == "" {
+		username = os.Getenv("USER")
+	}
+	homedir, _ := os.UserHomeDir()
+	raw := fmt.Sprintf("%s|%s|%s", hostname, username, homedir)
+	hash := sha256.Sum256([]byte(raw))
+	return fmt.Sprintf("fp_%x", hash[:8])
 }
 
 func getDeviceName() string {

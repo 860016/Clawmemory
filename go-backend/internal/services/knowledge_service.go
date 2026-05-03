@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"clawmemory/internal/models"
 
@@ -29,16 +30,27 @@ func (s *KnowledgeService) CreateEntity(userID uint, data map[string]interface{}
 		aliases = string(b)
 	}
 
+	var sourceMemoryID *uint
+	if smid, ok := data["source_memory_id"].(float64); ok && smid > 0 {
+		id := uint(smid)
+		sourceMemoryID = &id
+	}
+
 	entity := &models.Entity{
-		UserID:        userID,
-		Name:          getString(data, "name", ""),
-		EntityType:    getString(data, "entity_type", ""),
-		Description:   getString(data, "description", ""),
-		Properties:    properties,
-		Confidence:    getFloat(data, "confidence", 1.0),
-		ExtractMethod: getString(data, "extract_method", "manual"),
-		CanonicalName: getString(data, "canonical_name", ""),
-		Aliases:       aliases,
+		UserID:         userID,
+		Name:           getString(data, "name", ""),
+		EntityType:     getString(data, "entity_type", "concept"),
+		Description:    getString(data, "description", ""),
+		Properties:     properties,
+		Confidence:     getFloat(data, "confidence", 1.0),
+		ExtractMethod:  getString(data, "extract_method", "manual"),
+		CanonicalName:  getString(data, "canonical_name", ""),
+		Aliases:        aliases,
+		SourceMemoryID: sourceMemoryID,
+	}
+
+	if entity.Name == "" {
+		return nil, fmt.Errorf("entity name is required")
 	}
 
 	if err := s.db.Create(entity).Error; err != nil {
@@ -62,15 +74,28 @@ func (s *KnowledgeService) ListEntities(userID uint, entityType string, page, si
 }
 
 func (s *KnowledgeService) CreateRelation(userID uint, data map[string]interface{}) (*models.Relation, error) {
+	sourceID := uint(getFloat(data, "source_id", 0))
+	targetID := uint(getFloat(data, "target_id", 0))
+	if sourceID == 0 || targetID == 0 {
+		return nil, fmt.Errorf("source_id and target_id are required")
+	}
+	if sourceID == targetID {
+		return nil, fmt.Errorf("source_id and target_id must be different")
+	}
+
 	relation := &models.Relation{
 		UserID:         userID,
-		SourceID:       uint(getFloat(data, "source_id", 0)),
-		TargetID:       uint(getFloat(data, "target_id", 0)),
+		SourceID:       sourceID,
+		TargetID:       targetID,
 		RelationType:   getString(data, "relation_type", ""),
 		Description:    getString(data, "description", ""),
 		Confidence:     getFloat(data, "confidence", 1.0),
 		DiscoverMethod: getString(data, "discover_method", "manual"),
 		Weight:         getFloat(data, "weight", 1.0),
+	}
+
+	if relation.RelationType == "" {
+		return nil, fmt.Errorf("relation_type is required")
 	}
 
 	if err := s.db.Create(relation).Error; err != nil {

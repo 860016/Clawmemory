@@ -265,9 +265,9 @@ func handleInstallStatus(db *gorm.DB) gin.HandlerFunc {
 }
 
 // License handlers
-func handleLicenseInfo(lm *services.LicenseManager) gin.HandlerFunc {
+func handleLicenseInfo(proxy *services.ProProxy) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, lm.GetLicenseInfo())
+		c.JSON(http.StatusOK, proxy.GetLicenseInfo())
 	}
 }
 
@@ -705,15 +705,7 @@ func handleCreateEntity(db *gorm.DB) gin.HandlerFunc {
 func handleListRelations(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		var relations []struct {
-			ID           uint    `json:"id"`
-			SourceID     uint    `json:"source_id"`
-			TargetID     uint    `json:"target_id"`
-			RelationType string  `json:"relation_type"`
-			Description  string  `json:"description"`
-			Confidence   float64 `json:"confidence"`
-			Weight       float64 `json:"weight"`
-		}
+		var relations []models.Relation
 		db.Where("user_id = ?", userID).Find(&relations)
 		c.JSON(http.StatusOK, gin.H{"items": relations})
 	}
