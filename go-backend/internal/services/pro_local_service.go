@@ -368,14 +368,14 @@ func (s *ProLocalService) AIExtract(userID uint) (map[string]interface{}, error)
 	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
 	entities := []map[string]interface{}{}
 	for _, m := range memories {
-		if len(entities) >= 10 {
-			break
-		}
 		entities = append(entities, map[string]interface{}{
-			"name":        m.Key,
-			"entity_type": "concept",
-			"description": m.Value,
-			"source":      "local_extract",
+			"name":           m.Key,
+			"entity_type":    "concept",
+			"description":    m.Value,
+			"source":         "local_extract",
+			"extract_method": "auto",
+			"confidence":     m.Importance,
+			"source_memory_id": m.ID,
 		})
 	}
 	return map[string]interface{}{
@@ -387,13 +387,76 @@ func (s *ProLocalService) AIExtract(userID uint) (map[string]interface{}, error)
 }
 
 func (s *ProLocalService) AutoGraph(userID uint, overwrite bool) (map[string]interface{}, error) {
+	if overwrite {
+		s.db.Where("user_id = ?", userID).Delete(&models.Entity{})
+		s.db.Where("user_id = ?", userID).Delete(&models.Relation{})
+	}
+
 	extractResult, err := s.AIExtract(userID)
 	if err != nil {
 		return nil, err
 	}
+
+	entitiesRaw, _ := extractResult["entities"].([]map[string]interface{})
+	knowledgeSvc := NewKnowledgeService(s.db)
+
+	entitiesCreated := 0
+	entityMap := make(map[string]uint)
+
+	for _, eData := range entitiesRaw {
+		name, _ := eData["name"].(string)
+		if name == "" {
+			continue
+		}
+
+		if existingID, found := entityMap[name]; found && !overwrite {
+			entityMap[name] = existingID
+			continue
+		}
+
+		var existing models.Entity
+		if !overwrite {
+			if s.db.Where("user_id = ? AND name = ?", userID, name).First(&existing).Error == nil {
+				entityMap[name] = existing.ID
+				continue
+			}
+		}
+
+		entity, err := knowledgeSvc.CreateEntity(userID, eData)
+		if err != nil {
+			continue
+		}
+		entityMap[name] = entity.ID
+		entitiesCreated++
+	}
+
+	relationsCreated := 0
+	var allEntities []models.Entity
+	s.db.Where("user_id = ?", userID).Find(&allEntities)
+
+	for i := 0; i < len(allEntities) && relationsCreated < 50; i++ {
+		for j := i + 1; j < len(allEntities) && relationsCreated < 50; j++ {
+			e1 := allEntities[i]
+			e2 := allEntities[j]
+			if e1.EntityType == e2.EntityType {
+				s.db.Create(&models.Relation{
+					UserID:         userID,
+					SourceID:       e1.ID,
+					TargetID:       e2.ID,
+					RelationType:   "same_type",
+					Description:    fmt.Sprintf("Both are %s", e1.EntityType),
+					Confidence:     0.5,
+					DiscoverMethod: "auto_graph",
+					Weight:         0.3,
+				})
+				relationsCreated++
+			}
+		}
+	}
+
 	return map[string]interface{}{
-		"entities_created":  extractResult["total"],
-		"relations_created": 0,
+		"entities_created":  entitiesCreated,
+		"relations_created": relationsCreated,
 		"overwrite":         overwrite,
 		"algorithm":         "local_key_extract_v1",
 		"mode":              "local_pro",

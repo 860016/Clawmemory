@@ -441,6 +441,47 @@ func handleSearchKeyword(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+func handleExternalPushConversation(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+
+		var req services.ConversationPushRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if req.AgentName == "" {
+			req.AgentName = "openclaw"
+		}
+
+		if len(req.Messages) == 0 && req.Summary == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "messages or summary is required"})
+			return
+		}
+
+		if len(req.Messages) > 200 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "too many messages (max 200)"})
+			return
+		}
+
+		syncService := services.GetOpenClawSyncService(db)
+		created, err := syncService.PushConversation(userID, req)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		auditLog(db, c, "external.conversation_push", req.SessionID, fmt.Sprintf("agent:%s messages:%d created:%d", req.AgentName, len(req.Messages), created))
+
+		c.JSON(http.StatusOK, gin.H{
+			"created":  created,
+			"messages": len(req.Messages),
+			"agent":    req.AgentName,
+		})
+	}
+}
+
 func handleOpenClawSyncStatus(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		syncService := services.GetOpenClawSyncService(db)

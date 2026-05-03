@@ -132,6 +132,66 @@
         </el-alert>
       </div>
 
+      <!-- OpenClaw 连接配置 -->
+      <div class="settings-card" id="settings-openclaw">
+        <div class="card-title">🔗 {{ $t('settings.openclawConnection') }}</div>
+        <div class="setting-item" v-if="openclawStatus">
+          <span>{{ $t('settings.connectionMode') }}</span>
+          <el-tag :type="openclawStatus.mode === 'local' ? 'success' : 'warning'" size="small">
+            {{ openclawStatus.mode === 'local' ? $t('settings.localMode') : $t('settings.remoteMode') }}
+          </el-tag>
+        </div>
+        <div class="setting-item" v-if="openclawStatus">
+          <span>{{ $t('settings.autoRecord') }}</span>
+          <el-switch v-model="openclawAutoSync" @change="toggleOpenClawSync" :loading="openclawSyncLoading" />
+        </div>
+        <div v-if="openclawStatus && openclawStatus.mode === 'local'" class="openclaw-local-info">
+          <div class="setting-item">
+            <span>{{ $t('settings.localDetected') }}</span>
+            <el-tag type="success" size="small">✓</el-tag>
+          </div>
+          <div v-if="openclawStatus.local_paths && openclawStatus.local_paths.length > 0" class="openclaw-paths">
+            <div v-for="p in openclawStatus.local_paths" :key="p" class="openclaw-path-item">
+              <code>{{ p }}</code>
+            </div>
+          </div>
+          <div class="setting-item" v-if="openclawStatus.synced_count > 0">
+            <span>{{ $t('settings.syncedCount') }}</span>
+            <span class="setting-desc">{{ openclawStatus.synced_count }}</span>
+          </div>
+          <div class="setting-item" v-if="openclawStatus.skipped_count > 0">
+            <span>{{ $t('settings.skippedCount') }}</span>
+            <span class="setting-desc">{{ openclawStatus.skipped_count }}</span>
+          </div>
+          <div class="setting-item">
+            <span>{{ $t('settings.forceSync') }}</span>
+            <el-button size="small" type="primary" @click="forceOpenClawSync" :loading="openclawSyncLoading">{{ $t('settings.syncNow') }}</el-button>
+          </div>
+        </div>
+        <div v-if="openclawStatus && openclawStatus.mode === 'remote'" class="openclaw-remote-info">
+          <el-alert type="info" :closable="false" style="margin-bottom: 12px; font-size: 12px">
+            <template #title>{{ $t('settings.remoteModeHint') }}</template>
+          </el-alert>
+          <div class="api-usage-hint" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
+            <div style="font-weight: 600; margin-bottom: 6px">{{ $t('settings.pushEndpoint') }}</div>
+            <code style="display: block; padding: 8px; background: var(--cm-bg); border-radius: 4px; font-size: 11px; word-break: break-all; color: var(--cm-accent)">
+              curl -X POST http://localhost:8765/api/v1/external/conversations \<br>
+              &nbsp;&nbsp;-H "X-API-Key: YOUR_KEY" \<br>
+              &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+              &nbsp;&nbsp;-d '{"agent_name":"openclaw","session_id":"xxx","messages":[{"role":"user","content":"..."}]}'
+            </code>
+          </div>
+          <div class="setting-item" style="margin-top: 12px" v-if="apiKeys.length === 0">
+            <span class="setting-desc">{{ $t('settings.needApiKeyForRemote') }}</span>
+            <el-button size="small" type="primary" @click="openApiKeyDialog">{{ $t('settings.createApiKey') }}</el-button>
+          </div>
+        </div>
+        <div v-if="!openclawStatus" class="setting-item">
+          <span>{{ $t('settings.checkingStatus') }}</span>
+          <el-button size="small" @click="loadOpenClawStatus" :loading="openclawSyncLoading">{{ $t('settings.refresh') }}</el-button>
+        </div>
+      </div>
+
       <!-- 数据管理 -->
       <div class="settings-card" :class="{ 'section-highlight': activeSection === 'data' }" id="settings-data">
         <div class="card-title">💾 {{ $t('settings.data') }}</div>
@@ -407,7 +467,7 @@ const featureLabels: Record<string, string> = {
 }
 
 onMounted(async () => {
-  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys(), loadRecordSensitiveSetting()])
+  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys(), loadRecordSensitiveSetting(), loadOpenClawStatus()])
   if (activeSection.value) {
     nextTick(() => scrollToSection(activeSection.value))
   }
@@ -495,6 +555,49 @@ async function deleteApiKey(id: number) {
 function copyApiKey() {
   navigator.clipboard.writeText(newApiKeyRaw.value)
   ElMessage.success(t('settings.apiKeyCopied'))
+}
+
+const openclawStatus = ref<any>(null)
+const openclawAutoSync = ref(true)
+const openclawSyncLoading = ref(false)
+
+async function loadOpenClawStatus() {
+  openclawSyncLoading.value = true
+  try {
+    const { data } = await axios.get('/openclaw-sync/status')
+    openclawStatus.value = data
+    openclawAutoSync.value = data.auto_sync_enabled
+  } catch {
+    openclawStatus.value = null
+  } finally {
+    openclawSyncLoading.value = false
+  }
+}
+
+async function toggleOpenClawSync() {
+  openclawSyncLoading.value = true
+  try {
+    await axios.post('/openclaw-sync/toggle', { enabled: openclawAutoSync.value })
+    ElMessage.success(t('common.success'))
+  } catch (e: any) {
+    openclawAutoSync.value = !openclawAutoSync.value
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } finally {
+    openclawSyncLoading.value = false
+  }
+}
+
+async function forceOpenClawSync() {
+  openclawSyncLoading.value = true
+  try {
+    const { data } = await axios.post('/openclaw-sync/force')
+    ElMessage.success(t('settings.syncCompleted', { count: data.synced_count || 0 }))
+    await loadOpenClawStatus()
+  } catch (e: any) {
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } finally {
+    openclawSyncLoading.value = false
+  }
 }
 
 async function loadRecordSensitiveSetting() {
@@ -855,4 +958,7 @@ async function scanDedup() {
 .api-key-name { font-size: 14px; font-weight: 500; color: var(--cm-text); }
 .api-key-prefix { font-family: monospace; font-size: 12px; color: var(--cm-text-muted); }
 .api-key-time { font-size: 11px; color: var(--cm-text-muted); }
+.openclaw-paths { margin: 8px 0; padding: 8px; background: var(--cm-bg); border-radius: 6px; }
+.openclaw-path-item { font-size: 11px; color: var(--cm-text-muted); margin: 4px 0; word-break: break-all; }
+.openclaw-path-item code { font-size: 11px; }
 </style>
