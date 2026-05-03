@@ -193,6 +193,17 @@ type APIKey struct {
 	ExpiresAt *time.Time  `json:"expires_at"`
 	CreatedAt time.Time   `json:"created_at"`
 }
+
+type AuditLog struct {
+	ID        uint      `gorm:"primarykey" json:"id"`
+	UserID    uint      `gorm:"index" json:"user_id"`
+	Action    string    `gorm:"size:50;not null;index" json:"action"`
+	Target    string    `gorm:"size:100" json:"target"`
+	Detail    string    `gorm:"size:500" json:"detail"`
+	IP        string    `gorm:"size:45" json:"ip"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type SessionMemory struct {
 	ID              uint      `gorm:"primarykey" json:"id"`
 	UserID          uint      `gorm:"index;not null;default:1" json:"user_id"`

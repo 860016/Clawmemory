@@ -86,7 +86,10 @@
       <!-- API 密钥 -->
       <div class="settings-card">
         <div class="card-title">🔑 {{ $t('settings.apiKeys') }}</div>
-        <p class="setting-desc" style="margin-bottom: 12px">{{ $t('settings.apiKeysDesc') }}</p>
+        <p class="setting-desc" style="margin-bottom: 8px">{{ $t('settings.apiKeysDesc') }}</p>
+        <el-alert type="info" :closable="false" style="margin-bottom: 12px; font-size: 12px">
+          <template #title>{{ $t('settings.apiKeySecurityNote') }}</template>
+        </el-alert>
         <div class="api-key-list" v-if="apiKeys.length > 0">
           <div class="api-key-item" v-for="key in apiKeys" :key="key.id">
             <div class="api-key-info">
@@ -101,7 +104,8 @@
           <span class="setting-desc">{{ $t('settings.apiKeyNoKeys') }}</span>
         </div>
         <div class="setting-item" style="margin-top: 12px">
-          <el-button type="primary" size="small" @click="showApiKeyDialog = true">{{ $t('settings.createApiKey') }}</el-button>
+          <span class="setting-desc">{{ t('settings.apiKeyRemaining') }}: {{ 5 - apiKeys.length }}/5</span>
+          <el-button type="primary" size="small" @click="openApiKeyDialog" :disabled="apiKeys.length >= 5">{{ $t('settings.createApiKey') }}</el-button>
         </div>
         <div class="api-usage-hint" style="margin-top: 12px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
           <div style="font-weight: 600; margin-bottom: 6px">{{ $t('settings.apiKeyUsage') }}</div>
@@ -337,7 +341,7 @@ const newPassword = ref('')
 const settingPassword = ref(false)
 const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
-const appVersion = ref('2.12.0')
+const appVersion = ref('2.12.1')
 const updateInfo = ref<any>({ checked: false, has_update: false, latest_version: '', download_url: '', release_notes: '' })
 const updateChecking = ref(false)
 const cliResetCommand = ref(navigator.platform.toLowerCase().includes('win') ? 'clawmemory.exe --reset-password NEW_PASSWORD' : './clawmemory --reset-password NEW_PASSWORD')
@@ -426,6 +430,16 @@ async function loadApiKeys() {
   } catch {}
 }
 
+function openApiKeyDialog() {
+  if (apiKeys.value.length >= 5) {
+    ElMessage.warning(t('settings.apiKeyMaxReached'))
+    return
+  }
+  newApiKeyName.value = ''
+  newApiKeyRaw.value = ''
+  showApiKeyDialog.value = true
+}
+
 async function createApiKey() {
   if (!newApiKeyName.value.trim()) {
     ElMessage.warning(t('settings.apiKeyName'))
@@ -438,7 +452,14 @@ async function createApiKey() {
     ElMessage.success(t('settings.apiKeyCreated'))
     await loadApiKeys()
   } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+    const errMsg = e.response?.data?.error || ''
+    if (e.response?.status === 429) {
+      ElMessage.error(t('settings.apiKeyRateLimit'))
+    } else if (errMsg.includes('maximum')) {
+      ElMessage.error(t('settings.apiKeyMaxReached'))
+    } else {
+      ElMessage.error(translateError(errMsg, t('common.failed')))
+    }
   } finally {
     creatingApiKey.value = false
   }

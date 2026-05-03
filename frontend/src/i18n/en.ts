@@ -559,6 +559,10 @@ export default {
     apiKeyUsage: 'Usage',
     apiKeyUsageDesc: 'Add X-API-Key header to HTTP requests to call external API',
     apiKeyExample: 'Request Example',
+    apiKeyMaxReached: 'Maximum key limit reached (max 5), please delete before creating',
+    apiKeyRateLimit: 'Too many requests, please try again later',
+    apiKeySecurityNote: 'API keys can only write and search memories, no management access',
+    apiKeyRemaining: 'Remaining slots',
   },
   pro: {
     title: 'Pro Features',

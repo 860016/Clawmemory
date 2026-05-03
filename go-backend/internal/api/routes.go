@@ -20,8 +20,8 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	{
 		public.GET("/auth/init-status", handleInitStatus(authService))
 		public.POST("/auth/set-password", handleSetPassword(authService))
-		public.POST("/auth/login", handleLogin(authService))
-		public.POST("/auth/register", handleRegister(authService))
+		public.POST("/auth/login", middleware.LoginRateLimit(), handleLogin(authService))
+		public.POST("/auth/register", middleware.LoginRateLimit(), handleRegister(authService))
 		public.POST("/auth/forgot-password", handleForgotPassword(authService))
 		public.GET("/install-status", handleInstallStatus(db))
 		public.GET("/check-update", handleCheckUpdate)
@@ -31,7 +31,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	}
 
 	authorized := r.Group("/api/v1")
-	authorized.Use(middleware.Auth(cfg, db))
+	authorized.Use(middleware.Auth(cfg, db), middleware.JWTRateLimit())
 	{
 		authorized.GET("/auth/me", handleGetMe(authService))
 		authorized.POST("/auth/change-password", handleChangePassword(authService))
@@ -181,7 +181,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	}
 
 	external := r.Group("/api/v1/external")
-	external.Use(middleware.APIKeyAuth(db))
+	external.Use(middleware.APIKeyAuth(db), middleware.APIKeyRateLimit())
 	{
 		external.POST("/memories", handleExternalCreateMemory(db))
 		external.POST("/memories/batch", handleExternalBatchCreateMemories(db))

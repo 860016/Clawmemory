@@ -166,6 +166,17 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 
 ## 📝 更新日志
 
+### v2.12.1 (2026-05-03)
+- 🔒 安全加固：Auth 中间件拆分，API Key 只能访问 /api/v1/external 端点，无法操作管理功能
+- 🔒 安全加固：CORS 从 `*` 改为 Origin 白名单（localhost + 局域网）
+- 🔒 安全加固：添加速率限制（API Key 60次/分，JWT 120次/分，登录 10次/分）
+- 🔒 安全加固：API Key 数量上限（每用户最多 5 个）
+- 🔒 安全加固：批量写入上限（100条/次）+ 输入长度限制
+- 🔒 安全加固：密钥格式校验（`cm` 前缀 + 50字符长度）
+- 🔒 安全加固：JWT 签名算法验证（防止算法混淆攻击）
+- 📋 新增：审计日志（API Key 创建/删除、外部记忆写入自动记录）
+- 🎨 前端：API Key 管理界面添加安全提示、数量限制、错误处理优化
+
 ### v2.12.0 (2026-05-03)
 - 🔑 新增：API Key 认证机制，支持外部应用安全调用 ClawMemory API
 - 🤖 新增：外部 API 端点（`/api/v1/external/memories`），供 OpenClaw 自动写入记忆

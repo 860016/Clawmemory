@@ -5,11 +5,18 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"clawmemory/internal/models"
 
 	"gorm.io/gorm"
+)
+
+const (
+	MaxAPIKeysPerUser = 5
+	APIKeyLength      = 50
+	APIKeyPrefix      = "cm"
 )
 
 type APIKeyService struct {
@@ -21,6 +28,20 @@ func NewAPIKeyService(db *gorm.DB) *APIKeyService {
 }
 
 func (s *APIKeyService) Create(userID uint, name string) (*models.APIKey, string, error) {
+	var count int64
+	s.db.Model(&models.APIKey{}).Where("user_id = ?", userID).Count(&count)
+	if count >= MaxAPIKeysPerUser {
+		return nil, "", fmt.Errorf("maximum %d API keys per user", MaxAPIKeysPerUser)
+	}
+
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, "", fmt.Errorf("name is required")
+	}
+	if len(name) > 100 {
+		name = name[:100]
+	}
+
 	rawKey, err := generateAPIKey()
 	if err != nil {
 		return nil, "", err
@@ -51,12 +72,16 @@ func (s *APIKeyService) List(userID uint) ([]models.APIKey, error) {
 }
 
 func (s *APIKeyService) Delete(userID uint, id uint) error {
-	return s.db.Where("id = ? AND user_id = ?", id, userID).Delete(&models.APIKey{}).Error
+	result := s.db.Where("id = ? AND user_id = ?", id, userID).Delete(&models.APIKey{})
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("API key not found")
+	}
+	return result.Error
 }
 
 func (s *APIKeyService) Validate(rawKey string) (*models.APIKey, error) {
-	if len(rawKey) < 8 {
-		return nil, fmt.Errorf("invalid API key")
+	if !strings.HasPrefix(rawKey, APIKeyPrefix) || len(rawKey) != APIKeyLength {
+		return nil, fmt.Errorf("invalid API key format")
 	}
 
 	hash := sha256.Sum256([]byte(rawKey))
@@ -77,11 +102,16 @@ func (s *APIKeyService) Validate(rawKey string) (*models.APIKey, error) {
 	return &apiKey, nil
 }
 
+func (s *APIKeyService) Count(userID uint) int64 {
+	var count int64
+	s.db.Model(&models.APIKey{}).Where("user_id = ?", userID).Count(&count)
+	return count
+}
+
 func generateAPIKey() (string, error) {
-	prefix := "cm"
 	b := make([]byte, 24)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	return prefix + hex.EncodeToString(b), nil
+	return APIKeyPrefix + hex.EncodeToString(b), nil
 }

@@ -3494,6 +3494,18 @@ func handleProjectSearch(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+func auditLog(db *gorm.DB, c *gin.Context, action, target, detail string) {
+	userID := middleware.GetUserID(c)
+	log := models.AuditLog{
+		UserID: userID,
+		Action: action,
+		Target: target,
+		Detail: detail,
+		IP:     c.ClientIP(),
+	}
+	db.Create(&log)
+}
+
 func getString(m map[string]interface{}, key, def string) string {
 	if v, ok := m[key].(string); ok && v != "" {
 		return v
@@ -3803,9 +3815,17 @@ func handleCreateAPIKey(db *gorm.DB) gin.HandlerFunc {
 		svc := services.NewAPIKeyService(db)
 		apiKey, rawKey, err := svc.Create(userID, req.Name)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			status := http.StatusInternalServerError
+			if strings.Contains(err.Error(), "maximum") {
+				status = http.StatusConflict
+			}
+			c.JSON(status, gin.H{"error": err.Error()})
 			return
 		}
+
+		remaining := services.MaxAPIKeysPerUser - int(svc.Count(userID))
+
+		auditLog(db, c, "api_key.create", fmt.Sprintf("id:%d", apiKey.ID), fmt.Sprintf("name:%s prefix:%s", apiKey.Name, apiKey.KeyPrefix))
 
 		c.JSON(http.StatusCreated, gin.H{
 			"id":         apiKey.ID,
@@ -3813,6 +3833,7 @@ func handleCreateAPIKey(db *gorm.DB) gin.HandlerFunc {
 			"key_prefix": apiKey.KeyPrefix,
 			"key":        rawKey,
 			"created_at": apiKey.CreatedAt,
+			"remaining":  remaining,
 			"message":    "please save the API key securely, it will not be shown again",
 		})
 	}
@@ -3825,9 +3846,12 @@ func handleDeleteAPIKey(db *gorm.DB) gin.HandlerFunc {
 
 		svc := services.NewAPIKeyService(db)
 		if err := svc.Delete(userID, uint(id)); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		}
+
+		auditLog(db, c, "api_key.delete", fmt.Sprintf("id:%d", id), "")
+
 		c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 	}
 }
@@ -3845,6 +3869,15 @@ func handleExternalCreateMemory(db *gorm.DB) gin.HandlerFunc {
 		value, _ := data["value"].(string)
 		if key == "" || value == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "key and value are required"})
+			return
+		}
+
+		if len(key) > 500 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "key too long (max 500 characters)"})
+			return
+		}
+		if len(value) > 50000 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "value too long (max 50000 characters)"})
 			return
 		}
 
@@ -3867,6 +3900,8 @@ func handleExternalCreateMemory(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		auditLog(db, c, "external.memory_create", key, fmt.Sprintf("source:%s", source))
+
 		c.JSON(http.StatusCreated, memory)
 	}
 }
@@ -3882,6 +3917,11 @@ func handleExternalBatchCreateMemories(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		if len(req.Memories) > 100 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "batch size exceeds limit (max 100)"})
+			return
+		}
+
 		svc := services.NewMemoryService(db)
 		var created, errorsCount int
 
@@ -3889,6 +3929,11 @@ func handleExternalBatchCreateMemories(db *gorm.DB) gin.HandlerFunc {
 			key, _ := m["key"].(string)
 			value, _ := m["value"].(string)
 			if key == "" || value == "" {
+				errorsCount++
+				continue
+			}
+
+			if len(key) > 500 || len(value) > 50000 {
 				errorsCount++
 				continue
 			}

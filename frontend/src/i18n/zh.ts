@@ -559,6 +559,10 @@ export default {
     apiKeyUsage: '使用方式',
     apiKeyUsageDesc: '在 HTTP 请求头中添加 X-API-Key 即可调用外部 API',
     apiKeyExample: '请求示例',
+    apiKeyMaxReached: '已达密钥上限（最多 5 个），请删除后再创建',
+    apiKeyRateLimit: '请求过于频繁，请稍后再试',
+    apiKeySecurityNote: 'API 密钥仅可写入和搜索记忆，无法访问管理功能',
+    apiKeyRemaining: '剩余可创建',
   },
   pro: {
     title: 'Pro 功能',
