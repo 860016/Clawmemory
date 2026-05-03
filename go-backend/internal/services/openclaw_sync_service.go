@@ -17,6 +17,25 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+const (
+	MaxMemoryContentLength = 50000
+	SyncInterval           = 60 * time.Second
+)
+
+var sensitivePatterns = []string{
+	"api_key", "apikey", "api-key",
+	"secret", "password", "passwd", "pwd",
+	"token", "bearer", "auth",
+	"private_key", "privatekey",
+	"access_key", "accesskey",
+	"credentials", "credential",
+}
+
+var sensitiveValuePatterns = []string{
+	"sk-", "pk-", "Bearer ", "token_",
+	"-----BEGIN", "-----END",
+}
+
 type OpenClawSyncService struct {
 	db              *gorm.DB
 	memService      *MemoryService
@@ -29,12 +48,14 @@ type OpenClawSyncService struct {
 	syncedCount     int
 	lastError       string
 	autoSyncEnabled bool
+	skippedCount    int
 }
 
 type SyncStatus struct {
 	Running         bool      `json:"running"`
 	LastSyncTime    time.Time `json:"last_sync_time"`
 	SyncedCount     int       `json:"synced_count"`
+	SkippedCount    int       `json:"skipped_count"`
 	LastError       string    `json:"last_error"`
 	AutoSyncEnabled bool      `json:"auto_sync_enabled"`
 	OpenClawFound   bool      `json:"openclaw_found"`
@@ -133,9 +154,26 @@ func (s *OpenClawSyncService) doSync() {
 	}
 
 	newCount := 0
+	skipped := 0
 	for _, p := range previews {
 		hash := md5Hash(p.FilePath + p.Key)
 		if _, exists := s.syncedFiles[hash]; exists {
+			continue
+		}
+
+		if s.containsSensitiveInfo(p.Key) || s.containsSensitiveInfo(p.Content) {
+			skipped++
+			s.syncedFiles[hash] = "__SKIPPED_SENSITIVE__"
+			continue
+		}
+
+		if len(p.Content) > MaxMemoryContentLength {
+			p.Content = p.Content[:MaxMemoryContentLength]
+		}
+
+		if s.isSensitiveFile(p.FilePath) {
+			skipped++
+			s.syncedFiles[hash] = "__SKIPPED_FILE__"
 			continue
 		}
 
@@ -161,6 +199,51 @@ func (s *OpenClawSyncService) doSync() {
 	}
 
 	s.syncedCount += newCount
+	s.skippedCount += skipped
+}
+
+func (s *OpenClawSyncService) containsSensitiveInfo(content string) bool {
+	contentLower := strings.ToLower(content)
+
+	for _, pattern := range sensitivePatterns {
+		if strings.Contains(contentLower, pattern) {
+			for _, vp := range sensitiveValuePatterns {
+				if strings.Contains(content, vp) || strings.Contains(contentLower, strings.ToLower(vp)) {
+					return true
+				}
+			}
+		}
+	}
+
+	if strings.Contains(contentLower, "api_key") || strings.Contains(contentLower, "apikey") {
+		if len(content) > 20 {
+			potentialKey := content
+			for _, vp := range sensitiveValuePatterns {
+				if strings.Contains(potentialKey, vp) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+func (s *OpenClawSyncService) isSensitiveFile(filePath string) bool {
+	fileName := strings.ToLower(filepath.Base(filePath))
+	sensitiveFiles := []string{
+		".env", "credentials", "secrets",
+		"config.json", "settings.json",
+		"api_key", "apikey", "private",
+	}
+
+	for _, sf := range sensitiveFiles {
+		if strings.Contains(fileName, sf) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (s *OpenClawSyncService) getDefaultUserID() uint {
@@ -407,6 +490,7 @@ func (s *OpenClawSyncService) GetStatus() SyncStatus {
 		Running:         s.running,
 		LastSyncTime:    s.lastSyncTime,
 		SyncedCount:     s.syncedCount,
+		SkippedCount:    s.skippedCount,
 		LastError:       s.lastError,
 		AutoSyncEnabled: s.autoSyncEnabled,
 		OpenClawFound:   found == nil,
