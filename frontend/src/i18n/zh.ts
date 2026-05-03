@@ -246,6 +246,7 @@ export default {
     addRelation: '添加关系',
     emptyGraph: '暂无知识图谱数据',
     emptyHint: '添加实体和关系，或升级 Pro 自动从记忆中提取',
+    cardView: '卡片视图',
     entityName: '名称',
     entityNamePlaceholder: '实体名称',
     entityType: '类型',

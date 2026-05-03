@@ -23,6 +23,14 @@
       <button v-for="cat in categories" :key="cat.type" class="filter-chip" :class="{ active: selectedType === cat.type }" @click="selectedType = cat.type">
         {{ cat.icon }} {{ cat.label }} <span class="chip-count">{{ cat.count }}</span>
       </button>
+      <div class="view-switch">
+        <button class="view-btn" :class="{ active: viewMode === 'cards' }" @click="viewMode = 'cards'" :title="$t('knowledge.cardView')">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+        </button>
+        <button class="view-btn" :class="{ active: viewMode === 'graph' }" @click="viewMode = 'graph'" :title="$t('knowledge.graphView')">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="3" r="2"/><circle cx="13" cy="3" r="2"/><circle cx="8" cy="13" r="2"/><line x1="4.5" y1="4" x2="11.5" y2="4" stroke="currentColor" stroke-width="1.2"/><line x1="4" y1="4.5" x2="7" y2="11.5" stroke="currentColor" stroke-width="1.2"/><line x1="12" y1="4.5" x2="9" y2="11.5" stroke="currentColor" stroke-width="1.2"/></svg>
+        </button>
+      </div>
     </div>
 
     <div class="content-area">
@@ -37,7 +45,8 @@
         <el-button type="primary" @click="loadData">{{ $t('common.retry') }}</el-button>
       </div>
 
-      <div v-else-if="filteredEntities.length" class="cards-grid">
+      <div v-else-if="filteredEntities.length" class="content-views">
+        <div v-if="viewMode === 'cards'" class="cards-grid">
         <div v-for="entity in filteredEntities" :key="entity.id" class="entity-card" @click="openDetail(entity)">
           <div class="card-top">
             <div class="card-avatar" :style="{ background: getColor(entity.name) }">
@@ -69,6 +78,32 @@
               <el-icon><Connection /></el-icon> {{ getEntityRelations(entity.id).length }}
             </span>
             <span class="card-time">{{ formatTime(entity.updated_at) }}</span>
+          </div>
+        </div>
+        </div>
+
+        <div v-if="viewMode === 'graph'" class="graph-view">
+          <div ref="graphContainer" class="graph-container"></div>
+          <div v-if="selectedGraphNode" class="graph-detail-panel">
+            <div class="graph-detail-header">
+              <div class="card-avatar" :style="{ background: getColor(selectedGraphNode.name) }">
+                {{ selectedGraphNode.name?.charAt(0)?.toUpperCase() || '?' }}
+              </div>
+              <div>
+                <h3>{{ selectedGraphNode.name }}</h3>
+                <span class="type-badge" :class="selectedGraphNode.entity_type">{{ getTypeLabel(selectedGraphNode.entity_type) }}</span>
+              </div>
+              <button class="close-btn" @click="selectedGraphNode = null">✕</button>
+            </div>
+            <p class="graph-detail-desc">{{ selectedGraphNode.description || $t('knowledge.noDescription') }}</p>
+            <div v-if="getEntityRelations(selectedGraphNode.id).length" class="graph-detail-rels">
+              <h4>{{ $t('knowledge.relations') }}</h4>
+              <div v-for="r in getEntityRelations(selectedGraphNode.id)" :key="r.id" class="rel-item">
+                <span class="rel-node">{{ getEntityName(r.source_id) }}</span>
+                <span class="rel-type">{{ r.relation_type }}</span>
+                <span class="rel-node">{{ getEntityName(r.target_id) }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -220,12 +255,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Connection, Edit, Delete, Loading } from '@element-plus/icons-vue'
 import axios from '../api/go-client'
 import { translateError } from '../i18n'
 import { useI18n } from 'vue-i18n'
+import cytoscape from 'cytoscape'
 
 const { t } = useI18n()
 
@@ -244,6 +280,11 @@ const editingEntity = ref<any>(null)
 
 const formData = ref({ name: '', entity_type: 'concept', description: '' })
 const relationForm = ref({ source_id: 0, target_id: 0, relation_type: '' })
+
+const viewMode = ref<'cards' | 'graph'>('cards')
+const graphContainer = ref<HTMLElement | null>(null)
+const selectedGraphNode = ref<any>(null)
+let cyInstance: any = null
 
 const typeConfig: Record<string, { icon: string; label: string }> = {
   person: { icon: '👤', label: t('knowledge.types.person') },
@@ -391,6 +432,126 @@ async function createRelation() {
     ElMessage.error(translateError(e.response?.data?.error, t('common.createFailed')))
   }
 }
+
+const typeColors: Record<string, string> = {
+  person: '#6366f1',
+  organization: '#8b5cf6',
+  location: '#14b8a6',
+  concept: '#f97316',
+  technology: '#0ea5e9',
+  event: '#ec4899',
+}
+
+function renderGraph() {
+  if (!graphContainer.value) return
+
+  if (cyInstance) {
+    cyInstance.destroy()
+    cyInstance = null
+  }
+
+  const nodes = filteredEntities.value.map(e => ({
+    data: {
+      id: String(e.id),
+      label: e.name || '?',
+      entityType: e.entity_type,
+      color: typeColors[e.entity_type] || '#6366f1',
+      entity: e,
+    },
+  }))
+
+  const edges = relations.value
+    .filter(r => {
+      const srcExists = nodes.some(n => n.data.id === String(r.source_id))
+      const tgtExists = nodes.some(n => n.data.id === String(r.target_id))
+      return srcExists && tgtExists
+    })
+    .map(r => ({
+      data: {
+        id: `e-${r.id}`,
+        source: String(r.source_id),
+        target: String(r.target_id),
+        label: r.relation_type || '',
+      },
+    }))
+
+  cyInstance = cytoscape({
+    container: graphContainer.value,
+    elements: [...nodes, ...edges],
+    style: [
+      {
+        selector: 'node',
+        style: {
+          'background-color': 'data(color)',
+          label: 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '11px',
+          color: '#fff',
+          'text-outline-width': 2,
+          'text-outline-color': 'data(color)',
+          width: 40,
+          height: 40,
+          'border-width': 2,
+          'border-color': '#fff',
+        },
+      },
+      {
+        selector: 'node:selected',
+        style: {
+          'border-width': 3,
+          'border-color': '#fbbf24',
+        },
+      },
+      {
+        selector: 'edge',
+        style: {
+          width: 2,
+          'line-color': '#94a3b8',
+          'target-arrow-color': '#94a3b8',
+          'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier',
+          label: 'data(label)',
+          'font-size': '9px',
+          'text-rotation': 'autorotate',
+          color: '#64748b',
+          'text-background-color': '#fff',
+          'text-background-opacity': 1,
+          'text-background-padding': '2px',
+        },
+      },
+    ],
+    layout: {
+      name: 'cose',
+      padding: 40,
+      nodeRepulsion: () => 8000,
+      idealEdgeLength: () => 100,
+      animate: true,
+      animationDuration: 500,
+    },
+  })
+
+  cyInstance.on('tap', 'node', (evt: any) => {
+    const node = evt.target
+    selectedGraphNode.value = node.data().entity || null
+  })
+
+  cyInstance.on('tap', 'background', () => {
+    selectedGraphNode.value = null
+  })
+}
+
+watch(viewMode, (mode) => {
+  if (mode === 'graph') {
+    nextTick(() => renderGraph())
+  }
+})
+
+watch([entities, relations], () => {
+  if (viewMode.value === 'graph') {
+    nextTick(() => renderGraph())
+  }
+})
 
 onMounted(loadData)
 </script>
@@ -789,4 +950,93 @@ onMounted(loadData)
   border-color: var(--cm-primary, #6366f1);
   box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
 }
+
+.view-switch {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+  background: var(--cm-bg, #fafafa);
+  border: 1px solid var(--cm-border, #e5e5e5);
+  border-radius: 8px;
+  padding: 2px;
+}
+.view-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--cm-text-muted, #999);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.view-btn:hover { color: var(--cm-primary, #6366f1); }
+.view-btn.active {
+  background: var(--cm-primary, #6366f1);
+  color: #fff;
+}
+
+.content-views {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.graph-view {
+  flex: 1;
+  position: relative;
+  display: flex;
+  min-height: 500px;
+}
+.graph-container {
+  flex: 1;
+  min-height: 500px;
+  background: var(--cm-bg-primary, #fff);
+}
+.graph-detail-panel {
+  width: 320px;
+  background: var(--cm-bg-primary, #fff);
+  border-left: 1px solid var(--cm-border, #e5e5e5);
+  padding: 20px;
+  overflow-y: auto;
+}
+.graph-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.graph-detail-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--cm-text, #1a1a1a);
+}
+.graph-detail-desc {
+  font-size: 13px;
+  color: var(--cm-text-secondary, #666);
+  line-height: 1.6;
+  margin: 0 0 16px;
+}
+.graph-detail-rels h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cm-text, #1a1a1a);
+  margin: 0 0 8px;
+}
+.close-btn {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--cm-text-muted, #999);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+}
+.close-btn:hover { background: var(--cm-bg-tertiary, #f0f0f0); }
 </style>

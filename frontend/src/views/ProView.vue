@@ -575,7 +575,7 @@ async function applyDecay() {
   loading.value.applyDecay = true
   try {
     const { data } = await proApi.applyDecay()
-    ElMessage.success(t('pro.decayApplied', { updated: data.updated, deleted: data.auto_deleted }))
+    ElMessage.success(t('pro.decayApplied', { updated: data.adjusted || data.processed || 0, deleted: data.trashed || 0 }))
     loadDecayStats()
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
@@ -587,7 +587,7 @@ async function scanConflicts() {
   try {
     const { data } = await proApi.scanConflicts()
     conflicts.value = data.conflicts
-    conflictSummary.value = { total: data.total, auto_resolvable: 0, needs_review: data.total }
+    conflictSummary.value = { total: data.total, auto_resolvable: data.auto_resolvable || 0, needs_review: data.needs_review || data.total }
   } catch (e: any) {
     if (e.response?.status !== 403) ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.conflicts = false }
@@ -696,7 +696,7 @@ async function loadEvolutionInsights() {
   loading.value.insights = true
   try {
     const { data } = await proApi.getEvolutionInsights()
-    evolutionInsights.value = { total_memories: data.total_memories, relations_count: data.total_relations, discovered_relations: 0, inferred_chains: 0 }
+    evolutionInsights.value = { total_memories: data.total_memories, relations_count: data.total_relations, discovered_relations: data.discovered_relations || 0, inferred_chains: data.inferred_chains || 0 }
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.insights = false }

@@ -246,6 +246,7 @@ export default {
     addRelation: 'Add Relation',
     emptyGraph: 'No graph data yet',
     emptyHint: 'Add entities and relations, or upgrade Pro for auto-extraction',
+    cardView: 'Card View',
     entityName: 'Name',
     entityNamePlaceholder: 'Entity name',
     entityType: 'Type',

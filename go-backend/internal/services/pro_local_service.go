@@ -25,12 +25,44 @@ func (s *ProLocalService) DecayStats(userID uint) (map[string]interface{}, error
 	if err != nil {
 		return nil, err
 	}
+
+	suggestions := []map[string]interface{}{}
+	var lowImportance []models.Memory
+	s.db.Where("user_id = ? AND importance < ? AND status != ?", userID, 0.3, "trashed").
+		Order("importance ASC").Limit(10).Find(&lowImportance)
+	for _, m := range lowImportance {
+		suggestions = append(suggestions, map[string]interface{}{
+			"memory_id":   m.ID,
+			"key":         m.Key,
+			"importance":  m.Importance,
+			"suggestion":  "consider archiving or deleting",
+			"days_old":    int(time.Since(m.UpdatedAt).Hours() / 24),
+		})
+	}
+
+	var totalMemories int64
+	s.db.Model(&models.Memory{}).Where("user_id = ? AND status != ?", userID, "trashed").Count(&totalMemories)
+
+	avgImportance := 0.0
+	if totalMemories > 0 {
+		var sum float64
+		var allMems []models.Memory
+		s.db.Where("user_id = ? AND status != ?", userID, "trashed").Select("importance").Find(&allMems)
+		for _, m := range allMems {
+			sum += m.Importance
+		}
+		avgImportance = math.Round(sum/float64(len(allMems))*100) / 100
+	}
+
 	return map[string]interface{}{
-		"total":    stats.Total,
-		"active":   stats.Active,
-		"archived": stats.Archived,
-		"trashed":  stats.Trashed,
-		"mode":     "local_pro",
+		"total":            stats.Total,
+		"active":           stats.Active,
+		"archived":         stats.Archived,
+		"trashed":          stats.Trashed,
+		"prune_candidates": len(lowImportance),
+		"avg_importance":   avgImportance,
+		"suggestions":      suggestions,
+		"mode":             "local_pro",
 	}, nil
 }
 
@@ -69,11 +101,20 @@ func (s *ProLocalService) ConflictScan(userID uint) (map[string]interface{}, err
 				values[i] = m.Value
 			}
 			if !allSame(values) {
+				severity := "low"
+				if len(mems) > 3 {
+					severity = "high"
+				} else if len(mems) > 2 {
+					severity = "medium"
+				}
 				conflict := map[string]interface{}{
-					"key":      key,
-					"count":    len(mems),
-					"memories": mems,
-					"conflict": "different_values_same_key",
+					"key":       key,
+					"count":     len(mems),
+					"value_a":   values[0],
+					"value_b":   values[1],
+					"severity":  severity,
+					"memories":  mems,
+					"conflict":  "different_values_same_key",
 				}
 				conflicts = append(conflicts, conflict)
 			}
@@ -81,10 +122,12 @@ func (s *ProLocalService) ConflictScan(userID uint) (map[string]interface{}, err
 	}
 
 	return map[string]interface{}{
-		"conflicts": conflicts,
-		"total":     len(conflicts),
-		"algorithm": "local_key_conflict_v1",
-		"mode":      "local_pro",
+		"conflicts":         conflicts,
+		"total":             len(conflicts),
+		"auto_resolvable":   len(conflicts),
+		"needs_review":      0,
+		"algorithm":         "local_key_conflict_v1",
+		"mode":              "local_pro",
 	}, nil
 }
 
@@ -205,12 +248,21 @@ func (s *ProLocalService) EvolutionDiscover(userID uint) (map[string]interface{}
 				key := fmt.Sprintf("%d-%d", memories[i].ID, rec["id"])
 				if !seen[key] {
 					seen[key] = true
+					score := 0.5
+					if s, ok := rec["score"].(float64); ok {
+						score = s
+					}
+					relationType := "related_to"
+					if reason, ok := rec["reason"].(string); ok {
+						relationType = reason
+					}
 					relations = append(relations, map[string]interface{}{
+						"source":     memories[i].Key,
+						"target":     rec["key"],
+						"type":       relationType,
+						"confidence": math.Round(score*100) / 100,
 						"source_id":  memories[i].ID,
-						"source_key": memories[i].Key,
 						"target_id":  rec["id"],
-						"target_key": rec["key"],
-						"score":      rec["score"],
 						"reason":     rec["reason"],
 					})
 				}
@@ -438,19 +490,30 @@ func (s *ProLocalService) AutoGraph(userID uint, overwrite bool) (map[string]int
 		for j := i + 1; j < len(allEntities) && relationsCreated < 50; j++ {
 			e1 := allEntities[i]
 			e2 := allEntities[j]
-			if e1.EntityType == e2.EntityType {
-				s.db.Create(&models.Relation{
-					UserID:         userID,
-					SourceID:       e1.ID,
-					TargetID:       e2.ID,
-					RelationType:   "same_type",
-					Description:    fmt.Sprintf("Both are %s", e1.EntityType),
-					Confidence:     0.5,
-					DiscoverMethod: "auto_graph",
-					Weight:         0.3,
-				})
-				relationsCreated++
+
+			relType, desc, conf := inferRelation(e1, e2)
+			if relType == "" {
+				continue
 			}
+
+			var existing models.Relation
+			err := s.db.Where("user_id = ? AND source_id = ? AND target_id = ? AND relation_type = ?",
+				userID, e1.ID, e2.ID, relType).First(&existing).Error
+			if err == nil {
+				continue
+			}
+
+			s.db.Create(&models.Relation{
+				UserID:         userID,
+				SourceID:       e1.ID,
+				TargetID:       e2.ID,
+				RelationType:   relType,
+				Description:    desc,
+				Confidence:     conf,
+				DiscoverMethod: "auto_graph",
+				Weight:         conf,
+			})
+			relationsCreated++
 		}
 	}
 
@@ -482,9 +545,10 @@ func (s *ProLocalService) SetBackupSchedule(enabled bool, intervalHours int) (ma
 
 func (s *ProLocalService) CompressConfig() (map[string]interface{}, error) {
 	return map[string]interface{}{
-		"level": "light",
-		"auto":  false,
-		"mode":  "local_pro",
+		"level":        "light",
+		"auto_enabled": false,
+		"threshold":    1000,
+		"mode":         "local_pro",
 	}, nil
 }
 
@@ -506,21 +570,120 @@ func (s *ProLocalService) EvolutionInsights(userID uint) (map[string]interface{}
 	var totalRelations int64
 	s.db.Model(&models.Relation{}).Where("user_id = ?", userID).Count(&totalRelations)
 
+	var discoveredRelations int64
+	s.db.Model(&models.Relation{}).Where("user_id = ? AND discover_method != ?", userID, "manual").Count(&discoveredRelations)
+
+	healthScore := 0.5
+	if totalMemories > 0 && totalEntities > 0 {
+		ratio := float64(totalRelations) / float64(totalEntities)
+		if ratio > 1.0 {
+			healthScore = 0.9
+		} else if ratio > 0.5 {
+			healthScore = 0.7
+		}
+	}
+
 	return map[string]interface{}{
-		"total_memories":  totalMemories,
-		"total_entities":  totalEntities,
-		"total_relations": totalRelations,
-		"health_score":    0.7,
-		"recommendations": []string{"regularly clean low-importance memories", "add tags to key memories", "use knowledge graph to build associations"},
-		"mode":            "local_pro",
+		"total_memories":       totalMemories,
+		"total_entities":       totalEntities,
+		"total_relations":      totalRelations,
+		"discovered_relations": discoveredRelations,
+		"inferred_chains":      0,
+		"health_score":         math.Round(healthScore*100) / 100,
+		"recommendations":      []string{"regularly clean low-importance memories", "add tags to key memories", "use knowledge graph to build associations"},
+		"mode":                 "local_pro",
 	}, nil
 }
 
 func (s *ProLocalService) EvolutionInfer(userID uint) (map[string]interface{}, error) {
+	var entities []models.Entity
+	s.db.Where("user_id = ?", userID).Find(&entities)
+
+	var relations []models.Relation
+	s.db.Where("user_id = ?", userID).Find(&relations)
+
+	entityMap := make(map[uint]models.Entity)
+	for _, e := range entities {
+		entityMap[e.ID] = e
+	}
+
+	adj := make(map[uint][]models.Relation)
+	for _, r := range relations {
+		adj[r.SourceID] = append(adj[r.SourceID], r)
+	}
+
+	chains := []map[string]interface{}{}
+	visited := make(map[string]bool)
+
+	for startID := range adj {
+		paths := [][]uint{}
+		var dfs func(current uint, path []uint, depth int)
+		dfs = func(current uint, path []uint, depth int) {
+			if depth >= 3 {
+				return
+			}
+			for _, r := range adj[current] {
+				next := r.TargetID
+				inPath := false
+				for _, p := range path {
+					if p == next {
+						inPath = true
+						break
+					}
+				}
+				if inPath {
+					continue
+				}
+				newPath := append([]uint{}, path...)
+				newPath = append(newPath, next)
+				if len(newPath) >= 3 {
+					paths = append(paths, newPath)
+				}
+				dfs(next, newPath, depth+1)
+			}
+		}
+		dfs(startID, []uint{startID}, 0)
+
+		for _, path := range paths {
+			if len(chains) >= 10 {
+				break
+			}
+			key := fmt.Sprintf("%v", path)
+			if visited[key] {
+				continue
+			}
+			visited[key] = true
+
+			nodes := []string{}
+			for _, id := range path {
+				if e, ok := entityMap[id]; ok {
+					nodes = append(nodes, e.Name)
+				} else {
+					nodes = append(nodes, fmt.Sprintf("entity_%d", id))
+				}
+			}
+
+			lastID := path[len(path)-1]
+			conclusion := "related entities form a cluster"
+			if lastE, ok := entityMap[lastID]; ok {
+				conclusion = fmt.Sprintf("%s is connected through a chain of relationships", lastE.Name)
+			}
+
+			chains = append(chains, map[string]interface{}{
+				"nodes":      nodes,
+				"conclusion": conclusion,
+				"length":     len(nodes),
+			})
+		}
+		if len(chains) >= 10 {
+			break
+		}
+	}
+
 	return map[string]interface{}{
-		"chains":    []map[string]interface{}{},
-		"total":     0,
-		"algorithm": "local_infer_v1",
+		"chains":    chains,
+		"total":     len(chains),
+		"algorithm": "local_graph_traversal_v1",
 		"mode":      "local_pro",
 	}, nil
 }
@@ -556,4 +719,74 @@ func getImportanceReason(daysSinceUpdate float64, accessCount int) string {
 		return "frequently_accessed"
 	}
 	return "time_decay"
+}
+
+func inferRelation(e1, e2 models.Entity) (string, string, float64) {
+	if e1.EntityType == e2.EntityType {
+		return "same_type", fmt.Sprintf("Both are %s", e1.EntityType), 0.5
+	}
+
+	name1 := strings.ToLower(e1.Name)
+	name2 := strings.ToLower(e2.Name)
+	desc1 := strings.ToLower(e1.Description)
+	desc2 := strings.ToLower(e2.Description)
+
+	if strings.Contains(desc2, name1) || strings.Contains(desc1, name2) {
+		return "references", fmt.Sprintf("%s references %s", e1.Name, e2.Name), 0.7
+	}
+
+	typeRelationMap := map[string]map[string]struct {
+		relType string
+		desc    string
+		conf    float64
+	}{
+		"person": {
+			"organization": {"member_of", "is a member of", 0.7},
+			"technology":   {"uses", "uses technology", 0.6},
+			"concept":      {"understands", "understands concept", 0.5},
+			"event":        {"participated_in", "participated in", 0.7},
+			"location":     {"located_at", "is located at", 0.6},
+		},
+		"technology": {
+			"concept":     {"implements", "implements concept", 0.6},
+			"technology":  {"depends_on", "depends on", 0.6},
+			"organization": {"used_by", "is used by", 0.5},
+		},
+		"organization": {
+			"location": {"headquartered_at", "headquartered at", 0.6},
+			"event":    {"organized", "organized", 0.7},
+		},
+		"event": {
+			"location": {"held_at", "held at", 0.7},
+			"concept":  {"about", "is about", 0.5},
+		},
+		"concept": {
+			"concept": {"related_to", "is related to", 0.4},
+		},
+	}
+
+	if typeRels, ok := typeRelationMap[e1.EntityType]; ok {
+		if rel, ok := typeRels[e2.EntityType]; ok {
+			return rel.relType, fmt.Sprintf("%s %s %s", e1.Name, rel.desc, e2.Name), rel.conf
+		}
+	}
+
+	commonWords := 0
+	words1 := strings.Fields(desc1)
+	wordSet := make(map[string]bool)
+	for _, w := range words1 {
+		if len(w) > 3 {
+			wordSet[w] = true
+		}
+	}
+	for _, w := range strings.Fields(desc2) {
+		if len(w) > 3 && wordSet[w] {
+			commonWords++
+		}
+	}
+	if commonWords >= 2 {
+		return "related_to", fmt.Sprintf("%s and %s share common context", e1.Name, e2.Name), 0.4
+	}
+
+	return "", "", 0
 }
