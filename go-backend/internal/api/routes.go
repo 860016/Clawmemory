@@ -43,6 +43,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.PUT("/memories/:id", handleUpdateMemory(db))
 		authorized.DELETE("/memories/:id", handleDeleteMemory(db))
 		authorized.POST("/memories/:id/restore", handleRestoreMemory(db))
+		authorized.POST("/memories/:id/decrypt", handleDecryptMemory(db))
 		authorized.GET("/memories/search/keyword", handleSearchKeyword(db))
 		authorized.GET("/memories/search/semantic", handleSearchSemantic(db))
 

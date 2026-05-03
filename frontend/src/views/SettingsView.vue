@@ -119,6 +119,19 @@
         </div>
       </div>
 
+      <!-- 敏感内容设置 -->
+      <div class="settings-card">
+        <div class="card-title">🛡️ {{ $t('settings.recordSensitive') }}</div>
+        <p class="setting-desc" style="margin-bottom: 8px">{{ $t('settings.recordSensitiveDesc') }}</p>
+        <div class="setting-item">
+          <span>{{ $t('settings.recordSensitive') }}</span>
+          <el-switch v-model="recordSensitive" @change="updateRecordSensitive" />
+        </div>
+        <el-alert v-if="recordSensitive" type="warning" :closable="false" style="margin-top: 8px; font-size: 12px">
+          <template #title>{{ $t('settings.recordSensitiveWarning') }}</template>
+        </el-alert>
+      </div>
+
       <!-- 数据管理 -->
       <div class="settings-card" :class="{ 'section-highlight': activeSection === 'data' }" id="settings-data">
         <div class="card-title">💾 {{ $t('settings.data') }}</div>
@@ -341,7 +354,7 @@ const newPassword = ref('')
 const settingPassword = ref(false)
 const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
-const appVersion = ref('2.13.1')
+const appVersion = ref('2.14.0')
 const updateInfo = ref<any>({ checked: false, has_update: false, latest_version: '', download_url: '', release_notes: '' })
 const updateChecking = ref(false)
 const cliResetCommand = ref(navigator.platform.toLowerCase().includes('win') ? 'clawmemory.exe --reset-password NEW_PASSWORD' : './clawmemory --reset-password NEW_PASSWORD')
@@ -356,6 +369,7 @@ const decayEnabled = ref(false)
 const decayLoading = ref(false)
 const decayStats = ref<any>(null)
 const decayInfo = ref<any>(null)
+const recordSensitive = ref(false)
 
 const healthScore = ref<any>(null)
 const healthLoading = ref(false)
@@ -393,7 +407,7 @@ const featureLabels: Record<string, string> = {
 }
 
 onMounted(async () => {
-  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys()])
+  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys(), loadRecordSensitiveSetting()])
   if (activeSection.value) {
     nextTick(() => scrollToSection(activeSection.value))
   }
@@ -481,6 +495,23 @@ async function deleteApiKey(id: number) {
 function copyApiKey() {
   navigator.clipboard.writeText(newApiKeyRaw.value)
   ElMessage.success(t('settings.apiKeyCopied'))
+}
+
+async function loadRecordSensitiveSetting() {
+  try {
+    const { data } = await axios.get('/settings')
+    recordSensitive.value = !!data.record_sensitive_content
+  } catch {}
+}
+
+async function updateRecordSensitive() {
+  try {
+    await axios.put('/settings', { record_sensitive_content: recordSensitive.value })
+    ElMessage.success(t('common.success'))
+  } catch (e: any) {
+    recordSensitive.value = !recordSensitive.value
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  }
 }
 
 async function loadInitStatus() {

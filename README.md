@@ -1,4 +1,4 @@
-# ClawMemory v2.13.1 — AI 记忆管理中枢
+# ClawMemory v2.14.0 — AI 记忆管理中枢
 
 **ClawMemory** 是一款为 AI 助手设计的**长期记忆管理系统**。它让 AI 能够"记住"过去的对话、知识和上下文，实现跨会话的智能记忆检索与关联。
 
@@ -213,6 +213,12 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 ---
 
 ## 📝 更新日志
+
+### v2.14.0 (2026-05-03)
+- 🛡️ 新增：敏感内容记录开关（默认关闭），开启后敏感内容以 AES-GCM 加密存储
+- 🔐 新增：加密记忆解密 API（`POST /api/v1/memories/:id/decrypt`）
+- 🎛️ 新增：设置页面「记录敏感内容」开关 + 安全警告提示
+- 📋 新增：同步状态显示跳过数量（skipped_count）
 
 ### v2.13.1 (2026-05-03)
 - 🔒 安全：OpenClaw 同步增加敏感信息过滤（API Key、密码、token 等）

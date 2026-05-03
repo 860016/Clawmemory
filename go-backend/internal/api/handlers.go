@@ -484,6 +484,45 @@ func handleOpenClawSyncToggle(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+func handleDecryptMemory(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		id, _ := strconv.Atoi(c.Param("id"))
+
+		svc := services.NewMemoryService(db)
+		memory, err := svc.Get(userID, uint(id))
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+
+		if !memory.IsEncrypted {
+			c.JSON(http.StatusOK, gin.H{"value": memory.Value, "encrypted": false})
+			return
+		}
+
+		secretKey := os.Getenv("SECRET_KEY")
+		if secretKey == "" || secretKey == "clawmemory-default-secret-change-me" {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "encryption key not configured"})
+			return
+		}
+
+		encryptor, err := services.NewEncryptor(secretKey)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to init decryptor"})
+			return
+		}
+
+		decrypted, err := services.DecryptValue(encryptor, memory.Value)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "decryption failed"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"value": decrypted, "encrypted": true})
+	}
+}
+
 func handleSearchSemantic(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		q := c.Query("q")

@@ -153,6 +153,18 @@ func (s *OpenClawSyncService) doSync() {
 		return
 	}
 
+	recordSensitive := s.getRecordSensitiveSetting()
+	var encryptor *Encryptor
+	if recordSensitive {
+		secretKey := s.getSecretKey()
+		var err error
+		encryptor, err = NewEncryptor(secretKey)
+		if err != nil {
+			s.lastError = "failed to init encryptor"
+			return
+		}
+	}
+
 	newCount := 0
 	skipped := 0
 	for _, p := range previews {
@@ -161,20 +173,25 @@ func (s *OpenClawSyncService) doSync() {
 			continue
 		}
 
-		if s.containsSensitiveInfo(p.Key) || s.containsSensitiveInfo(p.Content) {
+		isSensitive := s.containsSensitiveInfo(p.Key) || s.containsSensitiveInfo(p.Content)
+		isSensitiveFile := s.isSensitiveFile(p.FilePath)
+
+		if isSensitive || isSensitiveFile {
+			if !recordSensitive {
+				skipped++
+				s.syncedFiles[hash] = "__SKIPPED_SENSITIVE__"
+				continue
+			}
+		}
+
+		if isSensitiveFile && !recordSensitive {
 			skipped++
-			s.syncedFiles[hash] = "__SKIPPED_SENSITIVE__"
+			s.syncedFiles[hash] = "__SKIPPED_FILE__"
 			continue
 		}
 
 		if len(p.Content) > MaxMemoryContentLength {
 			p.Content = p.Content[:MaxMemoryContentLength]
-		}
-
-		if s.isSensitiveFile(p.FilePath) {
-			skipped++
-			s.syncedFiles[hash] = "__SKIPPED_FILE__"
-			continue
 		}
 
 		userID := s.getDefaultUserID()
@@ -183,12 +200,27 @@ func (s *OpenClawSyncService) doSync() {
 			continue
 		}
 
+		value := p.Content
+		source := p.Source
+		isEncrypted := false
+		if isSensitive && recordSensitive && encryptor != nil {
+			encrypted, err := EncryptValue(encryptor, p.Content)
+			if err != nil {
+				skipped++
+				continue
+			}
+			value = encrypted
+			source = p.Source + ":encrypted"
+			isEncrypted = true
+		}
+
 		_, err := s.memService.Create(userID, map[string]interface{}{
-			"key":         p.Key,
-			"value":       p.Content,
-			"layer":       p.Layer,
-			"source":      p.Source,
-			"memory_type": "knowledge",
+			"key":          p.Key,
+			"value":        value,
+			"layer":        p.Layer,
+			"source":       source,
+			"memory_type":  "knowledge",
+			"is_encrypted": isEncrypted,
 		})
 		if err != nil {
 			continue
@@ -200,6 +232,29 @@ func (s *OpenClawSyncService) doSync() {
 
 	s.syncedCount += newCount
 	s.skippedCount += skipped
+}
+
+func (s *OpenClawSyncService) getRecordSensitiveSetting() bool {
+	userID := s.getDefaultUserID()
+	if userID == 0 {
+		return false
+	}
+	svc := NewSettingsService(s.db)
+	val, err := svc.GetByKey(userID, "record_sensitive_content")
+	if err != nil {
+		return false
+	}
+	if b, ok := val.(bool); ok {
+		return b
+	}
+	return false
+}
+
+func (s *OpenClawSyncService) getSecretKey() string {
+	if key := os.Getenv("SECRET_KEY"); key != "" && key != "clawmemory-default-secret-change-me" {
+		return key
+	}
+	return "clawmemory-encryption-key-" + fmt.Sprintf("%d", time.Now().UnixNano())
 }
 
 func (s *OpenClawSyncService) containsSensitiveInfo(content string) bool {

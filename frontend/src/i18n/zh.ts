@@ -563,6 +563,12 @@ export default {
     apiKeyRateLimit: '请求过于频繁，请稍后再试',
     apiKeySecurityNote: 'API 密钥仅可写入和搜索记忆，无法访问管理功能',
     apiKeyRemaining: '剩余可创建',
+    recordSensitive: '记录敏感内容',
+    recordSensitiveDesc: '开启后，包含 API Key、密码、Token 等敏感信息的对话内容将被加密存储（AES-GCM），关闭则自动跳过',
+    recordSensitiveWarning: '开启此选项后，敏感内容将以加密形式存储在数据库中。请确保 SECRET_KEY 环境变量已设置，否则将使用临时密钥（重启后无法解密）',
+    encrypted: '已加密',
+    decrypt: '解密查看',
+    encryptedContent: '此内容已加密存储，点击解密查看',
   },
   pro: {
     title: 'Pro 功能',
