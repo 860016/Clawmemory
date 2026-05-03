@@ -141,6 +141,10 @@ func handleResetPassword(authService *services.AuthService) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		if req.OldPassword == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "old_password is required"})
+			return
+		}
 		if req.NewPassword == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password is required"})
 			return
@@ -156,7 +160,7 @@ func handleResetPassword(authService *services.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": "密码重置成功"})
+		c.JSON(http.StatusOK, gin.H{"message": "password reset successfully"})
 	}
 }
 
@@ -229,15 +233,23 @@ func handleChangePassword(authService *services.AuthService) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		if req.OldPassword == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "old_password is required"})
+			return
+		}
 		if req.NewPassword == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password is required"})
+			return
+		}
+		if len(req.NewPassword) < 4 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password too short"})
 			return
 		}
 		if err := authService.ChangePassword(userID, req.OldPassword, req.NewPassword); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "密码修改成功"})
+		c.JSON(http.StatusOK, gin.H{"message": "password changed successfully"})
 	}
 }
 
@@ -281,7 +293,7 @@ func handleLicenseActivate(lm *services.LicenseManager) gin.HandlerFunc {
 
 func handleLicenseDeactivate(lm *services.LicenseManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "已停用"})
+		c.JSON(http.StatusOK, gin.H{"message": "deactivated"})
 	}
 }
 
@@ -2472,7 +2484,7 @@ func handleAutoImportMemories(db *gorm.DB) gin.HandlerFunc {
 			"skipped":          skipped,
 			"entities_created": entitiesCreated,
 			"files_found":      foundFiles,
-			"message":          fmt.Sprintf("成功导入 %d 条记忆，创建 %d 个实体，跳过 %d 条", imported, entitiesCreated, skipped),
+			"message":          fmt.Sprintf("imported %d memories, created %d entities, skipped %d", imported, entitiesCreated, skipped),
 		})
 	}
 }

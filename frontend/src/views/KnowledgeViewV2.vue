@@ -224,6 +224,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Connection, Edit, Delete, Loading } from '@element-plus/icons-vue'
 import axios from '../api/go-client'
+import { translateError } from '../i18n'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -315,7 +316,7 @@ async function loadData() {
     entities.value = entRes.data.items || entRes.data || []
     relations.value = relRes.data.items || relRes.data || []
   } catch (e: any) {
-    const msg = e.response?.data?.error || e.response?.data?.detail || t('common.loadFailed')
+    const msg = translateError(e.response?.data?.error || e.response?.data?.detail, t('common.loadFailed'))
     error.value = msg
   } finally {
     loading.value = false
@@ -349,7 +350,7 @@ async function createEntity() {
     showCreateDialog.value = false
     ElMessage.success(t('common.created'))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.createFailed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.createFailed')))
   }
 }
 
@@ -362,7 +363,7 @@ async function updateEntity() {
     showEditDialog.value = false
     ElMessage.success(t('common.saved'))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.saveFailed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.saveFailed')))
   }
 }
 
@@ -387,7 +388,7 @@ async function createRelation() {
     showRelationDialog.value = false
     ElMessage.success(t('common.created'))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.createFailed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.createFailed')))
   }
 }
 

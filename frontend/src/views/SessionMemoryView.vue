@@ -115,6 +115,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import { sessionMemoryApi } from '../api/go-memories'
+import { translateError } from '../i18n'
 
 const { t } = useI18n()
 const sessions = ref<any[]>([])
@@ -186,7 +187,7 @@ async function saveSession() {
     showAddDialog.value = false
     await loadSessions()
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally {
     saving.value = false
   }

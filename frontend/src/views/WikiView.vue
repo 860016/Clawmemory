@@ -234,6 +234,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, ArrowLeft, MagicStick } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import wikiApi from '../api/wiki'
+import { translateError } from '../i18n'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -399,7 +400,7 @@ async function savePage() {
     if (viewingPage.value && currentPageId.value === viewingPage.value.id) {
       await viewPage(viewingPage.value.id)
     }
-  } catch (e: any) { ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('common.failed')) }
+  } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
   finally { saving.value = false }
 }
 
@@ -424,7 +425,7 @@ async function markComplete(page: any) {
     if (viewingPage.value?.id === page.id) {
       await viewPage(page.id)
     }
-  } catch (e: any) { ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('common.failed')) }
+  } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
 }
 
 async function refinePage(page: any) {
@@ -435,7 +436,7 @@ async function refinePage(page: any) {
     if (viewingPage.value?.id === page.id) {
       await viewPage(page.id)
     }
-  } catch (e: any) { ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('common.failed')) }
+  } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
 }
 
 async function extractKnowledge() {
@@ -449,7 +450,7 @@ async function extractKnowledge() {
     ElMessage.success(t('wiki.extractSuccess'))
     showExtractDialog.value = false
     await Promise.all([loadPages(), loadStats()])
-  } catch (e: any) { ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('common.failed')) }
+  } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
   finally { extracting.value = false }
 }
 

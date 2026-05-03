@@ -488,6 +488,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import axios from '../api/go-client'
 import proApi from '../api/pro'
+import { translateError } from '../i18n'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -566,7 +567,7 @@ async function loadDecayStats() {
     decayStats.value = data
     pruneSuggestions.value = data.suggestions || []
   } catch (e: any) {
-    if (e.response?.status !== 403) ElMessage.error(e.response?.data?.error || t('common.failed'))
+    if (e.response?.status !== 403) ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.decay = false }
 }
 
@@ -577,7 +578,7 @@ async function applyDecay() {
     ElMessage.success(t('pro.decayApplied', { updated: data.updated, deleted: data.auto_deleted }))
     loadDecayStats()
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.applyDecay = false }
 }
 
@@ -588,7 +589,7 @@ async function scanConflicts() {
     conflicts.value = data.conflicts
     conflictSummary.value = { total: data.total, auto_resolvable: 0, needs_review: data.total }
   } catch (e: any) {
-    if (e.response?.status !== 403) ElMessage.error(e.response?.data?.error || t('common.failed'))
+    if (e.response?.status !== 403) ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.conflicts = false }
 }
 
@@ -598,7 +599,7 @@ async function resolveConflict(index: number, strategy: string) {
     ElMessage.success(t('pro.conflictResolved'))
     scanConflicts()
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   }
 }
 
@@ -608,7 +609,7 @@ async function loadTokenStats() {
     const { data } = await proApi.getTokenStats()
     tokenStatData.value = { total_estimated_tokens: data.total_tokens_used, avg_tokens_per_memory: data.total_memories > 0 ? Math.round(data.total_tokens_used / data.total_memories) : 0 }
   } catch (e: any) {
-    if (e.response?.status !== 403) ElMessage.error(e.response?.data?.error || t('common.failed'))
+    if (e.response?.status !== 403) ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.tokenStats = false }
 }
 
@@ -619,7 +620,7 @@ async function testRoute() {
     const { data } = await proApi.routeToken(testMessage.value)
     routeResult.value = { selected_model: data.model || data.provider, complexity: data.estimated_tokens > 500 ? 'high' : data.estimated_tokens > 200 ? 'medium' : 'low' }
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.route = false }
 }
 
@@ -630,7 +631,7 @@ async function runAiExtract() {
     extractResult.value = { entities_extracted: data.total, relations_extracted: 0 }
     ElMessage.success(t('pro.extractDone', { entities: data.total, relations: 0 }))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.extract = false }
 }
 
@@ -641,7 +642,7 @@ async function runAutoGraph(overwrite: boolean) {
     graphResult.value = data
     ElMessage.success(t('pro.graphDone', { entities: data.entities_created, relations: data.relations_created }))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.graph = false }
 }
 
@@ -657,7 +658,7 @@ async function saveBackupSchedule() {
     await proApi.setBackupSchedule(backupSchedule.value)
     ElMessage.success(t('common.success'))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   }
 }
 
@@ -667,7 +668,7 @@ async function previewCompress() {
     const { data } = await proApi.compressPreview(compressLevel.value)
     compressPreviewData.value = data
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.compressPreview = false }
 }
 
@@ -678,7 +679,7 @@ async function applyCompress() {
     ElMessage.success(t('pro.compressDone', { count: data.compressed, ratio: Math.round(data.ratio * 100) }))
     compressPreviewData.value = null
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.compressApply = false }
 }
 
@@ -687,7 +688,7 @@ async function saveCompressConfig() {
     await proApi.setCompressConfig(compressConfig.value)
     ElMessage.success(t('common.success'))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   }
 }
 
@@ -697,7 +698,7 @@ async function loadEvolutionInsights() {
     const { data } = await proApi.getEvolutionInsights()
     evolutionInsights.value = { total_memories: data.total_memories, relations_count: data.total_relations, discovered_relations: 0, inferred_chains: 0 }
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.insights = false }
 }
 
@@ -708,7 +709,7 @@ async function runDiscoverRelations() {
     discoverResult.value = data
     ElMessage.success(t('pro.discoveredCount', { count: data.relations?.length || 0 }))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.discover = false }
 }
 
@@ -719,7 +720,7 @@ async function runInferChains() {
     inferResult.value = data
     ElMessage.success(t('pro.inferredCount', { count: data.chains?.length || 0 }))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.infer = false }
 }
 
@@ -729,7 +730,7 @@ async function runImportanceAdjust() {
     const { data } = await proApi.getImportanceAdjustments()
     ElMessage.success(t('pro.adjustedCount', { count: data.total || 0 }))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.importance = false }
 }
 
@@ -740,7 +741,7 @@ async function runPrefetch() {
     const { data } = await proApi.prefetchMemories(prefetchContext.value)
     prefetchResult.value = { matched_count: data.total || 0 }
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.prefetch = false }
 }
 </script>

@@ -258,6 +258,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Upload, Loading, MagicStick } from '@element-plus/icons-vue'
 import axios from '../api/go-client'
+import { translateError } from '../i18n'
 import { memoryApi } from '../api/go-memories'
 
 const { t } = useI18n()
@@ -409,7 +410,7 @@ async function saveMemory() {
       }
     } catch {}
     await doSaveMemory(payload)
-  } catch (e: any) { ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('common.failed')) }
+  } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
   finally { saving.value = false }
 }
 
@@ -446,7 +447,7 @@ async function handleScan() {
     const { data } = await axios.get('/openclaw-memories/scan')
     scanResult.value = data
   } catch (e: any) {
-    scanError.value = e.response?.data?.error || e.response?.data?.detail || t('memories.scanFailed')
+    scanError.value = translateError(e.response?.data?.error || e.response?.data?.detail, t('memories.scanFailed'))
   } finally {
     scanning.value = false
   }
@@ -556,7 +557,7 @@ async function doSaveMemory(payload: any) {
     editingMemory.value = null
     searchResults.value = []
     await loadMemories()
-  } catch (e: any) { ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('common.failed')) }
+  } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
   finally { saving.value = false }
 }
 </script>

@@ -19,3 +19,13 @@ export function setLocale(locale: 'zh' | 'en') {
 export function getLocale(): string {
   return i18n.global.locale.value
 }
+
+const errorMessages: Record<string, Record<string, string>> = { zh: zh.errors, en: en.errors }
+
+export function translateError(error: string, fallback: string = ''): string {
+  if (!error) return fallback
+  const locale = getLocale()
+  const mapped = errorMessages[locale]?.[error]
+  if (mapped) return mapped
+  return fallback || error
+}

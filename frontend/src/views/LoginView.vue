@@ -61,10 +61,15 @@
           <p style="margin: 8px 0 0; font-size: 13px; color: var(--cm-text-muted)">{{ $t('login.forgotStep2Desc') }}</p>
         </el-alert>
         <div class="reset-token-section">
+          <el-input v-model="forgotUsername" :placeholder="$t('login.usernamePlaceholder')" size="large" style="margin-bottom: 12px" />
           <el-input v-model="newPassword" type="password" show-password :placeholder="$t('login.newPasswordPlaceholder')" size="large" />
           <el-button type="primary" @click="handleResetPassword" :loading="loading" size="large" style="margin-top: 12px; width: 100%">
             {{ $t('login.resetPassword') }}
           </el-button>
+        </div>
+        <div class="cli-hint">
+          <p>{{ $t('login.cliResetHint') }}</p>
+          <code>{{ cliCommand }}</code>
         </div>
       </div>
       <div v-else class="reset-success-box">
@@ -72,7 +77,7 @@
         <p style="margin: 12px 0 0; color: var(--cm-text); font-weight: 600">{{ resetMessage }}</p>
       </div>
       <template #footer>
-        <el-button @click="showForgotDialog = false; resetMessage = ''; newPassword = ''">{{ $t('common.cancel') }}</el-button>
+        <el-button @click="showForgotDialog = false; resetMessage = ''; newPassword = ''; forgotUsername = 'admin'">{{ $t('common.cancel') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -85,6 +90,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { SuccessFilled } from '@element-plus/icons-vue'
 import axios from '../api/go-client'
+import { translateError } from '../i18n'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -95,6 +101,8 @@ const passwordSet = ref(true)
 const resetMessage = ref('')
 const showForgotDialog = ref(false)
 const newPassword = ref('')
+const forgotUsername = ref('admin')
+const cliCommand = ref(navigator.platform.toLowerCase().includes('win') ? 'clawmemory.exe --reset-password NEW_PASSWORD' : './clawmemory --reset-password NEW_PASSWORD')
 
 onMounted(async () => {
   try {
@@ -114,7 +122,7 @@ async function handleLogin() {
     localStorage.setItem('token', data.access_token)
     router.push('/')
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('login.wrongPassword'))
+    ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('login.wrongPassword')))
   } finally {
     loading.value = false
   }
@@ -146,10 +154,10 @@ async function handleSetPassword() {
         router.push('/')
         return
       } catch (loginErr: any) {
-        ElMessage.error(loginErr.response?.data?.error || loginErr.response?.data?.detail || t('login.wrongPassword'))
+        ElMessage.error(translateError(loginErr.response?.data?.error || loginErr.response?.data?.detail, t('login.wrongPassword')))
       }
     } else {
-      ElMessage.error(detail || t('common.failed'))
+      ElMessage.error(translateError(detail, t('common.failed')))
     }
   } finally {
     loading.value = false
@@ -157,17 +165,23 @@ async function handleSetPassword() {
 }
 
 async function handleResetPassword() {
+  if (!forgotUsername.value) {
+    ElMessage.warning(t('login.usernameRequired'))
+    return
+  }
   if (!newPassword.value || newPassword.value.length < 4) {
     ElMessage.warning(t('login.passwordTooShort'))
     return
   }
   loading.value = true
   try {
-    await axios.post('/auth/forgot-password', { new_password: newPassword.value, confirm: true })
+    await axios.post('/auth/forgot-password', { username: forgotUsername.value, new_password: newPassword.value, confirm: true })
     resetMessage.value = t('login.resetSuccess')
     password.value = newPassword.value
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('login.resetFailed'))
+    const hint = e.response?.data?.hint
+    const error = translateError(e.response?.data?.error, t('login.resetFailed'))
+    ElMessage.error(hint ? `${error} (${hint})` : error)
   } finally {
     loading.value = false
   }
@@ -332,6 +346,30 @@ async function handleResetPassword() {
 
 .reset-token-section {
   margin-top: 8px;
+}
+
+.cli-hint {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--cm-bg);
+  border: 1px solid var(--cm-border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.cli-hint p {
+  color: var(--cm-text-muted);
+  margin: 0 0 6px;
+}
+.cli-hint code {
+  display: block;
+  padding: 6px 10px;
+  background: rgba(var(--cm-primary-rgb), 0.06);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--cm-text);
+  user-select: all;
+  word-break: break-all;
 }
 
 .reset-success-box {

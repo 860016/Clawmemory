@@ -412,7 +412,7 @@ func (s *ProLocalService) SetBackupSchedule(enabled bool, intervalHours int) (ma
 	return map[string]interface{}{
 		"enabled":        enabled,
 		"interval_hours": intervalHours,
-		"message":        "备份计划已记录，请手动执行备份",
+		"message":        "backup schedule recorded, please execute backup manually",
 		"mode":           "local_pro",
 	}, nil
 }
@@ -428,7 +428,7 @@ func (s *ProLocalService) CompressConfig() (map[string]interface{}, error) {
 func (s *ProLocalService) SetCompressConfig(config map[string]interface{}) (map[string]interface{}, error) {
 	return map[string]interface{}{
 		"config":  config,
-		"message": "压缩配置已记录",
+		"message": "compress config recorded",
 		"mode":    "local_pro",
 	}, nil
 }
@@ -448,7 +448,7 @@ func (s *ProLocalService) EvolutionInsights(userID uint) (map[string]interface{}
 		"total_entities":  totalEntities,
 		"total_relations": totalRelations,
 		"health_score":    0.7,
-		"recommendations": []string{"定期清理低重要性记忆", "为关键记忆添加标签", "利用知识图谱建立关联"},
+		"recommendations": []string{"regularly clean low-importance memories", "add tags to key memories", "use knowledge graph to build associations"},
 		"mode":            "local_pro",
 	}, nil
 }

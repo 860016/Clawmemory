@@ -14,7 +14,7 @@
             <span class="status-value pro">{{ license.type === 'enterprise' ? 'Enterprise' : 'Pro' }}</span>
           </div>
           <div class="status-row" v-if="license.license_key">
-            <span class="status-label">{{ $t('settings.licenseKey') || 'License Key' }}</span>
+            <span class="status-label">{{ $t('settings.licenseKey') }}</span>
             <span class="status-value">{{ license.license_key }}</span>
           </div>
           <div class="status-row" v-if="license.expires_at">
@@ -237,7 +237,7 @@
         </div>
         <div class="setting-item">
           <span>{{ $t('settings.resetPasswordTip') }}</span>
-          <span class="setting-desc code-hint">./clawmemory --reset-password NEW_PASSWORD</span>
+          <span class="setting-desc code-hint">{{ cliResetCommand }}</span>
         </div>
       </div>
     </div>
@@ -265,7 +265,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from '../api/go-client'
-import { setLocale, getLocale } from '../i18n'
+import { setLocale, getLocale, translateError } from '../i18n'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -284,6 +284,7 @@ const currentLocale = ref(getLocale())
 const appVersion = ref('2.11.0')
 const updateInfo = ref<any>({ checked: false, has_update: false, latest_version: '', download_url: '', release_notes: '' })
 const updateChecking = ref(false)
+const cliResetCommand = ref(navigator.platform.toLowerCase().includes('win') ? 'clawmemory.exe --reset-password NEW_PASSWORD' : './clawmemory --reset-password NEW_PASSWORD')
 
 const decayEnabled = ref(false)
 const decayLoading = ref(false)
@@ -404,7 +405,7 @@ async function importData(file: File) {
       await axios.post('/data/import', jsonData)
       ElMessage.success(t('settings.importSuccess'))
     } catch (e: any) {
-      ElMessage.error(e.response?.data?.error || t('settings.importFailed'))
+      ElMessage.error(translateError(e.response?.data?.error, t('settings.importFailed')))
     }
   }
   reader.readAsText(file)
@@ -426,7 +427,7 @@ async function activateLicense() {
   } catch (e: any) {
     const detail = e.response?.data?.error || e.response?.data?.detail
     if (typeof detail === 'string') {
-      ElMessage.error(detail)
+      ElMessage.error(translateError(detail, t('common.failed')))
     } else {
       ElMessage.error(t('common.failed'))
     }
@@ -453,7 +454,7 @@ async function handleSetPassword() {
       await axios.post('/auth/set-password', { password: newPassword.value })
     }
     ElMessage.success(t('settings.passwordSet')); showPasswordDialog.value = false; oldPassword.value = ''; newPassword.value = ''; passwordSet.value = true
-  } catch (e: any) { ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('common.failed')) }
+  } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
   finally { settingPassword.value = false }
 }
 

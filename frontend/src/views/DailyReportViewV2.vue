@@ -245,6 +245,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import axios from '../api/go-client'
+import { translateError } from '../i18n'
 import {
   ArrowLeft, ArrowRight, MagicStick, Loading,
   Document, Connection, Download, Share,
@@ -366,11 +367,11 @@ async function generateReport() {
   try {
     const dateStr = currentDate.value.toISOString().split('T')[0]
     const { data } = await axios.post('/reports/generate', { date: dateStr })
-    ElMessage.success(t('dailyReport.generated') || 'Report generated')
+    ElMessage.success(t('dailyReport.generated'))
     await loadReports()
     if (data) selectedReport.value = parseReport(data)
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.error || t('dailyReport.generateFailed') || 'Failed to generate report')
+    ElMessage.error(translateError(e?.response?.data?.error, t('dailyReport.generateFailed')))
   } finally {
     generating.value = false
   }
@@ -392,7 +393,7 @@ function shareReport() {
   const text = selectedReport.value.summary || ''
   if (navigator.clipboard) {
     navigator.clipboard.writeText(text)
-    ElMessage.success('Copied to clipboard')
+    ElMessage.success(t('common.copied'))
   }
 }
 
@@ -418,12 +419,12 @@ function truncate(text: string, length: number) {
 
 function statLabel(key: string | number) {
   const labels: Record<string, string> = {
-    new_memories: t('dailyReport.newMemories') || 'New Memories',
-    new_entities: t('dailyReport.newEntities') || 'New Entities',
-    updated_wiki: t('dailyReport.updatedWiki') || 'Updated Wiki',
-    active_hours: t('dailyReport.activeHours') || 'Active Hours',
+    new_memories: t('dailyReport.newMemories'),
+    new_entities: t('dailyReport.newEntities'),
+    updated_wiki: t('dailyReport.updatedWiki'),
+    active_hours: t('dailyReport.activeHours'),
   }
-  return labels[key] || key
+  return labels[key] || String(key)
 }
 
 onMounted(() => {

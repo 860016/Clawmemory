@@ -434,6 +434,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import axios from '../api/go-client'
+import { translateError } from '../i18n'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -539,7 +540,7 @@ async function checkChromaDB() {
       ElMessage.warning(data.reason || t('dashboard.chromadbNotInstalled'))
     }
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || e.response?.data?.detail || t('dashboard.installFailed'))
+    ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('dashboard.installFailed')))
   } finally {
     installing.value = false
   }
@@ -552,7 +553,7 @@ async function syncChromaDB() {
     chromadbMemoryCount.value = data.synced || 0
     ElMessage.success(t('dashboard.syncSuccess', { count: data.synced }))
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('dashboard.syncFailed'))
+    ElMessage.error(translateError(e.response?.data?.error, t('dashboard.syncFailed')))
   } finally {
     syncing.value = false
   }

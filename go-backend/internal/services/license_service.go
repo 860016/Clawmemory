@@ -55,12 +55,12 @@ func (lm *LicenseManager) Activate(licenseKey string) (map[string]interface{}, e
 		}),
 	)
 	if err != nil {
-		return nil, errors.New("无法连接授权服务器")
+		return nil, errors.New("unable to connect to license server")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("授权服务器返回错误")
+		return nil, errors.New("license server returned error")
 	}
 
 	var result map[string]interface{}
@@ -78,7 +78,7 @@ func (lm *LicenseManager) Activate(licenseKey string) (map[string]interface{}, e
 			// 尝试刷新公钥重试
 			if err := lm.refreshPublicKey(); err == nil {
 				if err := lm.verifySignature(signature); err != nil {
-					return nil, errors.New("RSA 签名验证失败")
+					return nil, errors.New("RSA signature verification failed")
 				}
 			}
 		}
@@ -131,7 +131,7 @@ func (lm *LicenseManager) Activate(licenseKey string) (map[string]interface{}, e
 
 	return map[string]interface{}{
 		"valid":             true,
-		"message":           "激活成功",
+		"message":           "activated successfully",
 		"tier":              license.Tier,
 		"expires_at":        license.ExpiresAt,
 		"features":          features,
@@ -206,13 +206,13 @@ func (lm *LicenseManager) GetTier() string {
 func (lm *LicenseManager) verifySignature(signatureB64 string) error {
 	pubkey := lm.loadPublicKey()
 	if pubkey == nil {
-		return errors.New("无法加载公钥")
+		return errors.New("unable to load public key")
 	}
 
 	// 解析签名
 	parts := splitLast(signatureB64, ".")
 	if len(parts) != 2 {
-		return errors.New("签名格式错误")
+		return errors.New("invalid signature format")
 	}
 
 	payload, err := base64.RawURLEncoding.DecodeString(parts[0])
@@ -268,7 +268,7 @@ func (lm *LicenseManager) refreshPublicKey() error {
 
 	pubkey, ok := result["public_key"].(string)
 	if !ok || pubkey == "" {
-		return errors.New("服务器未返回公钥")
+		return errors.New("server did not return public key")
 	}
 
 	// 保存到文件

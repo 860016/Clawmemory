@@ -119,7 +119,7 @@ func (s *DailyReportService) Generate(userID uint, date string) (*models.DailyRe
 		"active_hours":  0,
 	}
 
-	summary := fmt.Sprintf("记录了 %d 条新记忆，创建了 %d 个知识实体，更新了 %d 个 Wiki 页面。", memoryCount, entityCount, wikiCount)
+	summary := fmt.Sprintf("Recorded %d new memories, created %d knowledge entities, updated %d wiki pages.", memoryCount, entityCount, wikiCount)
 
 	report := &models.DailyReport{
 		UserID:              userID,
@@ -236,7 +236,7 @@ func (s *DailyReportService) scanSessionsForDate(baseDir string, date string) []
 				if len(preview) > 80 {
 					preview = preview[:80] + "..."
 				}
-				highlights = append(highlights, fmt.Sprintf("会话: %s", preview))
+				highlights = append(highlights, fmt.Sprintf("Session: %s", preview))
 			}
 		}
 	}
@@ -287,7 +287,7 @@ func (s *DailyReportService) scanWorkspaceMemoryForDate(baseDir string, date str
 						if len(line) > 80 {
 							line = line[:80] + "..."
 						}
-						highlights = append(highlights, fmt.Sprintf("记忆日志: %s", line))
+						highlights = append(highlights, fmt.Sprintf("Memory Log: %s", line))
 						if len(highlights) >= 3 {
 							return highlights
 						}
