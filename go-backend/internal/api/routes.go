@@ -140,6 +140,9 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.GET("/openclaw-memories/scan", handleScanOpenClawMemories)
 		authorized.GET("/openclaw-memories/scan/:agentName", handleScanOpenClawAgent)
 		authorized.POST("/openclaw-memories/import", handleImportOpenClawMemories(db))
+		authorized.GET("/openclaw-sync/status", handleOpenClawSyncStatus(db))
+		authorized.POST("/openclaw-sync/force", handleOpenClawSyncForce(db))
+		authorized.POST("/openclaw-sync/toggle", handleOpenClawSyncToggle(db))
 		authorized.POST("/memories/auto-import", handleAutoImportMemories(db))
 
 		authorized.GET("/chromadb/status", handleChromaDBStatus(db))

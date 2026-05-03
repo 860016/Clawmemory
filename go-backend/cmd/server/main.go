@@ -65,6 +65,10 @@ func main() {
 
 	services.Init(db)
 
+	syncService := services.GetOpenClawSyncService(db)
+	go syncService.Start()
+	log.Printf("OpenClaw auto-sync service started")
+
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())

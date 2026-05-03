@@ -441,6 +441,49 @@ func handleSearchKeyword(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+func handleOpenClawSyncStatus(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		syncService := services.GetOpenClawSyncService(db)
+		status := syncService.GetStatus()
+		c.JSON(http.StatusOK, status)
+	}
+}
+
+func handleOpenClawSyncForce(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		syncService := services.GetOpenClawSyncService(db)
+		count := syncService.ForceSync()
+		c.JSON(http.StatusOK, gin.H{
+			"message":     "sync completed",
+			"synced_count": count,
+		})
+	}
+}
+
+func handleOpenClawSyncToggle(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "enabled field required"})
+			return
+		}
+
+		syncService := services.GetOpenClawSyncService(db)
+		syncService.SetAutoSync(req.Enabled)
+
+		status := "enabled"
+		if !req.Enabled {
+			status = "disabled"
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message": "auto-sync " + status,
+			"enabled": req.Enabled,
+		})
+	}
+}
+
 func handleSearchSemantic(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		q := c.Query("q")
