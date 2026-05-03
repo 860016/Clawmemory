@@ -65,6 +65,8 @@ func main() {
 
 	services.Init(db)
 
+	autoCreateAPIKey(db)
+
 	syncService := services.GetOpenClawSyncService(db)
 	go syncService.Start()
 	log.Printf("OpenClaw auto-sync service started")
@@ -103,6 +105,33 @@ func main() {
 	if err := r.Run(addr); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
+}
+
+func autoCreateAPIKey(db *gorm.DB) {
+	var count int64
+	db.Model(&models.APIKey{}).Count(&count)
+	if count > 0 {
+		return
+	}
+
+	var user models.User
+	if err := db.First(&user).Error; err != nil {
+		return
+	}
+
+	svc := services.NewAPIKeyService(db)
+	apiKey, rawKey, err := svc.Create(user.ID, "OpenClaw Auto")
+	if err != nil {
+		log.Printf("Warning: failed to auto-create API key: %v", err)
+		return
+	}
+
+	log.Printf("========================================")
+	log.Printf("  Auto-generated API Key for OpenClaw")
+	log.Printf("  Name: %s", apiKey.Name)
+	log.Printf("  Key:  %s", rawKey)
+	log.Printf("  Please save this key, it won't be shown again!")
+	log.Printf("========================================")
 }
 
 func resetAdminPassword(db *gorm.DB, newPassword string) {

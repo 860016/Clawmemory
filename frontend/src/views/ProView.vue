@@ -748,7 +748,7 @@ async function runPrefetch() {
 
 <style scoped>
 .pro-page {
-  height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--cm-bg-secondary, #f5f5f5);
@@ -786,9 +786,7 @@ async function runPrefetch() {
 }
 
 .pro-grid {
-  flex: 1;
   padding: 24px 28px;
-  overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 16px;
@@ -813,7 +811,6 @@ async function runPrefetch() {
   background: var(--cm-bg-primary, #fff);
   border: 1px solid var(--cm-border, #e5e5e5);
   border-radius: 14px;
-  overflow: hidden;
   transition: all 0.25s ease;
 }
 
