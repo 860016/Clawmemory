@@ -86,10 +86,9 @@ func GetOpenClawSyncService(db *gorm.DB) *OpenClawSyncService {
 
 func (s *OpenClawSyncService) loadSyncedFiles() {
 	var memories []models.Memory
-	s.db.Where("source LIKE ?", "openclaw%").Select("key, source").Find(&memories)
+	s.db.Where("source LIKE ?", "openclaw%").Select("key").Find(&memories)
 	for _, m := range memories {
-		hash := md5Hash(m.Key + m.Source)
-		s.syncedFiles[hash] = m.Key
+		s.syncedFiles[m.Key] = m.Key
 	}
 }
 
@@ -157,36 +156,32 @@ func (s *OpenClawSyncService) doSync() {
 	var encryptor *Encryptor
 	if recordSensitive {
 		secretKey := s.getSecretKey()
-		var err error
-		encryptor, err = NewEncryptor(secretKey)
-		if err != nil {
-			s.lastError = "failed to init encryptor"
-			return
+		if secretKey == "" {
+			s.lastError = "SECRET_KEY not configured, cannot encrypt sensitive content"
+			recordSensitive = false
+		} else {
+			var err error
+			encryptor, err = NewEncryptor(secretKey)
+			if err != nil {
+				s.lastError = "failed to init encryptor"
+				return
+			}
 		}
 	}
 
 	newCount := 0
 	skipped := 0
 	for _, p := range previews {
-		hash := md5Hash(p.FilePath + p.Key)
-		if _, exists := s.syncedFiles[hash]; exists {
+		if _, exists := s.syncedFiles[p.Key]; exists {
 			continue
 		}
 
 		isSensitive := s.containsSensitiveInfo(p.Key) || s.containsSensitiveInfo(p.Content)
 		isSensitiveFile := s.isSensitiveFile(p.FilePath)
 
-		if isSensitive || isSensitiveFile {
-			if !recordSensitive {
-				skipped++
-				s.syncedFiles[hash] = "__SKIPPED_SENSITIVE__"
-				continue
-			}
-		}
-
-		if isSensitiveFile && !recordSensitive {
+		if (isSensitive || isSensitiveFile) && !recordSensitive {
 			skipped++
-			s.syncedFiles[hash] = "__SKIPPED_FILE__"
+			s.syncedFiles[p.Key] = "__SKIPPED_SENSITIVE__"
 			continue
 		}
 
@@ -226,7 +221,7 @@ func (s *OpenClawSyncService) doSync() {
 			continue
 		}
 
-		s.syncedFiles[hash] = p.Key
+		s.syncedFiles[p.Key] = p.Key
 		newCount++
 	}
 
@@ -251,10 +246,7 @@ func (s *OpenClawSyncService) getRecordSensitiveSetting() bool {
 }
 
 func (s *OpenClawSyncService) getSecretKey() string {
-	if key := os.Getenv("SECRET_KEY"); key != "" && key != "clawmemory-default-secret-change-me" {
-		return key
-	}
-	return "clawmemory-encryption-key-" + fmt.Sprintf("%d", time.Now().UnixNano())
+	return GetEncryptionKey()
 }
 
 func (s *OpenClawSyncService) containsSensitiveInfo(content string) bool {

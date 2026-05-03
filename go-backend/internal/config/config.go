@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	AppVersion    = "2.14.0"
+	AppVersion    = "2.15.0"
 	GitHubRepo    = "860016/Clawmemory"
 	GitHubRepoURL = "https://github.com/860016/Clawmemory"
 )

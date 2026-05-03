@@ -7,6 +7,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"os"
+	"strings"
 )
 
 type Encryptor struct {
@@ -62,11 +64,7 @@ func (e *Encryptor) Decrypt(encoded string) (string, error) {
 }
 
 func IsEncrypted(value string) bool {
-	if len(value) < 4 {
-		return false
-	}
-	prefix := value[:3]
-	return prefix == "ENC"
+	return strings.HasPrefix(value, "ENC:")
 }
 
 func EncryptValue(encryptor *Encryptor, value string) (string, error) {
@@ -83,4 +81,11 @@ func DecryptValue(encryptor *Encryptor, value string) (string, error) {
 	}
 	encoded := value[4:]
 	return encryptor.Decrypt(encoded)
+}
+
+func GetEncryptionKey() string {
+	if key := os.Getenv("SECRET_KEY"); key != "" && key != "clawmemory-default-secret-change-me" {
+		return key
+	}
+	return ""
 }

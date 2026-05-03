@@ -1,4 +1,4 @@
-# ClawMemory v2.14.0 — AI 记忆管理中枢
+# ClawMemory v2.15.0 — AI 记忆管理中枢
 
 **ClawMemory** 是一款为 AI 助手设计的**长期记忆管理系统**。它让 AI 能够"记住"过去的对话、知识和上下文，实现跨会话的智能记忆检索与关联。
 
@@ -60,7 +60,7 @@
 - **API Key 认证**: 安全的第三方应用接入
 - **外部 API**: `/api/v1/external/memories` 供 OpenClaw 等写入记忆
 - **批量导入**: 支持批量写入记忆（最多 100 条/次）
-- **OpenClaw 联动**: 对话自动记录为 ClawMemory 记忆
+- **OpenClaw 自动同步**: 安装后自动监控 `~/.openclaw/` 目录，每 60 秒增量同步新对话
 
 ### 🔐 安全特性
 - JWT 认证 + API Key 双重认证机制
@@ -68,6 +68,7 @@
 - 速率限制（防暴力破解）
 - 审计日志记录
 - 输入验证与长度限制
+- **敏感内容加密存储**：默认跳过含 API Key/密码/Token 的内容；开启后以 AES-GCM 加密存储，查看时解密
 
 ### 💾 数据管理
 - 本地 SQLite 数据库
@@ -139,7 +140,7 @@ clawmemory/
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `SECRET_KEY` | (自动生成) | JWT 密钥 |
+| `SECRET_KEY` | (自动生成) | JWT 密钥 + 敏感内容加密密钥（开启敏感内容记录时必须手动设置，否则敏感内容将被跳过） |
 | `PORT` | `8765` | 监听端口 |
 | `DATA_DIR` | `./data` | 数据目录 |
 
@@ -185,6 +186,7 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - `GET /api/v1/memories/:id` - 详情
 - `PUT /api/v1/memories/:id` - 更新
 - `DELETE /api/v1/memories/:id` - 删除
+- `POST /api/v1/memories/:id/decrypt` - 解密加密记忆
 - `GET /api/v1/memories/smart-load` - 智能加载
 - `POST /api/v1/memories/:id/reinforce` - 强化记忆
 - `POST /api/v1/memories/generate-summaries` - 生成摘要
@@ -209,6 +211,11 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - `POST /api/v1/external/memories` - 写入单条记忆
 - `POST /api/v1/external/memories/batch` - 批量写入记忆
 - `GET /api/v1/external/memories/search?q=keyword` - 搜索记忆
+
+### OpenClaw 自动同步
+- `GET /api/v1/openclaw-sync/status` - 同步状态
+- `POST /api/v1/openclaw-sync/force` - 手动触发同步
+- `POST /api/v1/openclaw-sync/toggle` - 开关自动同步
 
 ---
 

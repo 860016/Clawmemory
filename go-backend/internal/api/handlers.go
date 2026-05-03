@@ -501,9 +501,9 @@ func handleDecryptMemory(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		secretKey := os.Getenv("SECRET_KEY")
-		if secretKey == "" || secretKey == "clawmemory-default-secret-change-me" {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "encryption key not configured"})
+		secretKey := services.GetEncryptionKey()
+		if secretKey == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "SECRET_KEY not configured, cannot decrypt"})
 			return
 		}
 
@@ -2481,18 +2481,15 @@ func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
 					layer = p.Layer
 				}
 
-				memory := models.Memory{
-					UserID:     userID,
-					Key:        p.Key,
-					Value:      fullContent,
-					Layer:      layer,
-					Importance: 0.5,
-					Tags:       "",
-					Source:     p.Source,
-					Status:     "active",
-				}
-				result := db.Create(&memory)
-				if result.Error != nil {
+				memSvc := services.NewMemoryService(db)
+				_, err := memSvc.Create(userID, map[string]interface{}{
+					"key":        p.Key,
+					"value":      fullContent,
+					"layer":      layer,
+					"importance": 0.5,
+					"source":     p.Source,
+				})
+				if err != nil {
 					errorsCount++
 				} else {
 					imported++
@@ -2623,18 +2620,16 @@ func importFromJSON(db *gorm.DB, userID uint, content string, seenKeys map[strin
 			source = s
 		}
 
-		memory := models.Memory{
-			UserID:     userID,
-			Key:        key,
-			Value:      contentStr,
-			Layer:      layer,
-			Importance: importance,
-			Tags:       tags,
-			Source:     source,
-			Status:     "active",
-		}
-		result := db.Create(&memory)
-		if result.Error != nil {
+		memSvc := services.NewMemoryService(db)
+		_, err := memSvc.Create(userID, map[string]interface{}{
+			"key":        key,
+			"value":      contentStr,
+			"layer":      layer,
+			"importance": importance,
+			"tags":       tags,
+			"source":     source,
+		})
+		if err != nil {
 			*skipped++
 			continue
 		}
@@ -2682,18 +2677,16 @@ func importFromMarkdown(db *gorm.DB, userID uint, filePath, content string, seen
 			relPath = "..." + relPath[len(relPath)-97:]
 		}
 
-		memory := models.Memory{
-			UserID:     userID,
-			Key:        key,
-			Value:      body,
-			Layer:      layer,
-			Importance: importance,
-			Tags:       "markdown",
-			Source:     source,
-			Status:     "active",
-		}
-		result := db.Create(&memory)
-		if result.Error != nil {
+		memSvc := services.NewMemoryService(db)
+		_, err := memSvc.Create(userID, map[string]interface{}{
+			"key":        key,
+			"value":      body,
+			"layer":      layer,
+			"importance": importance,
+			"tags":       "markdown",
+			"source":     source,
+		})
+		if err != nil {
 			*skipped++
 			continue
 		}
@@ -2716,18 +2709,16 @@ func importFromText(db *gorm.DB, userID uint, filePath, content string, seenKeys
 
 			if !seenKeys[key] {
 				layer := classifyLayer(key, body)
-				memory := models.Memory{
-					UserID:     userID,
-					Key:        key,
-					Value:      body,
-					Layer:      layer,
-					Importance: 0.4,
-					Tags:       "text",
-					Source:     "auto_import_txt",
-					Status:     "active",
-				}
-				result := db.Create(&memory)
-				if result.Error == nil {
+				memSvc := services.NewMemoryService(db)
+				_, err := memSvc.Create(userID, map[string]interface{}{
+					"key":        key,
+					"value":      body,
+					"layer":      layer,
+					"importance": 0.4,
+					"tags":       "text",
+					"source":     "auto_import_txt",
+				})
+				if err == nil {
 					seenKeys[key] = true
 					*imported++
 					tryCreateEntity(db, userID, key, body, entitiesCreated)
@@ -2764,18 +2755,16 @@ func importFromText(db *gorm.DB, userID uint, filePath, content string, seenKeys
 		key = strings.TrimSuffix(key, filepath.Ext(key))
 		if !seenKeys[key] && len(content) > 10 {
 			layer := classifyLayer(key, content)
-			memory := models.Memory{
-				UserID:     userID,
-				Key:        key,
-				Value:      content,
-				Layer:      layer,
-				Importance: 0.3,
-				Tags:       "text",
-				Source:     "auto_import_txt",
-				Status:     "active",
-			}
-			result := db.Create(&memory)
-			if result.Error == nil {
+			memSvc := services.NewMemoryService(db)
+			_, err := memSvc.Create(userID, map[string]interface{}{
+				"key":        key,
+				"value":      content,
+				"layer":      layer,
+				"importance": 0.3,
+				"tags":       "text",
+				"source":     "auto_import_txt",
+			})
+			if err == nil {
 				seenKeys[key] = true
 				*imported++
 				tryCreateEntity(db, userID, key, content, entitiesCreated)
@@ -3122,7 +3111,11 @@ func handleListTrash(db *gorm.DB) gin.HandlerFunc {
 		var memories []models.Memory
 		userID := middleware.GetUserID(c)
 		db.Where("user_id = ? AND status = ?", userID, "trashed").Order("trashed_at DESC").Find(&memories)
-		c.JSON(http.StatusOK, gin.H{"items": memories})
+		items := make([]*services.MemoryModel, 0, len(memories))
+		for i := range memories {
+			items = append(items, services.ToMemoryModel(&memories[i]))
+		}
+		c.JSON(http.StatusOK, gin.H{"items": items})
 	}
 }
 

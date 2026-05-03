@@ -63,8 +63,12 @@
           <span v-if="m.score" class="score-badge">{{ m.score.toFixed(2) }}</span>
         </div>
         <div class="card-key">{{ m.key }}</div>
-        <div class="card-value" v-if="m.value">{{ m.value }}</div>
-        <div class="card-summary" v-else-if="m.summary">{{ m.summary }} <el-tag size="small" type="info">{{$t('memories.summaryTag')}}</el-tag></div>
+        <div class="card-value" v-if="m.is_encrypted">
+          <el-tag type="warning" size="small" style="margin-right: 6px">🔒 {{ $t('settings.encrypted') }}</el-tag>
+          <el-button text size="small" type="primary" @click="decryptMemory(m)">{{ $t('settings.decrypt') }}</el-button>
+        </div>
+        <div class="card-value" v-else-if="m.value">{{ m.value }}</div>
+        <div class="card-summary" v-if="!m.is_encrypted && !m.value && m.summary">{{ m.summary }} <el-tag size="small" type="info">{{$t('memories.summaryTag')}}</el-tag></div>
         <div class="card-footer">
           <span class="card-meta">{{ m.source }} · {{ formatTime(m.updated_at || m.created_at) }}</span>
           <div class="card-actions">
@@ -81,13 +85,19 @@
         <div class="card-top">
           <span class="layer-tag" :class="m.layer">{{ layerLabels[m.layer] || m.layer }}</span>
           <span class="importance" :class="importanceClass(m.importance)">{{ (m.importance * 100).toFixed(0) }}%</span>
+          <el-tag v-if="m.is_encrypted" type="warning" size="small">🔒</el-tag>
           <el-tag v-if="m.memory_type && m.memory_type !== 'knowledge'" size="small" class="type-tag">{{ m.memory_type }}</el-tag>
           <el-tag v-if="m.reinforce_count > 0" size="small" type="success" class="reinforce-badge">📌 {{ m.reinforce_count }}</el-tag>
           <span v-if="m.verified_at" class="verified-badge" :title="$t('memories.verifiedAt', { date: m.verified_at })">✅</span>
         </div>
         <div class="card-key">{{ m.key }}</div>
-        <div class="card-value">{{ truncate(m.value, 200) }}</div>
-        <div class="card-summary-line" v-if="m.summary && m.summary !== m.value">💡 {{ m.summary }}</div>
+        <div class="card-value" v-if="m.is_encrypted">
+          <el-tag type="warning" size="small" style="margin-right: 6px">🔒 {{ $t('settings.encrypted') }}</el-tag>
+          <span style="color: var(--cm-text-muted); font-size: 12px">{{ $t('settings.encryptedContent') }}</span>
+          <el-button text size="small" type="primary" @click="decryptMemory(m)" style="margin-left: 8px">{{ $t('settings.decrypt') }}</el-button>
+        </div>
+        <div class="card-value" v-else>{{ truncate(m.value, 200) }}</div>
+        <div class="card-summary-line" v-if="!m.is_encrypted && m.summary && m.summary !== m.value">💡 {{ m.summary }}</div>
         <div class="card-tags" v-if="m.tags && m.tags.length">
           <span class="tag" v-for="t in m.tags" :key="t">{{ t }}</span>
         </div>
@@ -422,6 +432,18 @@ async function deleteMemory(id: number) {
     searchResults.value = []
     await loadMemories()
   } catch {}
+}
+
+async function decryptMemory(m: any) {
+  try {
+    const { data } = await axios.post(`/memories/${m.id}/decrypt`)
+    if (data.encrypted) {
+      m.value = data.value
+      m.is_encrypted = false
+    }
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
+  }
 }
 
 function importanceClass(v: number) { return v >= 0.7 ? 'high' : v >= 0.3 ? 'medium' : 'low' }

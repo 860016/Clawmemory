@@ -53,17 +53,18 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 	}
 
 	memory := &models.Memory{
-		UserID:     userID,
-		Layer:      getString(data, "layer", "short"),
-		Key:        getString(data, "key", ""),
-		Value:      getString(data, "value", ""),
-		Importance: getFloat(data, "importance", 0.5),
-		Tags:       tags,
-		Summary:    generateSummary(getString(data, "key", ""), getString(data, "value", "")),
-		Source:     getString(data, "source", "manual"),
-		MemoryType: getString(data, "memory_type", "knowledge"),
-		Status:     "active",
-		DecayStage: 0,
+		UserID:      userID,
+		Layer:       getString(data, "layer", "short"),
+		Key:         getString(data, "key", ""),
+		Value:       getString(data, "value", ""),
+		Importance:  getFloat(data, "importance", 0.5),
+		Tags:        tags,
+		Summary:     generateSummary(getString(data, "key", ""), getString(data, "value", "")),
+		Source:      getString(data, "source", "manual"),
+		MemoryType:  getString(data, "memory_type", "knowledge"),
+		IsEncrypted: getBool(data, "is_encrypted", false),
+		Status:      "active",
+		DecayStage:  0,
 	}
 
 	if err := s.db.Create(memory).Error; err != nil {

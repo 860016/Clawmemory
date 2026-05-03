@@ -565,7 +565,7 @@ export default {
     apiKeyRemaining: 'Remaining slots',
     recordSensitive: 'Record Sensitive Content',
     recordSensitiveDesc: 'When enabled, sensitive content (API keys, passwords, tokens) will be encrypted (AES-GCM) before storage; when disabled, such content is skipped',
-    recordSensitiveWarning: 'Enabling this will store sensitive content in encrypted form. Ensure SECRET_KEY env var is set, otherwise a temporary key is used (cannot decrypt after restart)',
+    recordSensitiveWarning: 'Enabling this will store sensitive content in encrypted form. You MUST set the SECRET_KEY env var, otherwise sensitive content will be skipped',
     encrypted: 'Encrypted',
     decrypt: 'Decrypt',
     encryptedContent: 'This content is encrypted, click to decrypt',
