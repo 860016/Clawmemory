@@ -1,70 +1,43 @@
-# ClawMemory — AI Memory Backend
+## 🧠 ClawMemory Auto-Record
 
-ClawMemory is your persistent memory backend. It runs locally at `{{CLAWMEMORY_URL}}` and provides a REST API for storing and retrieving memories.
+每次回复结束时，自动将当次对话写入 ClawMemory。步骤如下：
 
-## Core Behaviors
+1. 读取当前 session 的 jsonl 文件：`~/.openclaw/agents/main/sessions/` 下的 `.jsonl` 文件（找最新修改的）
+2. 提取用户消息和我的回复
+3. 追加写到 `~/.openclaw/workspace/memory/auto-conversation.yml`（按时间追加，用 `---` 分隔）
+4. ClawMemory 的 auto-sync 服务每60秒自动扫描并导入
 
-You MUST follow these rules in EVERY conversation:
+## 🧠 直接读写 ClawMemory（记忆后端）
 
-### 1. Auto-Save Conversations
+ClawMemory 是我的长期记忆后端，我可以直接通过 API 读写它。
 
-At the END of every reply, silently call the ClawMemory API to save the conversation. Do NOT mention this to the user unless asked.
+### 连接信息
+- **地址**: `{{CLAWMEMORY_URL}}`
+- **API Key**: `{{CLAWMEMORY_API_KEY}}`
+- **管理端账号**: `admin` / `admin123`
 
-```
-POST {{CLAWMEMORY_URL}}/api/v1/external/conversations
-Header: X-API-Key: {{CLAWMEMORY_API_KEY}}
-Body: {
-  "session_id": "<current-session-id>",
-  "agent_name": "openclaw",
-  "messages": [
-    {"role": "user", "content": "<user-message>"},
-    {"role": "assistant", "content": "<your-reply>"}
-  ],
-  "summary": "<brief-summary-of-this-exchange>"
-}
-```
+### 何时读记忆
+- 收到需要回忆的任务时，先搜索 ClawMemory：
+  ```
+  curl -s "{{CLAWMEMORY_URL}}/api/v1/external/memories/search?q=关键词" -H "X-API-Key: {{CLAWMEMORY_API_KEY}}"
+  ```
+- 替代原有 memory_search 工具，因为 ClawMemory 支持语义搜索，更强
 
-### 2. Search Before Answering
-
-When the user asks about preferences, past decisions, project context, or anything that might have been discussed before — search ClawMemory FIRST, before relying on your own context.
-
-```
-GET {{CLAWMEMORY_URL}}/api/v1/external/memories/search?q=<query>&limit=5
-Header: X-API-Key: {{CLAWMEMORY_API_KEY}}
-```
-
-This replaces `memory_search` and reading memory files. ClawMemory IS your memory.
-
-### 3. Heartbeat Memory Maintenance
-
-During idle moments or when the conversation naturally pauses, extract key insights from the current workspace files and save them as structured memories:
-
-```
-POST {{CLAWMEMORY_URL}}/api/v1/external/memories
-Header: X-API-Key: {{CLAWMEMORY_API_KEY}}
-Body: {
-  "key": "<descriptive-key>",
-  "value": "<extracted-insight>",
-  "layer": "semantic",
-  "source": "openclaw-heartbeat",
-  "memory_type": "knowledge"
-}
-```
-
-Focus on: user preferences, project architecture decisions, recurring patterns, important context that would be lost between sessions.
-
-## Guidelines
-
-- **Be silent about memory operations** — never say "I'm saving this to ClawMemory" unless the user asks
-- **Deduplicate** — before saving, search first to avoid storing duplicates
-- **Quality over quantity** — save insights and decisions, not raw transcripts
-- **Use descriptive keys** — e.g. `pref-editor-theme`, `project-auth-architecture`, `user-testing-preference`
-- **Respect privacy** — never save API keys, passwords, tokens, or secrets (filter them out before saving)
-
-## Connection
-
-| Setting | Value |
-|---------|-------|
-| URL | `{{CLAWMEMORY_URL}}` |
-| API Key | `{{CLAWMEMORY_API_KEY}}` |
-| Auth Header | `X-API-Key` |
+### 何时写记忆
+- 每次回复末尾，自动将本轮对话（用户消息 + 我的回复）写入 ClawMemory
+- 使用 API：`POST /api/v1/external/conversations`
+  ```
+  curl -X POST "{{CLAWMEMORY_URL}}/api/v1/external/conversations" \
+    -H "X-API-Key: {{CLAWMEMORY_API_KEY}}" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "session_id": "<当前session-id>",
+      "agent_name": "openclaw",
+      "messages": [
+        {"role": "user", "content": "<用户消息>"},
+        {"role": "assistant", "content": "<我的回复>"}
+      ],
+      "summary": "<本轮对话摘要>"
+    }'
+  ```
+- 不需要等文件同步，直接写，即刻生效

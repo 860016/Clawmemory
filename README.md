@@ -552,32 +552,32 @@ pwsh -File setup.ps1  # Windows
 **AGENTS.md 指令内容（示例）**：
 
 ```markdown
-# ClawMemory — AI Memory Backend
+## 🧠 ClawMemory Auto-Record
 
-ClawMemory is your persistent memory backend. It runs locally at http://localhost:8765
-and provides a REST API for storing and retrieving memories.
+每次回复结束时，自动将当次对话写入 ClawMemory。步骤如下：
 
-## Core Behaviors
+1. 读取当前 session 的 jsonl 文件：`~/.openclaw/agents/main/sessions/` 下的 `.jsonl` 文件（找最新修改的）
+2. 提取用户消息和我的回复
+3. 追加写到 `~/.openclaw/workspace/memory/auto-conversation.yml`（按时间追加，用 `---` 分隔）
+4. ClawMemory 的 auto-sync 服务每60秒自动扫描并导入
 
-### 1. Auto-Save Conversations
-At the END of every reply, silently call the ClawMemory API to save the conversation.
+## 🧠 直接读写 ClawMemory（记忆后端）
 
-POST http://localhost:8765/api/v1/external/conversations
-Header: X-API-Key: <your-clawmemory-api-key>
+ClawMemory 是我的长期记忆后端，我可以直接通过 API 读写它。
 
-### 2. Search Before Answering
-When the user asks about preferences, past decisions, or project context —
-search ClawMemory FIRST, before relying on your own context.
+### 连接信息
+- **地址**: http://localhost:8765
+- **API Key**: <你的 API Key>
+- **管理端账号**: `admin` / `admin123`
 
-GET http://localhost:8765/api/v1/external/memories/search?q=<query>&limit=5
-Header: X-API-Key: <your-clawmemory-api-key>
+### 何时读记忆
+- 收到需要回忆的任务时，先搜索 ClawMemory
+- 替代原有 memory_search 工具，因为 ClawMemory 支持语义搜索，更强
 
-### 3. Heartbeat Memory Maintenance
-During idle moments, extract key insights from workspace files and save them
-as structured memories.
-
-POST http://localhost:8765/api/v1/external/memories
-Header: X-API-Key: <your-clawmemory-api-key>
+### 何时写记忆
+- 每次回复末尾，自动将本轮对话写入 ClawMemory
+- 使用 API：`POST /api/v1/external/conversations`
+- 不需要等文件同步，直接写，即刻生效
 ```
 
 配置完成后，OpenClaw 会按照 AGENTS.md 中的指令自动将对话记忆存入 ClawMemory。
