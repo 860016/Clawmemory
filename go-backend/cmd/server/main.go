@@ -67,6 +67,12 @@ func main() {
 
 	autoCreateAPIKey(db)
 
+	proProxy := services.NewProProxy(db, cfg)
+	proGuard := services.InitProGuard(proProxy, db, cfg)
+	if proGuard != nil && !proGuard.SelfCheck() {
+		log.Println("⚠️  Integrity check warning: binary may have been modified")
+	}
+
 	syncService := services.GetOpenClawSyncService(db)
 	go syncService.Start()
 	log.Printf("OpenClaw auto-sync service started")

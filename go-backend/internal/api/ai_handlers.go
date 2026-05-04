@@ -32,6 +32,12 @@ func handleAIConfigUpdate(aiRouter *ai.AIRouter, proProxy *services.ProProxy) gi
 			return
 		}
 
+		guard := services.GetProGuard()
+		if guard != nil && !guard.IsProFeatureEnabled("ai-config-update") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "License verification failed"})
+			return
+		}
+
 		userID := middleware.GetUserID(c)
 		var data map[string]interface{}
 		if err := c.ShouldBindJSON(&data); err != nil {
@@ -116,10 +122,24 @@ func handleAIExtract(aiSvc *ai.AIService, proProxy *services.ProProxy) gin.Handl
 	}
 }
 
+func checkProWithGuard(proxy *services.ProProxy, feature string, c *gin.Context) bool {
+	if !proxy.IsPro() {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Pro license required"})
+		return false
+	}
+
+	guard := services.GetProGuard()
+	if guard != nil && !guard.IsProFeatureEnabled(feature) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "License verification failed"})
+		return false
+	}
+
+	return true
+}
+
 func handleAIConflictScan(aiSvc *ai.AIService, proProxy *services.ProProxy) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !proProxy.IsPro() {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Pro license required"})
+		if !checkProWithGuard(proProxy, "ai-conflict-scan", c) {
 			return
 		}
 
@@ -140,8 +160,7 @@ func handleAIConflictScan(aiSvc *ai.AIService, proProxy *services.ProProxy) gin.
 
 func handleAIDecayEvaluate(aiSvc *ai.AIService, proProxy *services.ProProxy) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !proProxy.IsPro() {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Pro license required"})
+		if !checkProWithGuard(proProxy, "ai-decay-evaluate", c) {
 			return
 		}
 
@@ -185,8 +204,7 @@ func handleAIDailyReport(aiSvc *ai.AIService, proProxy *services.ProProxy, db *g
 
 func handleAIWikiGenerate(aiSvc *ai.AIService, proProxy *services.ProProxy) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !proProxy.IsPro() {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Pro license required"})
+		if !checkProWithGuard(proProxy, "ai-wiki-generate", c) {
 			return
 		}
 
@@ -215,8 +233,7 @@ func handleAIWikiGenerate(aiSvc *ai.AIService, proProxy *services.ProProxy) gin.
 
 func handleAICompress(aiSvc *ai.AIService, proProxy *services.ProProxy) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !proProxy.IsPro() {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Pro license required"})
+		if !checkProWithGuard(proProxy, "ai-compress", c) {
 			return
 		}
 
@@ -245,8 +262,7 @@ func handleAICompress(aiSvc *ai.AIService, proProxy *services.ProProxy) gin.Hand
 
 func handleAIDiscoverRelations(aiSvc *ai.AIService, proProxy *services.ProProxy) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !proProxy.IsPro() {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Pro license required"})
+		if !checkProWithGuard(proProxy, "ai-discover-relations", c) {
 			return
 		}
 
@@ -267,8 +283,7 @@ func handleAIDiscoverRelations(aiSvc *ai.AIService, proProxy *services.ProProxy)
 
 func handleAISmartRoute(aiSvc *ai.AIService, proProxy *services.ProProxy) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !proProxy.IsPro() {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Pro license required"})
+		if !checkProWithGuard(proProxy, "ai-smart-route", c) {
 			return
 		}
 

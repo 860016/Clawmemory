@@ -1292,6 +1292,11 @@ func checkPro(proxy *services.ProProxy, c *gin.Context) bool {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Pro license required"})
 		return false
 	}
+	guard := services.GetProGuard()
+	if guard != nil && !guard.SelfCheck() {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Integrity check failed"})
+		return false
+	}
 	return true
 }
 

@@ -16,6 +16,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	authService := services.NewAuthService(db, cfg.JWTSecret)
 	licenseManager := services.NewLicenseManager(db, cfg)
 	proProxy := services.NewProProxy(db, cfg)
+	services.InitProGuard(proProxy, db, cfg)
 	aiRouter := ai.NewAIRouter(db)
 	aiSvc := ai.NewAIService(aiRouter, db)
 

@@ -455,7 +455,7 @@
             <el-option v-for="m in currentProviderModels" :key="m" :label="m" :value="m" />
           </el-select>
         </el-form-item>
-        <el-form-item :label="$t('settings.aiApiKey')" v-if="aiForm.provider_id !== 'nvidia-nim'">
+        <el-form-item :label="$t('settings.aiApiKey')">
           <el-input v-model="aiForm.api_key" type="password" show-password :placeholder="$t('settings.aiApiKeyPlaceholder')" />
         </el-form-item>
         <el-form-item :label="$t('settings.aiBaseUrl')" v-if="aiForm.provider_id === 'custom'">

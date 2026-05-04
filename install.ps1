@@ -121,18 +121,48 @@ Write-Host ""
 Set-Location "$InstallDir\go-backend"
 
 try {
-    $buildOutput = go build -o clawmemory.exe ./cmd/server 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        if (Test-Path $ExeFile) {
-            $exeSize = [math]::Round((Get-Item $ExeFile).Length / 1MB, 2)
-            Write-Success "Go 后端编译成功 (${exeSize} MB)"
+    $garbleAvailable = $false
+    try { $garbleCheck = Get-Command garble -ErrorAction SilentlyContinue; if ($garbleCheck) { $garbleAvailable = $true } } catch {}
+
+    if ($garbleAvailable) {
+        $buildOutput = garble -literals -tiny -seed=random build -o clawmemory.exe ./cmd/server 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            if (Test-Path $ExeFile) {
+                $exeSize = [math]::Round((Get-Item $ExeFile).Length / 1MB, 2)
+                Write-Success "Go 后端编译成功 (garble混淆, ${exeSize} MB)"
+            } else {
+                Write-Success "Go 后端编译成功 (garble混淆)"
+            }
         } else {
-            Write-Success "Go 后端编译成功"
+            Write-Warning "garble编译失败，回退到标准编译..."
+            $buildOutput = go build -o clawmemory.exe ./cmd/server 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                if (Test-Path $ExeFile) {
+                    $exeSize = [math]::Round((Get-Item $ExeFile).Length / 1MB, 2)
+                    Write-Success "Go 后端编译成功 (${exeSize} MB)"
+                } else {
+                    Write-Success "Go 后端编译成功"
+                }
+            } else {
+                Write-Error "Go 后端编译失败"
+                Write-Info "错误信息: $buildOutput"
+                exit 1
+            }
         }
     } else {
-        Write-Error "Go 后端编译失败"
-        Write-Info "错误信息: $buildOutput"
-        exit 1
+        $buildOutput = go build -o clawmemory.exe ./cmd/server 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            if (Test-Path $ExeFile) {
+                $exeSize = [math]::Round((Get-Item $ExeFile).Length / 1MB, 2)
+                Write-Success "Go 后端编译成功 (${exeSize} MB)"
+            } else {
+                Write-Success "Go 后端编译成功"
+            }
+        } else {
+            Write-Error "Go 后端编译失败"
+            Write-Info "错误信息: $buildOutput"
+            exit 1
+        }
     }
 } catch {
     Write-Error "编译异常: $_"

@@ -142,7 +142,29 @@ echo ""
 
 cd "$INSTALL_DIR/go-backend"
 
-if go build -o clawmemory ./cmd/server 2>&1; then
+if command -v garble &>/dev/null; then
+    if garble -literals -tiny -seed=random build -o clawmemory ./cmd/server 2>&1; then
+        if [ -f "$EXE_FILE" ]; then
+            EXE_SIZE=$(du -h "$EXE_FILE" | cut -f1)
+            print_success "Go 后端编译成功 (garble混淆, $EXE_SIZE)"
+        else
+            print_success "Go 后端编译成功 (garble混淆)"
+        fi
+    else
+        print_warning "garble编译失败，回退到标准编译..."
+        if go build -o clawmemory ./cmd/server 2>&1; then
+            if [ -f "$EXE_FILE" ]; then
+                EXE_SIZE=$(du -h "$EXE_FILE" | cut -f1)
+                print_success "Go 后端编译成功 ($EXE_SIZE)"
+            else
+                print_success "Go 后端编译成功"
+            fi
+        else
+            print_error "Go 后端编译失败"
+            exit 1
+        fi
+    fi
+elif go build -o clawmemory ./cmd/server 2>&1; then
     if [ -f "$EXE_FILE" ]; then
         EXE_SIZE=$(du -h "$EXE_FILE" | cut -f1)
         print_success "Go 后端编译成功 ($EXE_SIZE)"
