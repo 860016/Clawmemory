@@ -14,7 +14,6 @@ ClawMemory 是我的长期记忆后端，我可以直接通过 API 读写它。
 ### 连接信息
 - **地址**: `{{CLAWMEMORY_URL}}`
 - **API Key**: `{{CLAWMEMORY_API_KEY}}`
-- **管理端账号**: `admin` / `admin123`
 
 ### 何时读记忆
 - 收到需要回忆的任务时，先搜索 ClawMemory：
@@ -41,3 +40,5 @@ ClawMemory 是我的长期记忆后端，我可以直接通过 API 读写它。
     }'
   ```
 - 不需要等文件同步，直接写，即刻生效
+
+<!-- END CLAWMEMORY -->

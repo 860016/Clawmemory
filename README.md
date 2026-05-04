@@ -568,7 +568,6 @@ ClawMemory 是我的长期记忆后端，我可以直接通过 API 读写它。
 ### 连接信息
 - **地址**: http://localhost:8765
 - **API Key**: <你的 API Key>
-- **管理端账号**: `admin` / `admin123`
 
 ### 何时读记忆
 - 收到需要回忆的任务时，先搜索 ClawMemory

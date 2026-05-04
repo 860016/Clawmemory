@@ -42,30 +42,29 @@ CONTENT=$(sed \
     -e "s|{{CLAWMEMORY_API_KEY}}|$CLAWMEMORY_API_KEY|g" \
     "$TEMPLATE")
 
-MARKER="# ClawMemory — AI Memory Backend"
+MARKER_START="## 🧠 ClawMemory Auto-Record"
 MARKER_END="<!-- END CLAWMEMORY -->"
 
 if [ -f "$AGENTS_MD" ]; then
-    if grep -q "$MARKER" "$AGENTS_MD"; then
+    if grep -qF "$MARKER_START" "$AGENTS_MD"; then
         echo "Updating existing ClawMemory section in $AGENTS_MD ..."
         TEMP_FILE=$(mktemp)
-        awk -v marker="$MARKER" -v marker_end="$MARKER_END" -v content="$CONTENT" '
-            $0 == marker { print content; found=1; next }
-            $0 == marker_end { found=0; next }
-            !found { print }
+        awk -v ms="$MARKER_START" -v me="$MARKER_END" '
+            $0 == ms { skip=1; next }
+            $0 == me { skip=0; next }
+            !skip { print }
         ' "$AGENTS_MD" > "$TEMP_FILE"
-        echo "$MARKER_END" >> "$TEMP_FILE"
+        echo "" >> "$TEMP_FILE"
+        echo "$CONTENT" >> "$TEMP_FILE"
         mv "$TEMP_FILE" "$AGENTS_MD"
     else
         echo "Appending ClawMemory instructions to $AGENTS_MD ..."
         echo "" >> "$AGENTS_MD"
         echo "$CONTENT" >> "$AGENTS_MD"
-        echo "$MARKER_END" >> "$AGENTS_MD"
     fi
 else
     echo "Creating $AGENTS_MD ..."
     echo "$CONTENT" > "$AGENTS_MD"
-    echo "$MARKER_END" >> "$AGENTS_MD"
 fi
 
 echo ""

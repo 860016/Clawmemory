@@ -40,26 +40,25 @@ $CONTENT = Get-Content $TEMPLATE -Raw
 $CONTENT = $CONTENT -replace '\{\{CLAWMEMORY_URL\}\}', $CLAWMEMORY_URL
 $CONTENT = $CONTENT -replace '\{\{CLAWMEMORY_API_KEY\}\}', $CLAWMEMORY_API_KEY
 
-$MARKER = "# ClawMemory — AI Memory Backend"
+$MARKER_START = "## 🧠 ClawMemory Auto-Record"
 $MARKER_END = "<!-- END CLAWMEMORY -->"
 
 if (Test-Path $AGENTS_MD) {
     $existing = Get-Content $AGENTS_MD -Raw
-    if ($existing -match [regex]::Escape($MARKER)) {
+    if ($existing -match [regex]::Escape($MARKER_START)) {
         Write-Host "Updating existing ClawMemory section in $AGENTS_MD ..."
-        $pattern = [regex]::Escape($MARKER) + "[\s\S]*?" + [regex]::Escape($MARKER_END)
-        $updated = $existing -replace $pattern, ($CONTENT + "`n" + $MARKER_END)
+        $pattern = [regex]::Escape($MARKER_START) + "[\s\S]*?" + [regex]::Escape($MARKER_END) + "\s*"
+        $updated = $existing -replace $pattern, ""
+        $updated = $updated.TrimEnd() + "`n`n" + $CONTENT
         Set-Content -Path $AGENTS_MD -Value $updated -NoNewline
     } else {
         Write-Host "Appending ClawMemory instructions to $AGENTS_MD ..."
-        Add-Content -Path $AGENTS_MD -Value ""
-        Add-Content -Path $AGENTS_MD -Value $CONTENT
-        Add-Content -Path $AGENTS_MD -Value $MARKER_END
+        $existing = $existing.TrimEnd() + "`n`n" + $CONTENT
+        Set-Content -Path $AGENTS_MD -Value $existing -NoNewline
     }
 } else {
     Write-Host "Creating $AGENTS_MD ..."
-    Set-Content -Path $AGENTS_MD -Value $CONTENT
-    Add-Content -Path $AGENTS_MD -Value $MARKER_END
+    Set-Content -Path $AGENTS_MD -Value $CONTENT -NoNewline
 }
 
 Write-Host ""
