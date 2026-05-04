@@ -233,6 +233,12 @@
           <span>{{ $t('settings.checkingStatus') }}</span>
           <el-button size="small" @click="loadOpenClawStatus" :loading="openclawSyncLoading">{{ $t('settings.refresh') }}</el-button>
         </div>
+        <div style="margin-top: 12px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
+          <div style="font-weight: 600; margin-bottom: 6px">{{ $t('settings.agentsMdTitle') }}</div>
+          <div style="color: var(--cm-text-muted); margin-bottom: 8px">{{ $t('settings.agentsMdDesc') }}</div>
+          <el-button size="small" type="primary" @click="copyAgentsMD" :loading="agentsMdLoading">{{ $t('settings.agentsMdCopy') }}</el-button>
+          <el-button size="small" @click="showAgentsMdPreview = true">{{ $t('settings.agentsMdPreview') }}</el-button>
+        </div>
       </div>
 
       <!-- 数据管理 -->
@@ -461,6 +467,16 @@
         <el-button type="primary" @click="saveAIConfig" :loading="aiSaving">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="showAgentsMdPreview" :title="$t('settings.agentsMdTitle')" width="640px">
+      <div style="max-height: 500px; overflow-y: auto; padding: 12px; background: var(--cm-bg-secondary); border-radius: 6px; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; line-height: 1.6">
+{{ agentsMdContent }}
+      </div>
+      <template #footer>
+        <el-button @click="showAgentsMdPreview = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="copyAgentsMD">{{ $t('settings.agentsMdCopy') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -536,6 +552,10 @@ const currentProviderModels = computed(() => {
   const p = aiProviders.value.find((x: any) => x.ID === aiForm.value.provider_id)
   return p?.Models || []
 })
+
+const showAgentsMdPreview = ref(false)
+const agentsMdContent = ref('')
+const agentsMdLoading = ref(false)
 
 const featureLabels: Record<string, string> = {
   ai_extract: t('settings.featAiExtract'),
@@ -962,6 +982,40 @@ watch(showAIConfigDialog, async (v) => {
       aiForm.value.api_key = ''
       aiForm.value.base_url = aiConfig.value.base_url || ''
     }
+  }
+})
+
+async function loadAgentsMD() {
+  agentsMdLoading.value = true
+  try {
+    const { data } = await axios.get('/openclaw/agents-md')
+    agentsMdContent.value = data.content || ''
+  } catch {
+    agentsMdContent.value = ''
+  } finally {
+    agentsMdLoading.value = false
+  }
+}
+
+async function copyAgentsMD() {
+  if (!agentsMdContent.value) {
+    await loadAgentsMD()
+  }
+  if (!agentsMdContent.value) {
+    ElMessage.error(t('common.failed'))
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(agentsMdContent.value)
+    ElMessage.success(t('settings.agentsMdCopied'))
+  } catch {
+    ElMessage.error(t('common.copyFailed'))
+  }
+}
+
+watch(showAgentsMdPreview, async (v) => {
+  if (v && !agentsMdContent.value) {
+    await loadAgentsMD()
   }
 })
 </script>

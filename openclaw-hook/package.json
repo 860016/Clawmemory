@@ -1,11 +1,11 @@
 {
-  "name": "clawmemory-openclaw-hook",
-  "version": "1.2.0",
-  "description": "OpenClaw hook that auto-captures conversations to ClawMemory",
-  "main": "clawmemory/handler.ts",
-  "openclaw": {
-    "hooks": ["./clawmemory"]
+  "name": "clawmemory-openclaw-agents",
+  "version": "2.0.0",
+  "description": "ClawMemory AGENTS.md installer for OpenClaw - write memory instructions to AGENTS.md",
+  "scripts": {
+    "setup": "pwsh -File setup.ps1",
+    "setup:bash": "bash setup.sh"
   },
-  "keywords": ["openclaw", "hook", "memory", "clawmemory"],
+  "keywords": ["openclaw", "agents", "memory", "clawmemory"],
   "license": "Apache-2.0"
 }

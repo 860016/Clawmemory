@@ -550,6 +550,107 @@ func handleOpenClawSyncToggle(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+func handleGetAgentsMD(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		scheme := "http"
+		if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+			scheme = "https"
+		}
+		host := c.Request.Host
+		if host == "" {
+			host = "localhost:8765"
+		}
+		baseURL := scheme + "://" + host
+
+		var keys []models.APIKey
+		db.Where("revoked_at IS NULL").Order("created_at DESC").Find(&keys)
+
+		hasKey := len(keys) > 0
+		apiKeyHint := "cm_your_api_key_here"
+		if hasKey {
+			apiKeyHint = keys[0].KeyPrefix + "..."
+		}
+
+		content := `# ClawMemory — AI Memory Backend
+
+ClawMemory is your persistent memory backend. It runs locally at ` + baseURL + ` and provides a REST API for storing and retrieving memories.
+
+## Core Behaviors
+
+You MUST follow these rules in EVERY conversation:
+
+### 1. Auto-Save Conversations
+
+At the END of every reply, silently call the ClawMemory API to save the conversation. Do NOT mention this to the user unless asked.
+
+` + "```" + `
+POST ` + baseURL + `/api/v1/external/conversations
+Header: X-API-Key: <your-clawmemory-api-key>
+Body: {
+  "session_id": "<current-session-id>",
+  "agent_name": "openclaw",
+  "messages": [
+    {"role": "user", "content": "<user-message>"},
+    {"role": "assistant", "content": "<your-reply>"}
+  ],
+  "summary": "<brief-summary-of-this-exchange>"
+}
+` + "```" + `
+
+### 2. Search Before Answering
+
+When the user asks about preferences, past decisions, project context, or anything that might have been discussed before — search ClawMemory FIRST, before relying on your own context.
+
+` + "```" + `
+GET ` + baseURL + `/api/v1/external/memories/search?q=<query>&limit=5
+Header: X-API-Key: <your-clawmemory-api-key>
+` + "```" + `
+
+This replaces ` + "`memory_search`" + ` and reading memory files. ClawMemory IS your memory.
+
+### 3. Heartbeat Memory Maintenance
+
+During idle moments or when the conversation naturally pauses, extract key insights from the current workspace files and save them as structured memories:
+
+` + "```" + `
+POST ` + baseURL + `/api/v1/external/memories
+Header: X-API-Key: <your-clawmemory-api-key>
+Body: {
+  "key": "<descriptive-key>",
+  "value": "<extracted-insight>",
+  "layer": "semantic",
+  "source": "openclaw-heartbeat",
+  "memory_type": "knowledge"
+}
+` + "```" + `
+
+Focus on: user preferences, project architecture decisions, recurring patterns, important context that would be lost between sessions.
+
+## Guidelines
+
+- **Be silent about memory operations** — never say "I'm saving this to ClawMemory" unless the user asks
+- **Deduplicate** — before saving, search first to avoid storing duplicates
+- **Quality over quantity** — save insights and decisions, not raw transcripts
+- **Use descriptive keys** — e.g. ` + "`pref-editor-theme`" + `, ` + "`project-auth-architecture`" + `, ` + "`user-testing-preference`" + `
+- **Respect privacy** — never save API keys, passwords, tokens, or secrets (filter them out before saving)
+
+## Connection
+
+| Setting | Value |
+|---------|-------|
+| URL | ` + baseURL + ` |
+| API Key | ` + apiKeyHint + ` |
+| Auth Header | ` + "`X-API-Key`" + ` |
+`
+
+		c.JSON(http.StatusOK, gin.H{
+			"content":  content,
+			"base_url": baseURL,
+			"has_key":  hasKey,
+		})
+	}
+}
+
 func handleDecryptMemory(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)

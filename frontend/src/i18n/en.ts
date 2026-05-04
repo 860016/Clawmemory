@@ -613,6 +613,11 @@ export default {
     aiBaseUrlPlaceholder: 'e.g. https://api.openai.com/v1',
     aiFree: 'Free',
     aiProRequired: 'Pro license required for this feature',
+    agentsMdTitle: 'AGENTS.md Instructions',
+    agentsMdDesc: 'Write ClawMemory instructions to OpenClaw AGENTS.md, letting AI proactively call ClawMemory API for memory storage and retrieval',
+    agentsMdCopy: 'Copy AGENTS.md',
+    agentsMdPreview: 'Preview',
+    agentsMdCopied: 'AGENTS.md content copied to clipboard',
   },
   pro: {
     title: 'Pro Features',

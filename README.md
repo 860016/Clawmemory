@@ -1,4 +1,4 @@
-# ClawMemory v2.17.0 — AI 记忆管理中枢
+# ClawMemory v2.18.0 — AI 记忆管理中枢
 
 **ClawMemory** 是一款为 AI 助手设计的**长期记忆管理系统**。它让 AI 能够"记住"过去的对话、知识和上下文，实现跨会话的智能记忆检索与关联。
 
@@ -226,10 +226,18 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - `GET /api/v1/openclaw-sync/status` - 同步状态
 - `POST /api/v1/openclaw-sync/force` - 手动触发同步
 - `POST /api/v1/openclaw-sync/toggle` - 开关自动同步
+- `GET /api/v1/openclaw/agents-md` - 获取 AGENTS.md 指令内容
 
 ---
 
 ## 📝 更新日志
+
+### v2.18.0 (2026-05-04)
+- 🔗 新增：AGENTS.md 指令集成，安装时自动写入 OpenClaw AGENTS.md
+- 🔗 新增：AGENTS.md 内容生成 API（`GET /api/v1/openclaw/agents-md`）
+- 🔗 新增：前端设置页 AGENTS.md 复制/预览功能
+- 🧹 移除：旧版 hook 安装方式，改用 AGENTS.md 指令方式
+- 📦 新增：openclaw-hook 安装脚本（setup.sh / setup.ps1），自动处理 AGENTS.md 模板
 
 ### v2.17.0 (2026-05-04)
 - 🧠 新增：AI 大模型集成系统，内置 NVIDIA NIM 免费模型
@@ -509,31 +517,70 @@ start.bat    # Windows
 
 ### 第四步：配置 OpenClaw 连接 ClawMemory
 
-安装 ClawMemory 后，需要在 OpenClaw 的 `AGENTS.md` 中添加配置，让 OpenClaw 自动将对话记忆存入 ClawMemory。
+安装 ClawMemory 后，需要在 OpenClaw 的 `AGENTS.md` 中添加 ClawMemory 指令，让 OpenClaw 自动将对话记忆存入 ClawMemory。
+
+**方式一：使用安装脚本（推荐）**
+
+```bash
+# 进入 openclaw-hook 目录
+cd openclaw-hook
+
+# 设置 API Key 环境变量
+export CLAWMEMORY_API_KEY='cm你的密钥'   # Linux/macOS
+$env:CLAWMEMORY_API_KEY = 'cm你的密钥'   # Windows
+
+# 运行安装脚本
+bash setup.sh       # Linux/macOS
+pwsh -File setup.ps1  # Windows
+```
+
+脚本会自动将 ClawMemory 指令写入 OpenClaw 的 AGENTS.md 文件，包括：
+- 自动保存对话到 ClawMemory
+- 搜索记忆时优先查询 ClawMemory
+- 心跳时从文件提炼精华写入 ClawMemory
+
+**方式二：手动复制**
+
+1. 登录 ClawMemory 网页 → 设置 → OpenClaw 连接
+2. 点击「复制 AGENTS.md」按钮
+3. 将内容粘贴到 OpenClaw 的 AGENTS.md 文件中
 
 **OpenClaw AGENTS.md 位置**：
 - Windows: `C:\Users\<用户名>\.openclaw\AGENTS.md`
 - Linux/macOS: `~/.openclaw/AGENTS.md`
 
-**添加以下内容到 AGENTS.md**：
+**AGENTS.md 指令内容（示例）**：
 
 ```markdown
-## ClawMemory - 主要记忆管理工具
+# ClawMemory — AI Memory Backend
 
-- **类型**: memory
-- **地址**: http://localhost:8765
-- **API Key**: <你创建的 API 密钥>
-- **功能**: 记忆管理、知识图谱、智能日报、向量搜索
-- **API 端点**: 
-  - 自动记录对话: POST /api/v1/external/memories (请求头 X-API-Key)
-  - 批量写入: POST /api/v1/external/memories/batch
-  - 搜索记忆: GET /api/v1/external/memories/search?q=关键词
-  - 记忆列表: GET /api/v1/memories
-  - 智能加载: GET /api/v1/memories/smart-load
-  - 知识图谱: GET /api/v1/knowledge/graph
+ClawMemory is your persistent memory backend. It runs locally at http://localhost:8765
+and provides a REST API for storing and retrieving memories.
+
+## Core Behaviors
+
+### 1. Auto-Save Conversations
+At the END of every reply, silently call the ClawMemory API to save the conversation.
+
+POST http://localhost:8765/api/v1/external/conversations
+Header: X-API-Key: <your-clawmemory-api-key>
+
+### 2. Search Before Answering
+When the user asks about preferences, past decisions, or project context —
+search ClawMemory FIRST, before relying on your own context.
+
+GET http://localhost:8765/api/v1/external/memories/search?q=<query>&limit=5
+Header: X-API-Key: <your-clawmemory-api-key>
+
+### 3. Heartbeat Memory Maintenance
+During idle moments, extract key insights from workspace files and save them
+as structured memories.
+
+POST http://localhost:8765/api/v1/external/memories
+Header: X-API-Key: <your-clawmemory-api-key>
 ```
 
-配置完成后，OpenClaw 会通过 API Key 自动将对话记忆存入 ClawMemory。
+配置完成后，OpenClaw 会按照 AGENTS.md 中的指令自动将对话记忆存入 ClawMemory。
 
 **自动记录请求示例**：
 

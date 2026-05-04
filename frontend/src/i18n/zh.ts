@@ -613,6 +613,11 @@ export default {
     aiBaseUrlPlaceholder: '如：https://api.openai.com/v1',
     aiFree: '免费',
     aiProRequired: '此功能需要 Pro 授权',
+    agentsMdTitle: 'AGENTS.md 指令',
+    agentsMdDesc: '将 ClawMemory 指令写入 OpenClaw 的 AGENTS.md，让 AI 主动调用 ClawMemory API 实现记忆存取',
+    agentsMdCopy: '复制 AGENTS.md',
+    agentsMdPreview: '预览',
+    agentsMdCopied: 'AGENTS.md 内容已复制到剪贴板',
   },
   pro: {
     title: 'Pro 功能',
