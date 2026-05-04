@@ -72,6 +72,49 @@
         </div>
       </div>
 
+      <!-- AI 配置 -->
+      <div class="settings-card" id="settings-ai">
+        <div class="card-title">🧠 {{ $t('settings.aiConfig') }}</div>
+        <div class="setting-item" v-if="aiConfig">
+          <span>{{ $t('settings.aiProvider') }}</span>
+          <span class="setting-desc">
+            <el-tag :type="aiConfig.provider_id === 'nvidia-nim' ? 'success' : 'primary'" size="small">
+              {{ aiConfig.provider_name || aiConfig.provider_id }}
+            </el-tag>
+            <el-tag v-if="aiConfig.is_pro" type="warning" size="small" style="margin-left: 4px">Pro</el-tag>
+          </span>
+        </div>
+        <div class="setting-item" v-if="aiConfig">
+          <span>{{ $t('settings.aiModel') }}</span>
+          <span class="setting-desc">{{ aiConfig.model || '-' }}</span>
+        </div>
+        <div class="setting-item" v-if="aiConfig && aiConfig.is_pro">
+          <span>{{ $t('settings.aiCustomProvider') }}</span>
+          <el-button size="small" @click="showAIConfigDialog = true">{{ $t('settings.aiConfigure') }}</el-button>
+        </div>
+        <div class="setting-item" v-if="!aiConfig">
+          <span>{{ $t('settings.aiProvider') }}</span>
+          <el-button size="small" @click="loadAIConfig" :loading="aiLoading">{{ $t('common.retry') }}</el-button>
+        </div>
+        <div class="setting-item">
+          <span>{{ $t('settings.aiTestConnection') }}</span>
+          <el-button size="small" type="primary" @click="testAIConnection" :loading="aiTesting">{{ $t('settings.aiTest') }}</el-button>
+        </div>
+        <div v-if="aiTestResult" class="ai-test-result" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
+          <span :style="{ color: aiTestResult.success ? 'var(--cm-success)' : 'var(--cm-danger)' }">
+            {{ aiTestResult.success ? '✓ ' + $t('settings.aiTestSuccess') : '✗ ' + (aiTestResult.error || $t('settings.aiTestFailed')) }}
+          </span>
+        </div>
+        <div class="setting-item" v-if="aiUsage">
+          <span>{{ $t('settings.aiUsage') }}</span>
+          <span class="setting-desc">{{ aiUsage.total_calls || 0 }} {{ $t('settings.aiCalls') }}</span>
+        </div>
+        <div class="ai-free-hint" v-if="aiConfig && !aiConfig.is_pro" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px; color: var(--cm-text-muted)">
+          <div style="font-weight: 600; margin-bottom: 4px">{{ $t('settings.aiFreeHint') }}</div>
+          <div>{{ $t('settings.aiFreeHintDesc') }}</div>
+        </div>
+      </div>
+
       <!-- 安全设置 -->
       <div class="settings-card" :class="{ 'section-highlight': activeSection === 'security' }" id="settings-security">
         <div class="card-title">◇ {{ $t('settings.security') }}</div>
@@ -389,6 +432,35 @@
         <el-button v-else type="primary" @click="showApiKeyDialog = false; newApiKeyRaw = ''">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="showAIConfigDialog" :title="$t('settings.aiConfigure')" width="520px" :close-on-click-modal="false">
+      <el-form label-position="top">
+        <el-form-item :label="$t('settings.aiProvider')">
+          <el-select v-model="aiForm.provider_id" @change="onAIProviderChange" style="width: 100%">
+            <el-option v-for="p in aiProviders" :key="p.ID" :label="p.Name" :value="p.ID">
+              <span>{{ p.Name }}</span>
+              <el-tag v-if="p.Free" type="success" size="small" style="margin-left: 8px">{{ $t('settings.aiFree') }}</el-tag>
+              <el-tag v-if="p.ProOnly" type="warning" size="small" style="margin-left: 4px">Pro</el-tag>
+            </el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="$t('settings.aiModel')">
+          <el-select v-model="aiForm.model" style="width: 100%">
+            <el-option v-for="m in currentProviderModels" :key="m" :label="m" :value="m" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="$t('settings.aiApiKey')" v-if="aiForm.provider_id !== 'nvidia-nim'">
+          <el-input v-model="aiForm.api_key" type="password" show-password :placeholder="$t('settings.aiApiKeyPlaceholder')" />
+        </el-form-item>
+        <el-form-item :label="$t('settings.aiBaseUrl')" v-if="aiForm.provider_id === 'custom'">
+          <el-input v-model="aiForm.base_url" :placeholder="$t('settings.aiBaseUrlPlaceholder')" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAIConfigDialog = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="saveAIConfig" :loading="aiSaving">{{ $t('common.save') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -399,6 +471,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from '../api/go-client'
 import { setLocale, getLocale, translateError } from '../i18n'
+import { aiApi } from '../api/go-ai'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -444,6 +517,26 @@ const healthGrade = computed(() => {
 const dedupResult = ref<any>(null)
 const dedupLoading = ref(false)
 
+const aiConfig = ref<any>(null)
+const aiLoading = ref(false)
+const aiTesting = ref(false)
+const aiTestResult = ref<any>(null)
+const aiUsage = ref<any>(null)
+const showAIConfigDialog = ref(false)
+const aiSaving = ref(false)
+const aiProviders = ref<any[]>([])
+const aiForm = ref<any>({
+  provider_id: 'nvidia-nim',
+  model: '',
+  api_key: '',
+  base_url: '',
+})
+
+const currentProviderModels = computed(() => {
+  const p = aiProviders.value.find((x: any) => x.ID === aiForm.value.provider_id)
+  return p?.Models || []
+})
+
 const featureLabels: Record<string, string> = {
   ai_extract: t('settings.featAiExtract'),
   auto_graph: t('settings.featAutoGraph'),
@@ -467,7 +560,7 @@ const featureLabels: Record<string, string> = {
 }
 
 onMounted(async () => {
-  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys(), loadRecordSensitiveSetting(), loadOpenClawStatus()])
+  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys(), loadRecordSensitiveSetting(), loadOpenClawStatus(), loadAIConfig(), loadAIUsage()])
   if (activeSection.value) {
     nextTick(() => scrollToSection(activeSection.value))
   }
@@ -786,6 +879,91 @@ async function scanDedup() {
     dedupLoading.value = false
   }
 }
+
+async function loadAIConfig() {
+  aiLoading.value = true
+  try {
+    const { data } = await aiApi.getConfig()
+    aiConfig.value = data
+  } catch {
+    aiConfig.value = null
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+async function loadAIUsage() {
+  try {
+    const { data } = await aiApi.getUsage()
+    aiUsage.value = data
+  } catch {}
+}
+
+async function testAIConnection() {
+  aiTesting.value = true
+  aiTestResult.value = null
+  try {
+    const { data } = await aiApi.testConnection()
+    aiTestResult.value = { success: true, ...data }
+  } catch (e: any) {
+    aiTestResult.value = { success: false, error: e.response?.data?.error || t('settings.aiTestFailed') }
+  } finally {
+    aiTesting.value = false
+  }
+}
+
+async function loadAIProviders() {
+  try {
+    const { data } = await aiApi.getProviders()
+    aiProviders.value = data.providers || []
+  } catch {}
+}
+
+function onAIProviderChange() {
+  const p = aiProviders.value.find((x: any) => x.ID === aiForm.value.provider_id)
+  if (p && p.Models && p.Models.length > 0) {
+    aiForm.value.model = p.Models[0]
+  } else {
+    aiForm.value.model = ''
+  }
+}
+
+async function saveAIConfig() {
+  aiSaving.value = true
+  try {
+    const payload: Record<string, any> = {
+      provider_id: aiForm.value.provider_id,
+      model: aiForm.value.model,
+    }
+    if (aiForm.value.api_key) payload.api_key = aiForm.value.api_key
+    if (aiForm.value.base_url) payload.base_url = aiForm.value.base_url
+    await aiApi.updateConfig(payload)
+    ElMessage.success(t('common.success'))
+    showAIConfigDialog.value = false
+    await loadAIConfig()
+  } catch (e: any) {
+    const errMsg = e.response?.data?.error || ''
+    if (e.response?.status === 403) {
+      ElMessage.error(t('settings.aiProRequired'))
+    } else {
+      ElMessage.error(translateError(errMsg, t('common.failed')))
+    }
+  } finally {
+    aiSaving.value = false
+  }
+}
+
+watch(showAIConfigDialog, async (v) => {
+  if (v) {
+    await loadAIProviders()
+    if (aiConfig.value) {
+      aiForm.value.provider_id = aiConfig.value.provider_id || 'nvidia-nim'
+      aiForm.value.model = aiConfig.value.model || ''
+      aiForm.value.api_key = ''
+      aiForm.value.base_url = aiConfig.value.base_url || ''
+    }
+  }
+})
 </script>
 
 <style scoped>

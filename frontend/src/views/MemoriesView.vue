@@ -6,6 +6,9 @@
         <el-button @click="showExtractDialog = true">
           <el-icon><MagicStick /></el-icon> {{ $t('memories.extractMemory') }}
         </el-button>
+        <el-button type="warning" @click="aiConflictScan" :loading="aiScanning" plain>
+          <el-icon><Warning /></el-icon> {{ $t('memories.aiConflictScan') }}
+        </el-button>
         <el-button @click="handleOpenClawScan">
           <el-icon><Upload /></el-icon> {{ $t('memories.importOpenClaw') }}
         </el-button>
@@ -266,10 +269,11 @@ import { ref, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Upload, Loading, MagicStick } from '@element-plus/icons-vue'
+import { Plus, Search, Upload, Loading, MagicStick, Warning } from '@element-plus/icons-vue'
 import axios from '../api/go-client'
 import { translateError } from '../i18n'
 import { memoryApi } from '../api/go-memories'
+import { aiApi } from '../api/go-ai'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -422,6 +426,26 @@ async function saveMemory() {
     await doSaveMemory(payload)
   } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
   finally { saving.value = false }
+}
+
+const aiScanning = ref(false)
+
+async function aiConflictScan() {
+  aiScanning.value = true
+  try {
+    const { data } = await aiApi.conflictScan()
+    const conflicts = data.conflicts?.length || 0
+    if (conflicts === 0) {
+      ElMessage.success(t('memories.aiNoConflicts'))
+    } else {
+      ElMessage.warning(t('memories.aiConflictsFound', { count: conflicts }))
+    }
+  } catch (e: any) {
+    const errMsg = e.response?.data?.error || ''
+    ElMessage.error(translateError(errMsg, t('common.failed')))
+  } finally {
+    aiScanning.value = false
+  }
 }
 
 async function deleteMemory(id: number) {

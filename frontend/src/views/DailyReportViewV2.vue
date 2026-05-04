@@ -38,6 +38,16 @@
             <el-icon v-else><MagicStick /></el-icon>
             <span>{{ generating ? $t('dailyReport.generating') : $t('dailyReport.generate') }}</span>
           </button>
+          <button 
+            class="cm-btn cm-btn-success" 
+            @click="generateAIReport"
+            :disabled="aiGenerating"
+            style="margin-left: 8px"
+          >
+            <el-icon v-if="aiGenerating" class="is-loading"><Loading /></el-icon>
+            <el-icon v-else><MagicStick /></el-icon>
+            <span>{{ aiGenerating ? $t('dailyReport.generating') : $t('dailyReport.aiGenerate') }}</span>
+          </button>
         </div>
       </div>
     </header>
@@ -246,6 +256,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import axios from '../api/go-client'
 import { translateError } from '../i18n'
+import { aiApi } from '../api/go-ai'
 import {
   ArrowLeft, ArrowRight, MagicStick, Loading,
   Document, Connection, Download, Share,
@@ -430,6 +441,27 @@ function statLabel(key: string | number) {
 onMounted(() => {
   loadReports()
 })
+
+const aiGenerating = ref(false)
+
+async function generateAIReport() {
+  aiGenerating.value = true
+  try {
+    const dateStr = currentDate.value.toISOString().split('T')[0]
+    const { data } = await aiApi.generateDailyReport(dateStr)
+    if (data.summary) {
+      ElMessage.success(t('dailyReport.aiGenerateSuccess'))
+      await loadReports()
+    } else {
+      ElMessage.info(t('dailyReport.aiGenerateEmpty'))
+    }
+  } catch (e: any) {
+    const errMsg = e.response?.data?.error || ''
+    ElMessage.error(translateError(errMsg, t('common.failed')))
+  } finally {
+    aiGenerating.value = false
+  }
+}
 </script>
 
 <style scoped>

@@ -13,6 +13,9 @@
         <el-button type="primary" @click="openCreateDialog">
           <el-icon><Plus /></el-icon> {{ $t('knowledge.addEntity') }}
         </el-button>
+        <el-button type="success" @click="aiExtract" :loading="aiExtracting" plain>
+          <el-icon><MagicStick /></el-icon> {{ $t('knowledge.aiExtract') }}
+        </el-button>
       </div>
     </div>
 
@@ -257,11 +260,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Connection, Edit, Delete, Loading } from '@element-plus/icons-vue'
+import { Search, Plus, Connection, Edit, Delete, Loading, MagicStick } from '@element-plus/icons-vue'
 import axios from '../api/go-client'
 import { translateError } from '../i18n'
 import { useI18n } from 'vue-i18n'
 import cytoscape from 'cytoscape'
+import { aiApi } from '../api/go-ai'
 
 const { t } = useI18n()
 
@@ -554,6 +558,35 @@ watch([entities, relations], () => {
 })
 
 onMounted(loadData)
+
+const aiExtracting = ref(false)
+
+async function aiExtract() {
+  try {
+    await ElMessageBox.confirm(t('knowledge.aiExtractConfirm'), t('common.confirm'), { type: 'info' })
+  } catch { return }
+  aiExtracting.value = true
+  try {
+    const { data } = await aiApi.extract()
+    const entityCount = data.entities?.length || 0
+    const relationCount = data.relations?.length || 0
+    if (entityCount === 0 && relationCount === 0) {
+      ElMessage.info(t('knowledge.aiExtractEmpty'))
+    } else {
+      ElMessage.success(t('knowledge.aiExtractSuccess', { entities: entityCount, relations: relationCount }))
+      await loadData()
+    }
+  } catch (e: any) {
+    const errMsg = e.response?.data?.error || ''
+    if (e.response?.status === 403) {
+      ElMessage.warning(t('knowledge.aiExtractPro'))
+    } else {
+      ElMessage.error(translateError(errMsg, t('common.failed')))
+    }
+  } finally {
+    aiExtracting.value = false
+  }
+}
 </script>
 
 <style scoped>
