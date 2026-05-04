@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import api from '../../api/go-client'
 import { knowledgeApi } from '../../api/knowledge'
 
-vi.mock('../../api/client')
+vi.mock('../../api/go-client')
 const mockedApi = vi.mocked(api)
 
 describe('knowledge API', () => {

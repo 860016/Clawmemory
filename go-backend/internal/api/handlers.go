@@ -3065,8 +3065,8 @@ func tryCreateEntity(db *gorm.DB, userID uint, key, content string, entitiesCrea
 }
 
 func handleListBackups(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	backupDir := filepath.Join(".", "backups", fmt.Sprintf("%d", userID))
+	cfg := config.Load()
+	backupDir := cfg.BackupsDir
 	if _, err := os.Stat(backupDir); os.IsNotExist(err) {
 		c.JSON(http.StatusOK, gin.H{"backups": []interface{}{}})
 		return
@@ -3095,18 +3095,15 @@ func handleListBackups(c *gin.Context) {
 }
 
 func handleCreateBackup(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	backupDir := filepath.Join(".", "backups", fmt.Sprintf("%d", userID))
+	cfg := config.Load()
+	backupDir := cfg.BackupsDir
 	os.MkdirAll(backupDir, 0755)
 
 	timestamp := time.Now().Format("20060102_150405")
 	filename := fmt.Sprintf("clawmemory_backup_%s.db", timestamp)
 	backupPath := filepath.Join(backupDir, filename)
 
-	dbPath := "clawmemory.db"
-	if envDb := os.Getenv("DB_PATH"); envDb != "" {
-		dbPath = envDb
-	}
+	dbPath := cfg.DatabasePath
 
 	src, err := os.Open(dbPath)
 	if err != nil {
@@ -3149,13 +3146,13 @@ func handleCreateBackup(c *gin.Context) {
 
 func handleDownloadBackup(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
 		filename := c.Param("filename")
 		if strings.Contains(filename, "..") || strings.ContainsAny(filename, "/\\") {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid filename"})
 			return
 		}
-		backupPath := filepath.Join(".", "backups", fmt.Sprintf("%d", userID), filename)
+		cfg := config.Load()
+		backupPath := filepath.Join(cfg.BackupsDir, filename)
 
 		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "backup not found"})
@@ -3168,13 +3165,13 @@ func handleDownloadBackup(db *gorm.DB) gin.HandlerFunc {
 
 func handleRestoreBackup(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
 		filename := c.Param("filename")
 		if strings.Contains(filename, "..") || strings.ContainsAny(filename, "/\\") {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid filename"})
 			return
 		}
-		backupPath := filepath.Join(".", "backups", fmt.Sprintf("%d", userID), filename)
+		cfg := config.Load()
+		backupPath := filepath.Join(cfg.BackupsDir, filename)
 
 		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "backup not found"})
@@ -3188,10 +3185,7 @@ func handleRestoreBackup(db *gorm.DB) gin.HandlerFunc {
 		}
 		defer src.Close()
 
-		dbPath := "clawmemory.db"
-		if envDb := os.Getenv("DB_PATH"); envDb != "" {
-			dbPath = envDb
-		}
+		dbPath := cfg.DatabasePath
 		dst, err := os.Create(dbPath)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot write database file"})
@@ -3210,13 +3204,13 @@ func handleRestoreBackup(db *gorm.DB) gin.HandlerFunc {
 
 func handleDeleteBackup(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
 		filename := c.Param("filename")
 		if strings.Contains(filename, "..") || strings.ContainsAny(filename, "/\\") {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid filename"})
 			return
 		}
-		backupPath := filepath.Join(".", "backups", fmt.Sprintf("%d", userID), filename)
+		cfg := config.Load()
+		backupPath := filepath.Join(cfg.BackupsDir, filename)
 
 		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "backup not found"})

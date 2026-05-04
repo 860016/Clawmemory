@@ -1,6 +1,7 @@
 package api
 
 import (
+	"clawmemory/internal/ai"
 	"clawmemory/internal/config"
 	"clawmemory/internal/middleware"
 	"clawmemory/internal/services"
@@ -15,6 +16,8 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	authService := services.NewAuthService(db, cfg.JWTSecret)
 	licenseManager := services.NewLicenseManager(db, cfg)
 	proProxy := services.NewProProxy(db, cfg)
+	aiRouter := ai.NewAIRouter(db)
+	aiSvc := ai.NewAIService(aiRouter, db)
 
 	public := r.Group("/api/v1")
 	{
@@ -181,6 +184,24 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 			pro.POST("/evolution/infer", handleProEvolutionInfer(proProxy, db))
 			pro.POST("/evolution/importance", handleProEvolutionImportance(proProxy, db))
 			pro.POST("/evolution/prefetch", handleProEvolutionPrefetch(proProxy, db))
+		}
+
+		aiGroup := authorized.Group("/ai")
+		{
+			aiGroup.GET("/config", handleAIConfig(aiRouter, proProxy))
+			aiGroup.PUT("/config", handleAIConfigUpdate(aiRouter, proProxy))
+			aiGroup.POST("/test", handleAITestConnection(aiRouter, proProxy))
+			aiGroup.GET("/usage", handleAIUsage(aiRouter))
+			aiGroup.GET("/providers", handleAIProviders(proProxy))
+
+			aiGroup.POST("/extract", handleAIExtract(aiSvc, proProxy))
+			aiGroup.POST("/conflict-scan", handleAIConflictScan(aiSvc, proProxy))
+			aiGroup.POST("/decay-evaluate", handleAIDecayEvaluate(aiSvc, proProxy))
+			aiGroup.GET("/daily-report", handleAIDailyReport(aiSvc, proProxy, db))
+			aiGroup.POST("/wiki-generate", handleAIWikiGenerate(aiSvc, proProxy))
+			aiGroup.POST("/compress", handleAICompress(aiSvc, proProxy))
+			aiGroup.POST("/discover-relations", handleAIDiscoverRelations(aiSvc, proProxy))
+			aiGroup.POST("/smart-route", handleAISmartRoute(aiSvc, proProxy))
 		}
 	}
 

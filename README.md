@@ -1,4 +1,4 @@
-# ClawMemory v2.15.0 — AI 记忆管理中枢
+# ClawMemory v2.17.0 — AI 记忆管理中枢
 
 **ClawMemory** 是一款为 AI 助手设计的**长期记忆管理系统**。它让 AI 能够"记住"过去的对话、知识和上下文，实现跨会话的智能记忆检索与关联。
 
@@ -12,6 +12,7 @@
 | **记忆衰减** | 模拟人类遗忘曲线，重要记忆自动强化，过时信息逐渐淡化 |
 | **冲突检测** | 自动发现记忆矛盾，提示用户确认正确信息 |
 | **日报生成** | 自动汇总每日活动，生成结构化工作报告 |
+| **AI 增强** | 内置 NVIDIA NIM 免费模型，智能提取实体、生成摘要、分析记忆 |
 | **外部集成** | 提供 API 接口，支持 OpenClaw 等外部应用自动写入记忆 |
 
 **典型用例**：
@@ -51,16 +52,17 @@
 - 趋势分析与统计图表
 
 ### 🧠 AI 增强功能
-- **智能记忆加载**: Token 预算控制，按重要性动态加载相关记忆
-- **AI 提取/摘要**: 自动从长文本提取关键信息
-- **记忆冲突检测**: 发现矛盾记忆并提示确认
-- **Token 智能路由**: 根据查询类型选择最优检索策略
+- **内置 NVIDIA NIM 免费模型**：无需 API Key，开箱即用
+- **智能实体提取**：自动从记忆中提取人物、地点、事件、概念
+- **AI 摘要生成**：长文本自动生成精炼摘要
+- **智能记忆加载**：Token 预算控制，按重要性动态加载相关记忆
+- **记忆冲突检测**：发现矛盾记忆并提示确认
 
 ### 🔌 外部集成
-- **API Key 认证**: 安全的第三方应用接入
-- **外部 API**: `/api/v1/external/memories` 供 OpenClaw 等写入记忆
-- **批量导入**: 支持批量写入记忆（最多 100 条/次）
-- **OpenClaw 自动同步**: 安装后自动监控 `~/.openclaw/` 目录，每 60 秒增量同步新对话
+- **API Key 认证**：安全的第三方应用接入
+- **外部 API**：`/api/v1/external/memories` 供 OpenClaw 等写入记忆
+- **批量导入**：支持批量写入记忆（最多 100 条/次）
+- **OpenClaw 自动同步**：安装后自动监控 `~/.openclaw/` 目录，每 60 秒增量同步新对话
 
 ### 🔐 安全特性
 - JWT 认证 + API Key 双重认证机制
@@ -121,6 +123,7 @@ clawmemory/
 │   ├── internal/             # 内部包
 │   │   ├── api/              # HTTP API
 │   │   ├── services/         # 业务逻辑
+│   │   ├── ai/               # AI 增强功能
 │   │   └── models/           # 数据模型
 │   ├── frontend_dist/        # 前端构建产物
 │   └── go.mod
@@ -197,6 +200,13 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - `GET /api/v1/knowledge/relations` - 关系列表
 - `GET /api/v1/knowledge/graph` - 图谱数据
 
+### AI 增强
+- `GET /api/v1/ai/config` - 获取 AI 配置
+- `GET /api/v1/ai/providers` - 列出可用 AI 模型
+- `POST /api/v1/ai/test` - 测试 AI 连接
+- `POST /api/v1/ai/extract` - AI 实体提取
+- `GET /api/v1/ai/daily-report` - AI 日报生成
+
 ### 授权
 - `GET /api/v1/license/info` - 授权信息
 - `POST /api/v1/license/activate` - 激活授权
@@ -221,13 +231,25 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 
 ## 📝 更新日志
 
-### v2.14.0 (2026-05-03)
+### v2.17.0 (2026-05-04)
+- 🧠 新增：AI 大模型集成系统，内置 NVIDIA NIM 免费模型
+- 🧠 新增：AI 实体提取、摘要生成、日报生成等智能功能
+- 🧠 新增：AI Provider 抽象层，支持 OpenAI/DeepSeek/自定义端点
+- 🧠 新增：Prompt 模板系统，8 种智能分析模板
+- 🔧 优化：AI 功能分级，免费用户可使用 NVIDIA NIM 免费模型
+
+### v2.16.0 (2026-05-04)
+- 🐛 修复：备份功能路径硬编码问题
+- 🐛 修复：前端单元测试 mock 路径错误
+- 🔧 优化：配置管理统一化
+
+### v2.15.0 (2026-05-03)
 - 🛡️ 新增：敏感内容记录开关（默认关闭），开启后敏感内容以 AES-GCM 加密存储
 - 🔐 新增：加密记忆解密 API（`POST /api/v1/memories/:id/decrypt`）
 - 🎛️ 新增：设置页面「记录敏感内容」开关 + 安全警告提示
 - 📋 新增：同步状态显示跳过数量（skipped_count）
 
-### v2.13.1 (2026-05-03)
+### v2.14.0 (2026-05-03)
 - 🔒 安全：OpenClaw 同步增加敏感信息过滤（API Key、密码、token 等）
 - 🔒 安全：跳过敏感文件（.env、credentials、secrets 等）
 - 🔒 安全：内容长度限制（最大 50000 字符）
@@ -240,17 +262,6 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - 📋 新增：同步状态 API（`/api/v1/openclaw-sync/status`）
 - 🎛️ 新增：手动触发同步和开关自动同步 API
 - 🚀 改进：启动时自动检测 OpenClaw 目录并开始同步
-
-### v2.12.1 (2026-05-03)
-- 🔒 安全加固：Auth 中间件拆分，API Key 只能访问 /api/v1/external 端点，无法操作管理功能
-- 🔒 安全加固：CORS 从 `*` 改为 Origin 白名单（localhost + 局域网）
-- 🔒 安全加固：添加速率限制（API Key 60次/分，JWT 120次/分，登录 10次/分）
-- 🔒 安全加固：API Key 数量上限（每用户最多 5 个）
-- 🔒 安全加固：批量写入上限（100条/次）+ 输入长度限制
-- 🔒 安全加固：密钥格式校验（`cm` 前缀 + 50字符长度）
-- 🔒 安全加固：JWT 签名算法验证（防止算法混淆攻击）
-- 📋 新增：审计日志（API Key 创建/删除、外部记忆写入自动记录）
-- 🎨 前端：API Key 管理界面添加安全提示、数量限制、错误处理优化
 
 ### v2.12.0 (2026-05-03)
 - 🔑 新增：API Key 认证机制，支持外部应用安全调用 ClawMemory API
@@ -269,10 +280,13 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - 🔒 改进：忘记密码 API 增加用户名验证
 - 📦 统一版本号管理（config.AppVersion）
 
-### v2.9.1 (2026-04-30)
-- 🔒 安全加固：密码重置验证、备份路径遍历防护
-- 🐛 修复：ChromaDB 搜索结果字段补全、导出数据格式修正
-- 🔗 前后端一致性：错误响应字段统一为 `error`
+### v2.10.0 (2026-04-30)
+- 🔒 安全加固：Auth 中间件拆分，API Key 只能访问 /api/v1/external 端点
+- 🔒 安全加固：CORS 从 `*` 改为 Origin 白名单（localhost + 局域网）
+- 🔒 安全加固：添加速率限制（API Key 60次/分，JWT 120次/分，登录 10次/分）
+- 🔒 安全加固：API Key 数量上限（每用户最多 5 个）
+- 🔒 安全加固：批量写入上限（100条/次）+ 输入长度限制
+- 📋 新增：审计日志（API Key 创建/删除、外部记忆写入自动记录）
 
 ### v2.0 (2026-04-29)
 - 🎨 全新现代化 UI (知识图谱/日报/主布局)
