@@ -25,7 +25,16 @@ func (s *KnowledgeService) CreateEntity(userID uint, data map[string]interface{}
 	}
 
 	aliases := "[]"
-	if a, ok := data["aliases"].([]string); ok {
+	if a, ok := data["aliases"].([]interface{}); ok {
+		strs := make([]string, 0, len(a))
+		for _, v := range a {
+			if s, ok := v.(string); ok {
+				strs = append(strs, s)
+			}
+		}
+		b, _ := json.Marshal(strs)
+		aliases = string(b)
+	} else if a, ok := data["aliases"].([]string); ok {
 		b, _ := json.Marshal(a)
 		aliases = string(b)
 	}
@@ -71,6 +80,16 @@ func (s *KnowledgeService) ListEntities(userID uint, entityType string, page, si
 	query.Count(&total)
 	err := query.Order("updated_at DESC").Offset((page - 1) * size).Limit(size).Find(&entities).Error
 	return entities, total, err
+}
+
+func (s *KnowledgeService) ListRelations(userID uint, page, size int) ([]models.Relation, int64, error) {
+	var relations []models.Relation
+	var total int64
+
+	query := s.db.Model(&models.Relation{}).Where("user_id = ?", userID)
+	query.Count(&total)
+	err := query.Order("created_at DESC").Offset((page - 1) * size).Limit(size).Find(&relations).Error
+	return relations, total, err
 }
 
 func (s *KnowledgeService) CreateRelation(userID uint, data map[string]interface{}) (*models.Relation, error) {

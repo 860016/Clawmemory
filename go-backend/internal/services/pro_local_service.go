@@ -33,11 +33,11 @@ func (s *ProLocalService) DecayStats(userID uint) (map[string]interface{}, error
 		Order("importance ASC").Limit(10).Find(&lowImportance)
 	for _, m := range lowImportance {
 		suggestions = append(suggestions, map[string]interface{}{
-			"memory_id":   m.ID,
-			"key":         m.Key,
-			"importance":  m.Importance,
-			"suggestion":  "consider archiving or deleting",
-			"days_old":    int(time.Since(m.UpdatedAt).Hours() / 24),
+			"memory_id":  m.ID,
+			"key":        m.Key,
+			"importance": m.Importance,
+			"suggestion": "consider archiving or deleting",
+			"days_old":   int(time.Since(m.UpdatedAt).Hours() / 24),
 		})
 	}
 
@@ -46,13 +46,15 @@ func (s *ProLocalService) DecayStats(userID uint) (map[string]interface{}, error
 
 	avgImportance := 0.0
 	if totalMemories > 0 {
-		var sum float64
-		var allMems []models.Memory
-		s.db.Where("user_id = ? AND status != ?", userID, "trashed").Select("importance").Find(&allMems)
-		for _, m := range allMems {
-			sum += m.Importance
+		type avgResult struct {
+			Avg float64
 		}
-		avgImportance = math.Round(sum/float64(len(allMems))*100) / 100
+		var result avgResult
+		s.db.Model(&models.Memory{}).
+			Where("user_id = ? AND status != ?", userID, "trashed").
+			Select("AVG(importance) as avg").
+			Scan(&result)
+		avgImportance = math.Round(result.Avg*100) / 100
 	}
 
 	return map[string]interface{}{
@@ -109,13 +111,19 @@ func (s *ProLocalService) ConflictScan(userID uint) (map[string]interface{}, err
 					severity = "medium"
 				}
 				conflict := map[string]interface{}{
-					"key":       key,
-					"count":     len(mems),
-					"value_a":   values[0],
-					"value_b":   values[1],
-					"severity":  severity,
-					"memories":  mems,
-					"conflict":  "different_values_same_key",
+					"key":      key,
+					"count":    len(mems),
+					"value_a":  values[0],
+					"value_b":  values[1],
+					"severity": severity,
+					"memory_ids": func() []uint {
+						ids := make([]uint, len(mems))
+						for i, m := range mems {
+							ids[i] = m.ID
+						}
+						return ids
+					}(),
+					"conflict": "different_values_same_key",
 				}
 				conflicts = append(conflicts, conflict)
 			}
@@ -123,12 +131,12 @@ func (s *ProLocalService) ConflictScan(userID uint) (map[string]interface{}, err
 	}
 
 	return map[string]interface{}{
-		"conflicts":         conflicts,
-		"total":             len(conflicts),
-		"auto_resolvable":   len(conflicts),
-		"needs_review":      0,
-		"algorithm":         "local_key_conflict_v1",
-		"mode":              "local_pro",
+		"conflicts":       conflicts,
+		"total":           len(conflicts),
+		"auto_resolvable": len(conflicts),
+		"needs_review":    0,
+		"algorithm":       "local_key_conflict_v1",
+		"mode":            "local_pro",
 	}, nil
 }
 
@@ -208,6 +216,14 @@ func (s *ProLocalService) CompressApply(userID uint, level string) (map[string]i
 		}
 	}
 
+	for i := 0; i < len(lowImportance)-1; i++ {
+		for j := i + 1; j < len(lowImportance); j++ {
+			if lowImportance[j].Importance < lowImportance[i].Importance {
+				lowImportance[i], lowImportance[j] = lowImportance[j], lowImportance[i]
+			}
+		}
+	}
+
 	targetCount := int(float64(len(lowImportance)) * rate)
 	compressed := 0
 
@@ -246,7 +262,18 @@ func (s *ProLocalService) EvolutionDiscover(userID uint) (map[string]interface{}
 		}
 		if recs, ok := result["recommendations"].([]map[string]interface{}); ok {
 			for _, rec := range recs {
-				key := fmt.Sprintf("%d-%d", memories[i].ID, rec["id"])
+				var targetID uint
+				switch v := rec["id"].(type) {
+				case float64:
+					targetID = uint(v)
+				case uint:
+					targetID = v
+				case int:
+					targetID = uint(v)
+				default:
+					continue
+				}
+				key := fmt.Sprintf("%d-%d", memories[i].ID, targetID)
 				if !seen[key] {
 					seen[key] = true
 					score := 0.5
@@ -263,7 +290,7 @@ func (s *ProLocalService) EvolutionDiscover(userID uint) (map[string]interface{}
 						"type":       relationType,
 						"confidence": math.Round(score*100) / 100,
 						"source_id":  memories[i].ID,
-						"target_id":  rec["id"],
+						"target_id":  targetID,
 						"reason":     rec["reason"],
 					})
 				}
@@ -315,11 +342,13 @@ func (s *ProLocalService) EvolutionImportance(userID uint) (map[string]interface
 		}
 
 		if math.Abs(adjustedImportance-m.Importance) > 0.01 {
+			adjustedImportance = math.Round(adjustedImportance*100) / 100
+			s.db.Model(&m).Update("importance", adjustedImportance)
 			adjustments = append(adjustments, map[string]interface{}{
 				"id":                  m.ID,
 				"key":                 m.Key,
 				"current_importance":  m.Importance,
-				"adjusted_importance": math.Round(adjustedImportance*100) / 100,
+				"adjusted_importance": adjustedImportance,
 				"reason":              getImportanceReason(daysSinceUpdate, m.AccessCount),
 			})
 		}
@@ -342,15 +371,17 @@ func (s *ProLocalService) ReinforceMemory(userID uint, memoryID uint) (map[strin
 	s.db.Model(&memory).Updates(map[string]interface{}{
 		"importance":       newImportance,
 		"access_count":     memory.AccessCount + 1,
+		"reinforce_count":  memory.ReinforceCount + 1,
 		"last_accessed_at": time.Now(),
 	})
 	return map[string]interface{}{
-		"memory_id":      memoryID,
-		"old_importance": memory.Importance,
-		"new_importance": newImportance,
-		"reinforced":     true,
-		"algorithm":      "local_access_reinforce_v1",
-		"mode":           "local_pro",
+		"memory_id":       memoryID,
+		"old_importance":  memory.Importance,
+		"new_importance":  newImportance,
+		"reinforced":      true,
+		"reinforce_count": memory.ReinforceCount + 1,
+		"algorithm":       "local_access_reinforce_v1",
+		"mode":            "local_pro",
 	}, nil
 }
 
@@ -364,18 +395,33 @@ func (s *ProLocalService) ConflictResolve(userID uint, conflictIndex int, strate
 		return nil, fmt.Errorf("conflict index out of range")
 	}
 	conflict := conflicts[conflictIndex]
-	memories, ok := conflict["memories"].([]models.Memory)
-	if !ok || len(memories) == 0 {
+	memoryIDs, ok := conflict["memory_ids"].([]uint)
+	if !ok || len(memoryIDs) == 0 {
 		return nil, fmt.Errorf("no memories in conflict")
 	}
+
+	var memories []models.Memory
+	s.db.Where("id IN ? AND user_id = ?", memoryIDs, userID).Order("id ASC").Find(&memories)
+	if len(memories) == 0 {
+		return nil, fmt.Errorf("no memories found for conflict")
+	}
+
 	switch strategy {
 	case "keep_first":
 		for i := 1; i < len(memories); i++ {
 			s.db.Model(&memories[i]).Update("status", "archived")
 		}
 	case "keep_latest":
-		for i := 0; i < len(memories)-1; i++ {
-			s.db.Model(&memories[i]).Update("status", "archived")
+		latest := 0
+		for i := 1; i < len(memories); i++ {
+			if memories[i].UpdatedAt.After(memories[latest].UpdatedAt) {
+				latest = i
+			}
+		}
+		for i := 0; i < len(memories); i++ {
+			if i != latest {
+				s.db.Model(&memories[i]).Update("status", "archived")
+			}
 		}
 	default:
 		for i := 1; i < len(memories); i++ {
@@ -581,7 +627,7 @@ func (s *ProLocalService) AutoGraph(userID uint, overwrite bool) (map[string]int
 				continue
 			}
 
-			s.db.Create(&models.Relation{
+			if err := s.db.Create(&models.Relation{
 				UserID:         userID,
 				SourceID:       e1.ID,
 				TargetID:       e2.ID,
@@ -590,8 +636,9 @@ func (s *ProLocalService) AutoGraph(userID uint, overwrite bool) (map[string]int
 				Confidence:     conf,
 				DiscoverMethod: "auto_graph",
 				Weight:         conf,
-			})
-			relationsCreated++
+			}).Error; err == nil {
+				relationsCreated++
+			}
 		}
 	}
 
@@ -604,36 +651,79 @@ func (s *ProLocalService) AutoGraph(userID uint, overwrite bool) (map[string]int
 	}, nil
 }
 
-func (s *ProLocalService) BackupSchedule() (map[string]interface{}, error) {
-	return map[string]interface{}{
-		"enabled":        false,
-		"interval_hours": 24,
-		"mode":           "local_pro",
-	}, nil
-}
-
-func (s *ProLocalService) SetBackupSchedule(enabled bool, intervalHours int) (map[string]interface{}, error) {
+func (s *ProLocalService) BackupSchedule(userID uint) (map[string]interface{}, error) {
+	settingsSvc := NewSettingsService(s.db)
+	enabled, _ := settingsSvc.GetByKey(userID, "pro_backup_enabled")
+	if enabled == nil {
+		enabled = false
+	}
+	intervalHours := 24
+	if ih, _ := settingsSvc.GetByKey(userID, "pro_backup_interval_hours"); ih != nil {
+		if v, ok := ih.(float64); ok {
+			intervalHours = int(v)
+		}
+	}
 	return map[string]interface{}{
 		"enabled":        enabled,
 		"interval_hours": intervalHours,
-		"message":        "backup schedule recorded, please execute backup manually",
 		"mode":           "local_pro",
 	}, nil
 }
 
-func (s *ProLocalService) CompressConfig() (map[string]interface{}, error) {
+func (s *ProLocalService) SetBackupSchedule(userID uint, enabled bool, intervalHours int) (map[string]interface{}, error) {
+	settingsSvc := NewSettingsService(s.db)
+	settingsSvc.SetByKey(userID, "pro_backup_enabled", enabled)
+	settingsSvc.SetByKey(userID, "pro_backup_interval_hours", intervalHours)
 	return map[string]interface{}{
-		"level":        "light",
-		"auto_enabled": false,
-		"threshold":    1000,
+		"enabled":        enabled,
+		"interval_hours": intervalHours,
+		"message":        "backup schedule saved",
+		"mode":           "local_pro",
+	}, nil
+}
+
+func (s *ProLocalService) CompressConfig(userID uint) (map[string]interface{}, error) {
+	settingsSvc := NewSettingsService(s.db)
+	level := "light"
+	if l, _ := settingsSvc.GetByKey(userID, "pro_compress_level"); l != nil {
+		if v, ok := l.(string); ok {
+			level = v
+		}
+	}
+	autoEnabled := false
+	if ae, _ := settingsSvc.GetByKey(userID, "pro_compress_auto_enabled"); ae != nil {
+		if v, ok := ae.(bool); ok {
+			autoEnabled = v
+		}
+	}
+	threshold := 1000
+	if t, _ := settingsSvc.GetByKey(userID, "pro_compress_threshold"); t != nil {
+		if v, ok := t.(float64); ok {
+			threshold = int(v)
+		}
+	}
+	return map[string]interface{}{
+		"level":        level,
+		"auto_enabled": autoEnabled,
+		"threshold":    threshold,
 		"mode":         "local_pro",
 	}, nil
 }
 
-func (s *ProLocalService) SetCompressConfig(config map[string]interface{}) (map[string]interface{}, error) {
+func (s *ProLocalService) SetCompressConfig(userID uint, config map[string]interface{}) (map[string]interface{}, error) {
+	settingsSvc := NewSettingsService(s.db)
+	if level, ok := config["level"].(string); ok {
+		settingsSvc.SetByKey(userID, "pro_compress_level", level)
+	}
+	if autoEnabled, ok := config["auto_enabled"].(bool); ok {
+		settingsSvc.SetByKey(userID, "pro_compress_auto_enabled", autoEnabled)
+	}
+	if threshold, ok := config["threshold"].(float64); ok {
+		settingsSvc.SetByKey(userID, "pro_compress_threshold", int(threshold))
+	}
 	return map[string]interface{}{
 		"config":  config,
-		"message": "compress config recorded",
+		"message": "compress config saved",
 		"mode":    "local_pro",
 	}, nil
 }
@@ -800,10 +890,6 @@ func getImportanceReason(daysSinceUpdate float64, accessCount int) string {
 }
 
 func inferRelation(e1, e2 models.Entity) (string, string, float64) {
-	if e1.EntityType == e2.EntityType {
-		return "same_type", fmt.Sprintf("Both are %s", e1.EntityType), 0.5
-	}
-
 	name1 := strings.ToLower(e1.Name)
 	name2 := strings.ToLower(e2.Name)
 	desc1 := strings.ToLower(e1.Description)
@@ -824,22 +910,31 @@ func inferRelation(e1, e2 models.Entity) (string, string, float64) {
 			"concept":      {"understands", "understands concept", 0.5},
 			"event":        {"participated_in", "participated in", 0.7},
 			"location":     {"located_at", "is located at", 0.6},
+			"person":       {"collaborates_with", "collaborates with", 0.5},
 		},
 		"technology": {
-			"concept":     {"implements", "implements concept", 0.6},
-			"technology":  {"depends_on", "depends on", 0.6},
+			"concept":      {"implements", "implements concept", 0.6},
+			"technology":   {"depends_on", "depends on", 0.6},
 			"organization": {"used_by", "is used by", 0.5},
+			"person":       {"used_by", "is used by", 0.6},
+			"event":        {"released_at", "released at", 0.5},
 		},
 		"organization": {
 			"location": {"headquartered_at", "headquartered at", 0.6},
 			"event":    {"organized", "organized", 0.7},
+			"person":   {"employs", "employs", 0.6},
 		},
 		"event": {
-			"location": {"held_at", "held at", 0.7},
-			"concept":  {"about", "is about", 0.5},
+			"location":   {"held_at", "held at", 0.7},
+			"concept":    {"about", "is about", 0.5},
+			"person":     {"attended_by", "attended by", 0.6},
+			"technology": {"features", "features", 0.5},
 		},
 		"concept": {
 			"concept": {"related_to", "is related to", 0.4},
+		},
+		"location": {
+			"location": {"near", "is near", 0.4},
 		},
 	}
 
@@ -847,6 +942,10 @@ func inferRelation(e1, e2 models.Entity) (string, string, float64) {
 		if rel, ok := typeRels[e2.EntityType]; ok {
 			return rel.relType, fmt.Sprintf("%s %s %s", e1.Name, rel.desc, e2.Name), rel.conf
 		}
+	}
+
+	if e1.EntityType == e2.EntityType {
+		return "same_type", fmt.Sprintf("Both are %s", e1.EntityType), 0.3
 	}
 
 	commonWords := 0

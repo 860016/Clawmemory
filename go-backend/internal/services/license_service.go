@@ -41,6 +41,27 @@ func NewLicenseManager(db *gorm.DB, cfg *config.Config) *LicenseManager {
 
 // Activate 激活授权
 func (lm *LicenseManager) Activate(licenseKey string) (map[string]interface{}, error) {
+	var existingActive models.License
+	if err := lm.db.Where("license_key = ? AND status = ?", licenseKey, "active").First(&existingActive).Error; err == nil {
+		currentFP := getDeviceFingerprint()
+		if existingActive.DeviceFingerprint == currentFP {
+			return map[string]interface{}{
+				"valid":   true,
+				"message": "already activated on this device",
+				"tier":    existingActive.Tier,
+			}, nil
+		}
+		return nil, errors.New("this license key is already activated on another device")
+	}
+
+	var deactivatedLicense models.License
+	if err := lm.db.Where("license_key = ? AND status = ?", licenseKey, "inactive").First(&deactivatedLicense).Error; err == nil {
+		currentFP := getDeviceFingerprint()
+		if deactivatedLicense.DeviceFingerprint != currentFP {
+			return nil, errors.New("this license key has been deactivated and cannot be reactivated on a different device")
+		}
+	}
+
 	fingerprint := getDeviceFingerprint()
 	deviceName := getDeviceName()
 
@@ -60,7 +81,17 @@ func (lm *LicenseManager) Activate(licenseKey string) (map[string]interface{}, e
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("license server returned error")
+		body, _ := io.ReadAll(resp.Body)
+		errMsg := "license server returned error"
+		var errResp map[string]interface{}
+		if json.Unmarshal(body, &errResp) == nil {
+			if msg, ok := errResp["message"].(string); ok && msg != "" {
+				errMsg = msg
+			} else if msg, ok := errResp["error"].(string); ok && msg != "" {
+				errMsg = msg
+			}
+		}
+		return nil, errors.New(errMsg)
 	}
 
 	var result map[string]interface{}
@@ -68,8 +99,14 @@ func (lm *LicenseManager) Activate(licenseKey string) (map[string]interface{}, e
 		return nil, err
 	}
 
-	if !result["valid"].(bool) {
-		return result, nil
+	if valid, ok := result["valid"].(bool); !ok || !valid {
+		errMsg := "license activation failed"
+		if msg, ok := result["message"].(string); ok && msg != "" {
+			errMsg = msg
+		} else if msg, ok := result["error"].(string); ok && msg != "" {
+			errMsg = msg
+		}
+		return nil, errors.New(errMsg)
 	}
 
 	// RSA 签名验证
@@ -88,7 +125,9 @@ func (lm *LicenseManager) Activate(licenseKey string) (map[string]interface{}, e
 	features := []string{}
 	if f, ok := result["features"].([]interface{}); ok {
 		for _, feature := range f {
-			features = append(features, feature.(string))
+			if s, ok := feature.(string); ok {
+				features = append(features, s)
+			}
 		}
 	}
 	featuresJSON, _ := json.Marshal(features)
@@ -96,15 +135,18 @@ func (lm *LicenseManager) Activate(licenseKey string) (map[string]interface{}, e
 	fallbackURLs := []string{}
 	if f, ok := result["pro_fallback_urls"].([]interface{}); ok {
 		for _, url := range f {
-			fallbackURLs = append(fallbackURLs, url.(string))
+			if s, ok := url.(string); ok {
+				fallbackURLs = append(fallbackURLs, s)
+			}
 		}
 	}
 	fallbackJSON, _ := json.Marshal(fallbackURLs)
 
-	// 停用旧授权
-	lm.db.Model(&models.License{}).Where("status = ?", "active").Update("status", "inactive")
+	// 停用其他授权（不同 key 的）
+	lm.db.Model(&models.License{}).Where("status = ? AND license_key != ?", "active", licenseKey).Update("status", "inactive")
 
-	// 创建新授权
+	// 创建或更新授权
+	now := time.Now()
 	license := &models.License{
 		LicenseKey:        licenseKey,
 		Tier:              getString(result, "tier", "pro"),
@@ -114,6 +156,7 @@ func (lm *LicenseManager) Activate(licenseKey string) (map[string]interface{}, e
 		Features:          string(featuresJSON),
 		ProDownloadURL:    getString(result, "pro_download_url", ""),
 		ProFallbackURLs:   string(fallbackJSON),
+		ActivatedAt:       &now,
 	}
 
 	if exp, ok := result["expires_at"].(string); ok {
@@ -121,8 +164,26 @@ func (lm *LicenseManager) Activate(licenseKey string) (map[string]interface{}, e
 		license.ExpiresAt = &t
 	}
 
-	if err := lm.db.Create(license).Error; err != nil {
-		return nil, err
+	var existingRecord models.License
+	if err := lm.db.Where("license_key = ?", licenseKey).First(&existingRecord).Error; err == nil {
+		if err := lm.db.Model(&existingRecord).Updates(map[string]interface{}{
+			"tier":               license.Tier,
+			"status":             "active",
+			"device_fingerprint": fingerprint,
+			"device_name":        deviceName,
+			"features":           string(featuresJSON),
+			"pro_download_url":   license.ProDownloadURL,
+			"pro_fallback_urls":  string(fallbackJSON),
+			"expires_at":         license.ExpiresAt,
+			"activated_at":       &now,
+		}).Error; err != nil {
+			return nil, err
+		}
+		license = &existingRecord
+	} else {
+		if err := lm.db.Create(license).Error; err != nil {
+			return nil, err
+		}
 	}
 
 	// 更新内存状态
@@ -173,6 +234,11 @@ func (lm *LicenseManager) GetLicenseInfo() map[string]interface{} {
 		}
 	}
 
+	fallbackURLs := []string{}
+	if license.Status == "active" && license.ProFallbackURLs != "" {
+		json.Unmarshal([]byte(license.ProFallbackURLs), &fallbackURLs)
+	}
+
 	return map[string]interface{}{
 		"active":            license.Status == "active",
 		"tier":              lm.tier,
@@ -181,9 +247,38 @@ func (lm *LicenseManager) GetLicenseInfo() map[string]interface{} {
 		"expires_at":        license.ExpiresAt,
 		"device_slot":       license.DeviceSlot,
 		"license_key":       maskLicenseKey(license.LicenseKey),
-		"is_valid":          true,
+		"is_valid":          license.Status == "active",
 		"pro_download_url":  license.ProDownloadURL,
-		"pro_fallback_urls": []string{},
+		"pro_fallback_urls": fallbackURLs,
+	}
+}
+
+func (lm *LicenseManager) Deactivate(userID uint) map[string]interface{} {
+	var activeLicense models.License
+	if err := lm.db.Where("status = ?", "active").First(&activeLicense).Error; err == nil {
+		fingerprint := getDeviceFingerprint()
+		go func() {
+			body := map[string]interface{}{
+				"license_key": activeLicense.LicenseKey,
+				"fingerprint": fingerprint,
+			}
+			resp, err := http.Post(
+				lm.cfg.LicenseServerURL+"/api/v1/deactivate",
+				"application/json",
+				jsonReader(body),
+			)
+			if err == nil {
+				resp.Body.Close()
+			}
+		}()
+	}
+
+	result := lm.db.Model(&models.License{}).Where("status = ?", "active").Update("status", "inactive")
+	lm.tier = "oss"
+	lm.features = []string{}
+	return map[string]interface{}{
+		"deactivated": true,
+		"affected":    result.RowsAffected,
 	}
 }
 

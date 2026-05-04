@@ -18,10 +18,10 @@ import (
 )
 
 type ProProxy struct {
-	db       *gorm.DB
-	cfg      *config.Config
-	cached   *models.License
-	cacheAt  time.Time
+	db      *gorm.DB
+	cfg     *config.Config
+	cached  *models.License
+	cacheAt time.Time
 }
 
 func NewProProxy(db *gorm.DB, cfg *config.Config) *ProProxy {
@@ -31,17 +31,21 @@ func NewProProxy(db *gorm.DB, cfg *config.Config) *ProProxy {
 	}
 }
 
+func (p *ProProxy) InvalidateCache() {
+	p.cached = nil
+	p.cacheAt = time.Time{}
+}
+
 func (p *ProProxy) getActiveLicense() *models.License {
 	if p.cached != nil && time.Since(p.cacheAt) < 5*time.Minute {
 		if p.validateLicense(p.cached) {
 			return p.cached
 		}
-		p.cached = nil
-		p.cacheAt = time.Time{}
+		p.InvalidateCache()
 	}
 
 	var license models.License
-	if err := p.db.Where("status = ?", "active").First(&license).Error; err != nil {
+	if err := p.db.Where("status = ? AND tier IN ?", "active", []string{"pro", "enterprise"}).Order("id DESC").First(&license).Error; err != nil {
 		return nil
 	}
 
@@ -122,7 +126,13 @@ func (p *ProProxy) validateLicenseKeyFormat(key string) bool {
 
 func (p *ProProxy) IsPro() bool {
 	license := p.getActiveLicense()
-	return p.validateLicense(license)
+	if !p.validateLicense(license) {
+		return false
+	}
+	if !p.verifyOfflineSignature(license) {
+		return false
+	}
+	return true
 }
 
 func (p *ProProxy) verifyOfflineSignature(license *models.License) bool {
@@ -132,6 +142,10 @@ func (p *ProProxy) verifyOfflineSignature(license *models.License) bool {
 
 	pubkey := p.loadPublicKey()
 	if pubkey == nil {
+		sigFile := filepath.Join(filepath.Dir(p.cfg.RSAPublicKeyPath), "license.sig")
+		if _, err := os.Stat(sigFile); err == nil {
+			return false
+		}
 		return true
 	}
 
@@ -141,12 +155,12 @@ func (p *ProProxy) verifyOfflineSignature(license *models.License) bool {
 	sigFile := filepath.Join(filepath.Dir(p.cfg.RSAPublicKeyPath), "license.sig")
 	sigData, err := os.ReadFile(sigFile)
 	if err != nil {
-		return true
+		return false
 	}
 
 	sig, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(sigData)))
 	if err != nil {
-		return true
+		return false
 	}
 
 	if err := rsa.VerifyPKCS1v15(pubkey, 0, hash[:], sig); err != nil {
@@ -179,15 +193,17 @@ func (p *ProProxy) GetLicenseInfo() map[string]interface{} {
 	features := []string{}
 	json.Unmarshal([]byte(license.Features), &features)
 
+	isValid := p.validateLicense(license) && p.verifyOfflineSignature(license)
+
 	return map[string]interface{}{
-		"active":       p.validateLicense(license),
-		"tier":         license.Tier,
-		"type":         license.Tier,
-		"features":     features,
-		"expires_at":   license.ExpiresAt,
-		"device_slot":  license.DeviceSlot,
-		"license_key":  maskLicenseKey(license.LicenseKey),
-		"is_valid":     p.validateLicense(license),
+		"active":      isValid,
+		"tier":        license.Tier,
+		"type":        license.Tier,
+		"features":    features,
+		"expires_at":  license.ExpiresAt,
+		"device_slot": license.DeviceSlot,
+		"license_key": maskLicenseKey(license.LicenseKey),
+		"is_valid":    isValid,
 	}
 }
 

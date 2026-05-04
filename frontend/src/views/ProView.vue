@@ -57,10 +57,11 @@
           <div v-if="pruneSuggestions.length" class="prune-section">
             <div class="sub-title">{{ $t('pro.pruneSuggestions') }} ({{ pruneSuggestions.length }})</div>
             <div class="prune-list">
-              <div v-for="s in pruneSuggestions.slice(0, 10)" :key="s.id" class="prune-item">
+              <div v-for="s in pruneSuggestions.slice(0, 10)" :key="s.memory_id" class="prune-item">
                 <span class="prune-key">{{ s.key }}</span>
-                <el-tag size="small" type="info">{{ s.layer }}</el-tag>
-                <span class="prune-imp">{{ s.decayed_importance }}</span>
+                <el-tag size="small" type="info">{{ s.suggestion }}</el-tag>
+                <span class="prune-imp">{{ s.importance?.toFixed(2) }}</span>
+                <span class="prune-days">{{ s.days_old }}d</span>
               </div>
             </div>
           </div>
@@ -206,10 +207,6 @@
               <span class="stat-value">{{ extractResult.entities_extracted }}</span>
               <span class="stat-label">{{ $t('pro.entitiesExtracted') }}</span>
             </div>
-            <div class="stat-item">
-              <span class="stat-value">{{ extractResult.relations_extracted }}</span>
-              <span class="stat-label">{{ $t('pro.relationsExtracted') }}</span>
-            </div>
           </div>
         </div>
       </div>
@@ -337,10 +334,10 @@
                 <span class="stat-label">{{ $t('pro.compressRatio') }}</span>
               </div>
             </div>
-            <div v-if="compressPreviewData.details" class="compress-details">
-              <div v-for="(d, i) in compressPreviewData.details.slice(0, 5)" :key="i" class="compress-detail-item">
-                <span class="detail-action">{{ d.action }}</span>
-                <span class="detail-target">{{ d.target }}</span>
+            <div v-if="compressPreviewData.preview" class="compress-details">
+              <div v-for="(d, i) in compressPreviewData.preview.slice(0, 5)" :key="i" class="compress-detail-item">
+                <span class="detail-action">{{ $t('pro.compressLayer') }} {{ d.layer }}</span>
+                <span class="detail-target">{{ d.original }} → {{ d.compressed }}</span>
               </div>
             </div>
           </div>
@@ -538,6 +535,7 @@ onMounted(async () => {
     loadDecayStats()
     loadTokenStats()
     loadBackupSchedule()
+    loadCompressConfig()
   }
   if (activeSection.value) {
     nextTick(() => scrollToSection(activeSection.value))
@@ -690,6 +688,13 @@ async function saveCompressConfig() {
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   }
+}
+
+async function loadCompressConfig() {
+  try {
+    const { data } = await proApi.getCompressConfig()
+    compressConfig.value = { auto_enabled: data.auto_enabled || false, threshold: data.threshold || 1000, level: data.level || 'light' }
+  } catch {}
 }
 
 async function loadEvolutionInsights() {

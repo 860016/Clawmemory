@@ -50,8 +50,17 @@ func isOriginAllowed(origin string) bool {
 			return true
 		}
 	}
-	if strings.HasPrefix(origin, "http://192.168.") || strings.HasPrefix(origin, "http://10.") || strings.HasPrefix(origin, "http://172.") {
+	if strings.HasPrefix(origin, "http://192.168.") || strings.HasPrefix(origin, "http://10.") {
 		return true
+	}
+	if strings.HasPrefix(origin, "http://172.") {
+		parts := strings.SplitN(strings.TrimPrefix(origin, "http://172."), ".", 2)
+		if len(parts) > 0 {
+			var second int
+			if _, err := fmt.Sscanf(parts[0], "%d", &second); err == nil && second >= 16 && second <= 31 {
+				return true
+			}
+		}
 	}
 	return false
 }

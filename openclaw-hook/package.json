@@ -1,10 +1,10 @@
 {
   "name": "clawmemory-openclaw-hook",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "OpenClaw hook that auto-captures conversations to ClawMemory",
-  "main": "handler.ts",
+  "main": "clawmemory/handler.ts",
   "openclaw": {
-    "hooks": ["./"]
+    "hooks": ["./clawmemory"]
   },
   "keywords": ["openclaw", "hook", "memory", "clawmemory"],
   "license": "Apache-2.0"

@@ -150,18 +150,19 @@ type DailyReport struct {
 
 // License 授权
 type License struct {
-	ID               uint      `gorm:"primarykey" json:"id"`
-	LicenseKey       string    `gorm:"size:100;not null" json:"license_key"`
-	Tier             string    `gorm:"size:20;default:oss" json:"tier"`
-	Status           string    `gorm:"size:20;default:inactive" json:"status"`
+	ID               uint       `gorm:"primarykey" json:"id"`
+	LicenseKey       string     `gorm:"size:100;not null;uniqueIndex" json:"license_key"`
+	Tier             string     `gorm:"size:20;default:oss" json:"tier"`
+	Status           string     `gorm:"size:20;default:inactive" json:"status"`
 	DeviceFingerprint string   `gorm:"size:64" json:"device_fingerprint"`
-	DeviceName       string    `gorm:"size:200" json:"device_name"`
+	DeviceName       string     `gorm:"size:200" json:"device_name"`
 	ExpiresAt        *time.Time `json:"expires_at"`
-	DeviceSlot       string    `gorm:"size:50" json:"device_slot"`
-	Features         string    `gorm:"type:text" json:"features"`
-	ProDownloadURL   string    `gorm:"size:500" json:"pro_download_url"`
-	ProFallbackURLs  string    `gorm:"type:text" json:"pro_fallback_urls"`
-	CreatedAt        time.Time `json:"created_at"`
+	DeviceSlot       string     `gorm:"size:50" json:"device_slot"`
+	Features         string     `gorm:"type:text" json:"features"`
+	ProDownloadURL   string     `gorm:"size:500" json:"pro_download_url"`
+	ProFallbackURLs  string     `gorm:"type:text" json:"pro_fallback_urls"`
+	ActivatedAt      *time.Time `json:"activated_at"`
+	CreatedAt        time.Time  `json:"created_at"`
 }
 
 // Setting 设置

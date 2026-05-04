@@ -4,11 +4,22 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
+
+	"golang.org/x/crypto/pbkdf2"
+)
+
+const (
+	pbkdf2Iterations = 100000
+	pbkdf2Salt       = "clawmemory-v2-enc-salt"
+	keyVersionV1     = "v1"
+	keyVersionV2     = "v2"
 )
 
 type Encryptor struct {
@@ -16,7 +27,7 @@ type Encryptor struct {
 }
 
 func NewEncryptor(secretKey string) (*Encryptor, error) {
-	key := deriveKey(secretKey)
+	key := deriveKeyV2(secretKey)
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -28,7 +39,11 @@ func NewEncryptor(secretKey string) (*Encryptor, error) {
 	return &Encryptor{gcm: gcm}, nil
 }
 
-func deriveKey(secret string) []byte {
+func deriveKeyV2(secret string) []byte {
+	return pbkdf2.Key([]byte(secret), []byte(pbkdf2Salt), pbkdf2Iterations, 32, sha256.New)
+}
+
+func deriveKeyV1(secret string) []byte {
 	key := make([]byte, 32)
 	src := []byte(secret)
 	for i := 0; i < 32; i++ {
@@ -43,24 +58,68 @@ func (e *Encryptor) Encrypt(plaintext string) (string, error) {
 		return "", err
 	}
 	ciphertext := e.gcm.Seal(nonce, nonce, []byte(plaintext), nil)
-	return base64.StdEncoding.EncodeToString(ciphertext), nil
+	return keyVersionV2 + ":" + base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 
 func (e *Encryptor) Decrypt(encoded string) (string, error) {
-	data, err := base64.StdEncoding.DecodeString(encoded)
+	version := ""
+	payload := encoded
+
+	if idx := strings.Index(encoded, ":"); idx == 2 {
+		version = encoded[:idx]
+		payload = encoded[idx+1:]
+	}
+
+	data, err := base64.StdEncoding.DecodeString(payload)
 	if err != nil {
 		return "", err
 	}
-	nonceSize := e.gcm.NonceSize()
+
+	if version == keyVersionV2 {
+		return decryptWithGCM(e.gcm, data)
+	}
+
+	if version == keyVersionV1 {
+		return decryptV1(data)
+	}
+
+	plaintext, err := decryptWithGCM(e.gcm, data)
+	if err == nil {
+		return plaintext, nil
+	}
+
+	v1Plaintext, v1Err := decryptV1(data)
+	if v1Err == nil {
+		return v1Plaintext, nil
+	}
+
+	return "", fmt.Errorf("decrypt failed (v2: %v, v1: %v)", err, v1Err)
+}
+
+func decryptWithGCM(gcm cipher.AEAD, data []byte) (string, error) {
+	nonceSize := gcm.NonceSize()
 	if len(data) < nonceSize {
 		return "", errors.New("ciphertext too short")
 	}
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
-	plaintext, err := e.gcm.Open(nil, nonce, ciphertext, nil)
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return "", err
 	}
 	return string(plaintext), nil
+}
+
+func decryptV1(data []byte) (string, error) {
+	key := deriveKeyV1(os.Getenv("SECRET_KEY"))
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+	return decryptWithGCM(gcm, data)
 }
 
 func IsEncrypted(value string) bool {

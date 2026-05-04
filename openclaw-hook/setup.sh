@@ -1,48 +1,104 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo "🧠 ClawMemory OpenClaw Hook - Setup"
+echo ""
+echo "ClawMemory OpenClaw Hook - Setup"
 echo "====================================="
 
-HOOK_DIR="$HOME/.openclaw/hooks/clawmemory"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOOK_PACK_DIR="$SCRIPT_DIR"
 
-if [ -d "$HOOK_DIR" ]; then
-  echo "⚠️  Hook already exists at $HOOK_DIR"
-  read -p "Overwrite? (y/N) " -n 1 -r
-  echo
-  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Aborted."
-    exit 0
-  fi
-  rm -rf "$HOOK_DIR"
+if [ ! -f "$HOOK_PACK_DIR/clawmemory/HOOK.md" ]; then
+    echo "ERROR: Invalid hook pack structure. Missing clawmemory/HOOK.md"
+    exit 1
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-mkdir -p "$HOOK_DIR"
-cp "$SCRIPT_DIR/HOOK.md" "$HOOK_DIR/HOOK.md"
-cp "$SCRIPT_DIR/handler.ts" "$HOOK_DIR/handler.ts"
-cp "$SCRIPT_DIR/package.json" "$HOOK_DIR/package.json"
-
-echo ""
-echo "✅ Hook installed to $HOOK_DIR"
-echo ""
-
-if [ -z "$CLAWMEMORY_URL" ]; then
-  echo "⚠️  CLAWMEMORY_URL not set. Using default: http://localhost:8765"
-  echo "   To set: export CLAWMEMORY_URL=http://localhost:8765"
+if [ ! -f "$HOOK_PACK_DIR/clawmemory/handler.ts" ]; then
+    echo "ERROR: Invalid hook pack structure. Missing clawmemory/handler.ts"
+    exit 1
 fi
 
-if [ -z "$CLAWMEMORY_API_KEY" ]; then
-  echo "⚠️  CLAWMEMORY_API_KEY not set!"
-  echo "   1. Open ClawMemory at http://localhost:8765"
-  echo "   2. Go to Settings → API Keys"
-  echo "   3. Create a new key"
-  echo "   4. Set: export CLAWMEMORY_API_KEY=cm_your_key_here"
+if [ ! -f "$HOOK_PACK_DIR/package.json" ]; then
+    echo "ERROR: Missing package.json in hook pack root"
+    exit 1
+fi
+
+if command -v openclaw &>/dev/null; then
+    echo ""
+    echo "Installing hook pack via openclaw plugins install..."
+
+    if openclaw plugins install "$HOOK_PACK_DIR"; then
+        echo ""
+        echo "Enabling hook..."
+        openclaw hooks enable clawmemory
+
+        echo ""
+        echo "Checking hook status..."
+        openclaw hooks check
+    else
+        echo ""
+        echo "WARNING: openclaw plugins install failed."
+        echo "Falling back to manual installation..."
+
+        HOOK_DIR="$HOME/.openclaw/hooks/clawmemory"
+        rm -rf "$HOOK_DIR"
+        mkdir -p "$HOOK_DIR"
+        cp "$HOOK_PACK_DIR/clawmemory/HOOK.md" "$HOOK_DIR/HOOK.md"
+        cp "$HOOK_PACK_DIR/clawmemory/handler.ts" "$HOOK_DIR/handler.ts"
+
+        echo "  Hook files copied to $HOOK_DIR"
+        echo ""
+        echo "  IMPORTANT: You must manually enable the hook:"
+        echo "    openclaw hooks enable clawmemory"
+        echo "    openclaw gateway restart"
+    fi
+else
+    echo ""
+    echo "WARNING: openclaw CLI not found on PATH."
+    echo "  Please install OpenClaw first: https://openclaw.ai"
+    echo ""
+    echo "Falling back to manual installation..."
+
+    HOOK_DIR="$HOME/.openclaw/hooks/clawmemory"
+    if [ -d "$HOOK_DIR" ]; then
+        read -p "  Hook already exists at $HOOK_DIR. Overwrite? (y/N) " reply
+        if [ "$reply" != "y" ] && [ "$reply" != "Y" ]; then
+            echo "  Aborted."
+            exit 0
+        fi
+        rm -rf "$HOOK_DIR"
+    fi
+
+    mkdir -p "$HOOK_DIR"
+    cp "$HOOK_PACK_DIR/clawmemory/HOOK.md" "$HOOK_DIR/HOOK.md"
+    cp "$HOOK_PACK_DIR/clawmemory/handler.ts" "$HOOK_DIR/handler.ts"
+
+    echo ""
+    echo "  Hook files copied to $HOOK_DIR"
+    echo ""
+    echo "  IMPORTANT: You must manually enable the hook:"
+    echo "    openclaw hooks enable clawmemory"
+    echo "    openclaw gateway restart"
 fi
 
 echo ""
-echo "To enable the hook:"
-echo "  openclaw hooks enable clawmemory"
+if [ -z "${CLAWMEMORY_URL:-}" ]; then
+    echo "WARNING: CLAWMEMORY_URL not set. Using default: http://localhost:8765"
+    echo "  To set: export CLAWMEMORY_URL='http://localhost:8765'"
+    echo "  Or add to your shell profile for persistence."
+fi
+
+if [ -z "${CLAWMEMORY_API_KEY:-}" ]; then
+    echo ""
+    echo "WARNING: CLAWMEMORY_API_KEY not set!"
+    echo "  1. Open ClawMemory at http://localhost:8765"
+    echo "  2. Go to Settings > API Keys"
+    echo "  3. Create a new key"
+    echo "  4. Set: export CLAWMEMORY_API_KEY='cm_your_key_here'"
+    echo "  Or add to your shell profile for persistence."
+fi
+
 echo ""
-echo "To restart OpenClaw:"
+echo "Setup complete! Restart OpenClaw gateway to activate:"
 echo "  openclaw gateway restart"
+echo ""

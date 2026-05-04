@@ -6,19 +6,19 @@ import (
 )
 
 const (
-	AppVersion    = "2.15.0"
+	AppVersion    = "2.16.0"
 	GitHubRepo    = "860016/Clawmemory"
 	GitHubRepoURL = "https://github.com/860016/Clawmemory"
 )
 
 type Config struct {
-	DatabasePath      string
-	LicenseServerURL  string
-	RSAPublicKeyPath  string
-	JWTSecret         string
-	DataDir           string
-	SkillsDir         string
-	BackupsDir        string
+	DatabasePath     string
+	LicenseServerURL string
+	RSAPublicKeyPath string
+	JWTSecret        string
+	DataDir          string
+	SkillsDir        string
+	BackupsDir       string
 }
 
 func Load() *Config {
@@ -27,13 +27,13 @@ func Load() *Config {
 	backupsDir := getBackupsDir(dataDir)
 
 	return &Config{
-		DatabasePath:      filepath.Join(dataDir, "clawmemory.db"),
-		LicenseServerURL:  getEnv("LICENSE_SERVER_URL", "https://auth.bestu.top"),
-		RSAPublicKeyPath:  filepath.Join(dataDir, "keys", "public.pem"),
-		JWTSecret:         getEnv("SECRET_KEY", "clawmemory-default-secret-change-me"),
-		DataDir:           dataDir,
-		SkillsDir:         skillsDir,
-		BackupsDir:        backupsDir,
+		DatabasePath:     filepath.Join(dataDir, "clawmemory.db"),
+		LicenseServerURL: getEnv("LICENSE_SERVER_URL", "https://auth.bestu.top"),
+		RSAPublicKeyPath: filepath.Join(dataDir, "keys", "public.pem"),
+		JWTSecret:        getEnv("SECRET_KEY", "clawmemory-default-secret-change-me"),
+		DataDir:          dataDir,
+		SkillsDir:        skillsDir,
+		BackupsDir:       backupsDir,
 	}
 }
 
