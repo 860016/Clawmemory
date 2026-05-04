@@ -457,7 +457,25 @@ ClawMemory/                      # 安装根目录
 
 1. **启动服务**: 双击 `start.bat` (Windows) 或运行 `./start.sh` (Linux/macOS)
 2. **访问地址**: 打开浏览器访问 `http://localhost:8765`
-3. **首次设置**: 首次访问需设置管理员密码
+3. **首次设置**: 首次访问需设置管理员密码（初始密码 `admin123`，首次登录后必须修改）
+
+### 🔑 忘记密码？
+
+ClawMemory 支持通过命令行重置密码，无需原密码：
+
+**Windows**:
+```powershell
+cd go-backend
+.\clawmemory.exe --reset-password 你的新密码
+```
+
+**Linux / macOS**:
+```bash
+cd go-backend
+./clawmemory --reset-password 你的新密码
+```
+
+> 💡 重置完成后，必须不带 `--reset-password` 参数重新启动服务才能正常使用。
 
 ### 💡 提示
 
@@ -568,6 +586,7 @@ ClawMemory 是我的长期记忆后端，我可以直接通过 API 读写它。
 ### 连接信息
 - **地址**: http://localhost:8765
 - **API Key**: <你的 API Key>
+- **初始密码**: `admin123`（首次登录后必须修改）
 
 ### 何时读记忆
 - 收到需要回忆的任务时，先搜索 ClawMemory
