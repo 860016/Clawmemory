@@ -24,7 +24,7 @@ api.interceptors.response.use(
         window.location.href = '/login'
       }
     } else if (status === 403) {
-      // 403 由具体页面处理（如免费版限制）
+      // 403 由具体页面处理（如开源版限制）
     } else if (status === 405) {
       ElMessage.error('请求方法不允许')
     } else {

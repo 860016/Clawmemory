@@ -588,21 +588,39 @@ ClawMemory/                      # 安装根目录
 
 ### 🔑 忘记密码？
 
-ClawMemory 支持通过命令行重置密码，无需原密码：
+ClawMemory 支持通过命令行重置密码，无需原密码。
+
+> ⚠️ **重置前请先停止 ClawMemory 服务**（关闭终端窗口或执行 `stop.bat` / `./stop.sh`）
 
 **Windows**:
 ```powershell
-cd go-backend
+# 打开 PowerShell，进入安装目录
+cd ClawMemory\go-backend
+
+# 执行重置（将"你的新密码"替换为实际密码）
 .\clawmemory.exe --reset-password 你的新密码
+
+# 重置成功后，重新启动服务
+cd ..
+start.bat
 ```
 
 **Linux / macOS**:
 ```bash
-cd go-backend
+# 打开终端，进入安装目录
+cd ClawMemory/go-backend
+
+# 执行重置（将"你的新密码"替换为实际密码）
 ./clawmemory --reset-password 你的新密码
+
+# 重置成功后，重新启动服务
+cd ..
+./start.sh
 ```
 
 > 💡 重置完成后，必须不带 `--reset-password` 参数重新启动服务才能正常使用。
+>
+> 如果提示权限不足（Linux/macOS），请先执行 `chmod +x ./go-backend/clawmemory`
 
 ### 💡 提示
 
@@ -618,6 +636,73 @@ cd go-backend
 ## 🤖 OpenClaw 集成说明
 
 ClawMemory 可以作为 OpenClaw 的主要记忆管理工具，通过 API 联动实现对话自动记忆。
+
+---
+
+## ⬆️ 升级到 Pro
+
+ClawMemory Pro 提供额外的 AI 增强功能，包括智能对话、Wiki 生成、每日报告、知识提炼、代理加速、本地推理等。
+
+### 下载 Pro
+
+前往 [ClawMemory Pro Releases](https://github.com/860016/ClawMemory-Pro/releases) 下载对应平台的安装包：
+
+| 平台 | 文件名 |
+|------|--------|
+| Windows x64 | `clawmemory-pro-2.18.0-windows-amd64.zip` |
+| Windows ARM | `clawmemory-pro-2.18.0-windows-arm64.zip` |
+| Linux x64 | `clawmemory-pro-2.18.0-linux-amd64.tar.gz` |
+| Linux ARM | `clawmemory-pro-2.18.0-linux-arm64.tar.gz` |
+| macOS Intel | `clawmemory-pro-2.18.0-darwin-amd64.tar.gz` |
+| macOS Apple Silicon | `clawmemory-pro-2.18.0-darwin-arm64.tar.gz` |
+
+> ⚠️ Pro 仓库为私有仓库，需要登录 GitHub 账号后才能访问。
+
+### 安装 Pro
+
+1. 先完成上方「一键安装」安装 ClawMemory
+2. 下载对应平台的 Pro 安装包并解压，得到 `clawmemory-pro`（Linux/macOS）或 `clawmemory-pro.exe`（Windows）可执行文件
+3. **将解压得到的可执行文件复制到 ClawMemory 安装目录的 `go-backend/` 下，替换原有的 `clawmemory`（或 `clawmemory.exe`）**
+
+**替换位置**：
+
+| 平台 | 替换文件路径 |
+|------|-------------|
+| **Windows** | `ClawMemory\go-backend\clawmemory.exe` |
+| **Linux/macOS** | `ClawMemory/go-backend/clawmemory` |
+
+**具体操作**：
+
+```bash
+# Windows (PowerShell)
+# 假设解压到了 Downloads 目录
+Copy-Item "$HOME\Downloads\clawmemory-pro.exe" ".\go-backend\clawmemory.exe" -Force
+
+# Linux / macOS
+# 假设解压到了 ~/Downloads 目录
+cp ~/Downloads/clawmemory-pro ./go-backend/clawmemory
+chmod +x ./go-backend/clawmemory
+```
+
+4. 重新启动 ClawMemory（`start.bat` 或 `./start.sh`）
+5. 打开浏览器访问 `http://localhost:8765` → **设置 → Pro 授权** → 输入授权码激活
+
+### Pro 专属功能
+
+- **AI 智能对话** - 基于记忆的智能 AI 对话
+- **AI Wiki 生成** - 自动生成知识库 Wiki
+- **AI 每日报告** - 自动生成每日总结报告
+- **AI 知识提炼** - 从对话中自动提炼知识点
+- **AI 记忆助手** - 智能化 AI 记忆管理
+- **AI 项目分析** - 深度分析项目记忆
+- **Pro 代理加速** - 支持 OpenAI/Anthropic 代理加速
+- **Pro 本地推理** - 支持 Ollama 本地模型推理
+- **Pro 高级加密** - 端到端加密存储
+- **Pro 数据同步** - 跨设备数据同步
+
+---
+
+## 🤖 OpenClaw 集成说明
 
 ### ⚠️ 安装目录要求
 
@@ -698,52 +783,9 @@ openclaw plugins install -l ./openclaw-plugin
 }
 ```
 
-**方式二：AGENTS.md 指令（备用方案）**
+**方式二：手动 API 调用**
 
-如无法安装插件，可将 ClawMemory 指令写入 AGENTS.md：
-
-1. 登录 ClawMemory 网页 → 设置 → OpenClaw 连接
-2. 点击「复制 AGENTS.md」按钮
-3. 将内容粘贴到 OpenClaw 的 AGENTS.md 文件中
-
-**OpenClaw AGENTS.md 位置**：
-- Windows: `C:\Users\<用户名>\.openclaw\AGENTS.md`
-- Linux/macOS: `~/.openclaw/AGENTS.md`
-
-**AGENTS.md 指令内容（示例）**：
-
-```markdown
-## 🧠 ClawMemory Auto-Record
-
-每次回复结束时，自动将当次对话写入 ClawMemory。步骤如下：
-
-1. 读取当前 session 的 jsonl 文件：`~/.openclaw/agents/main/sessions/` 下的 `.jsonl` 文件（找最新修改的）
-2. 提取用户消息和我的回复
-3. 追加写到 `~/.openclaw/workspace/memory/auto-conversation.yml`（按时间追加，用 `---` 分隔）
-4. ClawMemory 的 auto-sync 服务每60秒自动扫描并导入
-
-## 🧠 直接读写 ClawMemory（记忆后端）
-
-ClawMemory 是我的长期记忆后端，我可以直接通过 API 读写它。
-
-### 连接信息
-- **地址**: http://localhost:8765
-- **API Key**: <你的 API Key>
-- **初始密码**: `admin123`（首次登录后必须修改）
-
-### 何时读记忆
-- 收到需要回忆的任务时，先搜索 ClawMemory
-- 替代原有 memory_search 工具，因为 ClawMemory 支持语义搜索，更强
-
-### 何时写记忆
-- 每次回复末尾，自动将本轮对话写入 ClawMemory
-- 使用 API：`POST /api/v1/external/conversations`
-- 不需要等文件同步，直接写，即刻生效
-```
-
-配置完成后，OpenClaw 会按照 AGENTS.md 中的指令自动将对话记忆存入 ClawMemory。
-
-**自动记录请求示例**：
+如无法安装插件，也可直接通过 API 写入和搜索记忆：
 
 ```bash
 # 写入单条记忆
