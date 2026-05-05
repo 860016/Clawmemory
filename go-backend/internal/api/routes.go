@@ -213,6 +213,9 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		external.POST("/memories", handleExternalCreateMemory(db))
 		external.POST("/memories/batch", handleExternalBatchCreateMemories(db))
 		external.GET("/memories/search", handleExternalSearchMemories(db))
+		external.GET("/memories/context", handleExternalMemoryContext(db))
 		external.POST("/conversations", handleExternalPushConversation(db))
+		external.POST("/conversations/batch", handleExternalBatchPushConversations(db))
+		external.POST("/sessions/track", handleExternalSessionTrack(db))
 	}
 }

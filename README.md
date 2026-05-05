@@ -562,6 +562,10 @@ ClawMemory/                      # 安装根目录
 │   ├── clawmemory.exe          # 可执行文件
 │   ├── .env                    # 配置文件
 │   └── frontend_dist/          # 前端构建产物
+├── openclaw-plugin/             # OpenClaw Context Engine 插件
+│   ├── src/                    # 插件源码
+│   ├── package.json
+│   └── tsconfig.json
 ├── data/                        # 📌 统一数据目录
 │   ├── clawmemory.db           # 数据库
 │   ├── skills/                 # 技能插件目录
@@ -658,29 +662,45 @@ start.bat    # Windows
 
 ### 第四步：配置 OpenClaw 连接 ClawMemory
 
-安装 ClawMemory 后，需要在 OpenClaw 的 `AGENTS.md` 中添加 ClawMemory 指令，让 OpenClaw 自动将对话记忆存入 ClawMemory。
+**方式一：Context Engine 插件（推荐）**
 
-**方式一：使用安装脚本（推荐）**
+ClawMemory 提供了 OpenClaw Context Engine 插件，安装后自动实现：
+- ✅ 每轮对话自动写入 ClawMemory（ingestBatch）
+- ✅ 回复前自动检索相关记忆注入上下文（assemble）
+- ✅ 跨 session 关联记忆
+- ✅ 上下文压缩时同步到 ClawMemory（compact）
 
 ```bash
-# 进入 openclaw-hook 目录
-cd openclaw-hook
+# 1. 安装插件（ClawMemory 安装目录下的 openclaw-plugin/）
+openclaw plugins install -l ./openclaw-plugin
 
-# 设置 API Key 环境变量
-export CLAWMEMORY_API_KEY='cm你的密钥'   # Linux/macOS
-$env:CLAWMEMORY_API_KEY = 'cm你的密钥'   # Windows
-
-# 运行安装脚本
-bash setup.sh       # Linux/macOS
-pwsh -File setup.ps1  # Windows
+# 2. 在 openclaw.json 中配置
+# 将 contextEngine slot 指向 clawmemory，并填入 API Key
 ```
 
-脚本会自动将 ClawMemory 指令写入 OpenClaw 的 AGENTS.md 文件，包括：
-- 自动保存对话到 ClawMemory
-- 搜索记忆时优先查询 ClawMemory
-- 心跳时从文件提炼精华写入 ClawMemory
+在 `openclaw.json` 中添加：
+```json5
+{
+  plugins: {
+    slots: {
+      contextEngine: "clawmemory"
+    },
+    entries: {
+      clawmemory: {
+        enabled: true,
+        config: {
+          baseUrl: "http://localhost:8765",
+          apiKey: "cm_你的API密钥"
+        }
+      }
+    }
+  }
+}
+```
 
-**方式二：手动复制**
+**方式二：AGENTS.md 指令（备用方案）**
+
+如无法安装插件，可将 ClawMemory 指令写入 AGENTS.md：
 
 1. 登录 ClawMemory 网页 → 设置 → OpenClaw 连接
 2. 点击「复制 AGENTS.md」按钮

@@ -1,0 +1,20 @@
+{
+  "name": "openclaw-plugin-clawmemory",
+  "version": "1.0.0",
+  "description": "ClawMemory as OpenClaw's context engine - automatic conversation recording and memory retrieval",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": ["openclaw", "clawmemory", "context-engine", "memory"],
+  "author": "ClawMemory",
+  "license": "MIT",
+  "peerDependencies": {
+    "openclaw": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

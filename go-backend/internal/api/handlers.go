@@ -507,6 +507,126 @@ func handleExternalPushConversation(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+func handleExternalBatchPushConversations(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+
+		var req struct {
+			Turns []services.ConversationPushRequest `json:"turns" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if len(req.Turns) > 50 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "too many turns (max 50)"})
+			return
+		}
+
+		syncService := services.GetOpenClawSyncService(db)
+		totalCreated := 0
+		totalMessages := 0
+
+		for _, turn := range req.Turns {
+			if turn.AgentName == "" {
+				turn.AgentName = "openclaw"
+			}
+			created, err := syncService.PushConversation(userID, turn)
+			if err != nil {
+				continue
+			}
+			totalCreated += created
+			totalMessages += len(turn.Messages)
+		}
+
+		auditLog(db, c, "external.conversation_batch_push", "", fmt.Sprintf("turns:%d messages:%d created:%d", len(req.Turns), totalMessages, totalCreated))
+
+		c.JSON(http.StatusOK, gin.H{
+			"turns":    len(req.Turns),
+			"created":  totalCreated,
+			"messages": totalMessages,
+		})
+	}
+}
+
+func handleExternalMemoryContext(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		q := c.Query("q")
+		if q == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "q is required"})
+			return
+		}
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
+
+		svc := services.NewMemoryService(db)
+		memories, err := svc.SearchKeyword(userID, q, limit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var contextParts []string
+		for _, m := range memories {
+			if m.Key != "" && m.Value != "" {
+				contextParts = append(contextParts, fmt.Sprintf("- %s: %s", m.Key, m.Value))
+			}
+		}
+
+		systemPromptAddition := ""
+		if len(contextParts) > 0 {
+			systemPromptAddition = "\n\n[ClawMemory Relevant Memories]\n" + strings.Join(contextParts, "\n")
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"memories":               memories,
+			"count":                  len(memories),
+			"system_prompt_addition": systemPromptAddition,
+		})
+	}
+}
+
+func handleExternalSessionTrack(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+
+		var req struct {
+			SessionID string `json:"session_id" binding:"required"`
+			Metadata  string `json:"metadata"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var session models.SessionMemory
+		result := db.Where("user_id = ? AND session_id = ?", userID, req.SessionID).First(&session)
+		if result.Error == gorm.ErrRecordNotFound {
+			session = models.SessionMemory{
+				UserID:    userID,
+				SessionID: req.SessionID,
+				Title:     "OpenClaw Session",
+				Status:    "active",
+			}
+			if req.Metadata != "" {
+				session.CurrentState = req.Metadata
+			}
+			db.Create(&session)
+		} else {
+			if req.Metadata != "" {
+				db.Model(&session).Update("current_state", req.Metadata)
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"session_id": session.SessionID,
+			"status":     session.Status,
+			"tracked":    true,
+		})
+	}
+}
+
 func handleOpenClawSyncStatus(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		syncService := services.GetOpenClawSyncService(db)

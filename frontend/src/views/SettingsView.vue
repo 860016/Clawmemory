@@ -234,6 +234,17 @@
           <el-button size="small" @click="loadOpenClawStatus" :loading="openclawSyncLoading">{{ $t('settings.refresh') }}</el-button>
         </div>
         <div style="margin-top: 12px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
+          <div style="font-weight: 600; margin-bottom: 6px">🔌 {{ $t('settings.pluginInstallTitle') }}</div>
+          <div style="color: var(--cm-text-muted); margin-bottom: 8px">{{ $t('settings.pluginInstallDesc') }}</div>
+          <code style="display: block; padding: 8px; background: var(--cm-bg); border-radius: 4px; font-size: 11px; word-break: break-all; color: var(--cm-accent)">
+            openclaw plugins install -l ./openclaw-plugin
+          </code>
+          <div style="color: var(--cm-text-muted); margin-top: 8px; font-size: 11px">{{ $t('settings.pluginConfigHint') }}</div>
+          <code style="display: block; padding: 8px; background: var(--cm-bg); border-radius: 4px; font-size: 11px; word-break: break-all; color: var(--cm-accent); margin-top: 4px">
+            { "plugins": { "slots": { "contextEngine": "clawmemory" }, "entries": { "clawmemory": { "enabled": true, "config": { "baseUrl": "http://localhost:8765", "apiKey": "cm_..." } } } } }
+          </code>
+        </div>
+        <div style="margin-top: 12px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
           <div style="font-weight: 600; margin-bottom: 6px">{{ $t('settings.agentsMdTitle') }}</div>
           <div style="color: var(--cm-text-muted); margin-bottom: 8px">{{ $t('settings.agentsMdDesc') }}</div>
           <el-button size="small" type="primary" @click="copyAgentsMD" :loading="agentsMdLoading">{{ $t('settings.agentsMdCopy') }}</el-button>
