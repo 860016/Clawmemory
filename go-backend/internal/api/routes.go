@@ -217,5 +217,6 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		external.POST("/conversations", handleExternalPushConversation(db))
 		external.POST("/conversations/batch", handleExternalBatchPushConversations(db))
 		external.POST("/sessions/track", handleExternalSessionTrack(db))
+		external.POST("/session-memories", handleExternalCreateSessionMemory(db))
 	}
 }

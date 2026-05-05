@@ -466,6 +466,53 @@ func handleSearchKeyword(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+func handleExternalCreateSessionMemory(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		var data map[string]interface{}
+		if err := c.ShouldBindJSON(&data); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		sessionID, _ := data["session_id"].(string)
+		if sessionID == "" {
+			sessionID = "default"
+		}
+
+		session := models.SessionMemory{
+			UserID:       userID,
+			SessionID:    sessionID,
+			Title:        getString(data, "title", ""),
+			CurrentState: getString(data, "current_state", ""),
+			TaskSpec:     getString(data, "task_spec", ""),
+			Worklog:      getString(data, "worklog", ""),
+			Learnings:    getString(data, "learnings", ""),
+			KeyResults:   getString(data, "key_results", ""),
+			Docs:         getString(data, "docs", ""),
+			Errors:       getString(data, "errors", ""),
+			Workflow:     getString(data, "workflow", ""),
+			Status:       getString(data, "status", "active"),
+		}
+
+		if v, ok := data["token_count"].(float64); ok {
+			session.TokenCount = int(v)
+		}
+		if v, ok := data["compressed_from"].(string); ok {
+			session.CompressedFrom = v
+		}
+
+		if err := db.Create(&session).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		auditLog(db, c, "external.session_memory_create", sessionID, "")
+
+		c.JSON(http.StatusCreated, session)
+	}
+}
+
 func handleExternalPushConversation(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)

@@ -208,6 +208,17 @@ export = function register(api: OpenClawPluginApi): void {
           }],
         });
 
+        try {
+          await clawMemoryRequest("POST", "/session-memories", {
+            session_id: sessionId,
+            title: `[${message.role}] ${extractContent(message.content).slice(0, 100)}`,
+            current_state: extractContent(message.content),
+            worklog: `[${message.role}] ${extractContent(message.content)}`,
+          });
+        } catch (err) {
+          console.error("[ClawMemory] Write session memory failed:", err);
+        }
+
         return { ingested: true };
       },
 
@@ -224,6 +235,18 @@ export = function register(api: OpenClawPluginApi): void {
             content: extractContent(m.content),
           })),
         });
+
+        try {
+          const combined = messages.map(m => `[${m.role}] ${extractContent(m.content)}`).join("\n");
+          await clawMemoryRequest("POST", "/session-memories", {
+            session_id: sessionId,
+            title: combined.slice(0, 100),
+            current_state: combined,
+            worklog: combined,
+          });
+        } catch (err) {
+          console.error("[ClawMemory] Write session memory failed:", err);
+        }
 
         return { ingested: true };
       },
@@ -249,14 +272,14 @@ export = function register(api: OpenClawPluginApi): void {
             });
 
             try {
-              await clawMemoryRequest("POST", "/memories", {
-                key: `conv_${Date.now()}`,
-                value: `[${lastMsg.role}] ${extractContent(lastMsg.content)}`,
-                type: "conversation",
-                tags: ["conversation", sessionId],
+              await clawMemoryRequest("POST", "/session-memories", {
+                session_id: sessionId,
+                title: `[${lastMsg.role}] ${extractContent(lastMsg.content).slice(0, 100)}`,
+                current_state: extractContent(lastMsg.content),
+                worklog: `[${lastMsg.role}] ${extractContent(lastMsg.content)}`,
               });
             } catch (err) {
-              console.error("[ClawMemory] Write memory failed:", err);
+              console.error("[ClawMemory] Write session memory failed:", err);
             }
           }
         }
