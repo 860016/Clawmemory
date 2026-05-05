@@ -234,14 +234,29 @@ export = function register(api: OpenClawPluginApi): void {
       },
 
       async assemble({ sessionId, messages, tokenBudget }: AssembleParams) {
+        if (config.enableAutoIngest && messages.length > 0) {
+          const lastMsg = messages[messages.length - 1];
+          if (lastMsg) {
+            pushConversation({
+              session_id: sessionId,
+              agent_name: "openclaw",
+              messages: [{
+                role: lastMsg.role,
+                content: extractContent(lastMsg.content),
+              }],
+            }).catch((err) => {
+              console.error("[ClawMemory] Push in assemble failed:", err);
+            });
+          }
+        }
+
         const lastUserMsg = extractLastUserMessage(messages);
 
         let systemPromptAddition = "";
-        let contextMemories: unknown[] = [];
 
         if (lastUserMsg) {
           const queryWords = lastUserMsg.slice(0, 200);
-          contextMemories = await searchMemories(queryWords, config.maxContextMemories!);
+          const contextMemories = await searchMemories(queryWords, config.maxContextMemories!);
 
           if (Array.isArray(contextMemories) && contextMemories.length > 0) {
             const memoryLines: string[] = [];
