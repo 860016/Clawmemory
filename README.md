@@ -645,7 +645,7 @@ ClawMemory Pro 提供额外的 AI 增强功能，包括智能对话、Wiki 生�
 
 ### 下载 Pro
 
-前往 [ClawMemory Pro Releases](https://github.com/860016/ClawMemory-Pro/releases) 下载对应平台的安装包：
+前往 [ClawMemory Releases](https://github.com/860016/Clawmemory/releases/tag/v2.18.0) 下载对应平台的 Pro 安装包：
 
 | 平台 | 文件名 |
 |------|--------|
@@ -655,8 +655,6 @@ ClawMemory Pro 提供额外的 AI 增强功能，包括智能对话、Wiki 生�
 | Linux ARM | `clawmemory-pro-2.18.0-linux-arm64.tar.gz` |
 | macOS Intel | `clawmemory-pro-2.18.0-darwin-amd64.tar.gz` |
 | macOS Apple Silicon | `clawmemory-pro-2.18.0-darwin-arm64.tar.gz` |
-
-> ⚠️ Pro 仓库为私有仓库，需要登录 GitHub 账号后才能访问。
 
 ### 安装 Pro
 
