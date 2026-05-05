@@ -72,13 +72,6 @@ interface ClawMemoryConfig {
   enableAutoIngest?: boolean;
 }
 
-interface ConversationTurn {
-  session_id: string;
-  agent_name: string;
-  messages: Array<{ role: string; content: string }>;
-  summary?: string;
-}
-
 export = function register(api: OpenClawPluginApi): void {
   api.registerContextEngine("clawmemory", (ctx: PluginContext) => {
     const config: ClawMemoryConfig = {
@@ -117,6 +110,20 @@ export = function register(api: OpenClawPluginApi): void {
       return response.json();
     }
 
+    async function writeMemory(key: string, value: string): Promise<void> {
+      try {
+        await clawMemoryRequest("POST", "/memories", {
+          key,
+          value,
+          layer: "episodic",
+          source: "openclaw",
+          memory_type: "conversation",
+        });
+      } catch (err) {
+        console.error("[ClawMemory] Write memory failed:", err);
+      }
+    }
+
     async function searchMemories(query: string, limit: number): Promise<unknown[]> {
       try {
         const result = (await clawMemoryRequest(
@@ -130,14 +137,6 @@ export = function register(api: OpenClawPluginApi): void {
       } catch (err) {
         console.error("[ClawMemory] Search failed:", err);
         return [];
-      }
-    }
-
-    async function pushConversation(turn: ConversationTurn): Promise<void> {
-      try {
-        await clawMemoryRequest("POST", "/conversations", turn);
-      } catch (err) {
-        console.error("[ClawMemory] Push conversation failed:", err);
       }
     }
 
@@ -199,25 +198,10 @@ export = function register(api: OpenClawPluginApi): void {
           return { ingested: false };
         }
 
-        await pushConversation({
-          session_id: sessionId,
-          agent_name: "openclaw",
-          messages: [{
-            role: message.role,
-            content: extractContent(message.content),
-          }],
-        });
-
-        try {
-          await clawMemoryRequest("POST", "/session-memories", {
-            session_id: sessionId,
-            title: `[${message.role}] ${extractContent(message.content).slice(0, 100)}`,
-            current_state: extractContent(message.content),
-            worklog: `[${message.role}] ${extractContent(message.content)}`,
-          });
-        } catch (err) {
-          console.error("[ClawMemory] Write session memory failed:", err);
-        }
+        await writeMemory(
+          `${sessionId}_${message.role}_${Date.now()}`,
+          `[${message.role}] ${extractContent(message.content)}`
+        );
 
         return { ingested: true };
       },
@@ -227,26 +211,14 @@ export = function register(api: OpenClawPluginApi): void {
           return { ingested: false };
         }
 
-        await pushConversation({
-          session_id: sessionId,
-          agent_name: "openclaw",
-          messages: messages.map(m => ({
-            role: m.role,
-            content: extractContent(m.content),
-          })),
-        });
+        const combined = messages
+          .map(m => `[${m.role}] ${extractContent(m.content)}`)
+          .join("\n");
 
-        try {
-          const combined = messages.map(m => `[${m.role}] ${extractContent(m.content)}`).join("\n");
-          await clawMemoryRequest("POST", "/session-memories", {
-            session_id: sessionId,
-            title: combined.slice(0, 100),
-            current_state: combined,
-            worklog: combined,
-          });
-        } catch (err) {
-          console.error("[ClawMemory] Write session memory failed:", err);
-        }
+        await writeMemory(
+          `${sessionId}_batch_${Date.now()}`,
+          combined
+        );
 
         return { ingested: true };
       },
@@ -260,27 +232,12 @@ export = function register(api: OpenClawPluginApi): void {
         if (config.enableAutoIngest && messages.length > 0) {
           const lastMsg = messages[messages.length - 1];
           if (lastMsg) {
-            pushConversation({
-              session_id: sessionId,
-              agent_name: "openclaw",
-              messages: [{
-                role: lastMsg.role,
-                content: extractContent(lastMsg.content),
-              }],
-            }).catch((err) => {
-              console.error("[ClawMemory] Push in assemble failed:", err);
+            writeMemory(
+              `${sessionId}_${lastMsg.role}_${Date.now()}`,
+              `[${lastMsg.role}] ${extractContent(lastMsg.content)}`
+            ).catch((err) => {
+              console.error("[ClawMemory] Write memory in assemble failed:", err);
             });
-
-            try {
-              await clawMemoryRequest("POST", "/session-memories", {
-                session_id: sessionId,
-                title: `[${lastMsg.role}] ${extractContent(lastMsg.content).slice(0, 100)}`,
-                current_state: extractContent(lastMsg.content),
-                worklog: `[${lastMsg.role}] ${extractContent(lastMsg.content)}`,
-              });
-            } catch (err) {
-              console.error("[ClawMemory] Write session memory failed:", err);
-            }
           }
         }
 
@@ -319,17 +276,6 @@ export = function register(api: OpenClawPluginApi): void {
       },
 
       async compact({ sessionId, force }: CompactParams) {
-        try {
-          await pushConversation({
-            session_id: sessionId,
-            agent_name: "openclaw",
-            messages: [],
-            summary: `[compact] Session compacted at ${new Date().toISOString()} (force: ${force})`,
-          });
-        } catch {
-          // ignore
-        }
-
         return { ok: true, compacted: true };
       },
 
