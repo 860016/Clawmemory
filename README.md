@@ -347,8 +347,7 @@ ClawMemory Pro 提供高级 AI 功能和增强管理能力，适合需要深度�
 
 ### 获取 Pro 授权
 
-1. 访问 [ClawMemory GitHub](https://github.com/860016/Clawmemory) 获取 Pro 授权密钥
-2. 授权密钥格式：`CM-PRO-XXXX-XXXX-XXXX-XXXX`
+访问 [ClawMemory GitHub](https://github.com/860016/Clawmemory) 获取 Pro 授权。
 
 ### 安装 Pro 版本
 
@@ -414,7 +413,7 @@ chmod +x go-backend/clawmemory
 curl -X POST http://localhost:8765/api/v1/license/activate \
   -H "Authorization: Bearer <your-jwt-token>" \
   -H "Content-Type: application/json" \
-  -d '{"license_key": "CM-PRO-XXXX-XXXX-XXXX-XXXX"}'
+  -d '{"license_key": "YOUR_LICENSE_KEY"}'
 ```
 
 ### Pro 授权状态
