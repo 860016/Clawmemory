@@ -75,7 +75,7 @@ interface ClawMemoryConfig {
 interface ConversationTurn {
   session_id: string;
   agent_name: string;
-  messages: Message[];
+  messages: Array<{ role: string; content: string }>;
   summary?: string;
 }
 
@@ -91,8 +91,6 @@ export = function register(api: OpenClawPluginApi): void {
     if (!config.apiKey) {
       console.warn("[ClawMemory] No API key configured. Set clawmemory.apiKey in plugin config.");
     }
-
-    const pendingTurns: Map<string, Message[]> = new Map();
 
     async function clawMemoryRequest(
       method: string,
@@ -140,14 +138,6 @@ export = function register(api: OpenClawPluginApi): void {
         await clawMemoryRequest("POST", "/conversations", turn);
       } catch (err) {
         console.error("[ClawMemory] Push conversation failed:", err);
-      }
-    }
-
-    async function batchPushConversations(turns: ConversationTurn[]): Promise<void> {
-      try {
-        await clawMemoryRequest("POST", "/conversations/batch", { turns });
-      } catch (err) {
-        console.error("[ClawMemory] Batch push failed:", err);
       }
     }
 
@@ -209,14 +199,13 @@ export = function register(api: OpenClawPluginApi): void {
           return { ingested: false };
         }
 
-        if (!pendingTurns.has(sessionId)) {
-          pendingTurns.set(sessionId, []);
-        }
-        pendingTurns.get(sessionId)!.push({
-          role: message.role,
-          content: extractContent(message.content),
-          timestamp: message.timestamp,
-          metadata: message.metadata,
+        await pushConversation({
+          session_id: sessionId,
+          agent_name: "openclaw",
+          messages: [{
+            role: message.role,
+            content: extractContent(message.content),
+          }],
         });
 
         return { ingested: true };
@@ -227,37 +216,20 @@ export = function register(api: OpenClawPluginApi): void {
           return { ingested: false };
         }
 
-        if (!pendingTurns.has(sessionId)) {
-          pendingTurns.set(sessionId, []);
-        }
-        const pending = pendingTurns.get(sessionId)!;
-        for (const msg of messages) {
-          pending.push({
-            role: msg.role,
-            content: extractContent(msg.content),
-            timestamp: msg.timestamp,
-            metadata: msg.metadata,
-          });
-        }
+        await pushConversation({
+          session_id: sessionId,
+          agent_name: "openclaw",
+          messages: messages.map(m => ({
+            role: m.role,
+            content: extractContent(m.content),
+          })),
+        });
 
         return { ingested: true };
       },
 
       async afterTurn({ sessionId }: AfterTurnParams) {
-        const pending = pendingTurns.get(sessionId);
-        if (pending && pending.length > 0) {
-          const turn: ConversationTurn = {
-            session_id: sessionId,
-            agent_name: "openclaw",
-            messages: pending,
-          };
-
-          await pushConversation(turn);
-          pendingTurns.delete(sessionId);
-        }
-
         await trackSession(sessionId, `last_active:${new Date().toISOString()}`);
-
         return { ok: true };
       },
 
@@ -313,20 +285,7 @@ export = function register(api: OpenClawPluginApi): void {
       },
 
       async dispose() {
-        for (const [sessionId, messages] of pendingTurns) {
-          if (messages.length > 0) {
-            try {
-              await pushConversation({
-                session_id: sessionId,
-                agent_name: "openclaw",
-                messages,
-              });
-            } catch {
-              // ignore
-            }
-          }
-        }
-        pendingTurns.clear();
+        // no pending state to flush
       },
     };
   });
