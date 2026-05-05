@@ -247,6 +247,17 @@ export = function register(api: OpenClawPluginApi): void {
             }).catch((err) => {
               console.error("[ClawMemory] Push in assemble failed:", err);
             });
+
+            try {
+              await clawMemoryRequest("POST", "/memories", {
+                key: `conv_${Date.now()}`,
+                value: `[${lastMsg.role}] ${extractContent(lastMsg.content)}`,
+                type: "conversation",
+                tags: ["conversation", sessionId],
+              });
+            } catch (err) {
+              console.error("[ClawMemory] Write memory failed:", err);
+            }
           }
         }
 
