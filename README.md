@@ -311,7 +311,130 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 
 ## 📄 许可证
 
-MIT License
+ClawMemory 采用 **双许可证** 模式：
+
+| 组件 | 许可证 | 说明 |
+|------|--------|------|
+| OSS 核心 | MIT License | 自由使用、修改、分发 |
+| Pro 功能 | Commercial License | 需要购买授权密钥 |
+
+**OSS 核心功能**（MIT）包括：记忆管理、知识图谱基础版、Wiki、项目管理、日报、AI 基础提取（NVIDIA NIM 免费模型）、OpenClaw 集成、备份还原、API Key 管理等。
+
+**Pro 功能**（商业授权）包括：AI 高级功能（冲突扫描、Wiki 生成、记忆压缩、关系发现、智能路由、衰减评估）、Pro 衰减管理、Pro 知识图谱增强、Pro 备份调度、Pro 记忆压缩等。
+
+> 💡 Pro 功能的源代码不在本仓库中，仅以编译后的二进制形式分发。获取 Pro 授权请访问 [GitHub](https://github.com/860016/Clawmemory)。
+
+---
+
+## ⭐ Pro 版本
+
+ClawMemory Pro 提供高级 AI 功能和增强管理能力，适合需要深度记忆分析和自动化的用户。
+
+### Pro 功能列表
+
+| 功能 | 说明 |
+|------|------|
+| **AI 冲突扫描** | 自动检测记忆矛盾，提示确认正确信息 |
+| **AI Wiki 生成** | 根据记忆自动生成结构化 Wiki 页面 |
+| **AI 记忆压缩** | 智能合并冗余记忆，释放存储空间 |
+| **AI 关系发现** | 自动发现记忆间的隐藏关联 |
+| **AI 智能路由** | 根据任务复杂度自动选择最优 AI 模型 |
+| **AI 衰减评估** | 智能评估记忆重要性，优化衰减策略 |
+| **Pro 衰减管理** | 高级衰减统计、批量应用、智能强化 |
+| **Pro 知识图谱增强** | 自动图谱构建、演化洞察、推理发现 |
+| **Pro 备份调度** | 定时自动备份，可配置间隔和策略 |
+| **Pro 记忆压缩** | 预览压缩效果、多级压缩、自动压缩配置 |
+
+### 获取 Pro 授权
+
+1. 访问 [ClawMemory GitHub](https://github.com/860016/Clawmemory) 获取 Pro 授权密钥
+2. 授权密钥格式：`CM-PRO-XXXX-XXXX-XXXX-XXXX`
+
+### 安装 Pro 版本
+
+Pro 版本以编译后的二进制文件分发，替换 OSS 版本的可执行文件即可：
+
+#### 第一步：下载 Pro 二进制
+
+从发布页面下载对应平台的 Pro 版本：
+
+| 平台 | 文件名 |
+|------|--------|
+| Windows x64 | `clawmemory-pro-windows-amd64.zip` |
+| Windows ARM | `clawmemory-pro-windows-arm64.zip` |
+| Linux x64 | `clawmemory-pro-linux-amd64.tar.gz` |
+| Linux ARM | `clawmemory-pro-linux-arm64.tar.gz` |
+| macOS x64 | `clawmemory-pro-darwin-amd64.tar.gz` |
+| macOS ARM | `clawmemory-pro-darwin-arm64.tar.gz` |
+
+#### 第二步：替换可执行文件
+
+**Windows**:
+```powershell
+# 停止当前服务
+stop.bat
+
+# 备份原文件
+copy go-backend\clawmemory.exe go-backend\clawmemory-oss-backup.exe
+
+# 解压并替换
+# 将下载的 clawmemory-pro.exe 重命名为 clawmemory.exe
+# 复制到 go-backend\ 目录下
+
+# 启动服务
+start.bat
+```
+
+**Linux / macOS**:
+```bash
+# 停止当前服务
+./stop.sh
+
+# 备份原文件
+cp go-backend/clawmemory go-backend/clawmemory-oss-backup
+
+# 解压并替换
+# 将下载的 clawmemory-pro 重命名为 clawmemory
+# 复制到 go-backend/ 目录下
+chmod +x go-backend/clawmemory
+
+# 启动服务
+./start.sh
+```
+
+#### 第三步：激活 Pro 授权
+
+1. 启动 ClawMemory 后，访问 `http://localhost:8765`
+2. 进入 **设置 → Pro 授权**
+3. 输入授权密钥，点击「激活」
+4. 激活成功后，Pro 功能自动解锁
+
+也可以通过 API 激活：
+```bash
+curl -X POST http://localhost:8765/api/v1/license/activate \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"license_key": "CM-PRO-XXXX-XXXX-XXXX-XXXX"}'
+```
+
+### Pro 授权状态
+
+| API | 说明 |
+|-----|------|
+| `GET /api/v1/license/info` | 查看授权状态 |
+| `POST /api/v1/license/activate` | 激活授权 |
+| `POST /api/v1/license/deactivate` | 停用授权 |
+
+### 常见问题
+
+**Q: Pro 授权过期后会怎样？**
+A: 授权过期后，Pro 功能将不可用，但 OSS 核心功能不受影响。所有数据保留，续费后 Pro 功能自动恢复。
+
+**Q: 可以在多台设备上使用同一个授权密钥吗？**
+A: 每个授权密钥仅限一台设备使用。如需多设备授权，请联系获取多设备许可证。
+
+**Q: 如何从 Pro 版本回退到 OSS 版本？**
+A: 将备份的 `clawmemory-oss-backup` 文件恢复为 `clawmemory` 即可。数据完全兼容，无需迁移。
 
 ---
 
