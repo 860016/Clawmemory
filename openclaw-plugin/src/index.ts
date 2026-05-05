@@ -28,7 +28,7 @@ interface CompactParams {
 
 interface Message {
   role: "user" | "assistant" | "system";
-  content: string;
+  content: string | Record<string, unknown> | unknown[];
   timestamp?: string;
   metadata?: Record<string, unknown>;
 }
@@ -124,8 +124,11 @@ export = function register(api: OpenClawPluginApi): void {
         const result = (await clawMemoryRequest(
           "GET",
           `/memories/context?q=${encodeURIComponent(query)}&limit=${limit}`
-        )) as { memories?: unknown[]; count?: number };
-        return result.memories || [];
+        )) as Record<string, unknown>;
+        if (result && Array.isArray(result.memories)) {
+          return result.memories;
+        }
+        return [];
       } catch (err) {
         console.error("[ClawMemory] Search failed:", err);
         return [];
@@ -163,10 +166,32 @@ export = function register(api: OpenClawPluginApi): void {
       return Math.ceil(text.length / 4);
     }
 
+    function extractContent(content: unknown): string {
+      if (typeof content === "string") {
+        return content;
+      }
+      if (Array.isArray(content)) {
+        return content
+          .map((part: unknown) => {
+            if (typeof part === "string") return part;
+            if (part && typeof part === "object" && "text" in (part as Record<string, unknown>)) {
+              return String((part as Record<string, unknown>).text);
+            }
+            return "";
+          })
+          .filter(Boolean)
+          .join(" ");
+      }
+      if (content && typeof content === "object" && "text" in (content as Record<string, unknown>)) {
+        return String((content as Record<string, unknown>).text);
+      }
+      return "";
+    }
+
     function extractLastUserMessage(messages: Message[]): string {
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i].role === "user") {
-          return messages[i].content;
+          return extractContent(messages[i].content);
         }
       }
       return "";
@@ -187,7 +212,12 @@ export = function register(api: OpenClawPluginApi): void {
         if (!pendingTurns.has(sessionId)) {
           pendingTurns.set(sessionId, []);
         }
-        pendingTurns.get(sessionId)!.push(message);
+        pendingTurns.get(sessionId)!.push({
+          role: message.role,
+          content: extractContent(message.content),
+          timestamp: message.timestamp,
+          metadata: message.metadata,
+        });
 
         return { ingested: true };
       },
@@ -197,13 +227,19 @@ export = function register(api: OpenClawPluginApi): void {
           return { ingested: false };
         }
 
-        const turn: ConversationTurn = {
-          session_id: sessionId,
-          agent_name: "openclaw",
-          messages,
-        };
+        if (!pendingTurns.has(sessionId)) {
+          pendingTurns.set(sessionId, []);
+        }
+        const pending = pendingTurns.get(sessionId)!;
+        for (const msg of messages) {
+          pending.push({
+            role: msg.role,
+            content: extractContent(msg.content),
+            timestamp: msg.timestamp,
+            metadata: msg.metadata,
+          });
+        }
 
-        await pushConversation(turn);
         return { ingested: true };
       },
 
@@ -235,7 +271,7 @@ export = function register(api: OpenClawPluginApi): void {
           const queryWords = lastUserMsg.slice(0, 200);
           contextMemories = await searchMemories(queryWords, config.maxContextMemories!);
 
-          if (contextMemories.length > 0) {
+          if (Array.isArray(contextMemories) && contextMemories.length > 0) {
             const memoryLines: string[] = [];
             for (const m of contextMemories as Array<{ key?: string; value?: string }>) {
               if (m.key && m.value) {
@@ -252,7 +288,7 @@ export = function register(api: OpenClawPluginApi): void {
 
         const totalTokens =
           estimateTokens(systemPromptAddition) +
-          messages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
+          messages.reduce((sum, m) => sum + estimateTokens(extractContent(m.content)), 0);
 
         return {
           messages,
