@@ -69,8 +69,6 @@ export default {
     forgotStep2Title: 'Set New Password',
     forgotStep2Desc: 'Enter a new password to reset. You can login with the new password after reset:',
     newPasswordPlaceholder: 'Enter new password (min 4 chars)',
-    usernamePlaceholder: 'Enter username (default: admin)',
-    usernameRequired: 'Username is required',
     cliResetHint: 'You can also reset password via terminal command:',
   },
   dashboard: {

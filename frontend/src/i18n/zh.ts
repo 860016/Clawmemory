@@ -69,8 +69,6 @@ export default {
     forgotStep2Title: '设置新密码',
     forgotStep2Desc: '输入新密码即可重置，重置后可使用新密码登录：',
     newPasswordPlaceholder: '输入新密码（至少4位）',
-    usernamePlaceholder: '输入用户名（默认 admin）',
-    usernameRequired: '请输入用户名',
     cliResetHint: '也可以通过终端命令重置密码：',
   },
   dashboard: {

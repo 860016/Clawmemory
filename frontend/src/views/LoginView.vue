@@ -61,7 +61,6 @@
           <p style="margin: 8px 0 0; font-size: 13px; color: var(--cm-text-muted)">{{ $t('login.forgotStep2Desc') }}</p>
         </el-alert>
         <div class="reset-token-section">
-          <el-input v-model="forgotUsername" :placeholder="$t('login.usernamePlaceholder')" size="large" style="margin-bottom: 12px" />
           <el-input v-model="newPassword" type="password" show-password :placeholder="$t('login.newPasswordPlaceholder')" size="large" />
           <el-button type="primary" @click="handleResetPassword" :loading="loading" size="large" style="margin-top: 12px; width: 100%">
             {{ $t('login.resetPassword') }}
@@ -69,7 +68,12 @@
         </div>
         <div class="cli-hint">
           <p>{{ $t('login.cliResetHint') }}</p>
-          <code>{{ cliCommand }}</code>
+          <div class="cli-commands">
+            <div class="cli-platform">Windows:</div>
+            <code>clawmemory.exe --reset-password NEW_PASSWORD</code>
+            <div class="cli-platform">Linux/macOS:</div>
+            <code>./clawmemory --reset-password NEW_PASSWORD</code>
+          </div>
         </div>
       </div>
       <div v-else class="reset-success-box">
@@ -77,7 +81,7 @@
         <p style="margin: 12px 0 0; color: var(--cm-text); font-weight: 600">{{ resetMessage }}</p>
       </div>
       <template #footer>
-        <el-button @click="showForgotDialog = false; resetMessage = ''; newPassword = ''; forgotUsername = 'admin'">{{ $t('common.cancel') }}</el-button>
+        <el-button @click="showForgotDialog = false; resetMessage = ''; newPassword = ''">{{ $t('common.cancel') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -101,8 +105,6 @@ const passwordSet = ref(true)
 const resetMessage = ref('')
 const showForgotDialog = ref(false)
 const newPassword = ref('')
-const forgotUsername = ref('admin')
-const cliCommand = ref(navigator.platform.toLowerCase().includes('win') ? 'clawmemory.exe --reset-password NEW_PASSWORD' : './clawmemory --reset-password NEW_PASSWORD')
 
 onMounted(async () => {
   try {
@@ -165,17 +167,13 @@ async function handleSetPassword() {
 }
 
 async function handleResetPassword() {
-  if (!forgotUsername.value) {
-    ElMessage.warning(t('login.usernameRequired'))
-    return
-  }
   if (!newPassword.value || newPassword.value.length < 4) {
     ElMessage.warning(t('login.passwordTooShort'))
     return
   }
   loading.value = true
   try {
-    await axios.post('/auth/forgot-password', { username: forgotUsername.value, new_password: newPassword.value, confirm: true })
+    await axios.post('/auth/forgot-password', { username: 'admin', new_password: newPassword.value, confirm: true })
     resetMessage.value = t('login.resetSuccess')
     password.value = newPassword.value
   } catch (e: any) {
@@ -358,7 +356,20 @@ async function handleResetPassword() {
 }
 .cli-hint p {
   color: var(--cm-text-muted);
-  margin: 0 0 6px;
+  margin: 0 0 8px;
+}
+.cli-commands {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cli-platform {
+  color: var(--cm-text-muted);
+  font-size: 11px;
+  margin-top: 6px;
+}
+.cli-platform:first-child {
+  margin-top: 0;
 }
 .cli-hint code {
   display: block;
@@ -366,7 +377,7 @@ async function handleResetPassword() {
   background: rgba(var(--cm-primary-rgb), 0.06);
   border-radius: 4px;
   font-family: monospace;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--cm-text);
   user-select: all;
   word-break: break-all;
