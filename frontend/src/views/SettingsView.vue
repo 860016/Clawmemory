@@ -118,6 +118,13 @@
       <!-- 安全设置 -->
       <div class="settings-card" :class="{ 'section-highlight': activeSection === 'security' }" id="settings-security">
         <div class="card-title">◇ {{ $t('settings.security') }}</div>
+        <div class="setting-item">
+          <span>{{ $t('settings.password') }}</span>
+          <el-button size="small" @click="showPasswordDialog = true">
+            {{ passwordSet ? $t('settings.changePassword') : $t('settings.setPassword') }}
+          </el-button>
+        </div>
+      </div>
 
       <!-- Dialectic Reasoning -->
       <div class="settings-card" id="settings-reasoning">
@@ -142,7 +149,7 @@
         </div>
         <div class="setting-item" v-if="reasoningConfig">
           <span>{{ $t('settings.reasoningApiKey') }}</span>
-          <el-input v-model="reasoningForm.api_key" type="password" show-password style="width: 200px" :placeholder="$t('settings.reasoningApiKeyPlaceholder')" />
+          <el-input v-model="reasoningForm.api_key" type="password" show-password style="width: 200px" :placeholder="reasoningHasKey ? $t('settings.reasoningApiKeySet') : $t('settings.reasoningApiKeyPlaceholder')" />
         </div>
         <div class="setting-item" v-if="reasoningConfig && reasoningForm.provider === 'custom'">
           <span>{{ $t('settings.reasoningBaseUrl') }}</span>
@@ -181,13 +188,6 @@
         <div class="reasoning-hint" v-if="reasoningConfig" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px; color: var(--cm-text-muted)">
           <div style="font-weight: 600; margin-bottom: 4px">{{ $t('settings.reasoningHint') }}</div>
           <div>{{ $t('settings.reasoningHintDesc') }}</div>
-        </div>
-      </div>
-        <div class="setting-item">
-          <span>{{ $t('settings.password') }}</span>
-          <el-button size="small" @click="showPasswordDialog = true">
-            {{ passwordSet ? $t('settings.changePassword') : $t('settings.setPassword') }}
-          </el-button>
         </div>
       </div>
 
@@ -640,6 +640,7 @@ const reasoningSaving = ref(false)
 const reasoningTesting = ref(false)
 const reasoningTestResult = ref<any>(null)
 const reasoningEnabled = ref(false)
+const reasoningHasKey = ref(false)
 const reasoningForm = ref<any>({
   provider: 'openai',
   model: '',
@@ -1031,10 +1032,11 @@ async function loadReasoningConfig() {
     const { data } = await reasoningApi.getConfig()
     reasoningConfig.value = data
     reasoningEnabled.value = data.enabled || false
+    reasoningHasKey.value = data.has_api_key || false
     reasoningForm.value = {
       provider: data.provider || 'openai',
       model: data.model || '',
-      api_key: data.api_key || '',
+      api_key: '',
       base_url: data.base_url || '',
       dialectic_depth: data.dialectic_depth || 1,
       reasoning_level: data.reasoning_level || 'medium',
@@ -1073,7 +1075,11 @@ function onReasoningProviderChange() {
 async function saveReasoningConfig() {
   reasoningSaving.value = true
   try {
-    await reasoningApi.updateConfig(reasoningForm.value)
+    const payload: Record<string, any> = { ...reasoningForm.value }
+    if (!payload.api_key) {
+      delete payload.api_key
+    }
+    await reasoningApi.updateConfig(payload)
     ElMessage.success(t('common.success'))
     await loadReasoningConfig()
   } catch (e: any) {

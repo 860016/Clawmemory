@@ -66,7 +66,7 @@ if ($Upgrade) { Write-Info "模式: 升级 (保留配置和数据)" }
 if ($AutoStart) { Write-Info "自动启动: 是" }
 Write-Host ""
 
-$totalSteps = 5
+$totalSteps = 7
 
 Write-Step 1 $totalSteps "检查环境依赖..."
 Write-Host ""
@@ -171,7 +171,21 @@ try {
 
 Set-Location "$InstallDir"
 
-Write-Step 3 $totalSteps "配置环境..."
+if ($HasNode -and (Test-Path "$InstallDir\mcp-server")) {
+    Write-Step 4 $totalSteps "构建 MCP Server..."
+    Write-Host ""
+    Set-Location "$InstallDir\mcp-server"
+    try {
+        npm install --silent 2>$null
+        npm run build 2>$null
+        Write-Success "MCP Server 构建成功"
+    } catch {
+        Write-Warning "MCP Server 构建失败（可选，不影响主功能）"
+    }
+    Set-Location "$InstallDir"
+}
+
+Write-Step 5 $totalSteps "配置环境..."
 Write-Host ""
 
 if (-not (Test-Path $EnvFile)) {
@@ -212,7 +226,7 @@ foreach ($dir in $dirsToCreate) {
     Write-Success "$($dir.Name): $($dir.Path)"
 }
 
-Write-Step 4 $totalSteps "生成启动脚本..."
+Write-Step 6 $totalSteps "生成启动脚本..."
 Write-Host ""
 
 $startBatContent = @"
@@ -253,7 +267,7 @@ Set-Content -Path "$InstallDir\stop.bat" -Value $stopBatContent -Encoding ASCII
 Write-Success "start.bat - 启动脚本已生成"
 Write-Success "stop.bat  - 停止脚本已生成"
 
-Write-Step 5 $totalSteps "验证安装..."
+Write-Step 7 $totalSteps "验证安装..."
 Write-Host ""
 
 $checks = @(

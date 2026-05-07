@@ -178,7 +178,19 @@ fi
 
 cd "$INSTALL_DIR"
 
-print_step 3 "配置环境..."
+if [ "$HAS_NODE" = true ] && [ -d "$INSTALL_DIR/mcp-server" ]; then
+    print_step 3 "构建 MCP Server..."
+    echo ""
+    cd "$INSTALL_DIR/mcp-server"
+    if npm install --silent 2>&1 && npm run build 2>&1; then
+        print_success "MCP Server 构建成功"
+    else
+        print_warning "MCP Server 构建失败（可选，不影响主功能）"
+    fi
+    cd "$INSTALL_DIR"
+fi
+
+print_step 5 "配置环境..."
 echo ""
 
 if [ ! -f "$ENV_FILE" ]; then
@@ -216,7 +228,7 @@ create_dir "$BACKUPS_DIR" "备份目录"
 create_dir "$DATA_DIR/keys" "密钥目录"
 create_dir "$DATA_DIR/uploads" "上传目录"
 
-print_step 4 "生成启动脚本..."
+print_step 6 "生成启动脚本..."
 echo ""
 
 cat > "$INSTALL_DIR/start.sh" << EOF
@@ -245,7 +257,7 @@ chmod +x "$INSTALL_DIR/stop.sh"
 print_success "start.sh - 启动脚本已生成"
 print_success "stop.sh  - 停止脚本已生成"
 
-print_step 5 "验证安装..."
+print_step 7 "验证安装..."
 echo ""
 
 check_file() {

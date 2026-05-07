@@ -627,6 +627,7 @@ export default {
     reasoningModelPlaceholder: '如：gpt-4o-mini、llama3、deepseek-chat',
     reasoningApiKey: 'API Key',
     reasoningApiKeyPlaceholder: '输入 API Key（Ollama 可留空）',
+    reasoningApiKeySet: '已设置，留空保持不变',
     reasoningBaseUrl: 'Base URL',
     reasoningDepth: '推理深度',
     reasoningLevel: '推理级别',

@@ -627,6 +627,7 @@ export default {
     reasoningModelPlaceholder: 'e.g., gpt-4o-mini, llama3, deepseek-chat',
     reasoningApiKey: 'API Key',
     reasoningApiKeyPlaceholder: 'Enter API Key (leave empty for Ollama)',
+    reasoningApiKeySet: 'Already set, leave empty to keep',
     reasoningBaseUrl: 'Base URL',
     reasoningDepth: 'Reasoning Depth',
     reasoningLevel: 'Reasoning Level',

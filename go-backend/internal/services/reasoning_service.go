@@ -76,7 +76,7 @@ func (s *ReasoningService) SetConfig(userID uint, data map[string]interface{}) (
 	if v, ok := data["model"].(string); ok && v != "" {
 		updates["model"] = v
 	}
-	if v, ok := data["api_key"].(string); ok {
+	if v, ok := data["api_key"].(string); ok && v != "" {
 		updates["api_key"] = v
 	}
 	if v, ok := data["base_url"].(string); ok {
