@@ -155,6 +155,11 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.POST("/chromadb/install", handleChromaDBInstall(db))
 		authorized.POST("/chromadb/sync", handleChromaDBSync(db))
 
+		authorized.GET("/reasoning/config", handleGetReasoningConfig(db))
+		authorized.PUT("/reasoning/config", handleSetReasoningConfig(db))
+		authorized.POST("/reasoning/test", handleTestReasoningConnection(db))
+		authorized.POST("/reasoning/execute", handleReason(db))
+
 		authorized.GET("/backups", handleListBackups)
 		authorized.POST("/backups", handleCreateBackup)
 		authorized.GET("/backups/:filename", handleDownloadBackup(db))
@@ -218,5 +223,6 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		external.POST("/conversations/batch", handleExternalBatchPushConversations(db))
 		external.POST("/sessions/track", handleExternalSessionTrack(db))
 		external.POST("/session-memories", handleExternalCreateSessionMemory(db))
+		external.POST("/reason", handleExternalReason(db))
 	}
 }

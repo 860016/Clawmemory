@@ -1,4 +1,4 @@
-# ClawMemory v2.18.0 — AI 记忆管理中枢
+# ClawMemory v2.19.0 — AI 记忆管理中枢
 
 **ClawMemory** 是一款为 AI 助手设计的**长期记忆管理系统**。它让 AI 能够"记住"过去的对话、知识和上下文，实现跨会话的智能记忆检索与关联。
 
@@ -133,6 +133,10 @@ clawmemory/
 │   │   ├── DailyReportViewV2.vue
 │   │   └── MainLayout.vue
 │   └── src/styles/           # 设计系统
+├── mcp-server/               # MCP Server (TypeScript)
+│   └── src/                  # 6 个 MCP Tools
+├── openclaw-plugin/          # OpenClaw Context Engine 插件
+├── hermes-plugin/            # Hermes Agent Memory Provider (Python)
 ├── install.sh / install.ps1  # 一键安装脚本
 └── README.md
 ```
@@ -221,6 +225,17 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - `POST /api/v1/external/memories` - 写入单条记忆
 - `POST /api/v1/external/memories/batch` - 批量写入记忆
 - `GET /api/v1/external/memories/search?q=keyword` - 搜索记忆
+- `GET /api/v1/external/memories/context?q=keyword` - 获取上下文
+- `POST /api/v1/external/conversations` - 推送对话
+- `POST /api/v1/external/conversations/batch` - 批量推送对话
+- `POST /api/v1/external/sessions/track` - 跟踪会话
+- `POST /api/v1/external/reason` - Dialectic Reasoning 推理
+
+### 推理配置（需 JWT 认证）
+- `GET /api/v1/reasoning/config` - 获取推理配置
+- `PUT /api/v1/reasoning/config` - 更新推理配置
+- `POST /api/v1/reasoning/test` - 测试推理模型连接
+- `POST /api/v1/reasoning/execute` - 执行推理
 
 ### OpenClaw 自动同步
 - `GET /api/v1/openclaw-sync/status` - 同步状态
@@ -231,6 +246,19 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 ---
 
 ## 📝 更新日志
+
+### v2.19.0 (2026-05-08)
+- 🔮 新增：Dialectic Reasoning 多轮推理引擎（用户自带 AI 模型，零额外费用）
+- 🔮 新增：推理配置 UI（设置 → Dialectic Reasoning，支持 OpenAI/Ollama/DeepSeek/自定义）
+- 🔮 新增：推理 API 端点（`POST /api/v1/external/reason`、`POST /api/v1/reasoning/execute`）
+- 🔌 新增：MCP Server（支持 Trae/Claude Desktop/Cursor/Windsurf/Codex 等 MCP 兼容工具）
+- 🔌 新增：6 个 MCP Tools（memory_save/search/context/reason/conclude/push_conversation）
+- 🐍 新增：Hermes Agent Memory Provider Plugin（Python，支持 4 种会话策略）
+- 🏷️ 新增：Platform 多平台追踪（X-Platform Header，区分记忆来源）
+- 🧹 改进：OpenClaw 插件噪声过滤（自动跳过"ok"、"好的"等无意义内容）
+- 🧹 改进：OpenClaw 插件 afterTurn 推理触发（按间隔自动调用 Dialectic Reasoning）
+- 🧹 改进：MemoryService.Create 支持 Platform 字段
+- 🧹 改进：ToMemoryModel 映射 Platform 字段
 
 ### v2.18.0 (2026-05-04)
 - 🔗 新增：AGENTS.md 指令集成，安装时自动写入 OpenClaw AGENTS.md

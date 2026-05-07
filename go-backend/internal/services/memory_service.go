@@ -15,26 +15,27 @@ type MemoryService struct {
 
 // MemoryModel 用于返回的记忆模型
 type MemoryModel struct {
-	ID              uint       `json:"id"`
-	UserID          uint       `json:"user_id"`
-	Layer           string     `json:"layer"`
-	Key             string     `json:"key"`
-	Value           string     `json:"value"`
-	Summary         string     `json:"summary"`
-	Importance      float64    `json:"importance"`
-	AccessCount     int        `json:"access_count"`
-	LastAccessedAt  *time.Time `json:"last_accessed_at"`
-	IsEncrypted     bool       `json:"is_encrypted"`
-	Tags            []string   `json:"tags"`
-	Source          string     `json:"source"`
-	Status          string     `json:"status"`
-	TrashedAt       *time.Time `json:"trashed_at"`
-	DecayStage      int        `json:"decay_stage"`
-	ReinforceCount  int        `json:"reinforce_count"`
-	MemoryType      string     `json:"memory_type"`
-	VerifiedAt      *time.Time `json:"verified_at"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ID             uint       `json:"id"`
+	UserID         uint       `json:"user_id"`
+	Layer          string     `json:"layer"`
+	Key            string     `json:"key"`
+	Value          string     `json:"value"`
+	Summary        string     `json:"summary"`
+	Importance     float64    `json:"importance"`
+	AccessCount    int        `json:"access_count"`
+	LastAccessedAt *time.Time `json:"last_accessed_at"`
+	IsEncrypted    bool       `json:"is_encrypted"`
+	Tags           []string   `json:"tags"`
+	Source         string     `json:"source"`
+	Platform       string     `json:"platform"`
+	Status         string     `json:"status"`
+	TrashedAt      *time.Time `json:"trashed_at"`
+	DecayStage     int        `json:"decay_stage"`
+	ReinforceCount int        `json:"reinforce_count"`
+	MemoryType     string     `json:"memory_type"`
+	VerifiedAt     *time.Time `json:"verified_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 func NewMemoryService(db *gorm.DB) *MemoryService {
@@ -61,6 +62,7 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 		Tags:        tags,
 		Summary:     generateSummary(getString(data, "key", ""), getString(data, "value", "")),
 		Source:      getString(data, "source", "manual"),
+		Platform:    getString(data, "platform", "openclaw"),
 		MemoryType:  getString(data, "memory_type", "knowledge"),
 		IsEncrypted: getBool(data, "is_encrypted", false),
 		Status:      "active",
@@ -197,25 +199,26 @@ func ToMemoryModel(m *models.Memory) *MemoryModel {
 		tags = []string{}
 	}
 	return &MemoryModel{
-		ID:              m.ID,
-		UserID:          m.UserID,
-		Layer:           m.Layer,
-		Key:             m.Key,
-		Value:           m.Value,
-		Summary:         m.Summary,
-		Importance:      m.Importance,
-		AccessCount:     m.AccessCount,
-		LastAccessedAt:  m.LastAccessedAt,
-		IsEncrypted:     m.IsEncrypted,
-		Tags:            tags,
-		Source:          m.Source,
-		Status:          m.Status,
-		TrashedAt:       m.TrashedAt,
-		DecayStage:      m.DecayStage,
-		ReinforceCount:  m.ReinforceCount,
-		MemoryType:      m.MemoryType,
-		VerifiedAt:      m.VerifiedAt,
-		CreatedAt:       m.CreatedAt,
-		UpdatedAt:       m.UpdatedAt,
+		ID:             m.ID,
+		UserID:         m.UserID,
+		Layer:          m.Layer,
+		Key:            m.Key,
+		Value:          m.Value,
+		Summary:        m.Summary,
+		Importance:     m.Importance,
+		AccessCount:    m.AccessCount,
+		LastAccessedAt: m.LastAccessedAt,
+		IsEncrypted:    m.IsEncrypted,
+		Tags:           tags,
+		Source:         m.Source,
+		Platform:       m.Platform,
+		Status:         m.Status,
+		TrashedAt:      m.TrashedAt,
+		DecayStage:     m.DecayStage,
+		ReinforceCount: m.ReinforceCount,
+		MemoryType:     m.MemoryType,
+		VerifiedAt:     m.VerifiedAt,
+		CreatedAt:      m.CreatedAt,
+		UpdatedAt:      m.UpdatedAt,
 	}
 }

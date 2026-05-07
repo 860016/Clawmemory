@@ -466,6 +466,140 @@ func handleSearchKeyword(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+func handleExternalReason(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+
+		var req struct {
+			Query     string `json:"query" binding:"required"`
+			SessionID string `json:"session_id"`
+			Depth     int    `json:"depth"`
+			Level     string `json:"level"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		svc := services.NewReasoningService(db)
+		result, err := svc.Reason(userID, req.Query, req.Depth, req.Level)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		auditLog(db, c, "external.reason", req.SessionID, fmt.Sprintf("depth:%d level:%s", req.Depth, req.Level))
+
+		c.JSON(http.StatusOK, gin.H{
+			"reasoning": result,
+			"depth":     req.Depth,
+			"level":     req.Level,
+		})
+	}
+}
+
+func handleGetReasoningConfig(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+
+		svc := services.NewReasoningService(db)
+		config, err := svc.GetConfig(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if config == nil {
+			c.JSON(http.StatusOK, gin.H{"configured": false})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"configured":      true,
+			"provider":        config.Provider,
+			"model":           config.Model,
+			"base_url":        config.BaseURL,
+			"dialectic_depth": config.DialecticDepth,
+			"reasoning_level": config.ReasoningLevel,
+			"max_tokens":      config.MaxTokens,
+			"enabled":         config.Enabled,
+			"has_api_key":     config.APIKey != "",
+		})
+	}
+}
+
+func handleSetReasoningConfig(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+
+		var data map[string]interface{}
+		if err := c.ShouldBindJSON(&data); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		svc := services.NewReasoningService(db)
+		config, err := svc.SetConfig(userID, data)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		auditLog(db, c, "reasoning.config_update", "", fmt.Sprintf("provider:%s model:%s", config.Provider, config.Model))
+
+		c.JSON(http.StatusOK, gin.H{
+			"provider":        config.Provider,
+			"model":           config.Model,
+			"base_url":        config.BaseURL,
+			"dialectic_depth": config.DialecticDepth,
+			"reasoning_level": config.ReasoningLevel,
+			"max_tokens":      config.MaxTokens,
+			"enabled":         config.Enabled,
+		})
+	}
+}
+
+func handleTestReasoningConnection(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+
+		svc := services.NewReasoningService(db)
+		err := svc.TestConnection(userID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "success": false})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"success": true, "message": "Connection successful"})
+	}
+}
+
+func handleReason(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+
+		var req struct {
+			Query string `json:"query" binding:"required"`
+			Depth int    `json:"depth"`
+			Level string `json:"level"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		svc := services.NewReasoningService(db)
+		result, err := svc.Reason(userID, req.Query, req.Depth, req.Level)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		auditLog(db, c, "reasoning.execute", "", fmt.Sprintf("depth:%d level:%s", req.Depth, req.Level))
+
+		c.JSON(http.StatusOK, gin.H{"reasoning": result})
+	}
+}
+
 func handleExternalCreateSessionMemory(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
@@ -4415,6 +4549,7 @@ func handleDeleteAPIKey(db *gorm.DB) gin.HandlerFunc {
 func handleExternalCreateMemory(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
+		platform := middleware.GetPlatform(c)
 		var data map[string]interface{}
 		if err := c.ShouldBindJSON(&data); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -4439,7 +4574,7 @@ func handleExternalCreateMemory(db *gorm.DB) gin.HandlerFunc {
 
 		source, _ := data["source"].(string)
 		if source == "" {
-			source = "openclaw"
+			source = platform
 		}
 
 		svc := services.NewMemoryService(db)
@@ -4450,13 +4585,14 @@ func handleExternalCreateMemory(db *gorm.DB) gin.HandlerFunc {
 			"importance":  data["importance"],
 			"source":      source,
 			"memory_type": getString(data, "memory_type", "knowledge"),
+			"platform":    platform,
 		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
-		auditLog(db, c, "external.memory_create", key, fmt.Sprintf("source:%s", source))
+		auditLog(db, c, "external.memory_create", key, fmt.Sprintf("source:%s platform:%s", source, platform))
 
 		c.JSON(http.StatusCreated, memory)
 	}
@@ -4465,6 +4601,7 @@ func handleExternalCreateMemory(db *gorm.DB) gin.HandlerFunc {
 func handleExternalBatchCreateMemories(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
+		platform := middleware.GetPlatform(c)
 		var req struct {
 			Memories []map[string]interface{} `json:"memories" binding:"required"`
 		}
@@ -4496,7 +4633,7 @@ func handleExternalBatchCreateMemories(db *gorm.DB) gin.HandlerFunc {
 
 			source, _ := m["source"].(string)
 			if source == "" {
-				source = "openclaw"
+				source = platform
 			}
 
 			_, err := svc.Create(userID, map[string]interface{}{
@@ -4506,6 +4643,7 @@ func handleExternalBatchCreateMemories(db *gorm.DB) gin.HandlerFunc {
 				"importance":  m["importance"],
 				"source":      source,
 				"memory_type": getString(m, "memory_type", "knowledge"),
+				"platform":    platform,
 			})
 			if err != nil {
 				errorsCount++

@@ -22,3 +22,10 @@ func getBool(data map[string]interface{}, key string, defaultValue bool) bool {
 	}
 	return defaultValue
 }
+
+func getInt(data map[string]interface{}, key string, defaultValue int) int {
+	if v, ok := data[key].(float64); ok {
+		return int(v)
+	}
+	return defaultValue
+}

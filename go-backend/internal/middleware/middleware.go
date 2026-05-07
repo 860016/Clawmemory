@@ -131,6 +131,13 @@ func APIKeyAuth(db *gorm.DB) gin.HandlerFunc {
 		c.Set("auth_method", "apikey")
 		c.Set("api_key_id", apiKey.ID)
 		c.Set("api_key_name", apiKey.Name)
+
+		platform := c.GetHeader("X-Platform")
+		if platform == "" {
+			platform = "openclaw"
+		}
+		c.Set("platform", platform)
+
 		c.Next()
 	}
 }
@@ -238,4 +245,12 @@ func GetUserID(c *gin.Context) uint {
 		return id
 	}
 	return 1
+}
+
+func GetPlatform(c *gin.Context) string {
+	platform, _ := c.Get("platform")
+	if p, ok := platform.(string); ok {
+		return p
+	}
+	return "openclaw"
 }

@@ -1,0 +1,49 @@
+name: clawmemory
+version: 1.0.0
+description: ClawMemory - Persistent memory provider for Hermes Agent
+author: ClawMemory Team
+
+provider:
+  class: clawmemory_hermes:ClawMemoryProvider
+  factory: clawmemory_hermes:create_provider
+
+config_schema:
+  base_url:
+    type: string
+    default: "http://localhost:8765"
+    description: "ClawMemory backend URL"
+  api_key:
+    type: string
+    required: true
+    description: "ClawMemory API key"
+  session_strategy:
+    type: string
+    default: "per-directory"
+    enum: ["per-directory", "per-session", "per-repo", "global"]
+    description: "Session tracking strategy"
+  enable_reasoning:
+    type: boolean
+    default: false
+    description: "Enable dialectic reasoning using user's AI model"
+  reasoning_interval:
+    type: integer
+    default: 5
+    description: "Run reasoning every N turns"
+  reasoning_depth:
+    type: integer
+    default: 1
+    enum: [1, 2, 3]
+    description: "Reasoning depth (1=single, 2=audit, 3=reconcile)"
+  reasoning_level:
+    type: string
+    default: "low"
+    enum: ["minimal", "low", "medium", "high", "max"]
+    description: "Reasoning intensity level"
+
+hooks:
+  - event: user_message
+    handler: on_user_message
+  - event: assistant_message
+    handler: on_assistant_message
+  - event: session_end
+    handler: flush

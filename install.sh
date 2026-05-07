@@ -1,5 +1,5 @@
 #!/bin/bash
-# ClawMemory Linux/macOS 安装脚本 v3.1 (完整版)
+# ClawMemory Linux/macOS 安装脚本 v3.2 (完整版)
 # 用法: bash install.sh [选项]
 # 特性: 自动检测依赖、构建前端、编译后端、创建统一目录、生成启动脚本
 
@@ -21,7 +21,7 @@ for arg in "$@"; do
     --auto-start) AUTO_START=true ;;
     -h|--help)
       echo "╔══════════════════════════════════════════╗"
-      echo "║   ClawMemory 安装程序 v3.1 (Linux/macOS) ║"
+      echo "║   ClawMemory 安装程序 v3.2 (Linux/macOS) ║"
       echo "╚══════════════════════════════════════════╝"
       echo ""
       echo "用法: bash install.sh [选项]"
@@ -83,7 +83,7 @@ print_info() {
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
-echo "║   ClawMemory 安装程序 v3.1 (Linux/macOS) ║"
+echo "║   ClawMemory 安装程序 v3.2 (Linux/macOS) ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 print_info "安装目录: $INSTALL_DIR"

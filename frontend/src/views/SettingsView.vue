@@ -118,6 +118,71 @@
       <!-- 安全设置 -->
       <div class="settings-card" :class="{ 'section-highlight': activeSection === 'security' }" id="settings-security">
         <div class="card-title">◇ {{ $t('settings.security') }}</div>
+
+      <!-- Dialectic Reasoning -->
+      <div class="settings-card" id="settings-reasoning">
+        <div class="card-title">🔮 {{ $t('settings.reasoningConfig') }}</div>
+        <p class="setting-desc" style="margin-bottom: 8px">{{ $t('settings.reasoningDesc') }}</p>
+        <div class="setting-item" v-if="reasoningConfig">
+          <span>{{ $t('settings.reasoningEnabled') }}</span>
+          <el-switch v-model="reasoningEnabled" @change="updateReasoningEnabled" />
+        </div>
+        <div class="setting-item" v-if="reasoningConfig">
+          <span>{{ $t('settings.reasoningProvider') }}</span>
+          <el-select v-model="reasoningForm.provider" style="width: 200px" @change="onReasoningProviderChange">
+            <el-option label="OpenAI" value="openai" />
+            <el-option label="Ollama" value="ollama" />
+            <el-option label="DeepSeek" value="deepseek" />
+            <el-option label="Custom" value="custom" />
+          </el-select>
+        </div>
+        <div class="setting-item" v-if="reasoningConfig">
+          <span>{{ $t('settings.reasoningModel') }}</span>
+          <el-input v-model="reasoningForm.model" style="width: 200px" :placeholder="$t('settings.reasoningModelPlaceholder')" />
+        </div>
+        <div class="setting-item" v-if="reasoningConfig">
+          <span>{{ $t('settings.reasoningApiKey') }}</span>
+          <el-input v-model="reasoningForm.api_key" type="password" show-password style="width: 200px" :placeholder="$t('settings.reasoningApiKeyPlaceholder')" />
+        </div>
+        <div class="setting-item" v-if="reasoningConfig && reasoningForm.provider === 'custom'">
+          <span>{{ $t('settings.reasoningBaseUrl') }}</span>
+          <el-input v-model="reasoningForm.base_url" style="width: 200px" placeholder="http://localhost:11434/v1" />
+        </div>
+        <div class="setting-item" v-if="reasoningConfig">
+          <span>{{ $t('settings.reasoningDepth') }}</span>
+          <el-slider v-model="reasoningForm.dialectic_depth" :min="1" :max="3" :step="1" :marks="{ 1: '1', 2: '2', 3: '3' }" style="width: 200px" />
+        </div>
+        <div class="setting-item" v-if="reasoningConfig">
+          <span>{{ $t('settings.reasoningLevel') }}</span>
+          <el-select v-model="reasoningForm.reasoning_level" style="width: 200px">
+            <el-option label="Minimal" value="minimal" />
+            <el-option label="Low" value="low" />
+            <el-option label="Medium" value="medium" />
+            <el-option label="High" value="high" />
+            <el-option label="Max" value="max" />
+          </el-select>
+        </div>
+        <div class="setting-item" v-if="reasoningConfig">
+          <span></span>
+          <div>
+            <el-button size="small" type="primary" @click="saveReasoningConfig" :loading="reasoningSaving">{{ $t('common.save') }}</el-button>
+            <el-button size="small" @click="testReasoningConnection" :loading="reasoningTesting">{{ $t('settings.reasoningTest') }}</el-button>
+          </div>
+        </div>
+        <div v-if="reasoningTestResult" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
+          <span :style="{ color: reasoningTestResult.success ? 'var(--cm-success)' : 'var(--cm-danger)' }">
+            {{ reasoningTestResult.success ? '✓ ' + $t('settings.reasoningTestSuccess') : '✗ ' + (reasoningTestResult.error || $t('settings.reasoningTestFailed')) }}
+          </span>
+        </div>
+        <div v-if="!reasoningConfig" class="setting-item">
+          <span>{{ $t('settings.reasoningProvider') }}</span>
+          <el-button size="small" @click="loadReasoningConfig" :loading="reasoningLoading">{{ $t('common.retry') }}</el-button>
+        </div>
+        <div class="reasoning-hint" v-if="reasoningConfig" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px; color: var(--cm-text-muted)">
+          <div style="font-weight: 600; margin-bottom: 4px">{{ $t('settings.reasoningHint') }}</div>
+          <div>{{ $t('settings.reasoningHintDesc') }}</div>
+        </div>
+      </div>
         <div class="setting-item">
           <span>{{ $t('settings.password') }}</span>
           <el-button size="small" @click="showPasswordDialog = true">
@@ -499,6 +564,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from '../api/go-client'
 import { setLocale, getLocale, translateError } from '../i18n'
 import { aiApi } from '../api/go-ai'
+import { reasoningApi } from '../api/go-reasoning'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -568,6 +634,22 @@ const showAgentsMdPreview = ref(false)
 const agentsMdContent = ref('')
 const agentsMdLoading = ref(false)
 
+const reasoningConfig = ref<any>(null)
+const reasoningLoading = ref(false)
+const reasoningSaving = ref(false)
+const reasoningTesting = ref(false)
+const reasoningTestResult = ref<any>(null)
+const reasoningEnabled = ref(false)
+const reasoningForm = ref<any>({
+  provider: 'openai',
+  model: '',
+  api_key: '',
+  base_url: '',
+  dialectic_depth: 1,
+  reasoning_level: 'medium',
+  max_tokens: 1000,
+})
+
 const featureLabels: Record<string, string> = {
   ai_extract: t('settings.featAiExtract'),
   auto_graph: t('settings.featAutoGraph'),
@@ -591,7 +673,7 @@ const featureLabels: Record<string, string> = {
 }
 
 onMounted(async () => {
-  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys(), loadRecordSensitiveSetting(), loadOpenClawStatus(), loadAIConfig(), loadAIUsage()])
+  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys(), loadRecordSensitiveSetting(), loadOpenClawStatus(), loadAIConfig(), loadAIUsage(), loadReasoningConfig()])
   if (activeSection.value) {
     nextTick(() => scrollToSection(activeSection.value))
   }
@@ -940,6 +1022,77 @@ async function testAIConnection() {
     aiTestResult.value = { success: false, error: e.response?.data?.error || t('settings.aiTestFailed') }
   } finally {
     aiTesting.value = false
+  }
+}
+
+async function loadReasoningConfig() {
+  reasoningLoading.value = true
+  try {
+    const { data } = await reasoningApi.getConfig()
+    reasoningConfig.value = data
+    reasoningEnabled.value = data.enabled || false
+    reasoningForm.value = {
+      provider: data.provider || 'openai',
+      model: data.model || '',
+      api_key: data.api_key || '',
+      base_url: data.base_url || '',
+      dialectic_depth: data.dialectic_depth || 1,
+      reasoning_level: data.reasoning_level || 'medium',
+      max_tokens: data.max_tokens || 1000,
+    }
+  } catch {
+    reasoningConfig.value = null
+  } finally {
+    reasoningLoading.value = false
+  }
+}
+
+async function updateReasoningEnabled() {
+  try {
+    await reasoningApi.updateConfig({ enabled: reasoningEnabled.value })
+    ElMessage.success(t('common.success'))
+  } catch (e: any) {
+    reasoningEnabled.value = !reasoningEnabled.value
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  }
+}
+
+function onReasoningProviderChange() {
+  if (reasoningForm.value.provider === 'ollama') {
+    reasoningForm.value.base_url = 'http://localhost:11434/v1'
+    reasoningForm.value.model = reasoningForm.value.model || 'llama3'
+  } else if (reasoningForm.value.provider === 'deepseek') {
+    reasoningForm.value.base_url = 'https://api.deepseek.com/v1'
+    reasoningForm.value.model = reasoningForm.value.model || 'deepseek-chat'
+  } else if (reasoningForm.value.provider === 'openai') {
+    reasoningForm.value.base_url = ''
+    reasoningForm.value.model = reasoningForm.value.model || 'gpt-4o-mini'
+  }
+}
+
+async function saveReasoningConfig() {
+  reasoningSaving.value = true
+  try {
+    await reasoningApi.updateConfig(reasoningForm.value)
+    ElMessage.success(t('common.success'))
+    await loadReasoningConfig()
+  } catch (e: any) {
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } finally {
+    reasoningSaving.value = false
+  }
+}
+
+async function testReasoningConnection() {
+  reasoningTesting.value = true
+  reasoningTestResult.value = null
+  try {
+    await reasoningApi.testConnection()
+    reasoningTestResult.value = { success: true }
+  } catch (e: any) {
+    reasoningTestResult.value = { success: false, error: e.response?.data?.error || t('settings.reasoningTestFailed') }
+  } finally {
+    reasoningTesting.value = false
   }
 }
 
