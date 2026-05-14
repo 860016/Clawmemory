@@ -15,6 +15,8 @@ export default {
     success: 'Success',
     failed: 'Failed',
     noData: 'No data',
+    searching: 'Searching...',
+    noSearchResults: 'No results found',
     logout: 'Logout',
     language: 'Language',
     copy: 'Copy',

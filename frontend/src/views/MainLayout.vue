@@ -94,9 +94,9 @@
         <div class="sidebar-footer" v-if="!sidebarCollapsed">
           <div class="storage-info">
             <div class="storage-bar">
-              <div class="storage-fill" style="width: 45%"></div>
+              <div class="storage-fill" :style="{ width: storagePercent + '%' }"></div>
             </div>
-            <span class="storage-text">45% {{ $t('common.storageUsed') }}</span>
+            <span class="storage-text">{{ storagePercent }}% {{ $t('common.storageUsed') }}</span>
           </div>
         </div>
 
@@ -165,21 +165,30 @@
           <kbd class="shortcut">ESC</kbd>
         </div>
         <div class="search-results" v-if="searchQuery">
-          <div class="result-category" v-for="cat in searchResults" :key="cat.category">
-            <div class="category-label">{{ cat.label }}</div>
-            <div 
-              v-for="item in cat.items" 
-              :key="item.id"
-              class="result-item"
-              @click="navigateTo(item)"
-            >
-              <el-icon><component :is="item.icon" /></el-icon>
-              <div class="result-info">
-                <div class="result-title">{{ item.title }}</div>
-                <div class="result-desc">{{ item.description }}</div>
+          <div v-if="searchLoading" class="search-loading">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>{{ $t('common.searching') }}</span>
+          </div>
+          <div v-else-if="searchResults.length === 0" class="search-empty">
+            {{ $t('common.noSearchResults') }}
+          </div>
+          <template v-else>
+            <div class="result-category" v-for="cat in searchResults" :key="cat.category">
+              <div class="category-label">{{ cat.label }}</div>
+              <div 
+                v-for="item in cat.items" 
+                :key="item.id"
+                class="result-item"
+                @click="navigateTo(item)"
+              >
+                <el-icon><component :is="item.icon" /></el-icon>
+                <div class="result-info">
+                  <div class="result-title">{{ item.title }}</div>
+                  <div class="result-desc">{{ item.description }}</div>
+                </div>
               </div>
             </div>
-          </div>
+          </template>
         </div>
       </div>
     </el-dialog>
@@ -187,7 +196,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '../stores/theme'
@@ -198,7 +207,7 @@ import {
   DataAnalysis, MagicStick, Upload, Grid, Share,
   TrendCharts, Warning, Cpu, FolderOpened, Lock, Coin, Monitor,
   DocumentChecked, Star, Timer, Compass, CircleCheck, SuccessFilled, Memo,
-  DArrowLeft, DArrowRight
+  DArrowLeft, DArrowRight, Loading
 } from '@element-plus/icons-vue'
 import axios from '../api/go-client'
 
@@ -217,6 +226,7 @@ const searchInput = ref<HTMLInputElement>()
 const tier = ref('oss')
 const tierLabel = computed(() => tier.value === 'oss' ? t('tier.free') : t('tier.pro'))
 const tierClass = computed(() => tier.value === 'oss' ? 'tier-free' : 'tier-pro')
+const storagePercent = ref(0)
 
 // Handle window resize
 const handleResize = () => {
@@ -234,6 +244,15 @@ onMounted(() => {
       tier.value = data.tier || 'oss'
     }).catch(() => {
       tier.value = 'oss'
+    })
+    axios.get('/stats').then(({ data }) => {
+      const total = data.memory_count || 0
+      const maxFree = 500
+      const maxPro = 50000
+      const max = tier.value === 'pro' ? maxPro : maxFree
+      storagePercent.value = Math.min(Math.round((total / max) * 100), 100)
+    }).catch(() => {
+      storagePercent.value = 0
     })
   } catch {
     tier.value = 'oss'
@@ -342,29 +361,68 @@ const currentSubNavItems = computed(() => {
   return items
 })
 
-// Search results (mock)
-const searchResults = computed(() => [
-  {
-    category: 'memories',
-    label: t('nav.memories'),
-    items: [
-      { id: 1, title: 'Go Backend Migration', description: t('memories.knowledge'), icon: Collection },
-      { id: 2, title: 'UI Design Guide', description: t('project.title'), icon: Collection },
-    ]
-  },
-  {
-    category: 'knowledge',
-    label: t('nav.knowledge'),
-    items: [
-      { id: 3, title: 'ClawMemory Project', description: t('knowledge.entities'), icon: Connection },
-    ]
+const searchLoading = ref(false)
+const searchResults = ref<Array<{ category: string; label: string; items: Array<{ id: number; title: string; description: string; icon: any; path: string }> }>>([])
+
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(searchQuery, (q) => {
+  if (searchTimer) clearTimeout(searchTimer)
+  if (!q.trim()) {
+    searchResults.value = []
+    return
   }
-])
+  searchTimer = setTimeout(() => performSearch(q.trim()), 300)
+})
+
+async function performSearch(q: string) {
+  searchLoading.value = true
+  try {
+    const [memRes, wikiRes, projRes] = await Promise.allSettled([
+      axios.get('/memories/search/keyword', { params: { q, limit: 5 }, _silent: true } as any),
+      axios.get('/wiki/search', { params: { q, limit: 5 }, _silent: true } as any),
+      axios.get('/projects/search', { params: { q, limit: 5 }, _silent: true } as any),
+    ])
+    const results: typeof searchResults.value = []
+    if (memRes.status === 'fulfilled' && memRes.value.data?.items?.length) {
+      results.push({
+        category: 'memories',
+        label: t('nav.memories'),
+        items: memRes.value.data.items.map((m: any) => ({
+          id: m.id, title: m.key, description: (m.value || '').substring(0, 80), icon: Collection, path: '/memories'
+        }))
+      })
+    }
+    if (wikiRes.status === 'fulfilled' && wikiRes.value.data?.items?.length) {
+      results.push({
+        category: 'wiki',
+        label: t('nav.knowledge'),
+        items: wikiRes.value.data.items.map((w: any) => ({
+          id: w.id, title: w.title, description: (w.content || '').substring(0, 80), icon: Connection, path: '/knowledge'
+        }))
+      })
+    }
+    if (projRes.status === 'fulfilled' && projRes.value.data?.items?.length) {
+      results.push({
+        category: 'projects',
+        label: t('nav.projects'),
+        items: projRes.value.data.items.map((p: any) => ({
+          id: p.id, title: p.name, description: (p.description || '').substring(0, 80), icon: Document, path: '/projects'
+        }))
+      })
+    }
+    searchResults.value = results
+  } catch {
+    searchResults.value = []
+  } finally {
+    searchLoading.value = false
+  }
+}
 
 function navigateTo(item: any) {
   showSearch.value = false
   searchQuery.value = ''
-  // router.push(item.path)
+  if (item.path) router.push(item.path)
 }
 
 function handleUserCommand(command: string) {
@@ -877,6 +935,23 @@ function handleUserCommand(command: string) {
 
 .result-item:hover {
   background: var(--cm-bg-secondary);
+}
+
+.search-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--cm-text-tertiary);
+  font-size: 14px;
+}
+
+.search-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--cm-text-tertiary);
+  font-size: 14px;
 }
 
 .result-info {

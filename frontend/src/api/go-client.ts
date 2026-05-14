@@ -32,7 +32,8 @@ api.interceptors.response.use(
       localStorage.removeItem('token')
       localStorage.removeItem('cm_username')
       if (!window.location.pathname.endsWith('/login') && !window.location.pathname.endsWith('/register')) {
-        window.location.href = '/login'
+        const current = window.location.pathname + window.location.search
+        window.location.href = '/login?redirect=' + encodeURIComponent(current)
       }
     } else if (status === 403) {
       if (!error.config?._silent) {

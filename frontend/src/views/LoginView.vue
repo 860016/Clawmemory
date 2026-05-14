@@ -232,7 +232,8 @@ async function handleLogin() {
       password: password.value,
     })
     localStorage.setItem('token', data.access_token)
-    router.push('/')
+    const redirect = route.query.redirect as string
+    router.push(redirect || '/')
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('login.wrongPassword')))
   } finally {

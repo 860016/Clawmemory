@@ -15,6 +15,8 @@ export default {
     success: '操作成功',
     failed: '操作失败',
     noData: '暂无数据',
+    searching: '搜索中...',
+    noSearchResults: '未找到相关结果',
     logout: '退出',
     language: '语言',
     copy: '复制',
