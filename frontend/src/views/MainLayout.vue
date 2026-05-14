@@ -76,28 +76,35 @@
       <aside class="sidebar-v2" v-if="currentSubNav.length && !isMobile" :class="{ 'collapsed': sidebarCollapsed }">
         <div class="sidebar-inner">
           <div class="sidebar-section" v-for="group in currentSubNav" :key="group.label">
-            <div class="sidebar-group-title" v-if="group.label">{{ $t(group.label) }}</div>
+            <div class="sidebar-group-title" v-if="group.label && !sidebarCollapsed">{{ $t(group.label) }}</div>
             <router-link
               v-for="item in group.items"
               :key="item.path"
               :to="item.path"
               class="sidebar-item-v2"
               :class="{ active: isSubNavActive(item) }"
+              :title="sidebarCollapsed ? $t(item.label) : ''"
             >
-              <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
-              <span>{{ $t(item.label) }}</span>
+              <el-icon v-if="item.icon" :size="sidebarCollapsed ? 18 : 16"><component :is="item.icon" /></el-icon>
+              <span v-if="!sidebarCollapsed">{{ $t(item.label) }}</span>
             </router-link>
           </div>
         </div>
         
-        <!-- Sidebar Footer -->
-        <div class="sidebar-footer">
+        <div class="sidebar-footer" v-if="!sidebarCollapsed">
           <div class="storage-info">
             <div class="storage-bar">
               <div class="storage-fill" style="width: 45%"></div>
             </div>
             <span class="storage-text">45% {{ $t('common.storageUsed') }}</span>
           </div>
+        </div>
+
+        <div class="sidebar-collapse-btn" @click="sidebarCollapsed = !sidebarCollapsed">
+          <el-icon :size="14">
+            <DArrowLeft v-if="!sidebarCollapsed" />
+            <DArrowRight v-else />
+          </el-icon>
         </div>
       </aside>
 
@@ -190,7 +197,8 @@ import {
   Menu, User, Search, Sunny, Moon, Trophy, SwitchButton,
   DataAnalysis, MagicStick, Upload, Grid, Share,
   TrendCharts, Warning, Cpu, FolderOpened, Lock, Coin, Monitor,
-  DocumentChecked, Star, Timer, Compass, CircleCheck, SuccessFilled, Memo
+  DocumentChecked, Star, Timer, Compass, CircleCheck, SuccessFilled, Memo,
+  DArrowLeft, DArrowRight
 } from '@element-plus/icons-vue'
 import axios from '../api/go-client'
 
@@ -577,7 +585,7 @@ function handleUserCommand(command: string) {
 
 /* ===== Sidebar ===== */
 .sidebar-v2 {
-  width: 180px;
+  width: 160px;
   flex-shrink: 0;
   background: var(--cm-bg-primary);
   border-right: 1px solid var(--cm-border);
@@ -585,43 +593,51 @@ function handleUserCommand(command: string) {
   flex-direction: column;
   overflow: hidden;
   transition: width var(--cm-transition-normal);
+  position: relative;
 }
 
 .sidebar-v2.collapsed {
-  width: 56px;
+  width: 48px;
 }
 
 .sidebar-inner {
   flex: 1;
   overflow-y: auto;
-  padding: var(--cm-space-3);
+  padding: var(--cm-space-2);
 }
 
 .sidebar-section {
-  margin-bottom: var(--cm-space-4);
+  margin-bottom: var(--cm-space-3);
 }
 
 .sidebar-group-title {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--cm-text-tertiary);
-  padding: var(--cm-space-2) var(--cm-space-3);
+  padding: var(--cm-space-1) var(--cm-space-2);
   margin-bottom: var(--cm-space-1);
 }
 
 .sidebar-item-v2 {
   display: flex;
   align-items: center;
-  gap: var(--cm-space-3);
-  padding: var(--cm-space-2) var(--cm-space-3);
+  gap: var(--cm-space-2);
+  padding: 6px 8px;
   border-radius: var(--cm-radius-md);
-  font-size: 14px;
+  font-size: 13px;
   color: var(--cm-text-secondary);
   text-decoration: none;
   transition: all var(--cm-transition-fast);
   margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-v2.collapsed .sidebar-item-v2 {
+  justify-content: center;
+  padding: 8px;
 }
 
 .sidebar-item-v2:hover {
@@ -636,8 +652,24 @@ function handleUserCommand(command: string) {
 }
 
 .sidebar-footer {
-  padding: var(--cm-space-4);
+  padding: var(--cm-space-3);
   border-top: 1px solid var(--cm-border);
+}
+
+.sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-top: 1px solid var(--cm-border);
+  cursor: pointer;
+  color: var(--cm-text-tertiary);
+  transition: all var(--cm-transition-fast);
+}
+
+.sidebar-collapse-btn:hover {
+  color: var(--cm-text-primary);
+  background: var(--cm-bg-secondary);
 }
 
 .storage-info {

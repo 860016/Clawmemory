@@ -25,6 +25,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 
 	if lpp, ok := proProvider.(*services.LocalProProvider); ok {
 		lpp.SetBackupPaths(cfg.BackupsDir, cfg.DatabasePath)
+		lpp.SetAIService(aiSvc)
 	}
 
 	public := r.Group("/api/v1")

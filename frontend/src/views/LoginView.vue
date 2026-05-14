@@ -79,6 +79,11 @@
       <div v-else class="login-form">
         <p class="hint">{{ $t('login.noPassword') }}</p>
         <el-input
+          v-model="setupUsername"
+          :placeholder="$t('login.setupUsernamePlaceholder')"
+          size="large"
+        />
+        <el-input
           v-model="password"
           type="password"
           :placeholder="$t('login.setPassword')"
@@ -148,6 +153,7 @@ const route = useRoute()
 const loginMode = ref<'login' | 'register' | 'setup'>('login')
 const username = ref('')
 const password = ref('')
+const setupUsername = ref('')
 const loading = ref(false)
 const passwordSet = ref(true)
 const resetMessage = ref('')
@@ -247,13 +253,21 @@ async function handleRegister() {
 }
 
 async function handleSetPassword() {
+  if (setupUsername.value && setupUsername.value.length < 2) {
+    ElMessage.warning(t('login.usernameTooShort'))
+    return
+  }
   if (password.value.length < 6) {
     ElMessage.warning(t('login.passwordTooShort'))
     return
   }
   loading.value = true
   try {
-    const { data } = await axios.post('/auth/set-password', { password: password.value })
+    const payload: any = { password: password.value }
+    if (setupUsername.value) {
+      payload.username = setupUsername.value
+    }
+    const { data } = await axios.post('/auth/set-password', payload)
     if (data.access_token) {
       localStorage.setItem('token', data.access_token)
       passwordSet.value = true
@@ -265,7 +279,11 @@ async function handleSetPassword() {
     const detail = e.response?.data?.error || e.response?.data?.detail || ''
     if (detail === 'password already set') {
       try {
-        const { data: loginData } = await axios.post('/auth/login', { password: password.value })
+        const loginPayload: any = { password: password.value }
+        if (setupUsername.value) {
+          loginPayload.username = setupUsername.value
+        }
+        const { data: loginData } = await axios.post('/auth/login', loginPayload)
         localStorage.setItem('token', loginData.access_token)
         passwordSet.value = true
         router.push('/')

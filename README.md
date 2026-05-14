@@ -1,4 +1,4 @@
-# ClawMemory v2.21.0 — AI 记忆管理中枢
+# ClawMemory v2.22.0 — AI 记忆管理中枢
 
 **ClawMemory** 是一款为 AI 助手设计的**长期记忆管理系统**。它让 AI 能够"记住"过去的对话、知识和上下文，实现跨会话的智能记忆检索与关联。
 
@@ -246,6 +246,20 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 ---
 
 ## 📝 更新日志
+
+### v2.22.0 (2026-05-14)
+- 🔐 授权：Pro 授权系统接入远程授权服务器，支持设备指纹、RSA 签名验证、心跳上报
+- 🔐 授权：授权状态持久化到数据库，7 天离线宽限期
+- 🧠 P1-1：统一衰减算法，Pro 版 DecayApply 先尝试 AI 评估，不可用时 fallback 到 DecayService
+- 🧠 P1-2：增强 TokenRoute 算法，增加句子数统计、专业术语检测、平均句长、4 档复杂度评分
+- 🔗 P2-1：增强 AutoGraph 语义分析，增加 Jaccard 相似度、标签关联、实体共享关联，关系类型扩展为 same_topic/shared_tags/shared_entity
+- 🔍 P2-2：增强冲突检测算法，增加 Jaccard 相似度检测、标签重叠检测、严重度分级（exact_duplicate/similar_content/potential_conflict）
+- 🔑 登录：首次设置密码支持自定义用户名（不再硬编码 admin）
+- 🔑 登录：前端首次设置页面增加用户名输入框
+- 🎨 UI：记忆库子导航"导入 Agent 记忆"改为"导入记忆"
+- 🎨 UI：左侧子导航缩小，增加收缩功能（收缩后只显示图标）
+- 🎨 UI：设置页"界面语言"标签，中文系统显示英文、英文系统显示中文
+- 🔧 修复：前端 auth API 和 store 的 setPassword 缺少 username 参数
 
 ### v2.21.0 (2026-05-14)
 - 🔒 安全：JWT Secret 未设置时自动生成安全密钥（32字节随机）

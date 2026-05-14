@@ -25,10 +25,14 @@ export const useAuthStore = defineStore('auth', () => {
     await login(user, password)
   }
 
-  async function setPassword(password: string) {
-    const { data } = await axios.post('/auth/set-password', { password })
+  async function setPassword(password: string, user?: string) {
+    const payload: any = { password }
+    if (user) payload.username = user
+    const { data } = await axios.post('/auth/set-password', payload)
     token.value = data.access_token
+    username.value = user || 'admin'
     localStorage.setItem('token', data.access_token)
+    localStorage.setItem('cm_username', username.value)
   }
 
   async function fetchMe() {

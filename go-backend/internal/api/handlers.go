@@ -55,6 +55,7 @@ func handleInitStatus(authService *services.AuthService) gin.HandlerFunc {
 func handleSetPassword(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
+			Username string `json:"username"`
 			Password string `json:"password" binding:"required"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -67,7 +68,12 @@ func handleSetPassword(authService *services.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		token, err := authService.SetPassword(req.Password)
+		username := req.Username
+		if username == "" {
+			username = "admin"
+		}
+
+		token, err := authService.SetPasswordWithUsername(username, req.Password)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

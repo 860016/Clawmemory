@@ -11,25 +11,33 @@
         <div class="license-status" v-if="license.active">
           <div class="status-row">
             <span class="status-label">{{ $t('settings.version') }}</span>
-            <span class="status-value pro">{{ license.type === 'enterprise' ? 'Enterprise' : 'Pro' }}</span>
+            <span class="status-value pro">{{ license.tier === 'enterprise' ? 'Enterprise' : 'Pro' }}</span>
           </div>
-          <div class="status-row" v-if="license.license_key">
+          <div class="status-row" v-if="license.key_hash">
             <span class="status-label">{{ $t('settings.licenseKey') }}</span>
-            <span class="status-value">{{ license.license_key }}</span>
+            <span class="status-value">{{ license.key_hash }}••••</span>
           </div>
           <div class="status-row" v-if="license.expires_at">
             <span class="status-label">{{ $t('settings.expiresAt') }}</span>
-            <span class="status-value">{{ license.expires_at }}</span>
+            <span class="status-value" :class="{ 'text-warning': isExpiringSoon }">{{ formatDate(license.expires_at) }}</span>
           </div>
           <div class="status-row" v-if="license.device_slot">
             <span class="status-label">{{ $t('settings.deviceSlot') }}</span>
             <span class="status-value">{{ license.device_slot }}</span>
+          </div>
+          <div class="status-row" v-if="license.fingerprint">
+            <span class="status-label">{{ $t('settings.deviceFingerprint') }}</span>
+            <span class="status-value">{{ license.fingerprint }}•••</span>
           </div>
           <div class="status-row">
             <span class="status-label">{{ $t('settings.features') }}</span>
             <div class="feature-tags">
               <span class="ftag" v-for="f in license.features" :key="f">{{ featureLabels[f] || f }}</span>
             </div>
+          </div>
+          <div class="status-row" v-if="!license.is_valid && license.active">
+            <span class="status-label">{{ $t('settings.licenseStatus') }}</span>
+            <span class="status-value text-warning">{{ $t('settings.gracePeriodWarning') }}</span>
           </div>
           <el-button type="danger" plain size="small" @click="deactivateLicense" style="margin-top: 12px">{{ $t('settings.cancelLicense') }}</el-button>
         </div>
@@ -62,9 +70,9 @@
 
       <!-- 语言设置 -->
       <div class="settings-card">
-        <div class="card-title">◇ {{ $t('settings.language') }}</div>
+        <div class="card-title">◇ {{ currentLocale === 'zh' ? 'Language' : '界面语言' }}</div>
         <div class="setting-item">
-          <span>{{ $t('settings.language') }}</span>
+          <span>{{ currentLocale === 'zh' ? 'Language' : '界面语言' }}</span>
           <el-select v-model="currentLocale" @change="changeLocale" style="width: 140px">
             <el-option v-if="currentLocale === 'zh'" :label="$t('settings.english')" value="en" />
             <el-option v-else :label="$t('settings.chinese')" value="zh" />
@@ -691,12 +699,32 @@ const featureLabels: Record<string, string> = {
   token_stats: t('settings.featTokenStats'),
   wiki: t('settings.featWiki'),
   auto_backup: t('settings.featAutoBackup'),
-  // Enterprise only
+  compress: t('settings.featCompress'),
+  evolution: t('settings.featEvolution'),
   api_access: t('settings.featApiAccess'),
   sso: t('settings.featSso'),
   audit_log: t('settings.featAuditLog'),
   time_travel: t('settings.featTimeTravel'),
   offline_mode: t('settings.featOfflineMode'),
+}
+
+const isExpiringSoon = computed(() => {
+  if (!license.value.expires_at) return false
+  try {
+    const exp = new Date(license.value.expires_at)
+    const now = new Date()
+    const daysLeft = (exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    return daysLeft < 30 && daysLeft > 0
+  } catch { return false }
+})
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return ''
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch { return dateStr }
 }
 
 onMounted(async () => {
@@ -960,9 +988,13 @@ async function importData(file: File) {
 
 async function activateLicense() {
   if (!licenseKey.value) return
+  if (licenseKey.value.trim().length < 8) {
+    ElMessage.warning(t('settings.licenseKeyTooShort'))
+    return
+  }
   activating.value = true
   try {
-    const { data } = await axios.post('/license/activate', { license_key: licenseKey.value })
+    const { data } = await axios.post('/license/activate', { license_key: licenseKey.value.trim() })
     if (data.valid || data.active) {
       ElMessage.success(t('settings.activated'))
       licenseKey.value = ''
@@ -973,7 +1005,19 @@ async function activateLicense() {
   } catch (e: any) {
     const detail = e.response?.data?.error || e.response?.data?.detail
     if (typeof detail === 'string') {
-      ElMessage.error(translateError(detail, t('common.failed')))
+      if (detail.includes('connect license server') || detail.includes('connection refused')) {
+        ElMessage.error(t('settings.licenseServerUnreachable'))
+      } else if (detail.includes('already bound') || detail.includes('设备已绑定')) {
+        ElMessage.error(t('settings.deviceAlreadyBound'))
+      } else if (detail.includes('expired') || detail.includes('已过期')) {
+        ElMessage.error(t('settings.licenseExpired'))
+      } else if (detail.includes('invalid') || detail.includes('无效')) {
+        ElMessage.error(t('settings.licenseInvalid'))
+      } else if (detail.includes('rate limit') || detail.includes('too many')) {
+        ElMessage.error(t('settings.licenseRateLimited'))
+      } else {
+        ElMessage.error(translateError(detail, t('common.failed')))
+      }
     } else {
       ElMessage.error(t('common.failed'))
     }
@@ -983,9 +1027,19 @@ async function activateLicense() {
 async function deactivateLicense() {
   try {
     await ElMessageBox.confirm(t('settings.cancelConfirm'), t('common.confirm'), { type: 'warning' })
+  } catch { return }
+  try {
     await axios.post('/license/deactivate')
     ElMessage.success(t('settings.canceled')); await loadLicense()
-  } catch {}
+  } catch (e: any) {
+    const detail = e.response?.data?.error || ''
+    if (detail.includes('connect') || detail.includes('server')) {
+      ElMessage.warning(t('settings.deactivateServerWarning'))
+      await loadLicense()
+    } else {
+      ElMessage.error(translateError(detail, t('common.failed')))
+    }
+  }
 }
 
 async function handleSetPassword() {
@@ -1281,6 +1335,7 @@ watch(showAgentsMdPreview, async (v) => {
 .status-label { color: var(--cm-text-muted); font-size: 13px; }
 .status-value { font-size: 13px; color: var(--cm-text); }
 .status-value.pro { color: #10B981; font-weight: 600; }
+.status-value.text-warning { color: #F59E0B; font-weight: 600; }
 .feature-tags { display: flex; flex-wrap: wrap; gap: 4px; max-width: 280px; justify-content: flex-end; }
 .ftag { padding: 1px 8px; background: rgba(16,185,129,0.12); color: #10B981; border-radius: 4px; font-size: 11px; }
 .license-free { text-align: center; }

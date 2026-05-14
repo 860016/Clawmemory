@@ -15,7 +15,7 @@ var ErrProRequired = proprovider.ErrProRequired
 var globalProProvider ProProvider
 
 func InitProProvider(db *gorm.DB, cfg *config.Config) ProProvider {
-	p := NewLocalProProvider(db)
+	p := NewLocalProProvider(db, cfg)
 	globalProProvider = p
 	return p
 }

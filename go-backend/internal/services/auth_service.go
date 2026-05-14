@@ -42,9 +42,17 @@ func (s *AuthService) CheckInitStatus() (bool, error) {
 }
 
 func (s *AuthService) SetPassword(password string) (string, error) {
+	return s.SetPasswordWithUsername(DefaultUsername, password)
+}
+
+func (s *AuthService) SetPasswordWithUsername(username, password string) (string, error) {
 	if s.IsPasswordSet() {
 		log.Println("SetPassword: password already set")
 		return "", errors.New("password already set")
+	}
+
+	if len(username) < 2 || len(username) > 50 {
+		return "", errors.New("username must be between 2 and 50 characters")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -54,8 +62,9 @@ func (s *AuthService) SetPassword(password string) (string, error) {
 	}
 
 	user := &models.User{
-		Username: DefaultUsername,
+		Username: username,
 		Password: string(hashedPassword),
+		Role:     "admin",
 	}
 
 	if err := s.db.Create(user).Error; err != nil {
@@ -63,7 +72,7 @@ func (s *AuthService) SetPassword(password string) (string, error) {
 		return "", err
 	}
 
-	log.Printf("SetPassword: user created successfully, ID=%d", user.ID)
+	log.Printf("SetPassword: user created successfully, ID=%d, username=%s", user.ID, username)
 	return s.generateToken(user.ID)
 }
 
