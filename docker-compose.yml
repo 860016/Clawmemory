@@ -1,0 +1,20 @@
+services:
+  clawmemory:
+    build: .
+    container_name: clawmemory
+    ports:
+      - "8765:8765"
+    volumes:
+      - clawmemory-data:/app/data
+      - clawmemory-backups:/app/backups
+      - clawmemory-logs:/app/logs
+    environment:
+      - SECRET_KEY=change-me-to-a-random-secret-key
+      - PORT=8765
+      - HOST=0.0.0.0
+    restart: unless-stopped
+
+volumes:
+  clawmemory-data:
+  clawmemory-backups:
+  clawmemory-logs:

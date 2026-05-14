@@ -153,6 +153,51 @@ clawmemory/
 
 ---
 
+## 🐳 Docker 部署
+
+### 快速启动
+
+```bash
+docker compose up -d
+```
+
+访问：`http://localhost:8765`
+
+### 自定义配置
+
+编辑 `docker-compose.yml` 中的环境变量：
+
+```yaml
+environment:
+  - SECRET_KEY=your-random-secret-key   # 必须修改！
+  - PORT=8765
+```
+
+### 数据持久化
+
+Docker 部署使用命名卷持久化数据：
+
+| 卷 | 路径 | 说明 |
+|----|------|------|
+| `clawmemory-data` | `/app/data` | 数据库文件 |
+| `clawmemory-backups` | `/app/backups` | 自动备份 |
+| `clawmemory-logs` | `/app/logs` | 日志文件 |
+
+### 手动构建镜像
+
+```bash
+docker build -t clawmemory .
+docker run -d -p 8765:8765 -v clawmemory-data:/app/data clawmemory
+```
+
+### 重置密码
+
+```bash
+docker exec clawmemory ./clawmemory --reset-password NEW_PASSWORD
+```
+
+---
+
 ## 🔨 构建
 
 ### 前端构建
@@ -256,9 +301,12 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - 🔍 P2-2：增强冲突检测算法，增加 Jaccard 相似度检测、标签重叠检测、严重度分级（exact_duplicate/similar_content/potential_conflict）
 - 🔑 登录：首次设置密码支持自定义用户名（不再硬编码 admin）
 - 🔑 登录：前端首次设置页面增加用户名输入框
+- 🔑 登录：首次设置密码后引导创建 API Key，展示密钥并支持一键复制
+- 🔑 登录：`--reset-password` 在无用户时自动创建 admin 用户（不再报错）
 - 🎨 UI：记忆库子导航"导入 Agent 记忆"改为"导入记忆"
 - 🎨 UI：左侧子导航缩小，增加收缩功能（收缩后只显示图标）
 - 🎨 UI：设置页"界面语言"标签，中文系统显示英文、英文系统显示中文
+- 🐳 Docker：新增 Dockerfile 和 docker-compose.yml，支持一键 Docker 部署
 - 🔧 修复：前端 auth API 和 store 的 setPassword 缺少 username 参数
 
 ### v2.21.0 (2026-05-14)

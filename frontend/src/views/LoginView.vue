@@ -76,7 +76,7 @@
       </div>
 
       <!-- First-time setup -->
-      <div v-else class="login-form">
+      <div v-else-if="loginMode === 'setup'" class="login-form">
         <p class="hint">{{ $t('login.noPassword') }}</p>
         <el-input
           v-model="setupUsername"
@@ -93,6 +93,34 @@
         />
         <el-button type="primary" @click="handleSetPassword" :loading="loading" size="large" class="login-btn">
           {{ $t('login.setPasswordAndEnter') }}
+        </el-button>
+      </div>
+
+      <!-- Setup complete - show API key -->
+      <div v-else-if="loginMode === 'setup-complete'" class="login-form setup-complete-section">
+        <div class="setup-success-icon">
+          <el-icon :size="48" color="#10B981"><SuccessFilled /></el-icon>
+        </div>
+        <h2 class="setup-complete-title">{{ $t('login.setupComplete') }}</h2>
+        <p class="setup-complete-desc">{{ $t('login.setupCompleteDesc') }}</p>
+
+        <div class="api-key-guide" v-if="autoApiKey">
+          <div class="api-key-guide-header">
+            <span>🔑 {{ $t('login.apiKeyGuide') }}</span>
+            <el-tag size="small" type="success">{{ $t('login.apiKeyAutoCreated') }}</el-tag>
+          </div>
+          <p class="api-key-guide-desc">{{ $t('login.apiKeyGuideDesc') }}</p>
+          <div class="api-key-display">
+            <code class="api-key-value">{{ autoApiKey }}</code>
+            <el-button size="small" type="primary" @click="copyApiKey" class="copy-btn">
+              {{ apiKeyCopied ? $t('common.copied') : $t('common.copy') }}
+            </el-button>
+          </div>
+          <p class="api-key-warning">{{ $t('login.apiKeyCopyHint') }}</p>
+        </div>
+
+        <el-button type="primary" @click="router.push('/')" size="large" class="login-btn">
+          {{ $t('login.enterSystem') }} →
         </el-button>
       </div>
 
@@ -150,7 +178,7 @@ const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 
-const loginMode = ref<'login' | 'register' | 'setup'>('login')
+const loginMode = ref<'login' | 'register' | 'setup' | 'setup-complete'>('login')
 const username = ref('')
 const password = ref('')
 const setupUsername = ref('')
@@ -160,6 +188,8 @@ const resetMessage = ref('')
 const showForgotDialog = ref(false)
 const newPassword = ref('')
 const forgotUsername = ref('')
+const autoApiKey = ref('')
+const apiKeyCopied = ref(false)
 
 const regUsername = ref('')
 const regPassword = ref('')
@@ -271,7 +301,8 @@ async function handleSetPassword() {
     if (data.access_token) {
       localStorage.setItem('token', data.access_token)
       passwordSet.value = true
-      router.push('/')
+      await fetchAutoApiKey()
+      loginMode.value = 'setup-complete'
     } else {
       ElMessage.error(t('common.failed'))
     }
@@ -297,6 +328,37 @@ async function handleSetPassword() {
   } finally {
     loading.value = false
   }
+}
+
+async function fetchAutoApiKey() {
+  try {
+    const { data } = await axios.get('/api-keys')
+    const items = data.items || []
+    if (items.length > 0) {
+      autoApiKey.value = ''
+      return
+    }
+    const { data: created } = await axios.post('/api-keys', { name: 'ClawMemory Auto' })
+    autoApiKey.value = created.key || ''
+  } catch (e) {
+    console.error('Failed to fetch auto API key:', e)
+  }
+}
+
+function copyApiKey() {
+  navigator.clipboard.writeText(autoApiKey.value).then(() => {
+    apiKeyCopied.value = true
+    setTimeout(() => { apiKeyCopied.value = false }, 2000)
+  }).catch(() => {
+    const textarea = document.createElement('textarea')
+    textarea.value = autoApiKey.value
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    apiKeyCopied.value = true
+    setTimeout(() => { apiKeyCopied.value = false }, 2000)
+  })
 }
 
 async function handleResetPassword() {
@@ -519,6 +581,81 @@ async function handleResetPassword() {
   flex-direction: column;
   align-items: center;
   padding: 24px 0;
+}
+
+.setup-complete-section {
+  text-align: center;
+}
+
+.setup-success-icon {
+  margin-bottom: 12px;
+}
+
+.setup-complete-title {
+  color: var(--cm-text);
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.setup-complete-desc {
+  color: var(--cm-text-muted);
+  font-size: 14px;
+  margin: 0 0 20px;
+}
+
+.api-key-guide {
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.api-key-guide-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--cm-text);
+}
+
+.api-key-guide-desc {
+  color: var(--cm-text-muted);
+  font-size: 12px;
+  margin: 0 0 12px;
+}
+
+.api-key-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.api-key-value {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--cm-bg);
+  border: 1px solid var(--cm-border);
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--cm-text);
+  word-break: break-all;
+  user-select: all;
+}
+
+.api-key-warning {
+  color: var(--cm-text-muted);
+  font-size: 11px;
+  margin: 8px 0 0;
+  text-align: center;
+}
+
+.copy-btn {
+  flex-shrink: 0;
 }
 
 @media (max-width: 768px) {

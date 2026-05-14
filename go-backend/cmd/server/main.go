@@ -209,14 +209,28 @@ func autoCreateAPIKey(db *gorm.DB) {
 }
 
 func resetAdminPassword(db *gorm.DB, newPassword string) {
-	if len(newPassword) < 4 {
-		log.Fatal("Error: password must be at least 4 characters")
+	if len(newPassword) < 6 {
+		log.Fatal("Error: password must be at least 6 characters")
 	}
 
 	var user models.User
 	if err := db.First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			log.Fatal("Error: no user found in database. Please start the server first to create an account.")
+			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+			if err != nil {
+				log.Fatal("Error: failed to hash password:", err)
+			}
+			user = models.User{
+				Username: "admin",
+				Password: string(hashedPassword),
+				Role:     "admin",
+			}
+			if err := db.Create(&user).Error; err != nil {
+				log.Fatal("Error: failed to create admin user:", err)
+			}
+			fmt.Printf("✅ Admin user created with password reset successfully.\n")
+			fmt.Println("Please restart the server without --reset-password flag.")
+			return
 		}
 		log.Fatal("Error: failed to query user:", err)
 	}

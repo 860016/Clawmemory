@@ -85,6 +85,13 @@ export default {
     invalidInvitationCode: 'Invalid or expired invitation code',
     usernameExists: 'Username already exists',
     backToLogin: 'Back to Login',
+    setupComplete: 'Account Created',
+    setupCompleteDesc: 'Your ClawMemory is ready',
+    apiKeyGuide: 'API Key',
+    apiKeyGuideDesc: 'This key is used by external apps (e.g. OpenClaw/Trae/Cursor) to auto-record memories. Keep it safe',
+    apiKeyAutoCreated: 'API key auto-generated',
+    apiKeyCopyHint: 'Please copy and save this key, it won\'t be shown again',
+    enterSystem: 'Enter',
   },
   dashboard: {
     title: 'Dashboard',

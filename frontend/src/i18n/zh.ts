@@ -85,6 +85,13 @@ export default {
     invalidInvitationCode: '邀请码无效或已过期',
     usernameExists: '用户名已存在',
     backToLogin: '返回登录',
+    setupComplete: '账号创建成功',
+    setupCompleteDesc: '你的 ClawMemory 已就绪',
+    apiKeyGuide: 'API 密钥',
+    apiKeyGuideDesc: '此密钥用于外部应用（如 OpenClaw/Trae/Cursor 等）自动写入记忆，请妥善保存',
+    apiKeyAutoCreated: '已自动生成 API 密钥',
+    apiKeyCopyHint: '请复制并保存此密钥，它不会再次显示',
+    enterSystem: '进入系统',
   },
   dashboard: {
     title: '仪表盘',
