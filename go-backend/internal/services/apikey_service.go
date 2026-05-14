@@ -19,6 +19,17 @@ const (
 	APIKeyPrefix      = "cm"
 )
 
+var ValidPermissions = map[string]bool{
+	"memories:read":       true,
+	"memories:write":      true,
+	"conversations:write": true,
+	"sessions:write":      true,
+	"reason:execute":      true,
+	"read":                true,
+	"write":               true,
+	"admin":               true,
+}
+
 type APIKeyService struct {
 	db *gorm.DB
 }
@@ -28,7 +39,7 @@ func NewAPIKeyService(db *gorm.DB) *APIKeyService {
 }
 
 func (s *APIKeyService) Create(userID uint, name string) (*models.APIKey, string, error) {
-	return s.CreateWithPermissions(userID, name, "read,write", "")
+	return s.CreateWithPermissions(userID, name, "memories:read,memories:write,conversations:write,sessions:write,reason:execute", "")
 }
 
 func (s *APIKeyService) CreateWithPermissions(userID uint, name, permissions, agentName string) (*models.APIKey, string, error) {
@@ -47,7 +58,14 @@ func (s *APIKeyService) CreateWithPermissions(userID uint, name, permissions, ag
 	}
 
 	if permissions == "" {
-		permissions = "read,write"
+		permissions = "memories:read,memories:write,conversations:write,sessions:write,reason:execute"
+	}
+
+	for _, p := range strings.Split(permissions, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" && !ValidPermissions[p] {
+			return nil, "", fmt.Errorf("invalid permission: %s", p)
+		}
 	}
 
 	rawKey, err := generateAPIKey()

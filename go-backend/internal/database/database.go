@@ -90,5 +90,14 @@ func runPreMigrations(db *gorm.DB) error {
 		}
 	}
 
+	if db.Migrator().HasTable(&models.APIKey{}) {
+		result := db.Model(&models.APIKey{}).
+			Where("permissions = ?", "read,write").
+			Update("permissions", "memories:read,memories:write,conversations:write,sessions:write,reason:execute")
+		if result.RowsAffected > 0 {
+			fmt.Printf("[DB] migrated %d API keys from legacy 'read,write' to fine-grained permissions\n", result.RowsAffected)
+		}
+	}
+
 	return nil
 }

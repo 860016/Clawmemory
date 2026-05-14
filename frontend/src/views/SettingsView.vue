@@ -254,6 +254,7 @@
             <div class="api-key-info">
               <span class="api-key-name">{{ key.name }}</span>
               <span class="api-key-prefix">{{ key.key_prefix }}••••••••</span>
+              <span class="api-key-perms">{{ formatPermissions(key.permissions) }}</span>
               <span class="api-key-time">{{ key.last_used_at ? t('settings.apiKeyLastUsed') + ': ' + key.last_used_at.substring(0, 10) : t('settings.apiKeyNeverUsed') }}</span>
             </div>
             <el-button type="danger" plain size="small" @click="deleteApiKey(key.id)">{{ t('settings.apiKeyDelete') }}</el-button>
@@ -530,6 +531,18 @@
           <el-form-item :label="$t('settings.apiKeyName')">
             <el-input v-model="newApiKeyName" :placeholder="$t('settings.apiKeyNamePlaceholder')" />
           </el-form-item>
+          <el-form-item :label="$t('settings.apiKeyPermission')">
+            <el-select v-model="newApiKeyPerm" style="width: 100%">
+              <el-option :label="$t('settings.apiKeyPermFull')" value="full" />
+              <el-option :label="$t('settings.apiKeyPermReadWrite')" value="readwrite" />
+              <el-option :label="$t('settings.apiKeyPermReadOnly')" value="readonly" />
+            </el-select>
+            <div style="margin-top: 6px; font-size: 11px; color: var(--cm-text-muted)">
+              <template v-if="newApiKeyPerm === 'full'">{{ $t('settings.apiKeyPermFullDesc') }}</template>
+              <template v-else-if="newApiKeyPerm === 'readwrite'">{{ $t('settings.apiKeyPermReadWriteDesc') }}</template>
+              <template v-else>{{ $t('settings.apiKeyPermReadOnlyDesc') }}</template>
+            </div>
+          </el-form-item>
         </el-form>
       </div>
       <div v-else>
@@ -623,6 +636,7 @@ const apiKeys = ref<any[]>([])
 const showApiKeyDialog = ref(false)
 const newApiKeyName = ref('')
 const newApiKeyRaw = ref('')
+const newApiKeyPerm = ref('full')
 const creatingApiKey = ref(false)
 
 const decayEnabled = ref(false)
@@ -772,6 +786,7 @@ function openApiKeyDialog() {
   }
   newApiKeyName.value = ''
   newApiKeyRaw.value = ''
+  newApiKeyPerm.value = 'full'
   showApiKeyDialog.value = true
 }
 
@@ -782,7 +797,15 @@ async function createApiKey() {
   }
   creatingApiKey.value = true
   try {
-    const { data } = await axios.post('/api-keys', { name: newApiKeyName.value.trim() })
+    const permMap: Record<string, string> = {
+      full: 'memories:read,memories:write,conversations:write,sessions:write,reason:execute',
+      readwrite: 'memories:read,memories:write',
+      readonly: 'memories:read',
+    }
+    const payload: any = { name: newApiKeyName.value.trim() }
+    const perm = permMap[newApiKeyPerm.value]
+    if (perm) payload.permissions = perm
+    const { data } = await axios.post('/api-keys', payload)
     newApiKeyRaw.value = data.key
     ElMessage.success(t('settings.apiKeyCreated'))
     await loadApiKeys()
@@ -798,6 +821,21 @@ async function createApiKey() {
   } finally {
     creatingApiKey.value = false
   }
+}
+
+function formatPermissions(perms: string) {
+  if (!perms) return ''
+  const permLabels: Record<string, string> = {
+    'memories:read': '📖',
+    'memories:write': '✏️',
+    'conversations:write': '💬',
+    'sessions:write': '📋',
+    'reason:execute': '🧠',
+    'read': '📖',
+    'write': '✏️',
+    'admin': '👑',
+  }
+  return perms.split(',').map((p: string) => permLabels[p.trim()] || p.trim()).join(' ')
 }
 
 async function deleteApiKey(id: number) {
@@ -1493,6 +1531,7 @@ watch(showAgentsMdPreview, async (v) => {
 .api-key-info { display: flex; flex-direction: column; gap: 2px; }
 .api-key-name { font-size: 14px; font-weight: 500; color: var(--cm-text); }
 .api-key-prefix { font-family: monospace; font-size: 12px; color: var(--cm-text-muted); }
+.api-key-perms { font-size: 12px; color: var(--cm-text-secondary); letter-spacing: 2px; }
 .api-key-time { font-size: 11px; color: var(--cm-text-muted); }
 .openclaw-paths { margin: 8px 0; padding: 8px; background: var(--cm-bg); border-radius: 6px; }
 .openclaw-path-item { font-size: 11px; color: var(--cm-text-muted); margin: 4px 0; word-break: break-all; }

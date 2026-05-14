@@ -5308,7 +5308,8 @@ func handleCreateAPIKey(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 		var req struct {
-			Name string `json:"name" binding:"required"`
+			Name        string `json:"name" binding:"required"`
+			Permissions string `json:"permissions"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
@@ -5316,7 +5317,14 @@ func handleCreateAPIKey(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		svc := services.NewAPIKeyService(db)
-		apiKey, rawKey, err := svc.Create(userID, req.Name)
+		var apiKey *models.APIKey
+		var rawKey string
+		var err error
+		if req.Permissions != "" {
+			apiKey, rawKey, err = svc.CreateWithPermissions(userID, req.Name, req.Permissions, "")
+		} else {
+			apiKey, rawKey, err = svc.Create(userID, req.Name)
+		}
 		if err != nil {
 			status := http.StatusInternalServerError
 			if strings.Contains(err.Error(), "maximum") {
@@ -5328,16 +5336,17 @@ func handleCreateAPIKey(db *gorm.DB) gin.HandlerFunc {
 
 		remaining := services.MaxAPIKeysPerUser - int(svc.Count(userID))
 
-		auditLog(db, c, "api_key.create", fmt.Sprintf("id:%d", apiKey.ID), fmt.Sprintf("name:%s prefix:%s", apiKey.Name, apiKey.KeyPrefix))
+		auditLog(db, c, "api_key.create", fmt.Sprintf("id:%d", apiKey.ID), fmt.Sprintf("name:%s prefix:%s perms:%s", apiKey.Name, apiKey.KeyPrefix, apiKey.Permissions))
 
 		c.JSON(http.StatusCreated, gin.H{
-			"id":         apiKey.ID,
-			"name":       apiKey.Name,
-			"key_prefix": apiKey.KeyPrefix,
-			"key":        rawKey,
-			"created_at": apiKey.CreatedAt,
-			"remaining":  remaining,
-			"message":    "please save the API key securely, it will not be shown again",
+			"id":          apiKey.ID,
+			"name":        apiKey.Name,
+			"key_prefix":  apiKey.KeyPrefix,
+			"permissions": apiKey.Permissions,
+			"key":         rawKey,
+			"created_at":  apiKey.CreatedAt,
+			"remaining":   remaining,
+			"message":     "please save the API key securely, it will not be shown again",
 		})
 	}
 }

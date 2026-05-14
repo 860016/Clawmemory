@@ -346,8 +346,35 @@ func HasAPIKeyPermission(c *gin.Context, permission string) bool {
 		return false
 	}
 	for _, p := range splitPermissions(perms) {
-		if p == "admin" || p == permission || p == "*" {
+		if p == "admin" || p == "*" || p == permission {
 			return true
+		}
+		if isParentPermission(p, permission) {
+			return true
+		}
+	}
+	return false
+}
+
+func isParentPermission(parent, child string) bool {
+	if parent == "read" {
+		return strings.HasSuffix(child, ":read")
+	}
+	if parent == "write" {
+		return strings.HasSuffix(child, ":read") || strings.HasSuffix(child, ":write")
+	}
+	parts := strings.SplitN(parent, ":", 2)
+	if len(parts) == 2 {
+		resource := parts[0]
+		scope := parts[1]
+		childParts := strings.SplitN(child, ":", 2)
+		if len(childParts) == 2 && childParts[0] == resource {
+			if scope == "write" {
+				return childParts[1] == "read" || childParts[1] == "write"
+			}
+			if scope == "read" {
+				return childParts[1] == "read"
+			}
 		}
 	}
 	return false
