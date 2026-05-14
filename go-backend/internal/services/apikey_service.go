@@ -28,6 +28,10 @@ func NewAPIKeyService(db *gorm.DB) *APIKeyService {
 }
 
 func (s *APIKeyService) Create(userID uint, name string) (*models.APIKey, string, error) {
+	return s.CreateWithPermissions(userID, name, "read,write", "")
+}
+
+func (s *APIKeyService) CreateWithPermissions(userID uint, name, permissions, agentName string) (*models.APIKey, string, error) {
 	var count int64
 	s.db.Model(&models.APIKey{}).Where("user_id = ?", userID).Count(&count)
 	if count >= MaxAPIKeysPerUser {
@@ -42,6 +46,10 @@ func (s *APIKeyService) Create(userID uint, name string) (*models.APIKey, string
 		name = name[:100]
 	}
 
+	if permissions == "" {
+		permissions = "read,write"
+	}
+
 	rawKey, err := generateAPIKey()
 	if err != nil {
 		return nil, "", err
@@ -52,10 +60,12 @@ func (s *APIKeyService) Create(userID uint, name string) (*models.APIKey, string
 	prefix := rawKey[:8]
 
 	apiKey := &models.APIKey{
-		UserID:    userID,
-		Name:      name,
-		KeyHash:   keyHash,
-		KeyPrefix: prefix,
+		UserID:      userID,
+		Name:        name,
+		KeyHash:     keyHash,
+		KeyPrefix:   prefix,
+		Permissions: permissions,
+		AgentName:   agentName,
 	}
 
 	if err := s.db.Create(apiKey).Error; err != nil {
@@ -106,6 +116,24 @@ func (s *APIKeyService) Count(userID uint) int64 {
 	var count int64
 	s.db.Model(&models.APIKey{}).Where("user_id = ?", userID).Count(&count)
 	return count
+}
+
+func (s *APIKeyService) HasPermission(apiKey *models.APIKey, permission string) bool {
+	perms := strings.Split(apiKey.Permissions, ",")
+	for _, p := range perms {
+		p = strings.TrimSpace(p)
+		if p == "admin" || p == permission {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *APIKeyService) GetAgentName(apiKey *models.APIKey) string {
+	if apiKey.AgentName != "" {
+		return apiKey.AgentName
+	}
+	return "unknown"
 }
 
 func generateAPIKey() (string, error) {

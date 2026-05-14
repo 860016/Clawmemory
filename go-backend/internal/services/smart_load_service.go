@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -33,33 +34,33 @@ const (
 )
 
 type LoadedMemory struct {
-	ID             uint            `json:"id"`
-	Key            string          `json:"key"`
-	Value          string          `json:"value,omitempty"`
-	Summary        string          `json:"summary"`
-	Layer          string          `json:"layer"`
-	MemoryType     string          `json:"memory_type"`
-	Importance     float64         `json:"importance"`
-	Tags           []string        `json:"tags"`
-	Source         string          `json:"source"`
-	Score          float64         `json:"score"`
-	LoadLevel      MemoryLoadLevel `json:"load_level"`
-	RelatedIDs     []uint          `json:"related_ids,omitempty"`
-	EstimatedTokens int            `json:"estimated_tokens"`
-	Freshness      string          `json:"freshness"`
-	FreshnessWarning string        `json:"freshness_warning,omitempty"`
-	VerifiedAt     string          `json:"verified_at,omitempty"`
-	VerificationWarning string     `json:"verification_warning,omitempty"`
-	CreatedAt      string          `json:"created_at"`
+	ID                  uint            `json:"id"`
+	Key                 string          `json:"key"`
+	Value               string          `json:"value,omitempty"`
+	Summary             string          `json:"summary"`
+	Layer               string          `json:"layer"`
+	MemoryType          string          `json:"memory_type"`
+	Importance          float64         `json:"importance"`
+	Tags                []string        `json:"tags"`
+	Source              string          `json:"source"`
+	Score               float64         `json:"score"`
+	LoadLevel           MemoryLoadLevel `json:"load_level"`
+	RelatedIDs          []uint          `json:"related_ids,omitempty"`
+	EstimatedTokens     int             `json:"estimated_tokens"`
+	Freshness           string          `json:"freshness"`
+	FreshnessWarning    string          `json:"freshness_warning,omitempty"`
+	VerifiedAt          string          `json:"verified_at,omitempty"`
+	VerificationWarning string          `json:"verification_warning,omitempty"`
+	CreatedAt           string          `json:"created_at"`
 }
 
 type SmartLoadResult struct {
-	Memories       []LoadedMemory `json:"memories"`
-	TotalTokens    int            `json:"total_tokens"`
-	TokenBudget    int            `json:"token_budget"`
-	LoadLevel      string         `json:"load_level"`
-	Engine         string         `json:"engine"`
-	Suggestions    []string       `json:"suggestions,omitempty"`
+	Memories    []LoadedMemory `json:"memories"`
+	TotalTokens int            `json:"total_tokens"`
+	TokenBudget int            `json:"token_budget"`
+	LoadLevel   string         `json:"load_level"`
+	Engine      string         `json:"engine"`
+	Suggestions []string       `json:"suggestions,omitempty"`
 }
 
 func (s *SmartLoadService) SmartLoad(userID uint, query string, tokenBudget int, loadLevel string) (*SmartLoadResult, error) {
@@ -68,7 +69,7 @@ func (s *SmartLoadService) SmartLoad(userID uint, query string, tokenBudget int,
 	}
 
 	var memories []models.Memory
-	s.db.Where("user_id = ? AND status = ?", userID, "active").Find(&memories)
+	_ = s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error
 
 	if len(memories) == 0 {
 		return &SmartLoadResult{
@@ -88,13 +89,9 @@ func (s *SmartLoadService) SmartLoad(userID uint, query string, tokenBudget int,
 		}
 	}
 
-	for i := 0; i < len(scored)-1; i++ {
-		for j := i + 1; j < len(scored); j++ {
-			if scored[j].Score > scored[i].Score {
-				scored[i], scored[j] = scored[j], scored[i]
-			}
-		}
-	}
+	sort.Slice(scored, func(i, j int) bool {
+		return scored[i].Score > scored[j].Score
+	})
 
 	loaded := s.allocateByBudget(scored, tokenBudget, loadLevel)
 
@@ -197,23 +194,23 @@ func (s *SmartLoadService) allocateByBudget(scored []scoredMemory, tokenBudget i
 		verifiedAt, verificationWarning := computeVerification(m)
 
 		mem := LoadedMemory{
-			ID:                   m.ID,
-			Key:                  m.Key,
-			Value:                value,
-			Summary:              summary,
-			Layer:                m.Layer,
-			MemoryType:           m.MemoryType,
-			Importance:           m.Importance,
-			Tags:                 parseTagsSlice(m.Tags),
-			Source:               m.Source,
-			Score:                math.Round(sm.Score*1000) / 1000,
-			LoadLevel:            level,
-			EstimatedTokens:      estTokens,
-			Freshness:            freshness,
-			FreshnessWarning:     freshnessWarning,
-			VerifiedAt:           verifiedAt,
-			VerificationWarning:  verificationWarning,
-			CreatedAt:            m.CreatedAt.Format("2006-01-02 15:04:05"),
+			ID:                  m.ID,
+			Key:                 m.Key,
+			Value:               value,
+			Summary:             summary,
+			Layer:               m.Layer,
+			MemoryType:          m.MemoryType,
+			Importance:          m.Importance,
+			Tags:                parseTagsSlice(m.Tags),
+			Source:              m.Source,
+			Score:               math.Round(sm.Score*1000) / 1000,
+			LoadLevel:           level,
+			EstimatedTokens:     estTokens,
+			Freshness:           freshness,
+			FreshnessWarning:    freshnessWarning,
+			VerifiedAt:          verifiedAt,
+			VerificationWarning: verificationWarning,
+			CreatedAt:           m.CreatedAt.Format("2006-01-02 15:04:05"),
 		}
 
 		if remainingBudget-mem.EstimatedTokens < 0 && len(result) > 0 {
@@ -417,7 +414,9 @@ func (s *SmartLoadService) GenerateAndSaveSummary(userID uint, memoryID uint) (s
 
 func (s *SmartLoadService) BatchGenerateSummaries(userID uint) (int, error) {
 	var memories []models.Memory
-	s.db.Where("user_id = ? AND summary = '' AND status = ?", userID, "active").Find(&memories)
+	if err := s.db.Where("user_id = ? AND summary = '' AND status = ?", userID, "active").Find(&memories).Error; err != nil {
+		return 0, err
+	}
 
 	count := 0
 	for _, m := range memories {

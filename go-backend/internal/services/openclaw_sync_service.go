@@ -13,6 +13,7 @@ import (
 
 	"clawmemory/internal/models"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -21,6 +22,7 @@ import (
 const (
 	MaxMemoryContentLength = 50000
 	SyncInterval           = 60 * time.Second
+	DebounceInterval       = 2 * time.Second
 )
 
 var sensitivePatterns = []string{
@@ -44,6 +46,7 @@ type OpenClawSyncService struct {
 	stopChan        chan struct{}
 	running         bool
 	mu              sync.Mutex
+	keysMu          sync.RWMutex
 	lastSyncTime    time.Time
 	syncedKeys      map[string]string
 	syncedCount     int
@@ -51,11 +54,15 @@ type OpenClawSyncService struct {
 	autoSyncEnabled bool
 	skippedCount    int
 	mode            string
+	watcher         *fsnotify.Watcher
+	debounceTimer   *time.Timer
+	pendingEvents   map[string]bool
 }
 
 type SyncStatus struct {
 	Running         bool      `json:"running"`
 	Mode            string    `json:"mode"`
+	WatchMode       string    `json:"watch_mode"`
 	LastSyncTime    time.Time `json:"last_sync_time"`
 	SyncedCount     int       `json:"synced_count"`
 	SkippedCount    int       `json:"skipped_count"`
@@ -64,6 +71,7 @@ type SyncStatus struct {
 	OpenClawFound   bool      `json:"openclaw_found"`
 	LocalPaths      []string  `json:"local_paths,omitempty"`
 	RemoteEndpoint  string    `json:"remote_endpoint,omitempty"`
+	WatchedDirs     int       `json:"watched_dirs"`
 }
 
 type ConversationMessage struct {
@@ -72,12 +80,14 @@ type ConversationMessage struct {
 }
 
 type ConversationPushRequest struct {
-	SessionID   string               `json:"session_id"`
-	Title       string               `json:"title"`
-	ProjectPath string               `json:"project_path"`
-	AgentName   string               `json:"agent_name"`
+	SessionID   string                `json:"session_id"`
+	Title       string                `json:"title"`
+	ProjectPath string                `json:"project_path"`
+	AgentName   string                `json:"agent_name"`
 	Messages    []ConversationMessage `json:"messages"`
-	Summary     string               `json:"summary"`
+	Summary     string                `json:"summary"`
+	Platform    string                `json:"platform"`
+	Visibility  string                `json:"visibility"`
 }
 
 var (
@@ -114,45 +124,38 @@ func (s *OpenClawSyncService) detectMode() {
 }
 
 func (s *OpenClawSyncService) detectLocalOpenClaw() bool {
-	homeDir, _ := os.UserHomeDir()
-	openclawDir := filepath.Join(homeDir, ".openclaw")
-	if _, err := os.Stat(openclawDir); err == nil {
-		return true
-	}
-
-	appData := os.Getenv("APPDATA")
-	if appData != "" {
-		if _, err := os.Stat(filepath.Join(appData, "Trae CN")); err == nil {
-			return true
-		}
-		if _, err := os.Stat(filepath.Join(appData, "CodeBuddy CN")); err == nil {
-			return true
-		}
-		if _, err := os.Stat(filepath.Join(appData, "CodeBuddy")); err == nil {
-			return true
-		}
-	}
-
-	localAppData := os.Getenv("LOCALAPPDATA")
-	if localAppData != "" {
-		if _, err := os.Stat(filepath.Join(localAppData, "Trae CN")); err == nil {
-			return true
-		}
-		if _, err := os.Stat(filepath.Join(localAppData, "CodeBuddy CN")); err == nil {
-			return true
-		}
-	}
-
-	return false
+	installed := DetectInstalledClients()
+	return len(installed) > 0
 }
 
 func (s *OpenClawSyncService) loadSyncedKeys() {
 	var memories []models.Memory
-	s.db.Where("source LIKE ? OR source LIKE ? OR source LIKE ? OR source LIKE ?",
-		"openclaw%", "trae%", "codebuddy%", "conversation%").Select("key").Find(&memories)
+	_ = s.db.Where("source LIKE ? OR source LIKE ? OR source LIKE ? OR source LIKE ? OR source LIKE ? OR source LIKE ? OR source LIKE ? OR source LIKE ? OR source LIKE ? OR source LIKE ?",
+		"openclaw%", "trae%", "codebuddy%", "conversation%", "cursor%", "claude%", "windsurf%", "cline%", "continue%", "hermes%").Select("key").Find(&memories).Error
+	s.keysMu.Lock()
 	for _, m := range memories {
 		s.syncedKeys[m.Key] = m.Key
 	}
+	s.keysMu.Unlock()
+}
+
+func (s *OpenClawSyncService) isKeySynced(key string) bool {
+	s.keysMu.RLock()
+	defer s.keysMu.RUnlock()
+	_, exists := s.syncedKeys[key]
+	return exists
+}
+
+func (s *OpenClawSyncService) markKeySynced(key string) {
+	s.keysMu.Lock()
+	s.syncedKeys[key] = key
+	s.keysMu.Unlock()
+}
+
+func (s *OpenClawSyncService) markKeySkipped(key string) {
+	s.keysMu.Lock()
+	s.syncedKeys[key] = "__SKIPPED_SENSITIVE__"
+	s.keysMu.Unlock()
 }
 
 func (s *OpenClawSyncService) Start() {
@@ -170,9 +173,207 @@ func (s *OpenClawSyncService) Start() {
 
 	s.running = true
 	s.stopChan = make(chan struct{})
+	s.pendingEvents = make(map[string]bool)
+
+	s.localSync()
 
 	if s.mode == "local" {
-		go s.localSyncLoop()
+		watcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			s.lastError = fmt.Sprintf("fsnotify init failed: %v, falling back to polling", err)
+			go s.periodicRescan()
+			return
+		}
+		s.watcher = watcher
+
+		s.addWatchDirs()
+
+		go s.watchLoop()
+		go s.periodicRescan()
+	}
+}
+
+func (s *OpenClawSyncService) addWatchDirs() {
+	if s.watcher == nil {
+		return
+	}
+	dirs := GetAllSearchDirs()
+	for _, dir := range dirs {
+		if _, err := os.Stat(dir); err == nil {
+			s.watcher.Add(dir)
+			filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+				if err != nil || !info.IsDir() {
+					return nil
+				}
+				s.watcher.Add(path)
+				return nil
+			})
+		}
+	}
+}
+
+func (s *OpenClawSyncService) watchLoop() {
+	for {
+		select {
+		case <-s.stopChan:
+			return
+		case event, ok := <-s.watcher.Events:
+			if !ok {
+				return
+			}
+			if !s.autoSyncEnabled {
+				continue
+			}
+			if event.Op&fsnotify.Create == fsnotify.Create || event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Rename == fsnotify.Rename {
+				ext := strings.ToLower(filepath.Ext(event.Name))
+				if ext == ".md" || ext == ".json" || ext == ".db" || ext == ".sqlite" || ext == ".sqlite3" || ext == ".vscdb" {
+					if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
+						s.watcher.Add(event.Name)
+						continue
+					}
+					s.mu.Lock()
+					s.pendingEvents[event.Name] = true
+					if s.debounceTimer != nil {
+						s.debounceTimer.Stop()
+					}
+					s.debounceTimer = time.AfterFunc(DebounceInterval, func() {
+						s.mu.Lock()
+						events := s.pendingEvents
+						s.pendingEvents = make(map[string]bool)
+						s.mu.Unlock()
+						s.processFileEvents(events)
+					})
+					s.mu.Unlock()
+				}
+			}
+			if event.Op&fsnotify.Create == fsnotify.Create {
+				if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
+					s.watcher.Add(event.Name)
+				}
+			}
+		case err, ok := <-s.watcher.Errors:
+			if !ok {
+				return
+			}
+			s.mu.Lock()
+			s.lastError = err.Error()
+			s.mu.Unlock()
+		}
+	}
+}
+
+func (s *OpenClawSyncService) processFileEvents(events map[string]bool) {
+	for filePath := range events {
+		previews := s.extractFromFile(filePath)
+		if len(previews) == 0 {
+			continue
+		}
+
+		recordSensitive := s.getRecordSensitiveSetting()
+		var encryptor *Encryptor
+		if recordSensitive {
+			secretKey := s.getSecretKey()
+			if secretKey == "" {
+				recordSensitive = false
+			} else {
+				var err error
+				encryptor, err = NewEncryptor(secretKey)
+				if err != nil {
+					recordSensitive = false
+				}
+			}
+		}
+
+		userID := s.getDefaultUserID()
+		if userID == 0 {
+			continue
+		}
+
+		for _, p := range previews {
+			if s.isKeySynced(p.Key) {
+				continue
+			}
+			if s.isLowQualityContent(p.Content) {
+				continue
+			}
+
+			isSensitive := s.containsSensitiveInfo(p.Key) || s.containsSensitiveInfo(p.Content)
+			isSensitiveFile := s.isSensitiveFile(p.FilePath)
+			if (isSensitive || isSensitiveFile) && !recordSensitive {
+				s.skippedCount++
+				s.markKeySkipped(p.Key)
+				continue
+			}
+
+			if len(p.Content) > MaxMemoryContentLength {
+				p.Content = p.Content[:MaxMemoryContentLength]
+			}
+
+			value := p.Content
+			source := p.Source
+			isEncrypted := false
+			if isSensitive && recordSensitive && encryptor != nil {
+				encrypted, err := EncryptValue(encryptor, p.Content)
+				if err != nil {
+					continue
+				}
+				value = encrypted
+				source = p.Source + ":encrypted"
+				isEncrypted = true
+			}
+
+			_, err := s.memService.Create(userID, map[string]interface{}{
+				"key":          p.Key,
+				"value":        value,
+				"layer":        p.Layer,
+				"source":       source,
+				"memory_type":  s.inferMemoryType(p),
+				"is_encrypted": isEncrypted,
+				"platform":     s.inferPlatform(p),
+				"source_agent": p.AgentName,
+			})
+			if err == nil {
+				s.markKeySynced(p.Key)
+				s.syncedCount++
+			}
+		}
+	}
+
+	s.mu.Lock()
+	s.lastSyncTime = time.Now()
+	s.mu.Unlock()
+}
+
+func (s *OpenClawSyncService) extractFromFile(filePath string) []memoryPreview {
+	ext := strings.ToLower(filepath.Ext(filePath))
+	switch ext {
+	case ".md":
+		return s.parseMarkdownFile(filePath)
+	case ".db", ".sqlite", ".sqlite3":
+		return s.extractSqliteMemories(filePath)
+	case ".json":
+		return s.parseJSONFile(filePath)
+	case ".vscdb":
+		return s.extractVscdbMemories(filePath)
+	}
+	return nil
+}
+
+func (s *OpenClawSyncService) periodicRescan() {
+	ticker := time.NewTicker(SyncInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if !s.autoSyncEnabled {
+				continue
+			}
+			s.addWatchDirs()
+			s.localSync()
+		case <-s.stopChan:
+			return
+		}
 	}
 }
 
@@ -185,25 +386,14 @@ func (s *OpenClawSyncService) Stop() {
 	}
 
 	close(s.stopChan)
-	s.running = false
-}
-
-func (s *OpenClawSyncService) localSyncLoop() {
-	s.localSync()
-
-	ticker := time.NewTicker(s.syncInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			if s.autoSyncEnabled {
-				s.localSync()
-			}
-		case <-s.stopChan:
-			return
-		}
+	if s.watcher != nil {
+		s.watcher.Close()
+		s.watcher = nil
 	}
+	if s.debounceTimer != nil {
+		s.debounceTimer.Stop()
+	}
+	s.running = false
 }
 
 func (s *OpenClawSyncService) localSync() {
@@ -235,7 +425,7 @@ func (s *OpenClawSyncService) localSync() {
 	newCount := 0
 	skipped := 0
 	for _, p := range previews {
-		if _, exists := s.syncedKeys[p.Key]; exists {
+		if s.isKeySynced(p.Key) {
 			continue
 		}
 
@@ -249,7 +439,7 @@ func (s *OpenClawSyncService) localSync() {
 
 		if (isSensitive || isSensitiveFile) && !recordSensitive {
 			skipped++
-			s.syncedKeys[p.Key] = "__SKIPPED_SENSITIVE__"
+			s.markKeySkipped(p.Key)
 			continue
 		}
 
@@ -284,12 +474,14 @@ func (s *OpenClawSyncService) localSync() {
 			"source":       source,
 			"memory_type":  s.inferMemoryType(p),
 			"is_encrypted": isEncrypted,
+			"platform":     s.inferPlatform(p),
+			"source_agent": p.AgentName,
 		})
 		if err != nil {
 			continue
 		}
 
-		s.syncedKeys[p.Key] = p.Key
+		s.markKeySynced(p.Key)
 		newCount++
 	}
 
@@ -299,10 +491,18 @@ func (s *OpenClawSyncService) localSync() {
 
 func (s *OpenClawSyncService) PushConversation(userID uint, req ConversationPushRequest) (int, error) {
 	created := 0
+	platform := req.Platform
+	if platform == "" {
+		platform = req.AgentName
+	}
+	visibility := req.Visibility
+	if visibility == "" {
+		visibility = "private"
+	}
 
 	if req.SessionID != "" && req.Summary != "" {
 		key := "conversation-" + req.AgentName + "-" + req.SessionID
-		if _, exists := s.syncedKeys[key]; !exists {
+		if !s.isKeySynced(key) {
 			value := req.Summary
 			if req.Title != "" {
 				value = req.Title + "\n\n" + value
@@ -313,14 +513,17 @@ func (s *OpenClawSyncService) PushConversation(userID uint, req ConversationPush
 
 			if !s.isLowQualityContent(value) {
 				_, err := s.memService.Create(userID, map[string]interface{}{
-					"key":         key,
-					"value":       value,
-					"layer":       "episodic",
-					"source":      "conversation-" + req.AgentName,
-					"memory_type": "episodic",
+					"key":          key,
+					"value":        value,
+					"layer":        "episodic",
+					"source":       "conversation-" + req.AgentName,
+					"memory_type":  "episodic",
+					"platform":     platform,
+					"source_agent": req.AgentName,
+					"visibility":   visibility,
 				})
 				if err == nil {
-					s.syncedKeys[key] = key
+					s.markKeySynced(key)
 					created++
 				}
 			}
@@ -336,7 +539,7 @@ func (s *OpenClawSyncService) PushConversation(userID uint, req ConversationPush
 		}
 
 		key := "conversation-" + req.AgentName + "-" + msg.Role + "-" + md5Hash(msg.Content)[:12]
-		if _, exists := s.syncedKeys[key]; exists {
+		if s.isKeySynced(key) {
 			continue
 		}
 
@@ -353,14 +556,17 @@ func (s *OpenClawSyncService) PushConversation(userID uint, req ConversationPush
 		}
 
 		_, err := s.memService.Create(userID, map[string]interface{}{
-			"key":         key,
-			"value":       value,
-			"layer":       layer,
-			"source":      "conversation-" + req.AgentName + "-" + msg.Role,
-			"memory_type": memoryType,
+			"key":          key,
+			"value":        value,
+			"layer":        layer,
+			"source":       "conversation-" + req.AgentName + "-" + msg.Role,
+			"memory_type":  memoryType,
+			"platform":     platform,
+			"source_agent": req.AgentName,
+			"visibility":   visibility,
 		})
 		if err == nil {
-			s.syncedKeys[key] = key
+			s.markKeySynced(key)
 			created++
 		}
 	}
@@ -435,7 +641,10 @@ func (s *OpenClawSyncService) isSensitiveFile(filePath string) bool {
 
 func (s *OpenClawSyncService) getDefaultUserID() uint {
 	var user models.User
-	if err := s.db.First(&user).Error; err != nil {
+	if err := s.db.Where("role = ?", "admin").First(&user).Error; err == nil {
+		return user.ID
+	}
+	if err := s.db.Order("id ASC").First(&user).Error; err != nil {
 		return 0
 	}
 	return user.ID
@@ -466,41 +675,14 @@ func (s *OpenClawSyncService) readLocalDatabases() []memoryPreview {
 }
 
 func (s *OpenClawSyncService) getLocalSearchDirs() []string {
-	var dirs []string
-	homeDir, _ := os.UserHomeDir()
-
-	addDir := func(path string) {
-		if _, err := os.Stat(path); err == nil {
-			dirs = append(dirs, path)
+	allDirs := GetAllSearchDirs()
+	var existing []string
+	for _, d := range allDirs {
+		if _, err := os.Stat(d); err == nil {
+			existing = append(existing, d)
 		}
 	}
-
-	addDir(filepath.Join(homeDir, ".openclaw"))
-	addDir(filepath.Join(homeDir, ".openclaw", "workspace"))
-	addDir(filepath.Join(homeDir, ".openclaw", "skills"))
-
-	exePath, _ := os.Executable()
-	exeDir := filepath.Dir(exePath)
-	addDir(filepath.Join(exeDir, "openclaw"))
-
-	wd, _ := os.Getwd()
-	addDir(filepath.Join(wd, ".openclaw"))
-
-	appData := os.Getenv("APPDATA")
-	if appData != "" {
-		addDir(filepath.Join(appData, "Trae CN", "User", "workspaceStorage"))
-		addDir(filepath.Join(appData, "Trae CN", "ModularData", "ai-agent"))
-		addDir(filepath.Join(appData, "CodeBuddy CN", "User", "workspaceStorage"))
-		addDir(filepath.Join(appData, "CodeBuddy", "User", "workspaceStorage"))
-	}
-
-	localAppData := os.Getenv("LOCALAPPDATA")
-	if localAppData != "" {
-		addDir(filepath.Join(localAppData, "Trae CN"))
-		addDir(filepath.Join(localAppData, "CodeBuddy CN"))
-	}
-
-	return dirs
+	return existing
 }
 
 func (s *OpenClawSyncService) extractFromDir(dir string) []memoryPreview {
@@ -711,9 +893,16 @@ func (s *OpenClawSyncService) extractVscdbMemories(dbPath string) []memoryPrevie
 		return nil
 	}
 
-	agentName := "trae"
-	if strings.Contains(strings.ToLower(dbPath), "codebuddy") {
+	agentName := "unknown-vscdb"
+	lowerPath := strings.ToLower(dbPath)
+	if strings.Contains(lowerPath, "trae") {
+		agentName = "trae"
+	} else if strings.Contains(lowerPath, "codebuddy") {
 		agentName = "codebuddy"
+	} else if strings.Contains(lowerPath, "cursor") {
+		agentName = "cursor"
+	} else if strings.Contains(lowerPath, "windsurf") {
+		agentName = "windsurf"
 	}
 
 	type KV struct {
@@ -916,6 +1105,35 @@ func (s *OpenClawSyncService) inferMemoryType(p memoryPreview) string {
 	return "knowledge"
 }
 
+func (s *OpenClawSyncService) inferPlatform(p memoryPreview) string {
+	lowerSource := strings.ToLower(p.Source)
+	lowerPath := strings.ToLower(p.FilePath)
+	lowerAgent := strings.ToLower(p.AgentName)
+
+	platformPatterns := map[string][]string{
+		"openclaw":  {"openclaw", "claude-code"},
+		"hermes":    {"hermes"},
+		"cursor":    {"cursor"},
+		"trae":      {"trae"},
+		"codebuddy": {"codebuddy"},
+		"windsurf":  {"windsurf", "codeium"},
+		"cline":     {"cline"},
+		"continue":  {"continue"},
+		"aider":     {"aider"},
+		"augment":   {"augment"},
+	}
+
+	for platform, patterns := range platformPatterns {
+		for _, pat := range patterns {
+			if strings.Contains(lowerSource, pat) || strings.Contains(lowerPath, pat) || strings.Contains(lowerAgent, pat) {
+				return platform
+			}
+		}
+	}
+
+	return "clawmemory"
+}
+
 func (s *OpenClawSyncService) GetStatus() SyncStatus {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -928,9 +1146,17 @@ func (s *OpenClawSyncService) GetStatus() SyncStatus {
 		}
 	}
 
+	watchMode := "polling"
+	watchedDirs := 0
+	if s.watcher != nil {
+		watchMode = "fsnotify"
+		watchedDirs = len(s.watcher.WatchList())
+	}
+
 	return SyncStatus{
 		Running:         s.running,
 		Mode:            s.mode,
+		WatchMode:       watchMode,
 		LastSyncTime:    s.lastSyncTime,
 		SyncedCount:     s.syncedCount,
 		SkippedCount:    s.skippedCount,
@@ -939,6 +1165,7 @@ func (s *OpenClawSyncService) GetStatus() SyncStatus {
 		OpenClawFound:   s.detectLocalOpenClaw(),
 		LocalPaths:      existingPaths,
 		RemoteEndpoint:  "/api/v1/external/conversations",
+		WatchedDirs:     watchedDirs,
 	}
 }
 

@@ -1,12 +1,17 @@
 package config
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 const (
-	AppVersion    = "2.19.0"
+	AppVersion    = "2.21.0"
 	GitHubRepo    = "860016/Clawmemory"
 	GitHubRepoURL = "https://github.com/860016/Clawmemory"
 )
@@ -26,15 +31,32 @@ func Load() *Config {
 	skillsDir := getSkillsDir(dataDir)
 	backupsDir := getBackupsDir(dataDir)
 
+	jwtSecret := getEnv("SECRET_KEY", "clawmemory-default-secret-change-me")
+	if jwtSecret == "clawmemory-default-secret-change-me" {
+		jwtSecret = generateSecureSecret()
+		fmt.Printf("[CONFIG] WARNING: SECRET_KEY not set, auto-generated a secure secret.\n")
+		fmt.Printf("[CONFIG] To persist across restarts, set SECRET_KEY in your .env file.\n")
+	}
+
 	return &Config{
 		DatabasePath:     filepath.Join(dataDir, "clawmemory.db"),
 		LicenseServerURL: getEnv("LICENSE_SERVER_URL", "https://auth.bestu.top"),
 		RSAPublicKeyPath: filepath.Join(dataDir, "keys", "public.pem"),
-		JWTSecret:        getEnv("SECRET_KEY", "clawmemory-default-secret-change-me"),
+		JWTSecret:        jwtSecret,
 		DataDir:          dataDir,
 		SkillsDir:        skillsDir,
 		BackupsDir:       backupsDir,
 	}
+}
+
+func generateSecureSecret() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		fmt.Printf("[CONFIG] WARNING: failed to generate secure secret: %v, using fallback\n", err)
+		h := sha256.Sum256([]byte(fmt.Sprintf("%d%s", time.Now().UnixNano(), os.Getenv("SECRET_KEY"))))
+		return hex.EncodeToString(h[:])
+	}
+	return hex.EncodeToString(b)
 }
 
 func getDataDir() string {

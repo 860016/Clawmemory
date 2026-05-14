@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"clawmemory/internal/models"
 
@@ -243,7 +244,10 @@ func callLLM(config models.ReasoningConfig, prompt string, level string) (Reason
 
 	url := strings.TrimRight(baseURL, "/") + "/chat/completions"
 
-	req, _ := http.NewRequest("POST", url, bytes.NewReader(jsonBody))
+	req, err := http.NewRequest("POST", url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return ReasoningResult{}, fmt.Errorf("failed to create request: %w", err)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+config.APIKey)
 	if config.Provider == "openrouter" {
@@ -251,14 +255,17 @@ func callLLM(config models.ReasoningConfig, prompt string, level string) (Reason
 		req.Header.Set("X-Title", "ClawMemory Dialectic Reasoning")
 	}
 
-	client := &http.Client{Timeout: 30}
+	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return ReasoningResult{}, fmt.Errorf("LLM request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	respBody, _ := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ReasoningResult{}, fmt.Errorf("failed to read LLM response: %w", err)
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		return ReasoningResult{}, fmt.Errorf("LLM API returned %d: %s", resp.StatusCode, string(respBody[:min(len(respBody), 500)]))

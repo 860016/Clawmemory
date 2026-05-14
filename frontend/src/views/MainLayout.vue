@@ -53,10 +53,14 @@
         <!-- User Menu -->
         <el-dropdown trigger="click" @command="handleUserCommand">
           <button class="user-avatar">
-            <span class="avatar-text">U</span>
+            <span class="avatar-text">{{ userInitial }}</span>
           </button>
           <template #dropdown>
             <el-dropdown-menu>
+              <el-dropdown-item disabled>
+                <el-icon><User /></el-icon>
+                {{ authStore.username || 'admin' }}
+              </el-dropdown-item>
               <el-dropdown-item command="logout" divided>
                 <el-icon><SwitchButton /></el-icon>
                 {{ $t('common.logout') }}
@@ -180,6 +184,7 @@ import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '../stores/theme'
+import { useAuthStore } from '../stores/auth'
 import {
   HomeFilled, Collection, Connection, Setting, Document, Promotion,
   Menu, User, Search, Sunny, Moon, Trophy, SwitchButton,
@@ -193,6 +198,8 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const themeStore = useThemeStore()
+const authStore = useAuthStore()
+const userInitial = computed(() => (authStore.username || 'U').charAt(0).toUpperCase())
 const sidebarCollapsed = ref(false)
 const isMobile = ref(window.innerWidth <= 768)
 const showSearch = ref(false)
@@ -278,7 +285,8 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
   '/memories': [
     { items: [
       { path: '/memories', label: 'memories.all', icon: Collection },
-      { path: '/memories?import=openclaw', label: 'memories.importOpenClaw', icon: Upload },
+      { path: '/memories?import=agent', label: 'memories.importAgentMemories', icon: Upload },
+      { path: '/sharing', label: 'sharing.title', icon: Share },
       { path: '/session-memories', label: 'sessionMemory.title', icon: Memo },
     ]}
   ],
@@ -353,7 +361,7 @@ function navigateTo(item: any) {
 
 function handleUserCommand(command: string) {
   if (command === 'logout') {
-    localStorage.removeItem('token')
+    authStore.logout()
     router.push('/login')
   }
 }

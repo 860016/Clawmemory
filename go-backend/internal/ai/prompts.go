@@ -207,6 +207,400 @@ Return JSON:
   "sentence_count": 2
 }`,
 	},
+	"extract_facts": {
+		ID:          "extract_facts",
+		Name:        "Fact & Preference Extraction",
+		Description: "Extract facts, preferences, and relationships from conversation messages",
+		ProOnly:     false,
+		System: `You are a memory extraction specialist. Your job is to analyze conversation messages and extract structured facts, user preferences, and relationships that should be remembered for future interactions.
+
+Rules:
+1. Extract ONLY information worth remembering long-term
+2. Each fact should be atomic - one piece of information per entry
+3. Preferences should capture user's likes, dislikes, and tendencies
+4. Relationships should capture connections between entities
+5. Ignore greetings, small talk, and procedural messages
+6. Be specific - "prefers dark mode" not "has UI preference"
+
+Return ONLY valid JSON, no other text.`,
+		User: `Extract facts, preferences, and relationships from this conversation:
+
+{{.Messages}}
+
+Existing memories for deduplication:
+{{.ExistingMemories}}
+
+Return JSON:
+{
+  "facts": [
+    {"content": "the fact to remember", "category": "identity|preference|skill|possession|relationship|routine|goal|opinion", "confidence": 0.0-1.0, "source": "user|assistant|inferred"}
+  ],
+  "preferences": [
+    {"topic": "what the preference is about", "value": "the preference value", "strength": "strong|moderate|weak", "confidence": 0.0-1.0}
+  ],
+  "relations": [
+    {"subject": "entity A", "predicate": "relationship type", "object": "entity B", "confidence": 0.0-1.0}
+  ],
+  "updates": [
+    {"old_fact": "existing fact that should be updated", "new_fact": "updated fact", "reason": "why it changed"}
+  ]
+}`,
+	},
+	"memory_consolidate": {
+		ID:          "memory_consolidate",
+		Name:        "Memory Consolidation",
+		Description: "Consolidate and deduplicate extracted facts with existing memories",
+		ProOnly:     false,
+		System: `You are a memory consolidation expert. Your job is to merge new facts with existing memories, resolving conflicts and removing duplicates.
+
+Rules:
+1. If a new fact contradicts an existing memory, keep the newer one and mark the old one as superseded
+2. If a new fact is a subset of an existing memory, merge them
+3. If a new fact adds detail to an existing memory, enrich the existing one
+4. If a new fact is completely new, add it
+5. If a new fact duplicates an existing memory, skip it
+
+Return ONLY valid JSON, no other text.`,
+		User: `Consolidate these new facts with existing memories:
+
+New facts:
+{{.NewFacts}}
+
+Existing memories:
+{{.ExistingMemories}}
+
+Return JSON:
+{
+  "add": [
+    {"key": "memory key", "value": "memory content", "layer": "core|context|detail", "importance": 0.0-1.0, "category": "fact|preference|skill|relationship"}
+  ],
+  "update": [
+    {"memory_id": 1, "field": "value", "old_value": "old", "new_value": "new", "reason": "why updated"}
+  ],
+  "merge": [
+    {"source_ids": [1, 2], "merged_key": "new key", "merged_value": "merged content", "layer": "core|context|detail"}
+  ],
+  "supersede": [
+    {"old_id": 1, "reason": "superseded by newer information", "new_id": 2}
+  ],
+  "skip": [
+    {"fact": "the duplicate fact", "matches_memory_id": 1}
+  ]
+}`,
+	},
+	"context_assemble": {
+		ID:          "context_assemble",
+		Name:        "Smart Context Assembly",
+		Description: "Assemble optimal context for LLM from memories based on query",
+		ProOnly:     true,
+		System: `You are a context optimization expert. Given a user query and available memories, select and organize the most relevant context to include in the LLM prompt.
+
+Rules:
+1. Prioritize directly relevant memories
+2. Include related context that provides background
+3. Respect the token budget strictly
+4. Order memories from most to least relevant
+5. Include a brief relevance explanation for each selected memory
+
+Return ONLY valid JSON, no other text.`,
+		User: `Assemble context for this query:
+
+Query: {{.Query}}
+Token budget: {{.TokenBudget}}
+
+Available memories:
+{{.Memories}}
+
+Return JSON:
+{
+  "selected_memories": [
+    {"memory_id": 1, "relevance_score": 0.0-1.0, "relevance_reason": "why this is relevant", "tokens": 50}
+  ],
+  "total_tokens": 500,
+  "coverage_score": 0.0-1.0,
+  "missing_context": ["what information is still missing"],
+  "suggested_followup": ["what to ask next"]
+}`,
+	},
+	"nudge_reflect": {
+		ID:          "nudge_reflect",
+		Name:        "Periodic Nudge Reflection",
+		Description: "Periodically review recent activity and extract high-value knowledge worth persisting",
+		ProOnly:     false,
+		System: `You are a knowledge distillation specialist. Your job is to review recent memory activity and decide what is worth permanently remembering, what should be compressed, and what can be forgotten.
+
+Philosophy: Only remember information that will influence FUTURE behavior. Discard everything else.
+
+Rules:
+1. Environment facts (tools, configs, project paths) → always persist
+2. User corrections and feedback → always persist (high learning signal)
+3. Repetitive patterns → compress into a single rule
+4. One-time debugging details → forget
+5. User preferences → persist and update existing profile
+6. Task completion patterns → persist as procedural knowledge
+
+Return ONLY valid JSON, no other text.`,
+		User: `Review recent memory activity and extract high-value knowledge:
+
+Recent memory changes:
+{{.RecentChanges}}
+
+Current user profile:
+{{.UserProfile}}
+
+Current memory stats:
+{{.MemoryStats}}
+
+Return JSON:
+{
+  "persist": [
+    {"content": "what to remember", "category": "identity|preference|skill|possession|relationship|routine|goal|opinion|correction", "confidence": 0.0-1.0, "reason": "why this is worth remembering"}
+  ],
+  "compress": [
+    {"memory_ids": [1, 2, 3], "compressed_content": "unified summary", "reason": "why these should be merged"}
+  ],
+  "forget": [
+    {"memory_id": 4, "reason": "why this can be safely forgotten"}
+  ],
+  "profile_updates": [
+    {"field": "communication_style|tech_stack|workflow|preference", "old_value": "previous", "new_value": "updated", "evidence": "what evidence supports this change"}
+  ],
+  "insights": [
+    {"insight": "a higher-level pattern observed from the data", "confidence": 0.0-1.0}
+  ]
+}`,
+	},
+	"self_refine": {
+		ID:          "self_refine",
+		Name:        "Memory Self-Refinement",
+		Description: "Under capacity pressure, automatically distill memories to retain only the highest-value information",
+		ProOnly:     true,
+		System: `You are a memory refinement engine operating under strict capacity constraints. Your job is to distill a set of memories into a smaller, denser set that preserves maximum information value.
+
+Core principle: Information economy — every character must earn its place.
+
+Rules:
+1. Merge overlapping memories into single, denser entries
+2. Remove redundant qualifiers and hedging language
+3. Promote frequently-accessed details to higher layers
+4. Demote stale, rarely-accessed memories to lower layers
+5. Preserve all unique facts — never lose information, only compress it
+6. Keep the most specific, actionable version of each fact
+
+Return ONLY valid JSON, no other text.`,
+		User: `Refine these memories under capacity pressure (target: {{.TargetCount}} memories from {{.CurrentCount}}):
+
+{{.Memories}}
+
+Capacity pressure level: {{.PressureLevel}}
+
+Return JSON:
+{
+  "keep": [
+    {"memory_id": 1, "reason": "why this must be kept as-is"}
+  ],
+  "merge": [
+    {"source_ids": [2, 3, 4], "merged_key": "unified key", "merged_value": "compressed but complete content", "layer": "core|context|detail", "importance": 0.0-1.0}
+  ],
+  "demote": [
+    {"memory_id": 5, "from_layer": "context", "to_layer": "detail", "reason": "why this should be demoted"}
+  ],
+  "archive": [
+    {"memory_id": 6, "reason": "why this can be archived (not deleted, just inactive)"}
+  ],
+  "stats": {
+    "original_count": 0,
+    "result_count": 0,
+    "compression_ratio": 0.0,
+    "information_preservation": 0.0
+  }
+}`,
+	},
+	"user_profile_build": {
+		ID:          "user_profile_build",
+		Name:        "User Profile Modeling",
+		Description: "Build and maintain a deep user profile from accumulated memories and interactions",
+		ProOnly:     true,
+		System: `You are a user modeling specialist. Your job is to analyze a user's memories and activity patterns to build a comprehensive, evolving user profile.
+
+This profile serves as the "USER.md" equivalent — a compact, high-value representation of WHO the user is, HOW they work, and WHAT they need.
+
+Rules:
+1. Profile must be concise but comprehensive (target: under 500 tokens)
+2. Focus on actionable insights that improve future interactions
+3. Detect patterns across multiple memories, not just individual facts
+4. Identify the user's expertise level, communication style, and workflow preferences
+5. Track how the profile has evolved over time
+6. Be specific, not generic — "prefers TypeScript with strict mode" not "has programming preferences"
+
+Return ONLY valid JSON, no other text.`,
+		User: `Build/update the user profile from their memories and activity:
+
+User memories:
+{{.Memories}}
+
+Recent activity summary:
+{{.RecentActivity}}
+
+Existing profile (if any):
+{{.ExistingProfile}}
+
+Return JSON:
+{
+  "profile": {
+    "identity": {
+      "role": "their primary role/title",
+      "expertise_level": "beginner|intermediate|advanced|expert",
+      "domains": ["domain1", "domain2"],
+      "languages": ["language1", "language2"]
+    },
+    "communication_style": {
+      "detail_preference": "brief|moderate|detailed",
+      "language": "primary language",
+      "technical_depth": "surface|moderate|deep",
+      "examples_preference": "prefers code examples|prefers explanations|prefers diagrams"
+    },
+    "workflow": {
+      "tools": ["tool1", "tool2"],
+      "frameworks": ["framework1", "framework2"],
+      "platforms": ["platform1"],
+      "work_style": "description of how they work"
+    },
+    "preferences": [
+      {"topic": "what", "value": "preference", "strength": "strong|moderate|weak", "evidence": "what supports this"}
+    ],
+    "patterns": [
+      {"pattern": "observed behavioral pattern", "frequency": "rare|occasional|frequent", "implication": "what this means for interactions"}
+    ],
+    "growth_areas": [
+      {"area": "what they're learning/improving", "current_level": "level", "trajectory": "improving|stable|exploring"}
+    ]
+  },
+  "profile_version": 1,
+  "confidence": 0.0-1.0,
+  "changes_from_previous": ["what changed", "why"]
+}`,
+	},
+	"skill_create": {
+		ID:          "skill_create",
+		Name:        "AI-Enhanced Skill Creation",
+		Description: "Analyze action traces and create a high-quality, reusable Skill document from repetitive patterns",
+		ProOnly:     true,
+		System: `You are a workflow distillation specialist. Your job is to analyze repeated action patterns from a user's coding sessions and create a comprehensive, reusable Skill document.
+
+A Skill is a structured workflow that captures:
+1. WHEN to use it (trigger conditions)
+2. HOW to execute it (step-by-step instructions)
+3. WHAT to watch out for (known pitfalls)
+4. HOW to verify success (verification steps)
+
+Inspired by Hermes Agent's Skills system, but adapted for IDE-based workflows.
+
+Rules:
+1. Steps must be specific and actionable — not "configure the tool" but "run: clawmemory mcp add cursor"
+2. Include actual commands, file paths, and parameter values where possible
+3. Pitfalls should come from observed failures in the action traces
+4. Trigger keywords should be natural language phrases a user might say
+5. If the pattern involves multiple agents/tools, note the handoff points
+6. Keep the skill concise but complete — aim for under 300 tokens
+
+Return ONLY valid JSON, no other text.`,
+		User: `Analyze these repeated action patterns and create a Skill:
+
+Detected patterns:
+{{.Patterns}}
+
+Action traces (sample):
+{{.Traces}}
+
+Existing skills (to avoid duplication):
+{{.ExistingSkills}}
+
+User profile context:
+{{.UserProfile}}
+
+Return JSON:
+{
+  "skill": {
+    "name": "kebab-case-skill-name",
+    "description": "one-line description of what this skill does",
+    "trigger_keywords": ["keyword1", "keyword2", "phrase that triggers this"],
+    "category": "deployment|debugging|testing|refactoring|setup|workflow|integration|other",
+    "steps": [
+      {"step": 1, "action": "what to do", "detail": "specific command or instruction", "tool": "which tool/agent"},
+      {"step": 2, "action": "what to do next", "detail": "specific command", "tool": "which tool/agent"}
+    ],
+    "parameters": [
+      {"name": "param_name", "type": "string|number|boolean", "description": "what this param controls", "default": "default value if any"}
+    ],
+    "known_pitfalls": [
+      {"pitfall": "what can go wrong", "solution": "how to avoid or fix it", "evidence": "trace evidence if available"}
+    ],
+    "verification": "how to verify the skill executed successfully",
+    "tags": ["tag1", "tag2"]
+  },
+  "confidence": 0.0-1.0,
+  "source_pattern_hash": "hash of the pattern this was derived from",
+  "reasoning": "brief explanation of why this skill is worth creating"
+}`,
+	},
+	"skill_improve": {
+		ID:          "skill_improve",
+		Name:        "AI-Enhanced Skill Improvement",
+		Description: "Analyze skill usage history and improve an existing Skill based on success/failure patterns",
+		ProOnly:     true,
+		System: `You are a skill improvement specialist. Your job is to analyze how a Skill has been used and improve it based on real-world outcomes.
+
+Like Hermes Agent's patch-first philosophy: prefer patching (small targeted fixes) over rewriting (complete replacement). Only rewrite when the skill is fundamentally broken.
+
+Rules:
+1. If success_rate > 80%, only suggest minor optimizations
+2. If success_rate 50-80%, patch the failing steps
+3. If success_rate < 50%, consider a rewrite
+4. Always preserve what works — never remove successful steps
+5. Add new pitfalls based on observed failures
+6. Update trigger keywords based on what queries successfully matched
+
+Return ONLY valid JSON, no other text.`,
+		User: `Improve this Skill based on usage data:
+
+Current Skill:
+{{.CurrentSkill}}
+
+Usage history:
+{{.UsageHistory}}
+
+Recent failures:
+{{.RecentFailures}}
+
+Recent successes:
+{{.RecentSuccesses}}
+
+Action traces since last update:
+{{.RecentTraces}}
+
+Return JSON:
+{
+  "action": "patch|rewrite|keep",
+  "patches": [
+    {"field": "steps|known_pitfalls|trigger_keywords|description|verification", "old_value": "what to replace", "new_value": "replacement", "reason": "why this change"}
+  ],
+  "improved_skill": {
+    "name": "updated name if changed",
+    "description": "updated description",
+    "trigger_keywords": ["updated", "keywords"],
+    "steps": [
+      {"step": 1, "action": "updated action", "detail": "updated detail", "tool": "tool"}
+    ],
+    "known_pitfalls": [
+      {"pitfall": "new pitfall", "solution": "fix", "evidence": "trace evidence"}
+    ],
+    "verification": "updated verification"
+  },
+  "version_change": "patch|minor|major",
+  "changelog": "human-readable summary of what changed and why"
+}`,
+	},
 }
 
 func GetPromptTemplate(id string) (*PromptTemplate, bool) {

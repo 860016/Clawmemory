@@ -4,6 +4,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { ClawMemoryClient } from "./client.js";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const packageJson = require("../package.json");
 
 const CLAWMEMORY_BASE_URL = process.env.CLAWMEMORY_BASE_URL || "http://localhost:8765";
 const CLAWMEMORY_API_KEY = process.env.CLAWMEMORY_API_KEY || "";
@@ -22,7 +26,7 @@ const client = new ClawMemoryClient({
 
 const server = new McpServer({
   name: "clawmemory",
-  version: "1.0.0",
+  version: packageJson.version,
 });
 
 server.tool(
@@ -33,6 +37,8 @@ server.tool(
     value: z.string().describe("The memory content to save"),
     layer: z.enum(["episodic", "semantic", "procedural"]).optional().describe("Memory layer. episodic=events, semantic=facts, procedural=how-to"),
     memory_type: z.enum(["conversation", "knowledge", "preference", "decision"]).optional().describe("Type of memory"),
+    visibility: z.enum(["private", "shared", "public"]).optional().describe("Memory visibility. private=only owner, shared=authorized agents, public=all agents"),
+    source_agent: z.string().optional().describe("Name of the agent saving this memory (e.g., 'trae', 'cursor', 'claude')"),
   },
   async (params) => {
     try {
@@ -41,6 +47,8 @@ server.tool(
         value: params.value,
         layer: params.layer,
         memory_type: params.memory_type,
+        visibility: params.visibility,
+        source_agent: params.source_agent,
       });
       return { content: [{ type: "text", text: `Memory saved: ${params.key}` }] };
     } catch (err: unknown) {
@@ -130,6 +138,7 @@ server.tool(
   {
     content: z.string().describe("The conclusion to save (e.g., 'User prefers TypeScript over JavaScript')"),
     category: z.enum(["preference", "style", "workflow", "skill", "fact"]).optional().describe("Category of the conclusion (default: fact)"),
+    visibility: z.enum(["private", "shared", "public"]).optional().describe("Memory visibility (default: shared)"),
   },
   async (params) => {
     try {
@@ -140,6 +149,7 @@ server.tool(
         layer: "semantic",
         source: "mcp-conclusion",
         memory_type: "knowledge",
+        visibility: params.visibility || "shared",
       });
       return {
         content: [{ type: "text", text: `Conclusion saved (${category}): ${params.content.slice(0, 80)}...` }],

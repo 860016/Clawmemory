@@ -8,12 +8,15 @@ import (
 
 // User 用户
 type User struct {
-	ID        uint      `gorm:"primarykey" json:"id"`
-	Username  string    `gorm:"uniqueIndex;not null" json:"username"`
-	Password  string    `gorm:"not null" json:"-"`
-	Email     string    `json:"email"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID             uint      `gorm:"primarykey" json:"id"`
+	Username       string    `gorm:"uniqueIndex;not null" json:"username"`
+	Password       string    `gorm:"not null" json:"-"`
+	Email          string    `json:"email"`
+	Role           string    `gorm:"size:20;default:user" json:"role"`
+	TokenVersion   int       `gorm:"default:1" json:"token_version"`
+	InvitationCode string    `gorm:"size:50" json:"-"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // Memory 记忆
@@ -30,13 +33,16 @@ type Memory struct {
 	Tags           string     `gorm:"type:text" json:"tags"`
 	Summary        string     `gorm:"size:500" json:"summary"`
 	Source         string     `gorm:"size:50;default:manual" json:"source"`
-	Platform       string     `gorm:"size:30;default:openclaw;index" json:"platform"`
+	Platform       string     `gorm:"size:30;default:clawmemory;index" json:"platform"`
 	Status         string     `gorm:"size:20;default:active;index" json:"status"`
 	TrashedAt      *time.Time `json:"trashed_at"`
 	DecayStage     int        `gorm:"default:0" json:"decay_stage"`
 	ReinforceCount int        `gorm:"default:0" json:"reinforce_count"`
 	MemoryType     string     `gorm:"size:20;default:knowledge" json:"memory_type"`
 	VerifiedAt     *time.Time `json:"verified_at"`
+	SourceAgent    string     `gorm:"size:50;index" json:"source_agent"`
+	Visibility     string     `gorm:"size:20;default:private;index" json:"visibility"`
+	OriginChain    string     `gorm:"size:200" json:"origin_chain"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
 }
@@ -186,14 +192,16 @@ type Backup struct {
 
 // APIKey API 密钥 - 供外部应用（如 OpenClaw）调用
 type APIKey struct {
-	ID         uint       `gorm:"primarykey" json:"id"`
-	UserID     uint       `gorm:"index;not null" json:"user_id"`
-	Name       string     `gorm:"size:100;not null" json:"name"`
-	KeyHash    string     `gorm:"size:64;not null;uniqueIndex" json:"-"`
-	KeyPrefix  string     `gorm:"size:8;not null" json:"key_prefix"`
-	LastUsedAt *time.Time `json:"last_used_at"`
-	ExpiresAt  *time.Time `json:"expires_at"`
-	CreatedAt  time.Time  `json:"created_at"`
+	ID          uint       `gorm:"primarykey" json:"id"`
+	UserID      uint       `gorm:"index;not null" json:"user_id"`
+	Name        string     `gorm:"size:100;not null" json:"name"`
+	KeyHash     string     `gorm:"size:64;not null;uniqueIndex" json:"-"`
+	KeyPrefix   string     `gorm:"size:8;not null" json:"key_prefix"`
+	Permissions string     `gorm:"size:200;default:read,write" json:"permissions"`
+	AgentName   string     `gorm:"size:50;index" json:"agent_name"`
+	LastUsedAt  *time.Time `json:"last_used_at"`
+	ExpiresAt   *time.Time `json:"expires_at"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 type AuditLog struct {
@@ -203,6 +211,8 @@ type AuditLog struct {
 	Target    string    `gorm:"size:100" json:"target"`
 	Detail    string    `gorm:"size:500" json:"detail"`
 	IP        string    `gorm:"size:45" json:"ip"`
+	UserAgent string    `gorm:"size:500" json:"user_agent"`
+	AgentName string    `gorm:"size:50;index" json:"agent_name"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -240,4 +250,152 @@ type ReasoningConfig struct {
 	Enabled        bool      `gorm:"default:false" json:"enabled"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type MemoryShare struct {
+	ID         uint       `gorm:"primarykey" json:"id"`
+	MemoryID   uint       `gorm:"index;not null" json:"memory_id"`
+	FromUserID uint       `gorm:"index;not null" json:"from_user_id"`
+	ToUserID   uint       `gorm:"index" json:"to_user_id"`
+	ToAgent    string     `gorm:"size:50;index" json:"to_agent"`
+	ShareType  string     `gorm:"size:20;not null;default:manual" json:"share_type"`
+	Status     string     `gorm:"size:20;default:pending;index" json:"status"`
+	ApprovedBy *uint      `json:"approved_by"`
+	ApprovedAt *time.Time `json:"approved_at"`
+	ExpiresAt  *time.Time `json:"expires_at"`
+	RuleID     *uint      `json:"rule_id"`
+	Memory     Memory     `gorm:"foreignKey:MemoryID" json:"memory,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
+}
+
+type ShareRule struct {
+	ID            uint      `gorm:"primarykey" json:"id"`
+	UserID        uint      `gorm:"index;not null" json:"user_id"`
+	Name          string    `gorm:"size:100;not null" json:"name"`
+	SourceAgent   string    `gorm:"size:50" json:"source_agent"`
+	TargetAgent   string    `gorm:"size:50" json:"target_agent"`
+	Layer         string    `gorm:"size:20" json:"layer"`
+	MinImportance float64   `gorm:"default:0.5" json:"min_importance"`
+	AutoApprove   bool      `gorm:"default:false" json:"auto_approve"`
+	Enabled       bool      `gorm:"default:true" json:"enabled"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type Invitation struct {
+	ID        uint       `gorm:"primarykey" json:"id"`
+	Code      string     `gorm:"uniqueIndex;size:50;not null" json:"code"`
+	CreatedBy uint       `gorm:"index;not null" json:"created_by"`
+	UsedBy    *uint      `json:"used_by"`
+	UsedAt    *time.Time `json:"used_at"`
+	MaxUses   int        `gorm:"default:1" json:"max_uses"`
+	UsedCount int        `gorm:"default:0" json:"used_count"`
+	ExpiresAt *time.Time `json:"expires_at"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+type SystemLog struct {
+	ID        uint      `gorm:"primarykey" json:"id"`
+	Timestamp string    `gorm:"size:30;index" json:"timestamp"`
+	Level     string    `gorm:"size:10;index" json:"level"`
+	Service   string    `gorm:"size:50" json:"service"`
+	Message   string    `gorm:"size:500" json:"message"`
+	Caller    string    `gorm:"size:100" json:"caller"`
+	Data      string    `gorm:"type:text" json:"data"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type SchemaMigration struct {
+	ID      uint   `gorm:"primarykey" json:"id"`
+	Version int    `gorm:"default:0" json:"version"`
+	Dirty   bool   `gorm:"default:false" json:"dirty"`
+	Key     string `gorm:"size:100;uniqueIndex" json:"key"`
+}
+
+type MemoryHistory struct {
+	ID          uint      `gorm:"primarykey" json:"id"`
+	UserID      uint      `gorm:"index;not null" json:"user_id"`
+	MemoryID    uint      `gorm:"index;not null" json:"memory_id"`
+	OldKey      string    `gorm:"size:200" json:"old_key"`
+	OldValue    string    `gorm:"type:text" json:"old_value"`
+	NewKey      string    `gorm:"size:200" json:"new_key"`
+	NewValue    string    `gorm:"type:text" json:"new_value"`
+	ChangeType  string    `gorm:"size:30;not null" json:"change_type"`
+	Reason      string    `gorm:"size:500" json:"reason"`
+	SourceAgent string    `gorm:"size:50" json:"source_agent"`
+	SessionID   string    `gorm:"size:100;index" json:"session_id"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type UserProfile struct {
+	ID               uint       `gorm:"primarykey" json:"id"`
+	UserID           uint       `gorm:"uniqueIndex;not null" json:"user_id"`
+	Identity         string     `gorm:"type:text" json:"identity"`
+	Communication    string     `gorm:"type:text" json:"communication"`
+	Workflow         string     `gorm:"type:text" json:"workflow"`
+	Preferences      string     `gorm:"type:text" json:"preferences"`
+	Patterns         string     `gorm:"type:text" json:"patterns"`
+	GrowthAreas      string     `gorm:"type:text" json:"growth_areas"`
+	ProfileVersion   int        `gorm:"default:1" json:"profile_version"`
+	Confidence       float64    `gorm:"default:0" json:"confidence"`
+	LastNudgeAt      *time.Time `json:"last_nudge_at"`
+	NudgeCount       int        `gorm:"default:0" json:"nudge_count"`
+	TotalRefinements int        `gorm:"default:0" json:"total_refinements"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+}
+
+type ActionTrace struct {
+	ID          uint      `gorm:"primarykey" json:"id"`
+	UserID      uint      `gorm:"index;not null" json:"user_id"`
+	SessionID   string    `gorm:"size:100;index" json:"session_id"`
+	AgentName   string    `gorm:"size:50;index" json:"agent_name"`
+	Platform    string    `gorm:"size:30;index" json:"platform"`
+	ActionType  string    `gorm:"size:30;not null;index" json:"action_type"`
+	ActionName  string    `gorm:"size:100;not null" json:"action_name"`
+	Parameters  string    `gorm:"type:text" json:"parameters"`
+	Result      string    `gorm:"size:20;default:success" json:"result"`
+	Duration    int       `gorm:"default:0" json:"duration"`
+	PatternHash string    `gorm:"size:64;index" json:"pattern_hash"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type Skill struct {
+	ID              uint       `gorm:"primarykey" json:"id"`
+	UserID          uint       `gorm:"not null;uniqueIndex:idx_user_skill" json:"user_id"`
+	Name            string     `gorm:"size:100;not null;uniqueIndex:idx_user_skill" json:"name"`
+	Description     string     `gorm:"size:500" json:"description"`
+	TriggerKeywords string     `gorm:"type:text" json:"trigger_keywords"`
+	Steps           string     `gorm:"type:text" json:"steps"`
+	Parameters      string     `gorm:"type:text" json:"parameters"`
+	KnownPitfalls   string     `gorm:"type:text" json:"known_pitfalls"`
+	Verification    string     `gorm:"size:500" json:"verification"`
+	SourceAgent     string     `gorm:"size:50;index" json:"source_agent"`
+	SourceSession   string     `gorm:"size:100" json:"source_session"`
+	Category        string     `gorm:"size:30;index" json:"category"`
+	Tags            string     `gorm:"type:text" json:"tags"`
+	UsageCount      int        `gorm:"default:0" json:"usage_count"`
+	SuccessCount    int        `gorm:"default:0" json:"success_count"`
+	FailCount       int        `gorm:"default:0" json:"fail_count"`
+	Version         int        `gorm:"default:1" json:"version"`
+	AutoCreated     bool       `gorm:"default:true" json:"auto_created"`
+	Status          string     `gorm:"size:20;default:active;index" json:"status"`
+	LastUsedAt      *time.Time `json:"last_used_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+type SkillSuggestion struct {
+	ID          uint       `gorm:"primarykey" json:"id"`
+	UserID      uint       `gorm:"index;not null" json:"user_id"`
+	AgentName   string     `gorm:"size:50;index" json:"agent_name"`
+	SuggestType string     `gorm:"size:30;not null" json:"suggest_type"`
+	Title       string     `gorm:"size:200;not null" json:"title"`
+	Description string     `gorm:"type:text" json:"description"`
+	ImportURL   string     `gorm:"size:500" json:"import_url"`
+	ImportGuide string     `gorm:"type:text" json:"import_guide"`
+	Status      string     `gorm:"size:20;default:pending;index" json:"status"`
+	DismissedAt *time.Time `json:"dismissed_at"`
+	CreatedAt   time.Time  `json:"created_at"`
 }

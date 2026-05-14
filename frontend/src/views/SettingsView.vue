@@ -126,6 +126,49 @@
         </div>
       </div>
 
+      <!-- 风险开关 -->
+      <div class="settings-card" id="settings-risk-switches">
+        <div class="card-title">⚠️ {{ $t('riskSwitch.title') }}</div>
+        <p class="setting-desc" style="margin-bottom: 12px">{{ $t('riskSwitch.desc') }}</p>
+        <div class="risk-category">
+          <div class="risk-category-title">{{ $t('riskSwitch.categoryMemory') }}</div>
+          <div class="setting-item">
+            <span>{{ $t('riskSwitch.allowCrossAgentRead') }}</span>
+            <el-switch v-model="riskSwitches.allow_cross_agent_read" @change="saveRiskSwitches" />
+          </div>
+          <div class="setting-item">
+            <span>{{ $t('riskSwitch.allowCrossAgentWrite') }}</span>
+            <el-switch v-model="riskSwitches.allow_cross_agent_write" @change="saveRiskSwitches" />
+          </div>
+          <div class="setting-item">
+            <span>{{ $t('riskSwitch.allowMemoryVisibilityChange') }}</span>
+            <el-switch v-model="riskSwitches.allow_visibility_change" @change="saveRiskSwitches" />
+          </div>
+        </div>
+        <div class="risk-category">
+          <div class="risk-category-title">{{ $t('riskSwitch.categorySharing') }}</div>
+          <div class="setting-item">
+            <span>{{ $t('riskSwitch.allowAutoSharing') }}</span>
+            <el-switch v-model="riskSwitches.allow_auto_sharing" @change="saveRiskSwitches" />
+          </div>
+          <div class="setting-item">
+            <span>{{ $t('riskSwitch.allowManualSharing') }}</span>
+            <el-switch v-model="riskSwitches.allow_manual_sharing" @change="saveRiskSwitches" />
+          </div>
+          <div class="setting-item">
+            <span>{{ $t('riskSwitch.allowBatchShare') }}</span>
+            <el-switch v-model="riskSwitches.allow_batch_share" @change="saveRiskSwitches" />
+          </div>
+        </div>
+        <div class="risk-category">
+          <div class="risk-category-title">{{ $t('riskSwitch.categoryWriteback') }}</div>
+          <div class="setting-item">
+            <span>{{ $t('riskSwitch.allowWriteback') }}</span>
+            <el-switch v-model="riskSwitches.allow_writeback" @change="saveRiskSwitches" />
+          </div>
+        </div>
+      </div>
+
       <!-- Dialectic Reasoning -->
       <div class="settings-card" id="settings-reasoning">
         <div class="card-title">🔮 {{ $t('settings.reasoningConfig') }}</div>
@@ -240,63 +283,44 @@
         </el-alert>
       </div>
 
-      <!-- OpenClaw 连接配置 -->
+      <!-- 客户端连接配置 -->
       <div class="settings-card" id="settings-openclaw">
-        <div class="card-title">🔗 {{ $t('settings.openclawConnection') }}</div>
-        <div class="setting-item" v-if="openclawStatus">
-          <span>{{ $t('settings.connectionMode') }}</span>
-          <el-tag :type="openclawStatus.mode === 'local' ? 'success' : 'warning'" size="small">
-            {{ openclawStatus.mode === 'local' ? $t('settings.localMode') : $t('settings.remoteMode') }}
-          </el-tag>
+        <div class="card-title">🔗 {{ $t('settings.clientConnection') }}</div>
+        <div class="setting-item">
+          <span>{{ $t('settings.connectedAgents') }}</span>
+          <el-button size="small" @click="loadConnectedAgents" :loading="agentScanLoading">{{ $t('settings.refresh') }}</el-button>
         </div>
-        <div class="setting-item" v-if="openclawStatus">
-          <span>{{ $t('settings.autoRecord') }}</span>
-          <el-switch v-model="openclawAutoSync" @change="toggleOpenClawSync" :loading="openclawSyncLoading" />
-        </div>
-        <div v-if="openclawStatus && openclawStatus.mode === 'local'" class="openclaw-local-info">
-          <div class="setting-item">
-            <span>{{ $t('settings.localDetected') }}</span>
-            <el-tag type="success" size="small">✓</el-tag>
-          </div>
-          <div v-if="openclawStatus.local_paths && openclawStatus.local_paths.length > 0" class="openclaw-paths">
-            <div v-for="p in openclawStatus.local_paths" :key="p" class="openclaw-path-item">
-              <code>{{ p }}</code>
+        <div v-if="connectedAgents.length > 0" class="agent-list">
+          <div v-for="agent in connectedAgents" :key="agent.name" class="agent-item">
+            <div class="agent-item-header">
+              <span class="agent-name">{{ agent.display_name || agent.name }}</span>
+              <el-tag type="success" size="small">{{ $t('settings.agentConnected') }}</el-tag>
+            </div>
+            <div v-if="agent.found_dirs && agent.found_dirs.length > 0" class="openclaw-paths">
+              <div v-for="p in agent.found_dirs" :key="p" class="openclaw-path-item">
+                <code>{{ p }}</code>
+              </div>
             </div>
           </div>
-          <div class="setting-item" v-if="openclawStatus.synced_count > 0">
-            <span>{{ $t('settings.syncedCount') }}</span>
-            <span class="setting-desc">{{ openclawStatus.synced_count }}</span>
-          </div>
-          <div class="setting-item" v-if="openclawStatus.skipped_count > 0">
-            <span>{{ $t('settings.skippedCount') }}</span>
-            <span class="setting-desc">{{ openclawStatus.skipped_count }}</span>
-          </div>
-          <div class="setting-item">
-            <span>{{ $t('settings.forceSync') }}</span>
-            <el-button size="small" type="primary" @click="forceOpenClawSync" :loading="openclawSyncLoading">{{ $t('settings.syncNow') }}</el-button>
-          </div>
         </div>
-        <div v-if="openclawStatus && openclawStatus.mode === 'remote'" class="openclaw-remote-info">
-          <el-alert type="info" :closable="false" style="margin-bottom: 12px; font-size: 12px">
-            <template #title>{{ $t('settings.remoteModeHint') }}</template>
-          </el-alert>
-          <div class="api-usage-hint" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
-            <div style="font-weight: 600; margin-bottom: 6px">{{ $t('settings.pushEndpoint') }}</div>
-            <code style="display: block; padding: 8px; background: var(--cm-bg); border-radius: 4px; font-size: 11px; word-break: break-all; color: var(--cm-accent)">
-              curl -X POST http://localhost:8765/api/v1/external/conversations \<br>
-              &nbsp;&nbsp;-H "X-API-Key: YOUR_KEY" \<br>
-              &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
-              &nbsp;&nbsp;-d '{"agent_name":"openclaw","session_id":"xxx","messages":[{"role":"user","content":"..."}]}'
-            </code>
-          </div>
-          <div class="setting-item" style="margin-top: 12px" v-if="apiKeys.length === 0">
-            <span class="setting-desc">{{ $t('settings.needApiKeyForRemote') }}</span>
-            <el-button size="small" type="primary" @click="openApiKeyDialog">{{ $t('settings.createApiKey') }}</el-button>
-          </div>
+        <div v-if="connectedAgents.length === 0 && !agentScanLoading" class="setting-item">
+          <span class="setting-desc">{{ $t('settings.noAgentsDetected') }}</span>
         </div>
-        <div v-if="!openclawStatus" class="setting-item">
-          <span>{{ $t('settings.checkingStatus') }}</span>
-          <el-button size="small" @click="loadOpenClawStatus" :loading="openclawSyncLoading">{{ $t('settings.refresh') }}</el-button>
+        <div class="setting-item" v-if="agentSyncStatus">
+          <span>{{ $t('settings.autoRecord') }}</span>
+          <el-switch v-model="agentAutoSync" @change="toggleAgentSync" :loading="agentSyncLoading" />
+        </div>
+        <div v-if="agentSyncStatus" class="setting-item">
+          <span>{{ $t('settings.forceSync') }}</span>
+          <el-button size="small" type="primary" @click="forceAgentSync" :loading="agentSyncLoading">{{ $t('settings.syncNow') }}</el-button>
+        </div>
+        <div v-if="agentSyncStatus && agentSyncStatus.synced_count > 0" class="setting-item">
+          <span>{{ $t('settings.syncedCount') }}</span>
+          <span class="setting-desc">{{ agentSyncStatus.synced_count }}</span>
+        </div>
+        <div v-if="agentSyncStatus && agentSyncStatus.skipped_count > 0" class="setting-item">
+          <span>{{ $t('settings.skippedCount') }}</span>
+          <span class="setting-desc">{{ agentSyncStatus.skipped_count }}</span>
         </div>
         <div style="margin-top: 12px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
           <div style="font-weight: 600; margin-bottom: 6px">🔌 {{ $t('settings.pluginInstallTitle') }}</div>
@@ -326,7 +350,8 @@
         </div>
         <div class="setting-item">
           <span>{{ $t('settings.exportData') }}</span>
-          <el-button size="small" type="primary" @click="exportData">{{ $t('settings.export') }}</el-button>
+          <el-input v-model="exportPassword" type="password" :placeholder="$t('settings.enterPassword')" size="small" style="width:160px;margin-right:8px" show-password />
+          <el-button size="small" type="primary" @click="exportData" :disabled="!exportPassword">{{ $t('settings.export') }}</el-button>
         </div>
         <div class="setting-item">
           <span>{{ $t('settings.importData') }}</span>
@@ -573,6 +598,7 @@ const license = ref<any>({ active: false, tier: 'oss', features: [] })
 const activating = ref(false)
 const licenseKey = ref('')
 const exporting = ref(false)
+const exportPassword = ref('')
 const passwordSet = ref(false)
 const showPasswordDialog = ref(false)
 const oldPassword = ref('')
@@ -674,7 +700,7 @@ const featureLabels: Record<string, string> = {
 }
 
 onMounted(async () => {
-  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys(), loadRecordSensitiveSetting(), loadOpenClawStatus(), loadAIConfig(), loadAIUsage(), loadReasoningConfig()])
+  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys(), loadRecordSensitiveSetting(), loadConnectedAgents(), loadAgentSyncStatus(), loadRiskSwitches(), loadAIConfig(), loadAIUsage(), loadReasoningConfig()])
   if (activeSection.value) {
     nextTick(() => scrollToSection(activeSection.value))
   }
@@ -764,46 +790,60 @@ function copyApiKey() {
   ElMessage.success(t('settings.apiKeyCopied'))
 }
 
-const openclawStatus = ref<any>(null)
-const openclawAutoSync = ref(true)
-const openclawSyncLoading = ref(false)
+const connectedAgents = ref<any[]>([])
+const agentScanLoading = ref(false)
+const agentSyncStatus = ref<any>(null)
+const agentAutoSync = ref(true)
+const agentSyncLoading = ref(false)
 
-async function loadOpenClawStatus() {
-  openclawSyncLoading.value = true
+async function loadConnectedAgents() {
+  agentScanLoading.value = true
   try {
-    const { data } = await axios.get('/openclaw-sync/status')
-    openclawStatus.value = data
-    openclawAutoSync.value = data.auto_sync_enabled
+    const { data } = await axios.get('/agents/connected')
+    connectedAgents.value = data.agents || []
   } catch {
-    openclawStatus.value = null
+    connectedAgents.value = []
   } finally {
-    openclawSyncLoading.value = false
+    agentScanLoading.value = false
   }
 }
 
-async function toggleOpenClawSync() {
-  openclawSyncLoading.value = true
+async function loadAgentSyncStatus() {
+  agentSyncLoading.value = true
   try {
-    await axios.post('/openclaw-sync/toggle', { enabled: openclawAutoSync.value })
+    const { data } = await axios.get('/agent-sync/status')
+    agentSyncStatus.value = data
+    agentAutoSync.value = data.auto_sync_enabled
+  } catch {
+    agentSyncStatus.value = null
+  } finally {
+    agentSyncLoading.value = false
+  }
+}
+
+async function toggleAgentSync() {
+  agentSyncLoading.value = true
+  try {
+    await axios.post('/agent-sync/toggle', { enabled: agentAutoSync.value })
     ElMessage.success(t('common.success'))
   } catch (e: any) {
-    openclawAutoSync.value = !openclawAutoSync.value
+    agentAutoSync.value = !agentAutoSync.value
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally {
-    openclawSyncLoading.value = false
+    agentSyncLoading.value = false
   }
 }
 
-async function forceOpenClawSync() {
-  openclawSyncLoading.value = true
+async function forceAgentSync() {
+  agentSyncLoading.value = true
   try {
-    const { data } = await axios.post('/openclaw-sync/force')
+    const { data } = await axios.post('/agent-sync/force')
     ElMessage.success(t('settings.syncCompleted', { count: data.synced_count || 0 }))
-    await loadOpenClawStatus()
+    await loadAgentSyncStatus()
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally {
-    openclawSyncLoading.value = false
+    agentSyncLoading.value = false
   }
 }
 
@@ -812,6 +852,45 @@ async function loadRecordSensitiveSetting() {
     const { data } = await axios.get('/settings')
     recordSensitive.value = !!data.record_sensitive_content
   } catch {}
+}
+
+const riskSwitches = ref<Record<string, boolean>>({
+  allow_cross_agent_read: false,
+  allow_cross_agent_write: false,
+  allow_visibility_change: true,
+  allow_auto_sharing: false,
+  allow_manual_sharing: true,
+  allow_batch_share: false,
+  allow_writeback: false,
+})
+
+async function loadRiskSwitches() {
+  try {
+    const { data } = await axios.get('/risk-switches')
+    if (data.switches) {
+      riskSwitches.value = { ...riskSwitches.value, ...data.switches }
+    }
+  } catch {}
+}
+
+async function saveRiskSwitches() {
+  try {
+    await ElMessageBox.confirm(
+      t('riskSwitch.confirmDesc'),
+      t('riskSwitch.confirmTitle'),
+      { type: 'warning' }
+    )
+  } catch {
+    await loadRiskSwitches()
+    return
+  }
+  try {
+    await axios.put('/risk-switches', { switches: riskSwitches.value })
+    ElMessage.success(t('riskSwitch.updated'))
+  } catch (e: any) {
+    await loadRiskSwitches()
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  }
 }
 
 async function updateRecordSensitive() {
@@ -853,7 +932,7 @@ async function checkForUpdate() {
 async function exportData() {
   exporting.value = true
   try {
-    const { data } = await axios.get('/data/export')
+    const { data } = await axios.post('/data/export', { password: exportPassword.value })
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -910,7 +989,7 @@ async function deactivateLicense() {
 }
 
 async function handleSetPassword() {
-  if (newPassword.value.length < 4) { ElMessage.warning(t('settings.passwordMinLen')); return }
+  if (newPassword.value.length < 6) { ElMessage.warning(t('settings.passwordMinLen')); return }
   settingPassword.value = true
   try {
     if (passwordSet.value) {
@@ -1158,7 +1237,7 @@ watch(showAIConfigDialog, async (v) => {
 async function loadAgentsMD() {
   agentsMdLoading.value = true
   try {
-    const { data } = await axios.get('/openclaw/agents-md')
+    const { data } = await axios.get('/agent/agents-md')
     agentsMdContent.value = data.content || ''
   } catch {
     agentsMdContent.value = ''
@@ -1363,4 +1442,10 @@ watch(showAgentsMdPreview, async (v) => {
 .openclaw-paths { margin: 8px 0; padding: 8px; background: var(--cm-bg); border-radius: 6px; }
 .openclaw-path-item { font-size: 11px; color: var(--cm-text-muted); margin: 4px 0; word-break: break-all; }
 .openclaw-path-item code { font-size: 11px; }
+.agent-list { margin: 8px 0; }
+.agent-item { padding: 10px; margin-bottom: 8px; background: var(--cm-bg); border-radius: 6px; }
+.agent-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.agent-name { font-weight: 600; font-size: 13px; }
+.risk-category { margin-bottom: 12px; }
+.risk-category-title { font-weight: 600; font-size: 12px; color: var(--cm-text-muted); margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--cm-border); }
 </style>

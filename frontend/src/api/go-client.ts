@@ -11,20 +11,35 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  if (config.url && config.url.includes('/agent-memories/scan')) {
+    config.timeout = 120000
+  }
   return config
 })
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.code === 'ECONNABORTED' || error.code === 'ERR_CANCELED' || error.message?.includes('timeout')) {
+      if (!error.config?._silent) {
+        ElMessage.error('请求超时，请稍后重试')
+      }
+      return Promise.reject(error)
+    }
+
     const status = error.response?.status
     if (status === 401) {
       localStorage.removeItem('token')
-      if (!window.location.pathname.endsWith('/login')) {
+      localStorage.removeItem('cm_username')
+      if (!window.location.pathname.endsWith('/login') && !window.location.pathname.endsWith('/register')) {
         window.location.href = '/login'
       }
     } else if (status === 403) {
-      // 403 由具体页面处理
+      if (!error.config?._silent) {
+        ElMessage.warning('权限不足，无法执行此操作')
+      }
+    } else if (status === 429) {
+      ElMessage.warning('请求过于频繁，请稍后重试')
     } else {
       let msg = error.response?.data?.error || error.response?.data?.detail || error.response?.data?.message || 'Request failed'
       if (typeof msg === 'string') {
@@ -34,7 +49,7 @@ api.interceptors.response.use(
         if (msg.includes('missing token') || msg.includes('invalid token')) {
           msg = '登录已过期，请重新登录'
         }
-        if (!msg.includes('rate limit') && !error.config?._silent) {
+        if (!error.config?._silent) {
           ElMessage.error(msg)
         }
       }

@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -40,6 +41,17 @@ func isOriginAllowed(origin string) bool {
 	if origin == "" {
 		return true
 	}
+
+	if customOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); customOrigins != "" {
+		for _, allowed := range strings.Split(customOrigins, ",") {
+			allowed = strings.TrimSpace(allowed)
+			if allowed != "" && origin == allowed {
+				return true
+			}
+		}
+		return false
+	}
+
 	allowedLocalhosts := []string{
 		"http://localhost",
 		"http://127.0.0.1",
@@ -102,9 +114,29 @@ func Auth(cfg *config.Config, db *gorm.DB) gin.HandlerFunc {
 		}
 
 		if claims, ok := token.Claims.(jwt.MapClaims); ok {
-			if uid, ok := claims["user_id"].(float64); ok {
-				c.Set("user_id", uint(uid))
+			uid, ok := claims["user_id"].(float64)
+			if !ok {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token: missing user_id"})
+				return
 			}
+			c.Set("user_id", uint(uid))
+
+			if tokenVersion, ok := claims["token_version"].(float64); ok {
+				var user struct {
+					TokenVersion int
+				}
+				if err := db.Table("users").Select("token_version").Where("id = ?", uint(uid)).First(&user).Error; err == nil {
+					if user.TokenVersion != int(tokenVersion) {
+						c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+							"error": "token has been revoked, please login again",
+						})
+						return
+					}
+				}
+			}
+		} else {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
+			return
 		}
 
 		c.Set("auth_method", "jwt")
@@ -131,10 +163,16 @@ func APIKeyAuth(db *gorm.DB) gin.HandlerFunc {
 		c.Set("auth_method", "apikey")
 		c.Set("api_key_id", apiKey.ID)
 		c.Set("api_key_name", apiKey.Name)
+		c.Set("api_key_permissions", apiKey.Permissions)
+		c.Set("agent_name", apiKey.AgentName)
 
 		platform := c.GetHeader("X-Platform")
 		if platform == "" {
-			platform = "openclaw"
+			if apiKey.AgentName != "" {
+				platform = apiKey.AgentName
+			} else {
+				platform = "clawmemory"
+			}
 		}
 		c.Set("platform", platform)
 
@@ -147,6 +185,7 @@ type rateLimiter struct {
 	requests map[string][]time.Time
 	limit    int
 	window   time.Duration
+	maxKeys  int
 }
 
 func newRateLimiter(limit int, window time.Duration) *rateLimiter {
@@ -154,6 +193,7 @@ func newRateLimiter(limit int, window time.Duration) *rateLimiter {
 		requests: make(map[string][]time.Time),
 		limit:    limit,
 		window:   window,
+		maxKeys:  100000,
 	}
 }
 
@@ -177,9 +217,34 @@ func (rl *rateLimiter) allow(key string) bool {
 		return false
 	}
 
+	if len(valid) == 0 && len(rl.requests) >= rl.maxKeys {
+		rl.evictOldest()
+	}
+
 	valid = append(valid, now)
 	rl.requests[key] = valid
 	return true
+}
+
+func (rl *rateLimiter) evictOldest() {
+	var oldestKey string
+	var oldestTime time.Time
+	first := true
+	for k, v := range rl.requests {
+		if len(v) > 0 {
+			if first || v[0].Before(oldestTime) {
+				oldestKey = k
+				oldestTime = v[0]
+				first = false
+			}
+		} else {
+			delete(rl.requests, k)
+			return
+		}
+	}
+	if oldestKey != "" {
+		delete(rl.requests, oldestKey)
+	}
 }
 
 func RateLimit(limit int, window time.Duration, keyFunc func(*gin.Context) string) gin.HandlerFunc {
@@ -187,7 +252,7 @@ func RateLimit(limit int, window time.Duration, keyFunc func(*gin.Context) strin
 
 	go func() {
 		for {
-			time.Sleep(5 * time.Minute)
+			time.Sleep(1 * time.Minute)
 			limiter.mu.Lock()
 			cutoff := time.Now().Add(-window)
 			for k, v := range limiter.requests {
@@ -244,7 +309,7 @@ func GetUserID(c *gin.Context) uint {
 	if id, ok := userID.(uint); ok {
 		return id
 	}
-	return 1
+	return 0
 }
 
 func GetPlatform(c *gin.Context) string {
@@ -252,5 +317,49 @@ func GetPlatform(c *gin.Context) string {
 	if p, ok := platform.(string); ok {
 		return p
 	}
-	return "openclaw"
+	return "clawmemory"
+}
+
+func GetAgentName(c *gin.Context) string {
+	agentName, _ := c.Get("agent_name")
+	if a, ok := agentName.(string); ok {
+		return a
+	}
+	return ""
+}
+
+func GetAPIKeyPermissions(c *gin.Context) string {
+	perms, _ := c.Get("api_key_permissions")
+	if p, ok := perms.(string); ok {
+		return p
+	}
+	return ""
+}
+
+func HasAPIKeyPermission(c *gin.Context, permission string) bool {
+	authMethod, _ := c.Get("auth_method")
+	if authMethod != "apikey" {
+		return true
+	}
+	perms := GetAPIKeyPermissions(c)
+	if perms == "" {
+		return false
+	}
+	for _, p := range splitPermissions(perms) {
+		if p == "admin" || p == permission || p == "*" {
+			return true
+		}
+	}
+	return false
+}
+
+func splitPermissions(perms string) []string {
+	var result []string
+	for _, p := range strings.Split(perms, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
 }

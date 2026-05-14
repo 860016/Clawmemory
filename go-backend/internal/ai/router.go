@@ -17,6 +17,15 @@ type AIRouter struct {
 	freeProvider  Provider
 	mu            sync.RWMutex
 	providerCache map[uint]cachedProvider
+	usageMu       sync.Mutex
+	usageBuffer   map[uint]*usageEntry
+	lastFlush     time.Time
+	stopCh        chan struct{}
+}
+
+type usageEntry struct {
+	Calls  int
+	Tokens int
 }
 
 type cachedProvider struct {
@@ -25,10 +34,76 @@ type cachedProvider struct {
 }
 
 func NewAIRouter(db *gorm.DB) *AIRouter {
-	return &AIRouter{
+	r := &AIRouter{
 		db:            db,
 		freeProvider:  NewNVIDIAFreeProvider(),
 		providerCache: make(map[uint]cachedProvider),
+		usageBuffer:   make(map[uint]*usageEntry),
+		lastFlush:     time.Now(),
+		stopCh:        make(chan struct{}),
+	}
+	go r.flushLoop()
+	return r
+}
+
+func (r *AIRouter) Stop() {
+	close(r.stopCh)
+}
+
+func (r *AIRouter) flushLoop() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			r.flushUsage()
+			r.cleanExpiredCache()
+		case <-r.stopCh:
+			r.flushUsage()
+			return
+		}
+	}
+}
+
+func (r *AIRouter) cleanExpiredCache() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	now := time.Now()
+	for k, v := range r.providerCache {
+		if now.After(v.expiredAt) {
+			delete(r.providerCache, k)
+		}
+	}
+}
+
+func (r *AIRouter) flushUsage() {
+	r.usageMu.Lock()
+	if len(r.usageBuffer) == 0 {
+		r.usageMu.Unlock()
+		return
+	}
+	buffer := r.usageBuffer
+	r.usageBuffer = make(map[uint]*usageEntry)
+	r.lastFlush = time.Now()
+	r.usageMu.Unlock()
+
+	settingsSvc := services.NewSettingsService(r.db)
+	for userID, entry := range buffer {
+		var totalCalls float64
+		if v, _ := settingsSvc.GetByKey(userID, "ai_total_calls"); v != nil {
+			if f, ok := v.(float64); ok {
+				totalCalls = f
+			}
+		}
+		settingsSvc.SetByKey(userID, "ai_total_calls", totalCalls+float64(entry.Calls))
+
+		var totalTokens float64
+		if v, _ := settingsSvc.GetByKey(userID, "ai_total_tokens"); v != nil {
+			if f, ok := v.(float64); ok {
+				totalTokens = f
+			}
+		}
+		settingsSvc.SetByKey(userID, "ai_total_tokens", totalTokens+float64(entry.Tokens))
 	}
 }
 
@@ -286,23 +361,19 @@ func (r *AIRouter) GetUsageStats(userID uint) map[string]interface{} {
 }
 
 func (r *AIRouter) IncrementUsage(userID uint, tokensIn, tokensOut int) {
-	settingsSvc := services.NewSettingsService(r.db)
-
-	var totalCalls float64
-	if v, _ := settingsSvc.GetByKey(userID, "ai_total_calls"); v != nil {
-		if f, ok := v.(float64); ok {
-			totalCalls = f
-		}
+	r.usageMu.Lock()
+	entry, ok := r.usageBuffer[userID]
+	if !ok {
+		entry = &usageEntry{}
+		r.usageBuffer[userID] = entry
 	}
-	settingsSvc.SetByKey(userID, "ai_total_calls", totalCalls+1)
+	entry.Calls++
+	entry.Tokens += tokensIn + tokensOut
+	r.usageMu.Unlock()
 
-	var totalTokens float64
-	if v, _ := settingsSvc.GetByKey(userID, "ai_total_tokens"); v != nil {
-		if f, ok := v.(float64); ok {
-			totalTokens = f
-		}
+	if time.Since(r.lastFlush) > 60*time.Second {
+		r.flushUsage()
 	}
-	settingsSvc.SetByKey(userID, "ai_total_tokens", totalTokens+float64(tokensIn+tokensOut))
 }
 
 func defaultModel(providerID string) string {

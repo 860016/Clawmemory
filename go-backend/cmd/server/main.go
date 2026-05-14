@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	"clawmemory/internal/api"
 	"clawmemory/internal/config"
@@ -65,17 +69,60 @@ func main() {
 
 	services.Init(db)
 
+	logger := services.InitLogger(filepath.Join(exeDir, "logs"), "info", "clawmemory")
+	logger.SetDB(db)
+	metrics := services.InitMetrics(db)
+	_ = metrics
+
+	services.InitSecurity(db, cfg.JWTSecret)
+	services.InitRiskSwitchService(db)
+
+	gracefulShutdown := services.NewGracefulShutdown(db)
+	backupSvc := services.NewBackupService(db, filepath.Join(exeDir, "backups"))
+	_ = backupSvc
+
+	proProvider := services.InitProProvider(db, cfg)
+
 	autoCreateAPIKey(db)
 
-	proProxy := services.NewProProxy(db, cfg)
-	proGuard := services.InitProGuard(proProxy, db, cfg)
-	if proGuard != nil && !proGuard.SelfCheck() {
+	if !proProvider.SelfCheck() {
 		log.Println("⚠️  Integrity check warning: binary may have been modified")
 	}
 
+	if proProvider.IsPro() {
+		log.Printf("✅ Pro license active (tier: %s)", proProvider.GetTier())
+	} else {
+		log.Printf("ℹ️  Running in OSS mode")
+	}
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := proProvider.Heartbeat(); err != nil {
+				log.Printf("License heartbeat failed: %v", err)
+			}
+		}
+	}()
+
 	syncService := services.GetOpenClawSyncService(db)
 	go syncService.Start()
-	log.Printf("OpenClaw auto-sync service started")
+	log.Printf("Agent auto-sync service started")
+
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			svc := services.NewSkillLearningService(db)
+			if deleted, err := svc.CleanupOldTraces(30); err == nil && deleted > 0 {
+				log.Printf("Skill cleanup: removed %d old action traces", deleted)
+			}
+			if deleted, err := svc.CleanupDismissedSuggestions(); err == nil && deleted > 0 {
+				log.Printf("Skill cleanup: removed %d dismissed suggestions", deleted)
+			}
+		}
+	}()
+	log.Printf("Skill auto-cleanup service started (daily)")
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
@@ -108,9 +155,30 @@ func main() {
 	}
 	addr := host + ":" + port
 	log.Printf("ClawMemory v%s starting on %s", config.AppVersion, addr)
-	if err := r.Run(addr); err != nil {
-		log.Fatal("Failed to start server:", err)
+
+	srv := &http.Server{Addr: addr, Handler: r}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal("Failed to start server:", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	gracefulShutdown.Shutdown(10 * time.Second)
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatal("Server forced to shutdown:", err)
 	}
+
+	log.Println("Server exited gracefully")
 }
 
 func autoCreateAPIKey(db *gorm.DB) {
@@ -126,14 +194,14 @@ func autoCreateAPIKey(db *gorm.DB) {
 	}
 
 	svc := services.NewAPIKeyService(db)
-	apiKey, rawKey, err := svc.Create(user.ID, "OpenClaw Auto")
+	apiKey, rawKey, err := svc.Create(user.ID, "ClawMemory Auto")
 	if err != nil {
 		log.Printf("Warning: failed to auto-create API key: %v", err)
 		return
 	}
 
 	log.Printf("========================================")
-	log.Printf("  Auto-generated API Key for OpenClaw")
+	log.Printf("  Auto-generated API Key for ClawMemory")
 	log.Printf("  Name: %s", apiKey.Name)
 	log.Printf("  Key:  %s", rawKey)
 	log.Printf("  Please save this key, it won't be shown again!")

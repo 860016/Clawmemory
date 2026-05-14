@@ -66,6 +66,8 @@ export class ClawMemoryClient {
     layer?: string;
     source?: string;
     memory_type?: string;
+    visibility?: string;
+    source_agent?: string;
   }): Promise<unknown> {
     return this.request("POST", "/memories", {
       key: params.key,
@@ -73,6 +75,8 @@ export class ClawMemoryClient {
       layer: params.layer || "episodic",
       source: params.source || this.platform,
       memory_type: params.memory_type || "knowledge",
+      visibility: params.visibility || "private",
+      source_agent: params.source_agent || this.platform,
     });
   }
 
@@ -83,6 +87,8 @@ export class ClawMemoryClient {
       layer?: string;
       source?: string;
       memory_type?: string;
+      visibility?: string;
+      source_agent?: string;
     }>
   ): Promise<unknown> {
     return this.request("POST", "/memories/batch", {
@@ -92,6 +98,8 @@ export class ClawMemoryClient {
         layer: m.layer || "episodic",
         source: m.source || this.platform,
         memory_type: m.memory_type || "knowledge",
+        visibility: m.visibility || "private",
+        source_agent: m.source_agent || this.platform,
       })),
     });
   }
@@ -133,14 +141,17 @@ export class ClawMemoryClient {
     summary?: string;
     title?: string;
     project_path?: string;
+    visibility?: string;
   }): Promise<unknown> {
     return this.request("POST", "/conversations", {
       session_id: params.session_id,
       agent_name: params.agent_name || this.platform,
+      platform: this.platform,
       messages: params.messages || [],
       summary: params.summary || "",
       title: params.title || "",
       project_path: params.project_path || "",
+      visibility: params.visibility || "private",
     });
   }
 

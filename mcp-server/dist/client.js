@@ -32,6 +32,8 @@ export class ClawMemoryClient {
             layer: params.layer || "episodic",
             source: params.source || this.platform,
             memory_type: params.memory_type || "knowledge",
+            visibility: params.visibility || "private",
+            source_agent: params.source_agent || this.platform,
         });
     }
     async batchSaveMemories(memories) {
@@ -42,6 +44,8 @@ export class ClawMemoryClient {
                 layer: m.layer || "episodic",
                 source: m.source || this.platform,
                 memory_type: m.memory_type || "knowledge",
+                visibility: m.visibility || "private",
+                source_agent: m.source_agent || this.platform,
             })),
         });
     }
@@ -65,10 +69,12 @@ export class ClawMemoryClient {
         return this.request("POST", "/conversations", {
             session_id: params.session_id,
             agent_name: params.agent_name || this.platform,
+            platform: this.platform,
             messages: params.messages || [],
             summary: params.summary || "",
             title: params.title || "",
             project_path: params.project_path || "",
+            visibility: params.visibility || "private",
         });
     }
     async trackSession(sessionId, metadata) {

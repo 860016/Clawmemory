@@ -3,6 +3,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { ClawMemoryClient } from "./client.js";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const packageJson = require("../package.json");
 const CLAWMEMORY_BASE_URL = process.env.CLAWMEMORY_BASE_URL || "http://localhost:8765";
 const CLAWMEMORY_API_KEY = process.env.CLAWMEMORY_API_KEY || "";
 const CLAWMEMORY_PLATFORM = process.env.CLAWMEMORY_PLATFORM || "mcp";
@@ -17,13 +20,15 @@ const client = new ClawMemoryClient({
 });
 const server = new McpServer({
     name: "clawmemory",
-    version: "1.0.0",
+    version: packageJson.version,
 });
 server.tool("memory_save", "Save a memory to ClawMemory. Use this to persist important information, conversation highlights, user preferences, or key decisions.", {
     key: z.string().describe("A short identifier for this memory (e.g., 'user-pref-dark-mode')"),
     value: z.string().describe("The memory content to save"),
     layer: z.enum(["episodic", "semantic", "procedural"]).optional().describe("Memory layer. episodic=events, semantic=facts, procedural=how-to"),
     memory_type: z.enum(["conversation", "knowledge", "preference", "decision"]).optional().describe("Type of memory"),
+    visibility: z.enum(["private", "shared", "public"]).optional().describe("Memory visibility. private=only owner, shared=authorized agents, public=all agents"),
+    source_agent: z.string().optional().describe("Name of the agent saving this memory (e.g., 'trae', 'cursor', 'claude')"),
 }, async (params) => {
     try {
         await client.saveMemory({
@@ -31,6 +36,8 @@ server.tool("memory_save", "Save a memory to ClawMemory. Use this to persist imp
             value: params.value,
             layer: params.layer,
             memory_type: params.memory_type,
+            visibility: params.visibility,
+            source_agent: params.source_agent,
         });
         return { content: [{ type: "text", text: `Memory saved: ${params.key}` }] };
     }
@@ -99,6 +106,7 @@ server.tool("memory_reason", "Perform dialectic reasoning about the user using t
 server.tool("memory_conclude", "Save a durable conclusion about the user. Use this when you've identified a stable preference, pattern, or fact that should persist across sessions.", {
     content: z.string().describe("The conclusion to save (e.g., 'User prefers TypeScript over JavaScript')"),
     category: z.enum(["preference", "style", "workflow", "skill", "fact"]).optional().describe("Category of the conclusion (default: fact)"),
+    visibility: z.enum(["private", "shared", "public"]).optional().describe("Memory visibility (default: shared)"),
 }, async (params) => {
     try {
         const category = params.category || "fact";
@@ -108,6 +116,7 @@ server.tool("memory_conclude", "Save a durable conclusion about the user. Use th
             layer: "semantic",
             source: "mcp-conclusion",
             memory_type: "knowledge",
+            visibility: params.visibility || "shared",
         });
         return {
             content: [{ type: "text", text: `Conclusion saved (${category}): ${params.content.slice(0, 80)}...` }],

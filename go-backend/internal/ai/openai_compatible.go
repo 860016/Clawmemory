@@ -49,7 +49,7 @@ func NewNVIDIAFreeProvider() *OpenAICompatibleProvider {
 		baseURL:    "https://integrate.api.nvidia.com/v1",
 		apiKey:     "",
 		model:      "nvidia/llama-3.1-nemotron-70b-instruct",
-		embedModel: "nvidia/llama-3.1-nemotron-70b-instruct",
+		embedModel: "nvidia/llama-3.2-nv-embedqa-1b-v2",
 		free:       true,
 		proOnly:    false,
 		httpClient: &http.Client{Timeout: 120 * time.Second},
@@ -87,8 +87,8 @@ func (p *OpenAICompatibleProvider) Chat(ctx context.Context, messages []Message,
 	}
 
 	reqBody := map[string]interface{}{
-		"model":      model,
-		"messages":   messages,
+		"model":       model,
+		"messages":    messages,
 		"temperature": opts.Temperature,
 	}
 	if opts.MaxTokens > 0 {

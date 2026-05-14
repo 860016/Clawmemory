@@ -42,6 +42,16 @@
         <el-option label="Reference" value="reference" />
         <el-option label="User" value="user" />
       </el-select>
+      <el-select v-model="currentSourceAgent" @change="loadMemories" :placeholder="$t('memories.sourceAgent')" clearable style="width: 140px">
+        <el-option :label="$t('memories.all')" value="" />
+        <el-option v-for="a in connectedAgents" :key="a.name" :label="a.display_name || a.name" :value="a.name" />
+      </el-select>
+      <el-select v-model="currentVisibility" @change="loadMemories" :placeholder="$t('memories.visibility')" clearable style="width: 130px">
+        <el-option :label="$t('memories.all')" value="" />
+        <el-option :label="$t('memories.visibilityPrivate')" value="private" />
+        <el-option :label="$t('memories.visibilityShared')" value="shared" />
+        <el-option :label="$t('memories.visibilityPublic')" value="public" />
+      </el-select>
     </div>
 
     <div v-if="smartLoadResult" class="smart-load-info">
@@ -90,6 +100,8 @@
           <span class="importance" :class="importanceClass(m.importance)">{{ (m.importance * 100).toFixed(0) }}%</span>
           <el-tag v-if="m.is_encrypted" type="warning" size="small">🔒</el-tag>
           <el-tag v-if="m.memory_type && m.memory_type !== 'knowledge'" size="small" class="type-tag">{{ m.memory_type }}</el-tag>
+          <el-tag v-if="m.source_agent" size="small" type="info" class="source-agent-tag">{{ m.source_agent }}</el-tag>
+          <el-tag v-if="m.visibility && m.visibility !== 'private'" size="small" :type="m.visibility === 'public' ? 'success' : 'warning'" class="visibility-tag">{{ visibilityLabels[m.visibility] || m.visibility }}</el-tag>
           <el-tag v-if="m.reinforce_count > 0" size="small" type="success" class="reinforce-badge">📌 {{ m.reinforce_count }}</el-tag>
           <span v-if="m.verified_at" class="verified-badge" :title="$t('memories.verifiedAt', { date: m.verified_at })">✅</span>
         </div>
@@ -154,6 +166,21 @@
         <el-form-item :label="$t('memories.tags')">
           <el-input v-model="form.tagsStr" :placeholder="$t('memories.tagsPlaceholder')" />
         </el-form-item>
+        <el-form-item :label="$t('memories.visibility')">
+          <el-select v-model="form.visibility" style="width: 100%">
+            <el-option :label="$t('memories.visibilityPrivate') + ' (private)'" value="private" />
+            <el-option :label="$t('memories.visibilityShared') + ' (shared)'" value="shared" />
+            <el-option :label="$t('memories.visibilityPublic') + ' (public)'" value="public" />
+          </el-select>
+          <div v-if="form.visibility !== 'private'" class="visibility-warning">
+            <el-alert type="warning" :closable="false" style="margin-top: 6px">
+              <template #title>{{ form.visibility === 'public' ? $t('memories.visibilityPublicWarning') : $t('memories.visibilitySharedWarning') }}</template>
+            </el-alert>
+          </div>
+        </el-form-item>
+        <el-form-item :label="$t('memories.sourceAgent')">
+          <el-input v-model="form.source_agent" :placeholder="$t('memories.sourceAgentPlaceholder')" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showAddDialog = false">{{ $t('common.cancel') }}</el-button>
@@ -179,8 +206,14 @@
           </template>
         </el-alert>
         <template v-else>
+          <div v-if="scanResult.clients?.length" style="margin-bottom: 12px">
+            <p style="color: var(--cm-text-muted); margin-bottom: 8px">{{ $t('memories.detectedClients') }}：</p>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <el-tag v-for="cl in scanResult.clients" :key="cl.name" size="small" type="success">{{ cl.display_name }}</el-tag>
+            </div>
+          </div>
           <p style="margin-bottom: 12px; color: var(--cm-text-muted)">
-            {{ $t('memories.detectedDir') }}：<code>{{ scanResult.openclaw_dir }}</code>
+            {{ $t('memories.detectedDir') }}：<code>{{ scanResult.scanned_dirs || scanResult.openclaw_dir }}</code>
           </p>
           <el-table :data="scanResult.agents" stripe style="width: 100%">
             <el-table-column prop="agent_name" :label="$t('memories.agentCol')" width="150" />
@@ -273,6 +306,7 @@ import { Plus, Search, Upload, Loading, MagicStick, Warning } from '@element-plu
 import axios from '../api/go-client'
 import { translateError } from '../i18n'
 import { memoryApi } from '../api/go-memories'
+import { agentApi } from '../api/go-agents'
 import { aiApi } from '../api/go-ai'
 
 const { t } = useI18n()
@@ -284,6 +318,8 @@ const searchMode = ref('keyword')
 const smartLoadResult = ref<any>(null)
 const currentLayer = ref('')
 const currentMemoryType = ref('')
+const currentSourceAgent = ref('')
+const currentVisibility = ref('')
 const currentPage = ref(1)
 const pageSize = 20
 const total = ref(0)
@@ -299,13 +335,28 @@ const scanError = ref('')
 const previewData = ref<any>(null)
 const importing = ref(false)
 
-const form = ref({ layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '', memory_type: 'knowledge' })
+const form = ref({ layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '', memory_type: 'knowledge', visibility: 'private', source_agent: '' })
 
 const layerLabels: Record<string, string> = {
   preference: t('memories.preference'),
   knowledge: t('memories.knowledge'),
   short_term: t('memories.shortTerm'),
   private: t('memories.private'),
+}
+
+const visibilityLabels: Record<string, string> = {
+  private: t('memories.visibilityPrivate'),
+  shared: t('memories.visibilityShared'),
+  public: t('memories.visibilityPublic'),
+}
+
+const connectedAgents = ref<any[]>([])
+
+async function loadConnectedAgents() {
+  try {
+    const { data } = await agentApi.getConnected()
+    connectedAgents.value = data.agents || []
+  } catch {}
 }
 
 const showExtractDialog = ref(false)
@@ -318,8 +369,8 @@ const pendingSaveData = ref<any>(null)
 
 onMounted(() => {
   loadMemories()
-  // Handle ?import=openclaw query param
-  if (route.query.import === 'openclaw') {
+  loadConnectedAgents()
+  if (route.query.import === 'openclaw' || route.query.import === 'agent') {
     handleOpenClawScan()
   }
 })
@@ -332,7 +383,7 @@ watch(() => route.query.import, (val) => {
 
 function openAddDialog() {
   editingMemory.value = null
-  form.value = { layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '', memory_type: 'knowledge' }
+  form.value = { layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '', memory_type: 'knowledge', visibility: 'private', source_agent: '' }
   showAddDialog.value = true
 }
 
@@ -341,6 +392,8 @@ async function loadMemories() {
     const params: any = { page: currentPage.value, size: pageSize }
     if (currentLayer.value) params.layer = currentLayer.value
     if (currentMemoryType.value) params.memory_type = currentMemoryType.value
+    if (currentSourceAgent.value) params.source_agent = currentSourceAgent.value
+    if (currentVisibility.value) params.visibility = currentVisibility.value
     const { data } = await axios.get('/memories', { params })
     memories.value = data.items || []
     total.value = data.total || 0
@@ -404,7 +457,7 @@ async function reinforceMemory(id: number) {
 
 function editMemory(m: any) {
   editingMemory.value = m
-  form.value = { layer: m.layer, key: m.key, value: m.value, importance: Math.round(m.importance * 100), tagsStr: (m.tags || []).join(', '), memory_type: m.memory_type || 'knowledge' }
+  form.value = { layer: m.layer, key: m.key, value: m.value, importance: Math.round(m.importance * 100), tagsStr: (m.tags || []).join(', '), memory_type: m.memory_type || 'knowledge', visibility: m.visibility || 'private', source_agent: m.source_agent || '' }
   showAddDialog.value = true
 }
 
@@ -412,7 +465,8 @@ async function saveMemory() {
   if (!form.value.key || !form.value.value) { ElMessage.warning(t('memories.fillRequired')); return }
   saving.value = true
   try {
-    const payload: any = { layer: form.value.layer, key: form.value.key, value: form.value.value, importance: form.value.importance / 100, tags: form.value.tagsStr ? form.value.tagsStr.split(',').map((s: string) => s.trim()).filter(Boolean) : [], memory_type: form.value.memory_type }
+    const payload: any = { layer: form.value.layer, key: form.value.key, value: form.value.value, importance: form.value.importance / 100, tags: form.value.tagsStr ? form.value.tagsStr.split(',').map((s: string) => s.trim()).filter(Boolean) : [], memory_type: form.value.memory_type, visibility: form.value.visibility || 'private' }
+    if (form.value.source_agent) payload.source_agent = form.value.source_agent
     try {
       const { data: scanResult } = await memoryApi.scanSecrets(form.value.key + ' ' + form.value.value)
       if (scanResult?.found) {
@@ -490,7 +544,7 @@ async function handleScan() {
   scanning.value = true
   scanError.value = ''
   try {
-    const { data } = await axios.get('/openclaw-memories/scan')
+    const { data } = await agentApi.scanMemories()
     scanResult.value = data
   } catch (e: any) {
     scanError.value = translateError(e.response?.data?.error || e.response?.data?.detail, t('memories.scanFailed'))
@@ -502,7 +556,7 @@ async function handleScan() {
 async function handlePreview(agentName: string) {
   previewData.value = null
   try {
-    const { data } = await axios.get(`/openclaw-memories/scan/${encodeURIComponent(agentName)}`)
+    const { data } = await agentApi.scanAgentMemories(agentName)
     previewData.value = data
   } catch {
     ElMessage.error(t('memories.previewFailed'))
@@ -520,7 +574,7 @@ async function handleImport(agentName: string) {
 
   importing.value = true
   try {
-    const { data } = await axios.post('/openclaw-memories/import', {
+    const { data } = await agentApi.importMemories({
       agent_name: agentName,
       skip_existing: true,
       layer: 'knowledge',
@@ -637,6 +691,9 @@ async function doSaveMemory(payload: any) {
 .tag { padding: 1px 8px; background: var(--cm-border); border-radius: 4px; font-size: 11px; color: var(--cm-text-muted); }
 .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--cm-border); }
 .type-tag { background: rgba(139,92,246,0.15); color: #8b5cf6; border: none; }
+.source-agent-tag { background: rgba(6,182,212,0.12); color: #06b6d4; border: none; }
+.visibility-tag { border: none; }
+.visibility-warning { margin-top: 0; }
 .verified-badge { font-size: 12px; }
 .card-freshness { margin-top: 6px; }
 .freshness-tag { padding: 1px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }

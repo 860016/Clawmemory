@@ -81,9 +81,38 @@ func (s *AuthService) LoginWithPassword(password string) (string, error) {
 }
 
 func (s *AuthService) Register(username, password string) (*models.User, error) {
+	return s.RegisterWithInvitation(username, password, "")
+}
+
+func (s *AuthService) RegisterWithInvitation(username, password, invitationCode string) (*models.User, error) {
+	if len(username) < 2 || len(username) > 50 {
+		return nil, errors.New("username must be between 2 and 50 characters")
+	}
+	if len(password) < 6 {
+		return nil, errors.New("password must be at least 6 characters")
+	}
+
 	var existing models.User
 	if err := s.db.Where("username = ?", username).First(&existing).Error; err == nil {
 		return nil, errors.New("username already exists")
+	}
+
+	invSvc := NewInvitationService(s.db)
+	var userCount int64
+	s.db.Model(&models.User{}).Count(&userCount)
+
+	role := "user"
+	if userCount == 0 {
+		role = "admin"
+	} else {
+		if invitationCode == "" {
+			return nil, errors.New("invitation code is required for registration")
+		}
+		inv, err := invSvc.ValidateCode(invitationCode)
+		if err != nil {
+			return nil, err
+		}
+		_ = inv
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -94,10 +123,15 @@ func (s *AuthService) Register(username, password string) (*models.User, error) 
 	user := &models.User{
 		Username: username,
 		Password: string(hashedPassword),
+		Role:     role,
 	}
 
 	if err := s.db.Create(user).Error; err != nil {
 		return nil, err
+	}
+
+	if invitationCode != "" && userCount > 0 {
+		invSvc.UseCode(invitationCode, user.ID)
 	}
 
 	return user, nil
@@ -134,10 +168,8 @@ func (s *AuthService) ChangePassword(userID uint, oldPassword, newPassword strin
 		return err
 	}
 
-	if oldPassword != "" {
-		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldPassword)); err != nil {
-			return errors.New("invalid old password")
-		}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldPassword)); err != nil {
+		return errors.New("invalid old password")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
@@ -145,13 +177,44 @@ func (s *AuthService) ChangePassword(userID uint, oldPassword, newPassword strin
 		return err
 	}
 
-	return s.db.Model(&user).Update("password", string(hashedPassword)).Error
+	return s.db.Model(&user).Updates(map[string]interface{}{
+		"password":      string(hashedPassword),
+		"token_version": gorm.Expr("token_version + 1"),
+	}).Error
+}
+
+func (s *AuthService) ResetPassword(userID uint, newPassword string) error {
+	var user models.User
+	if err := s.db.First(&user, userID).Error; err != nil {
+		return err
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	return s.db.Model(&user).Updates(map[string]interface{}{
+		"password":      string(hashedPassword),
+		"token_version": gorm.Expr("token_version + 1"),
+	}).Error
+}
+
+func (s *AuthService) IncrementTokenVersion(userID uint) error {
+	return s.db.Model(&models.User{}).Where("id = ?", userID).
+		Update("token_version", gorm.Expr("token_version + 1")).Error
 }
 
 func (s *AuthService) generateToken(userID uint) (string, error) {
+	var user models.User
+	if err := s.db.First(&user, userID).Error; err != nil {
+		return "", err
+	}
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": userID,
-		"exp":     time.Now().Add(time.Hour * 24 * 7).Unix(),
+		"user_id":       userID,
+		"token_version": user.TokenVersion,
+		"exp":           time.Now().Add(time.Hour * 24 * 7).Unix(),
 	})
 
 	tokenString, err := token.SignedString(s.jwtSecret)

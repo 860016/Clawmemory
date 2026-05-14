@@ -1,17 +1,16 @@
-# ClawMemory Windows 安装脚本 v3.2 (完整版)
+﻿﻿﻿﻿# ClawMemory Windows 安装脚本 v3.4 (完整版)
 # 用法: powershell -ExecutionPolicy Bypass -File install.ps1
 # 特性: 自动检测依赖、构建前端、编译后端、创建统一目录、生成启动脚本
 param(
     [string]$LicenseServer = "https://auth.bestu.top",
     [int]$Port = 8765,
-    [switch]$RebuildFrontend,
     [switch]$Upgrade,
     [string]$InstallPath = "",
     [switch]$AutoStart
 )
 
 $ErrorActionPreference = "Stop"
-$Host.UI.RawUI.WindowTitle = "ClawMemory 安装程序 v3.2"
+try { $Host.UI.RawUI.WindowTitle = "ClawMemory 安装程序 v3.4" } catch {}
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 if ($InstallPath -eq "") {
@@ -43,7 +42,7 @@ function Write-Success($message) {
     Write-Host "  ✓ $message" -ForegroundColor Green
 }
 
-function Write-Error($message) {
+function Write-Fail($message) {
     Write-Host "  ✗ $message" -ForegroundColor Red
 }
 
@@ -53,7 +52,7 @@ function Write-Info($message) {
 
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║     ClawMemory 安装程序 v3.2 (Windows)   ║" -ForegroundColor Cyan
+Write-Host "║     ClawMemory 安装程序 v3.4 (Windows)   ║" -ForegroundColor Cyan
 Write-Host "╚══════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 Write-Info "安装目录: $InstallDir"
@@ -67,20 +66,18 @@ if ($AutoStart) { Write-Info "自动启动: 是" }
 Write-Host ""
 
 $totalSteps = 7
+$currentStep = 0
 
-Write-Step 1 $totalSteps "检查环境依赖..."
+Write-Step (++$currentStep) $totalSteps "检查环境依赖..."
 Write-Host ""
 
-$hasGo = $false
 $hasNode = $false
-$hasGit = $false
 
 try {
     $goVer = go version 2>&1
-    $hasGo = $true
     Write-Success "Go 环境: $goVer"
 } catch {
-    Write-Error "Go 未安装"
+    Write-Fail "Go 未安装"
     Write-Info "下载地址: https://go.dev/dl/"
     Write-Info "请安装 Go 1.21+ 后重试"
     exit 1
@@ -96,13 +93,16 @@ try {
 
 try {
     $gitVer = git --version 2>&1
-    $hasGit = $true
     Write-Success "Git: $gitVer"
 } catch {
     Write-Info "Git 未安装 (可选，用于技能安装)"
 }
 
-Write-Step 2 $totalSteps "检查前端文件..."
+if (-not ($hasNode -and (Test-Path "$InstallDir\mcp-server"))) {
+    $totalSteps = 6
+}
+
+Write-Step (++$currentStep) $totalSteps "检查前端文件..."
 Write-Host ""
 
 $frontendReady = Test-Path "$InstallDir\go-backend\frontend_dist\index.html"
@@ -110,15 +110,14 @@ $frontendReady = Test-Path "$InstallDir\go-backend\frontend_dist\index.html"
 if ($frontendReady) {
     Write-Success "前端已预编译，跳过构建"
 } else {
-    Write-Error "前端文件缺失，请确保 go-backend/frontend_dist/ 目录存在"
-    Write-Info "前端已预编译，无需手动构建"
+    Write-Fail "前端预编译文件缺失，请重新下载完整安装包"
     exit 1
 }
 
-Write-Step 3 $totalSteps "编译 Go 后端..."
+Write-Step (++$currentStep) $totalSteps "编译 Go 后端..."
 Write-Host ""
 
-Set-Location "$InstallDir\go-backend"
+Push-Location "$InstallDir\go-backend"
 
 try {
     $garbleAvailable = $false
@@ -144,8 +143,9 @@ try {
                     Write-Success "Go 后端编译成功"
                 }
             } else {
-                Write-Error "Go 后端编译失败"
+                Write-Fail "Go 后端编译失败"
                 Write-Info "错误信息: $buildOutput"
+                Pop-Location
                 exit 1
             }
         }
@@ -159,33 +159,39 @@ try {
                 Write-Success "Go 后端编译成功"
             }
         } else {
-            Write-Error "Go 后端编译失败"
+            Write-Fail "Go 后端编译失败"
             Write-Info "错误信息: $buildOutput"
+            Pop-Location
             exit 1
         }
     }
 } catch {
-    Write-Error "编译异常: $_"
+    Write-Fail "编译异常: $_"
+    Pop-Location
     exit 1
 }
 
-Set-Location "$InstallDir"
+Pop-Location
 
 if ($HasNode -and (Test-Path "$InstallDir\mcp-server")) {
-    Write-Step 4 $totalSteps "构建 MCP Server..."
+    Write-Step (++$currentStep) $totalSteps "构建 MCP Server..."
     Write-Host ""
-    Set-Location "$InstallDir\mcp-server"
+    Push-Location "$InstallDir\mcp-server"
     try {
         npm install --silent 2>$null
         npm run build 2>$null
-        Write-Success "MCP Server 构建成功"
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "MCP Server 构建成功"
+        } else {
+            Write-Warning "MCP Server 构建失败（可选，不影响主功能）"
+        }
     } catch {
         Write-Warning "MCP Server 构建失败（可选，不影响主功能）"
     }
-    Set-Location "$InstallDir"
+    Pop-Location
 }
 
-Write-Step 5 $totalSteps "配置环境..."
+Write-Step (++$currentStep) $totalSteps "配置环境..."
 Write-Host ""
 
 if (-not (Test-Path $EnvFile)) {
@@ -201,13 +207,19 @@ BACKUPS_DIR=$BackupsDir
 LICENSE_SERVER_URL=$LicenseServer
 "@
     
-    Set-Content -Path $EnvFile -Value $envContent -Encoding UTF8
+    [System.IO.File]::WriteAllText($EnvFile, $envContent)
     Write-Success ".env 配置文件已创建"
     Write-Info "SECRET_KEY 已自动生成"
 } elseif ($Upgrade) {
     Write-Success "升级模式，保留现有 .env 配置"
 } else {
     Write-Success ".env 配置文件已存在"
+    if ($Port -ne 8765) {
+        Write-Info "注意: -Port 参数被忽略，现有 .env 中的端口配置优先"
+    }
+    if ($LicenseServer -ne "https://auth.bestu.top") {
+        Write-Info "注意: -LicenseServer 参数被忽略，现有 .env 中的配置优先"
+    }
 }
 
 Write-Host ""
@@ -226,7 +238,7 @@ foreach ($dir in $dirsToCreate) {
     Write-Success "$($dir.Name): $($dir.Path)"
 }
 
-Write-Step 6 $totalSteps "生成启动脚本..."
+Write-Step (++$currentStep) $totalSteps "生成启动脚本..."
 Write-Host ""
 
 $startBatContent = @"
@@ -244,15 +256,16 @@ pause
 
 $stopBatContent = @"
 @echo off
+setlocal enabledelayedexpansion
 title Stop ClawMemory
 echo Stopping ClawMemory on port $Port...
-for /f "tokens=5" %%%%a in ('netstat -aon ^| findstr :$Port ^| findstr LISTENING') do (
+for /f "tokens=5" %%%%a in ('netstat -aon ^| findstr ":$Port " ^| findstr LISTENING') do (
     echo Found process PID: %%%%a
     taskkill /pid %%%%a /f >nul 2>&1
     if !errorlevel! equ 0 (
-        echo ✓ ClawMemory stopped successfully (PID: %%%%a)
+        echo [OK] ClawMemory stopped successfully (PID: %%%%a)
     ) else (
-        echo ✗ Failed to stop process
+        echo [FAIL] Failed to stop process
     )
     goto :done
 )
@@ -262,12 +275,12 @@ pause
 "@
 
 Set-Content -Path "$InstallDir\start.bat" -Value $startBatContent -Encoding ASCII
-Set-Content -Path "$InstallDir\stop.bat" -Value $stopBatContent -Encoding ASCII
+[System.IO.File]::WriteAllText("$InstallDir\stop.bat", $stopBatContent)
 
 Write-Success "start.bat - 启动脚本已生成"
 Write-Success "stop.bat  - 停止脚本已生成"
 
-Write-Step 7 $totalSteps "验证安装..."
+Write-Step (++$currentStep) $totalSteps "验证安装..."
 Write-Host ""
 
 $checks = @(
@@ -289,7 +302,7 @@ foreach ($check in $checks) {
             Write-Success "$($check.Name): ✓"
         } else {
             if ($check.Required) {
-                Write-Error "$($check.Name): ✗ 缺失!"
+                Write-Fail "$($check.Name): ✗ 缺失!"
                 $allPassed = $false
             } else {
                 Write-Info "$($check.Name): ⚠ 不存在 (可选)"
@@ -300,7 +313,7 @@ foreach ($check in $checks) {
             Write-Success "$($check.Name): ✓"
         } else {
             if ($check.Required) {
-                Write-Error "$($check.Name): ✗ 缺失!"
+                Write-Fail "$($check.Name): ✗ 缺失!"
                 $allPassed = $false
             } else {
                 Write-Info "$($check.Name): ⚠ 不存在 (可选)"
@@ -351,9 +364,27 @@ if ($AutoStart -and $allPassed) {
     Write-Host ""
     Write-Info "正在启动服务..."
     Start-Process -FilePath "$InstallDir\start.bat" -WorkingDirectory "$InstallDir"
-    Start-Sleep -Seconds 2
-    Write-Success "服务已启动!"
-    Write-Info "请在浏览器中打开: http://localhost:$Port"
+    
+    $maxRetries = 30
+    $retryCount = 0
+    $serviceReady = $false
+    while ($retryCount -lt $maxRetries) {
+        Start-Sleep -Seconds 1
+        $retryCount++
+        try {
+            $response = Invoke-WebRequest -Uri "http://localhost:$Port" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+            $serviceReady = $true
+            break
+        } catch {}
+    }
+    
+    if ($serviceReady) {
+        Write-Success "服务已启动! (耗时 ${retryCount} 秒)"
+        Write-Info "请在浏览器中打开: http://localhost:$Port"
+    } else {
+        Write-Warning "服务启动超时 (${maxRetries} 秒)，请手动检查服务状态"
+        Write-Info "浏览器访问: http://localhost:$Port"
+    }
 }
 
 Write-Host ""

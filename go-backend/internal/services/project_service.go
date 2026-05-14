@@ -44,15 +44,15 @@ func (s *ProjectService) Get(userID uint, id uint) (*models.Project, error) {
 
 func (s *ProjectService) Create(userID uint, data map[string]interface{}) (*models.Project, error) {
 	project := &models.Project{
-		UserID:      userID,
-		Name:        getString(data, "name", "Untitled Project"),
-		Description: getString(data, "description", ""),
-		Status:      getString(data, "status", "active"),
-		Category:    getString(data, "category", ""),
-		Tags:        toJSONStr(data["tags"]),
-		KeyDecisions: toJSONStr(data["key_decisions"]),
-		ActionItems:  toJSONStr(data["action_items"]),
-		SourceAgent:  getString(data, "source_agent", ""),
+		UserID:          userID,
+		Name:            getString(data, "name", "Untitled Project"),
+		Description:     getString(data, "description", ""),
+		Status:          getString(data, "status", "active"),
+		Category:        getString(data, "category", ""),
+		Tags:            toJSONStr(data["tags"]),
+		KeyDecisions:    toJSONStr(data["key_decisions"]),
+		ActionItems:     toJSONStr(data["action_items"]),
+		SourceAgent:     getString(data, "source_agent", ""),
 		SourceSessionID: getString(data, "source_session_id", ""),
 	}
 	if p, ok := data["progress"].(float64); ok {
@@ -73,19 +73,41 @@ func (s *ProjectService) Update(userID uint, id uint, data map[string]interface{
 		return nil, err
 	}
 	updates := map[string]interface{}{}
-	if v, ok := data["name"].(string); ok { updates["name"] = v }
-	if v, ok := data["description"].(string); ok { updates["description"] = v }
-	if v, ok := data["status"].(string); ok { updates["status"] = v }
-	if v, ok := data["category"].(string); ok { updates["category"] = v }
-	if v, ok := data["tags"]; ok { updates["tags"] = toJSONStr(v) }
-	if v, ok := data["key_decisions"]; ok { updates["key_decisions"] = toJSONStr(v) }
-	if v, ok := data["action_items"]; ok { updates["action_items"] = toJSONStr(v) }
-	if v, ok := data["progress"].(float64); ok { updates["progress"] = int(v) }
-	if v, ok := data["is_pinned"].(bool); ok { updates["is_pinned"] = v }
-	if len(updates) > 0 {
-		s.db.Model(&project).Updates(updates)
+	if v, ok := data["name"].(string); ok {
+		updates["name"] = v
 	}
-	s.db.Where("user_id = ? AND id = ?", userID, id).First(&project)
+	if v, ok := data["description"].(string); ok {
+		updates["description"] = v
+	}
+	if v, ok := data["status"].(string); ok {
+		updates["status"] = v
+	}
+	if v, ok := data["category"].(string); ok {
+		updates["category"] = v
+	}
+	if v, ok := data["tags"]; ok {
+		updates["tags"] = toJSONStr(v)
+	}
+	if v, ok := data["key_decisions"]; ok {
+		updates["key_decisions"] = toJSONStr(v)
+	}
+	if v, ok := data["action_items"]; ok {
+		updates["action_items"] = toJSONStr(v)
+	}
+	if v, ok := data["progress"].(float64); ok {
+		updates["progress"] = int(v)
+	}
+	if v, ok := data["is_pinned"].(bool); ok {
+		updates["is_pinned"] = v
+	}
+	if len(updates) > 0 {
+		if err := s.db.Model(&project).Updates(updates).Error; err != nil {
+			return nil, err
+		}
+	}
+	if err := s.db.Where("user_id = ? AND id = ?", userID, id).First(&project).Error; err != nil {
+		return nil, err
+	}
 	return &project, nil
 }
 
@@ -129,9 +151,15 @@ func (s *ProjectService) UpdateNote(userID uint, noteID uint, data map[string]in
 		return nil, err
 	}
 	updates := map[string]interface{}{}
-	if v, ok := data["content"].(string); ok { updates["content"] = v }
-	if v, ok := data["note_type"].(string); ok { updates["note_type"] = v }
-	if v, ok := data["is_key_point"].(bool); ok { updates["is_key_point"] = v }
+	if v, ok := data["content"].(string); ok {
+		updates["content"] = v
+	}
+	if v, ok := data["note_type"].(string); ok {
+		updates["note_type"] = v
+	}
+	if v, ok := data["is_key_point"].(bool); ok {
+		updates["is_key_point"] = v
+	}
 	if len(updates) > 0 {
 		s.db.Model(&note).Updates(updates)
 	}
@@ -157,9 +185,9 @@ func (s *ProjectService) ExtractFromMemories(userID uint, projectID uint) (int, 
 	}
 
 	var memories []models.Memory
-	s.db.Where("user_id = ? AND status != ?", userID, "trashed").
+	_ = s.db.Where("user_id = ? AND status != ?", userID, "trashed").
 		Where("key LIKE ? OR value LIKE ?", "%"+project.Name+"%", "%"+project.Name+"%").
-		Order("importance DESC").Limit(50).Find(&memories)
+		Order("importance DESC").Limit(50).Find(&memories).Error
 
 	extracted := 0
 	for _, m := range memories {
@@ -173,7 +201,7 @@ func (s *ProjectService) ExtractFromMemories(userID uint, projectID uint) (int, 
 			ProjectID:  projectID,
 			Content:    m.Value,
 			NoteType:   "memory_extract",
-			Source:      "memory:" + m.Key,
+			Source:     "memory:" + m.Key,
 			IsKeyPoint: m.Importance >= 0.7,
 		}
 		if err := s.db.Create(note).Error; err == nil {
@@ -190,8 +218,8 @@ func (s *ProjectService) GetContextForOpenClaw(userID uint, projectName string) 
 	}
 
 	var notes []models.ProjectNote
-	s.db.Where("user_id = ? AND project_id = ?", userID, project.ID).
-		Order("is_key_point DESC, created_at DESC").Limit(20).Find(&notes)
+	_ = s.db.Where("user_id = ? AND project_id = ?", userID, project.ID).
+		Order("is_key_point DESC, created_at DESC").Limit(20).Find(&notes).Error
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("# Project: %s\n", project.Name))
@@ -237,9 +265,10 @@ func (s *ProjectService) GetContextForOpenClaw(userID uint, projectName string) 
 }
 
 func (s *ProjectService) Search(userID uint, query string, limit int) ([]models.Project, error) {
+	escaped := escapeLikeQuery(query)
 	var projects []models.Project
 	err := s.db.Where("user_id = ? AND (name LIKE ? OR description LIKE ? OR category LIKE ?)",
-		userID, "%"+query+"%", "%"+query+"%", "%"+query+"%").
+		userID, "%"+escaped+"%", "%"+escaped+"%", "%"+escaped+"%").
 		Order("is_pinned DESC, updated_at DESC").Limit(limit).Find(&projects).Error
 	return projects, err
 }

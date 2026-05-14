@@ -17,16 +17,32 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const status = error.response?.status
+    if (!error.response) {
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        ElMessage.error('请求超时，请检查网络后重试')
+      } else {
+        ElMessage.error('网络连接异常，请检查网络设置')
+      }
+      return Promise.reject(error)
+    }
+
+    const status = error.response.status
     if (status === 401) {
       localStorage.removeItem('token')
       if (!window.location.pathname.endsWith('/login')) {
         window.location.href = '/login'
       }
     } else if (status === 403) {
-      // 403 由具体页面处理（如开源版限制）
+      const msg = error.response?.data?.error || ''
+      if (msg.includes('permission')) {
+        ElMessage.error('权限不足：' + msg)
+      }
+    } else if (status === 429) {
+      ElMessage.warning('操作过于频繁，请稍后再试')
     } else if (status === 405) {
       ElMessage.error('请求方法不允许')
+    } else if (status >= 500) {
+      ElMessage.error('服务器内部错误，请稍后重试')
     } else {
       let msg = error.response?.data?.error || error.response?.data?.detail || error.response?.data?.message || '请求失败，请稍后重试'
       if (typeof msg === 'string') {

@@ -1,7 +1,7 @@
 import api from './go-client'
 
 export const memoryApi = {
-  list: (params?: { layer?: string; page?: number; size?: number; status?: string; memory_type?: string }) =>
+  list: (params?: { layer?: string; page?: number; size?: number; status?: string; memory_type?: string; source_agent?: string; visibility?: string }) =>
     api.get('/memories', { params }),
   create: (data: any) => api.post('/memories', data),
   get: (id: number) => api.get(`/memories/${id}`),
@@ -23,9 +23,17 @@ export const memoryApi = {
     api.post('/memories/extract-and-save', { content, auto_save: autoSave }),
   scanSecrets: (content: string) => api.post('/memories/scan-secrets', { content }),
 
-  scanOpenClaw: () => api.get('/openclaw-memories/scan'),
-  scanOpenClawAgent: (agentName: string) => api.get(`/openclaw-memories/scan/${agentName}`),
-  importOpenClaw: (data: any) => api.post('/openclaw-memories/import', data),
+  scanAgentMemories: () => api.get('/agent-memories/scan'),
+  scanAgent: (agentName: string) => api.get(`/agent-memories/scan/${agentName}`),
+  importAgentMemories: (data: any) => api.post('/agent-memories/import', data),
+  getAgentSyncStatus: () => api.get('/agent-sync/status'),
+  forceAgentSync: () => api.post('/agent-sync/force'),
+  toggleAgentSync: (enabled: boolean) => api.post('/agent-sync/toggle', { enabled }),
+  getAgentsMD: () => api.get('/agent/agents-md'),
+
+  scanOpenClaw: () => api.get('/agent-memories/scan'),
+  scanOpenClawAgent: (agentName: string) => api.get(`/agent-memories/scan/${agentName}`),
+  importOpenClaw: (data: any) => api.post('/agent-memories/import', data),
 }
 
 export const sessionMemoryApi = {

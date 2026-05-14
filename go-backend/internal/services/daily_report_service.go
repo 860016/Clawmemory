@@ -91,8 +91,8 @@ func (s *DailyReportService) Generate(userID uint, date string) (*models.DailyRe
 	s.db.Model(&models.WikiPage{}).Where("user_id = ? AND DATE(updated_at) = ?", userID, date).Count(&wikiCount)
 
 	var memories []models.Memory
-	s.db.Where("user_id = ? AND DATE(created_at) = ? AND status != ?", userID, date, "trashed").
-		Order("importance DESC").Limit(10).Find(&memories)
+	_ = s.db.Where("user_id = ? AND DATE(created_at) = ? AND status != ?", userID, date, "trashed").
+		Order("importance DESC").Limit(10).Find(&memories).Error
 
 	highlights := []string{}
 	for _, m := range memories {
@@ -113,10 +113,10 @@ func (s *DailyReportService) Generate(userID uint, date string) (*models.DailyRe
 	}
 
 	stats := map[string]interface{}{
-		"new_memories":  memoryCount,
-		"new_entities":  entityCount,
-		"updated_wiki":  wikiCount,
-		"active_hours":  0,
+		"new_memories": memoryCount,
+		"new_entities": entityCount,
+		"updated_wiki": wikiCount,
+		"active_hours": 0,
 	}
 
 	summary := fmt.Sprintf("Recorded %d new memories, created %d knowledge entities, updated %d wiki pages.", memoryCount, entityCount, wikiCount)
@@ -143,16 +143,7 @@ func (s *DailyReportService) Generate(userID uint, date string) (*models.DailyRe
 func (s *DailyReportService) scanOpenClawDataForDate(date string) []string {
 	var highlights []string
 
-	homeDir, _ := os.UserHomeDir()
-	if homeDir == "" {
-		return highlights
-	}
-
-	searchDirs := []string{
-		filepath.Join(homeDir, ".openclaw"),
-		filepath.Join(homeDir, ".trae"),
-		filepath.Join(homeDir, ".trae-cn"),
-	}
+	searchDirs := GetAllSearchDirs()
 
 	for _, dir := range searchDirs {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {

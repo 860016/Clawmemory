@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"math"
 	"strings"
 
@@ -18,9 +19,9 @@ func NewDedupService(db *gorm.DB) *DedupService {
 }
 
 type DuplicateGroup struct {
-	Key       string               `json:"key"`
-	Similarity float64             `json:"similarity"`
-	Memories  []DuplicateMemory    `json:"memories"`
+	Key        string            `json:"key"`
+	Similarity float64           `json:"similarity"`
+	Memories   []DuplicateMemory `json:"memories"`
 }
 
 type DuplicateMemory struct {
@@ -35,12 +36,14 @@ type DuplicateMemory struct {
 
 func (s *DedupService) Scan(userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
-	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
+	if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error; err != nil {
+		return nil, fmt.Errorf("failed to load memories: %w", err)
+	}
 
 	if len(memories) < 2 {
 		return map[string]interface{}{
-			"duplicate_groups": []DuplicateGroup{},
-			"total_duplicates": 0,
+			"duplicate_groups":  []DuplicateGroup{},
+			"total_duplicates":  0,
 			"potential_savings": 0,
 		}, nil
 	}
@@ -110,6 +113,10 @@ func (s *DedupService) Scan(userID uint) (map[string]interface{}, error) {
 }
 
 func (s *DedupService) Merge(userID uint, sourceID, targetID uint) (map[string]interface{}, error) {
+	if sourceID == targetID {
+		return nil, fmt.Errorf("source and target cannot be the same memory")
+	}
+
 	var source, target models.Memory
 	if err := s.db.Where("id = ? AND user_id = ?", sourceID, userID).First(&source).Error; err != nil {
 		return nil, err
@@ -132,10 +139,10 @@ func (s *DedupService) Merge(userID uint, sourceID, targetID uint) (map[string]i
 	s.db.Model(&source).Update("status", "trashed")
 
 	return map[string]interface{}{
-		"merged_into":       targetID,
-		"merged_from":       sourceID,
-		"final_importance":  bestImportance,
-		"message":           "memories merged successfully",
+		"merged_into":      targetID,
+		"merged_from":      sourceID,
+		"final_importance": bestImportance,
+		"message":          "memories merged successfully",
 	}, nil
 }
 

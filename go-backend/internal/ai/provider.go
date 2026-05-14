@@ -50,11 +50,11 @@ type Provider interface {
 }
 
 type ProviderConfig struct {
-	ID       string `json:"id"`
-	Type     string `json:"type"`
-	APIKey   string `json:"api_key,omitempty"`
-	BaseURL  string `json:"base_url,omitempty"`
-	Model    string `json:"model"`
+	ID         string `json:"id"`
+	Type       string `json:"type"`
+	APIKey     string `json:"api_key,omitempty"`
+	BaseURL    string `json:"base_url,omitempty"`
+	Model      string `json:"model"`
 	EmbedModel string `json:"embed_model,omitempty"`
 }
 
@@ -67,6 +67,15 @@ var AllProviders = []ProviderInfo{
 		Free:        true,
 		ProOnly:     false,
 		Description: "NVIDIA NIM free models, available for all users",
+	},
+	{
+		ID:          "nvidia-nim-embed",
+		Name:        "NVIDIA NIM Embedding (Free)",
+		Type:        "openai_compatible",
+		Models:      []string{"nvidia/llama-3.2-nv-embedqa-1b-v2", "nvidia/embed-qa-4"},
+		Free:        true,
+		ProOnly:     false,
+		Description: "NVIDIA NIM free embedding models for semantic search",
 	},
 	{
 		ID:          "deepseek",

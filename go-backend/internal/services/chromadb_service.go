@@ -30,6 +30,10 @@ func NewChromaDBService(db *gorm.DB) *ChromaDBService {
 	}
 }
 
+func (s *ChromaDBService) getEmbeddingService() *EmbeddingService {
+	return GetEmbeddingService()
+}
+
 func (s *ChromaDBService) IsAvailable() bool {
 	resp, err := s.httpClient.Get(s.baseURL + "/heartbeat")
 	if err != nil {
@@ -66,10 +70,10 @@ func (s *ChromaDBService) GetStatus() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"available":    true,
-		"version":      "running",
-		"collections":  len(collections),
-		"memoryCount":  memoryCount,
+		"available":   true,
+		"version":     "running",
+		"collections": len(collections),
+		"memoryCount": memoryCount,
 	}
 }
 
@@ -156,27 +160,36 @@ func (s *ChromaDBService) SyncMemories(userID uint) (int, error) {
 	}
 
 	var memories []models.Memory
-	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
+	_ = s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error
 
 	if len(memories) == 0 {
 		return 0, nil
 	}
 
 	ids := make([]string, len(memories))
-	embeddings := make([][]float64, len(memories))
 	documents := make([]string, len(memories))
 	metadatas := make([]map[string]interface{}, len(memories))
 
 	for i, m := range memories {
 		ids[i] = fmt.Sprintf("mem_%d", m.ID)
 		documents[i] = m.Key + ": " + m.Value
-		embeddings[i] = textToVector(m.Key + " " + m.Value)
 		metadatas[i] = map[string]interface{}{
-			"user_id":     fmt.Sprintf("%d", m.UserID),
-			"layer":       m.Layer,
-			"importance":  m.Importance,
-			"source":      m.Source,
-			"memory_id":   fmt.Sprintf("%d", m.ID),
+			"user_id":    fmt.Sprintf("%d", m.UserID),
+			"layer":      m.Layer,
+			"importance": m.Importance,
+			"source":     m.Source,
+			"memory_id":  fmt.Sprintf("%d", m.ID),
+		}
+	}
+
+	var embeddings [][]float64
+	embSvc := s.getEmbeddingService()
+	if embSvc != nil {
+		embeddings = embSvc.GetEmbeddings(documents)
+	} else {
+		embeddings = make([][]float64, len(memories))
+		for i, doc := range documents {
+			embeddings[i] = textToVector(doc)
 		}
 	}
 
@@ -216,7 +229,13 @@ func (s *ChromaDBService) Search(userID uint, query string, limit int) ([]map[st
 		return nil, err
 	}
 
-	queryEmbedding := textToVector(query)
+	var queryEmbedding []float64
+	embSvc := s.getEmbeddingService()
+	if embSvc != nil {
+		queryEmbedding = embSvc.GetEmbedding(query)
+	} else {
+		queryEmbedding = textToVector(query)
+	}
 
 	payload := map[string]interface{}{
 		"query_embeddings": [][][]float64{{queryEmbedding}},
@@ -318,6 +337,10 @@ func extractBatch(result map[string]interface{}, key string) []interface{} {
 }
 
 func textToVector(text string) []float64 {
+	return enhancedTextToVector(text)
+}
+
+func enhancedTextToVector(text string) []float64 {
 	text = strings.ToLower(text)
 	tokens := tokenize(text)
 
@@ -328,22 +351,58 @@ func textToVector(text string) []float64 {
 		return vector
 	}
 
-	for i, token := range tokens {
-		hash := simpleHash(token)
-		idx := hash % uint32(vectorSize)
-		boost := 1.0 + 0.5*float64(len(tokens)-i)/float64(len(tokens))
-		vector[idx] += boost
+	tokenFreq := make(map[string]float64)
+	for _, t := range tokens {
+		tokenFreq[t]++
+	}
 
-		if len(token) > 2 {
-			bigramHash := simpleHash(token[:2])
-			bigramIdx := bigramHash % uint32(vectorSize)
-			vector[bigramIdx] += 0.5
-		}
+	totalTokens := float64(len(tokens))
+
+	ngrams := make(map[string]float64)
+	for i := 0; i < len(tokens)-1; i++ {
+		bigram := tokens[i] + "_" + tokens[i+1]
+		ngrams[bigram]++
+	}
+	for i := 0; i < len(tokens)-2; i++ {
+		trigram := tokens[i] + "_" + tokens[i+1] + "_" + tokens[i+2]
+		ngrams[trigram] += 0.5
+	}
+
+	for token, freq := range tokenFreq {
+		tf := freq / totalTokens
+
+		h1 := fnvHash(token)
+		h2 := simpleHash(token)
+
+		idx1 := h1 % uint32(vectorSize)
+		idx2 := h2 % uint32(vectorSize)
+
+		weight := tf * (1.0 + float64(len(token))/8.0)
+
+		vector[idx1] += weight
+		vector[idx2] -= weight * 0.3
 
 		if len(token) > 3 {
-			trigramHash := simpleHash(token[len(token)-3:])
-			trigramIdx := trigramHash % uint32(vectorSize)
-			vector[trigramIdx] += 0.3
+			prefix := token[:len(token)/2]
+			suffix := token[len(token)/2:]
+			prefixIdx := fnvHash(prefix) % uint32(vectorSize)
+			suffixIdx := fnvHash(suffix) % uint32(vectorSize)
+			vector[prefixIdx] += weight * 0.4
+			vector[suffixIdx] += weight * 0.3
+		}
+	}
+
+	for ngram, freq := range ngrams {
+		tf := freq / float64(len(ngrams)+1)
+		idx := fnvHash(ngram) % uint32(vectorSize)
+		vector[idx] += tf * 0.6
+	}
+
+	words := strings.Fields(text)
+	for _, w := range words {
+		if len(w) > 0 {
+			charIdx := fnvHash("char_"+w[:1]) % uint32(vectorSize)
+			vector[charIdx] += 0.05
 		}
 	}
 
@@ -360,6 +419,15 @@ func textToVector(text string) []float64 {
 	}
 
 	return vector
+}
+
+func fnvHash(s string) uint32 {
+	h := uint32(2166136261)
+	for _, c := range s {
+		h ^= uint32(c)
+		h *= 16777619
+	}
+	return h
 }
 
 func simpleHash(s string) uint32 {

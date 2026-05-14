@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"clawmemory/internal/models"
@@ -34,6 +35,9 @@ type MemoryModel struct {
 	ReinforceCount int        `json:"reinforce_count"`
 	MemoryType     string     `json:"memory_type"`
 	VerifiedAt     *time.Time `json:"verified_at"`
+	SourceAgent    string     `json:"source_agent"`
+	Visibility     string     `json:"visibility"`
+	OriginChain    string     `json:"origin_chain"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
 }
@@ -45,9 +49,11 @@ func NewMemoryService(db *gorm.DB) *MemoryService {
 func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*MemoryModel, error) {
 	tags := "[]"
 	if t, ok := data["tags"].([]interface{}); ok {
-		tagStrings := make([]string, len(t))
-		for i, v := range t {
-			tagStrings[i] = v.(string)
+		tagStrings := make([]string, 0, len(t))
+		for _, v := range t {
+			if s, ok := v.(string); ok {
+				tagStrings = append(tagStrings, s)
+			}
 		}
 		b, _ := json.Marshal(tagStrings)
 		tags = string(b)
@@ -62,9 +68,12 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 		Tags:        tags,
 		Summary:     generateSummary(getString(data, "key", ""), getString(data, "value", "")),
 		Source:      getString(data, "source", "manual"),
-		Platform:    getString(data, "platform", "openclaw"),
+		Platform:    getString(data, "platform", "clawmemory"),
 		MemoryType:  getString(data, "memory_type", "knowledge"),
 		IsEncrypted: getBool(data, "is_encrypted", false),
+		SourceAgent: getString(data, "source_agent", ""),
+		Visibility:  getString(data, "visibility", "private"),
+		OriginChain: getString(data, "origin_chain", ""),
 		Status:      "active",
 		DecayStage:  0,
 	}
@@ -77,7 +86,7 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 
 func (s *MemoryService) Get(userID, id uint) (*MemoryModel, error) {
 	var memory models.Memory
-	if err := s.db.Where("user_id = ? AND id = ?", userID, id).First(&memory).Error; err != nil {
+	if err := s.db.Where("user_id = ? AND id = ? AND status != ?", userID, id, "trashed").First(&memory).Error; err != nil {
 		return nil, err
 	}
 	return ToMemoryModel(&memory), nil
@@ -95,6 +104,21 @@ func (s *MemoryService) List(userID uint, layer string, page, size int, status s
 
 	if len(memoryType) > 0 && memoryType[0] != "" {
 		query = query.Where("memory_type = ?", memoryType[0])
+	}
+
+	var sourceAgent, visibility string
+	if len(memoryType) > 1 && memoryType[1] != "" {
+		sourceAgent = memoryType[1]
+	}
+	if len(memoryType) > 2 && memoryType[2] != "" {
+		visibility = memoryType[2]
+	}
+
+	if sourceAgent != "" {
+		query = query.Where("source_agent = ?", sourceAgent)
+	}
+	if visibility != "" {
+		query = query.Where("visibility = ?", visibility)
 	}
 
 	if status != "" {
@@ -123,21 +147,18 @@ func (s *MemoryService) Update(userID, id uint, data map[string]interface{}) (*M
 	}
 
 	updates := map[string]interface{}{}
-	if v, ok := data["value"]; ok {
-		updates["value"] = v
-		key := existing.Key
-		if k, ok2 := data["key"]; ok2 {
-			key = k.(string)
-		}
-		updates["summary"] = generateSummary(key, v.(string))
-	}
-	if v, ok := data["key"]; ok {
+	keyStr := existing.Key
+	valStr := existing.Value
+	if v, ok := data["key"].(string); ok {
+		keyStr = v
 		updates["key"] = v
-		value := existing.Value
-		if val, ok2 := data["value"]; ok2 {
-			value = val.(string)
-		}
-		updates["summary"] = generateSummary(v.(string), value)
+	}
+	if v, ok := data["value"].(string); ok {
+		valStr = v
+		updates["value"] = v
+	}
+	if _, ok := data["key"]; ok || data["value"] != nil {
+		updates["summary"] = generateSummary(keyStr, valStr)
 	}
 	if v, ok := data["importance"]; ok {
 		updates["importance"] = v
@@ -147,13 +168,27 @@ func (s *MemoryService) Update(userID, id uint, data map[string]interface{}) (*M
 	}
 	if v, ok := data["tags"]; ok {
 		if tags, ok := v.([]interface{}); ok {
-			tagStrings := make([]string, len(tags))
-			for i, t := range tags {
-				tagStrings[i] = t.(string)
+			tagStrings := make([]string, 0, len(tags))
+			for _, t := range tags {
+				if s, ok := t.(string); ok {
+					tagStrings = append(tagStrings, s)
+				}
 			}
 			b, _ := json.Marshal(tagStrings)
 			updates["tags"] = string(b)
 		}
+	}
+	if v, ok := data["layer"]; ok {
+		updates["layer"] = v
+	}
+	if v, ok := data["visibility"]; ok {
+		updates["visibility"] = v
+	}
+	if v, ok := data["source_agent"]; ok {
+		updates["source_agent"] = v
+	}
+	if v, ok := data["source"]; ok {
+		updates["source"] = v
 	}
 
 	if err := s.db.Model(&models.Memory{}).Where("user_id = ? AND id = ?", userID, id).Updates(updates).Error; err != nil {
@@ -171,10 +206,31 @@ func (s *MemoryService) Restore(userID, id uint) error {
 }
 
 func (s *MemoryService) SearchKeyword(userID uint, q string, limit int) ([]*MemoryModel, error) {
+	escaped := escapeLikeQuery(q)
 	var memories []models.Memory
-	err := s.db.Where("user_id = ? AND (key LIKE ? OR value LIKE ?)", userID, "%"+q+"%", "%"+q+"%").
+	err := s.db.Where("user_id = ? AND status != ? AND (key LIKE ? OR value LIKE ?)", userID, "trashed", "%"+escaped+"%", "%"+escaped+"%").
 		Limit(limit).
 		Find(&memories).Error
+
+	result := make([]*MemoryModel, len(memories))
+	for i, m := range memories {
+		result[i] = ToMemoryModel(&m)
+	}
+	return result, err
+}
+
+func (s *MemoryService) SearchKeywordWithPlatform(userID uint, q string, platform string, platformFilter string, limit int) ([]*MemoryModel, error) {
+	escaped := escapeLikeQuery(q)
+	var memories []models.Memory
+	query := s.db.Where("user_id = ? AND status != ? AND (key LIKE ? OR value LIKE ?)", userID, "trashed", "%"+escaped+"%", "%"+escaped+"%")
+
+	if platformFilter != "" {
+		query = query.Where("platform = ?", platformFilter)
+	} else if platform != "" && platform != "clawmemory" {
+		query = query.Where("platform = ? OR platform = ? OR platform = ?", platform, "clawmemory", "")
+	}
+
+	err := query.Limit(limit).Find(&memories).Error
 
 	result := make([]*MemoryModel, len(memories))
 	for i, m := range memories {
@@ -218,7 +274,17 @@ func ToMemoryModel(m *models.Memory) *MemoryModel {
 		ReinforceCount: m.ReinforceCount,
 		MemoryType:     m.MemoryType,
 		VerifiedAt:     m.VerifiedAt,
+		SourceAgent:    m.SourceAgent,
+		Visibility:     m.Visibility,
+		OriginChain:    m.OriginChain,
 		CreatedAt:      m.CreatedAt,
 		UpdatedAt:      m.UpdatedAt,
 	}
+}
+
+func escapeLikeQuery(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
 }

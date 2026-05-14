@@ -1,6 +1,6 @@
 {
   "name": "clawmemory-mcp-server",
-  "version": "1.0.0",
+  "version": "2.21.0",
   "description": "ClawMemory MCP Server - AI memory management for Trae, Claude Desktop, Cursor, Windsurf",
   "type": "module",
   "main": "dist/index.js",

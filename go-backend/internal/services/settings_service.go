@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"clawmemory/internal/models"
 
@@ -18,7 +19,9 @@ func NewSettingsService(db *gorm.DB) *SettingsService {
 
 func (s *SettingsService) Get(userID uint) (map[string]interface{}, error) {
 	var settings []models.Setting
-	s.db.Where("user_id = ?", userID).Find(&settings)
+	if err := s.db.Where("user_id = ?", userID).Find(&settings).Error; err != nil {
+		return nil, err
+	}
 
 	result := map[string]interface{}{
 		"language":     "zh-CN",
@@ -43,13 +46,19 @@ func (s *SettingsService) Update(userID uint, data map[string]interface{}) error
 		var setting models.Setting
 		result := s.db.Where("user_id = ? AND key = ?", userID, key).First(&setting)
 		if result.Error == gorm.ErrRecordNotFound {
-			s.db.Create(&models.Setting{
+			if err := s.db.Create(&models.Setting{
 				UserID: userID,
 				Key:    key,
 				Value:  string(valueBytes),
-			})
+			}).Error; err != nil {
+				return fmt.Errorf("failed to create setting %s: %w", key, err)
+			}
+		} else if result.Error != nil {
+			return fmt.Errorf("failed to query setting %s: %w", key, result.Error)
 		} else {
-			s.db.Model(&setting).Update("value", string(valueBytes))
+			if err := s.db.Model(&setting).Update("value", string(valueBytes)).Error; err != nil {
+				return fmt.Errorf("failed to update setting %s: %w", key, err)
+			}
 		}
 	}
 	return nil

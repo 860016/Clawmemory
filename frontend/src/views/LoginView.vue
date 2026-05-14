@@ -14,9 +14,16 @@
         <p class="subtitle">{{ $t('common.appDesc') }}</p>
       </div>
 
-      <!-- Password already set - show login form -->
-      <div v-if="passwordSet" class="login-form">
+      <!-- Login form -->
+      <div v-if="loginMode === 'login'" class="login-form">
         <el-input
+          v-model="username"
+          :placeholder="$t('login.usernamePlaceholder')"
+          @keyup.enter="focusPassword"
+          size="large"
+        />
+        <el-input
+          ref="passwordInput"
           v-model="password"
           type="password"
           :placeholder="$t('login.passwordPlaceholder')"
@@ -27,10 +34,48 @@
         <el-button type="primary" @click="handleLogin" :loading="loading" size="large" class="login-btn">
           {{ $t('login.login') }}
         </el-button>
-        <button class="forgot-link" @click="showForgotDialog = true">{{ $t('login.forgotPassword') }}</button>
+        <div class="login-links">
+          <button class="link-btn" @click="showForgotDialog = true">{{ $t('login.forgotPassword') }}</button>
+          <button class="link-btn" @click="loginMode = 'register'">{{ $t('login.goRegister') }}</button>
+        </div>
       </div>
 
-      <!-- No password set - require setting one -->
+      <!-- Register form -->
+      <div v-else-if="loginMode === 'register'" class="login-form">
+        <el-input
+          v-model="regUsername"
+          :placeholder="$t('login.usernamePlaceholder')"
+          size="large"
+        />
+        <el-input
+          v-model="regPassword"
+          type="password"
+          :placeholder="$t('login.regPasswordPlaceholder')"
+          size="large"
+          show-password
+        />
+        <el-input
+          v-model="regConfirmPassword"
+          type="password"
+          :placeholder="$t('login.confirmPasswordPlaceholder')"
+          @keyup.enter="handleRegister"
+          size="large"
+          show-password
+        />
+        <el-input
+          v-model="invitationCode"
+          :placeholder="$t('login.invitationCodePlaceholder')"
+          size="large"
+        />
+        <el-button type="primary" @click="handleRegister" :loading="loading" size="large" class="login-btn">
+          {{ $t('login.register') }}
+        </el-button>
+        <div class="login-links">
+          <button class="link-btn" @click="loginMode = 'login'">{{ $t('login.backToLogin') }}</button>
+        </div>
+      </div>
+
+      <!-- First-time setup -->
       <div v-else class="login-form">
         <p class="hint">{{ $t('login.noPassword') }}</p>
         <el-input
@@ -46,7 +91,6 @@
         </el-button>
       </div>
 
-      <!-- Reset password success message -->
       <div v-if="resetMessage" class="reset-message">
         <el-icon color="#10B981"><SuccessFilled /></el-icon>
         <span>{{ resetMessage }}</span>
@@ -61,6 +105,7 @@
           <p style="margin: 8px 0 0; font-size: 13px; color: var(--cm-text-muted)">{{ $t('login.forgotStep2Desc') }}</p>
         </el-alert>
         <div class="reset-token-section">
+          <el-input v-model="forgotUsername" :placeholder="$t('login.usernamePlaceholder')" size="large" style="margin-bottom: 12px" />
           <el-input v-model="newPassword" type="password" show-password :placeholder="$t('login.newPasswordPlaceholder')" size="large" />
           <el-button type="primary" @click="handleResetPassword" :loading="loading" size="large" style="margin-top: 12px; width: 100%">
             {{ $t('login.resetPassword') }}
@@ -99,20 +144,46 @@ import { translateError } from '../i18n'
 const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
+
+const loginMode = ref<'login' | 'register' | 'setup'>('login')
+const username = ref('')
 const password = ref('')
 const loading = ref(false)
 const passwordSet = ref(true)
 const resetMessage = ref('')
 const showForgotDialog = ref(false)
 const newPassword = ref('')
+const forgotUsername = ref('')
+
+const regUsername = ref('')
+const regPassword = ref('')
+const regConfirmPassword = ref('')
+const invitationCode = ref('')
+
+const passwordInput = ref<any>(null)
+
+function focusPassword() {
+  passwordInput.value?.focus()
+}
 
 onMounted(async () => {
+  if (route.query.mode === 'register') {
+    loginMode.value = 'register'
+    if (route.query.code) {
+      invitationCode.value = route.query.code as string
+    }
+  }
+
   try {
     const { data } = await axios.get('/auth/init-status')
     passwordSet.value = data.password_set
+    if (!data.password_set) {
+      loginMode.value = 'setup'
+    }
   } catch (e) {
     console.error('Failed to check init status:', e)
     passwordSet.value = false
+    loginMode.value = 'setup'
   }
 })
 
@@ -120,7 +191,10 @@ async function handleLogin() {
   if (!password.value) return
   loading.value = true
   try {
-    const { data } = await axios.post('/auth/login', { password: password.value })
+    const { data } = await axios.post('/auth/login', {
+      username: username.value || 'admin',
+      password: password.value,
+    })
     localStorage.setItem('token', data.access_token)
     router.push('/')
   } catch (e: any) {
@@ -130,8 +204,50 @@ async function handleLogin() {
   }
 }
 
+async function handleRegister() {
+  if (!regUsername.value || !regPassword.value) {
+    ElMessage.warning(t('login.fillRequired'))
+    return
+  }
+  if (regPassword.value.length < 6) {
+    ElMessage.warning(t('login.passwordMinLen6'))
+    return
+  }
+  if (regPassword.value !== regConfirmPassword.value) {
+    ElMessage.warning(t('login.passwordMismatch'))
+    return
+  }
+  loading.value = true
+  try {
+    const payload: any = {
+      username: regUsername.value,
+      password: regPassword.value,
+    }
+    if (invitationCode.value) {
+      payload.invitation_code = invitationCode.value
+    }
+    await axios.post('/auth/register-with-invitation', payload)
+    ElMessage.success(t('login.registerSuccess'))
+    username.value = regUsername.value
+    password.value = regPassword.value
+    loginMode.value = 'login'
+    await handleLogin()
+  } catch (e: any) {
+    const errMsg = e.response?.data?.error || ''
+    if (errMsg.includes('invitation') || errMsg.includes('invite')) {
+      ElMessage.error(t('login.invalidInvitationCode'))
+    } else if (errMsg.includes('already exists') || errMsg.includes('conflict')) {
+      ElMessage.error(t('login.usernameExists'))
+    } else {
+      ElMessage.error(translateError(errMsg, t('common.failed')))
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
 async function handleSetPassword() {
-  if (password.value.length < 4) {
+  if (password.value.length < 6) {
     ElMessage.warning(t('login.passwordTooShort'))
     return
   }
@@ -147,7 +263,6 @@ async function handleSetPassword() {
     }
   } catch (e: any) {
     const detail = e.response?.data?.error || e.response?.data?.detail || ''
-    console.error('Set password error:', detail, e.response?.status)
     if (detail === 'password already set') {
       try {
         const { data: loginData } = await axios.post('/auth/login', { password: password.value })
@@ -167,14 +282,19 @@ async function handleSetPassword() {
 }
 
 async function handleResetPassword() {
-  if (!newPassword.value || newPassword.value.length < 4) {
+  if (!newPassword.value || newPassword.value.length < 6) {
     ElMessage.warning(t('login.passwordTooShort'))
     return
   }
   loading.value = true
   try {
-    await axios.post('/auth/forgot-password', { username: 'admin', new_password: newPassword.value, confirm: true })
+    await axios.post('/auth/forgot-password', {
+      username: forgotUsername.value || 'admin',
+      new_password: newPassword.value,
+      confirm: true,
+    })
     resetMessage.value = t('login.resetSuccess')
+    username.value = forgotUsername.value
     password.value = newPassword.value
   } catch (e: any) {
     const hint = e.response?.data?.hint
@@ -238,7 +358,7 @@ async function handleResetPassword() {
   border: 1px solid rgba(16, 185, 129, 0.15);
   border-radius: 20px;
   padding: 48px 40px;
-  width: 400px;
+  width: 420px;
   max-width: 90vw;
   position: relative;
   z-index: 1;
@@ -285,7 +405,7 @@ async function handleResetPassword() {
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .hint {
@@ -303,17 +423,22 @@ async function handleResetPassword() {
   font-weight: 600;
 }
 
-.forgot-link {
+.login-links {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.link-btn {
   background: none;
   border: none;
   color: var(--cm-primary);
   cursor: pointer;
   font-size: 13px;
-  text-align: center;
   padding: 4px;
   transition: opacity 0.2s;
 }
-.forgot-link:hover {
+.link-btn:hover {
   opacity: 0.8;
 }
 
@@ -328,18 +453,6 @@ async function handleResetPassword() {
   border-radius: 10px;
   color: var(--cm-text-secondary);
   font-size: 13px;
-}
-
-.cli-code {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--cm-bg);
-  border: 1px solid var(--cm-border);
-  border-radius: 8px;
-  padding: 10px 16px;
-  font-size: 13px;
-  margin: 12px 0;
 }
 
 .reset-token-section {
@@ -391,9 +504,6 @@ async function handleResetPassword() {
 }
 
 @media (max-width: 768px) {
-  .login-page {
-    padding: 16px;
-  }
   .login-card {
     padding: 36px 28px;
     border-radius: 16px;
@@ -401,59 +511,15 @@ async function handleResetPassword() {
   .login-header h1 {
     font-size: 24px;
   }
-  .login-header p {
-    font-size: 14px;
-  }
-  .login-form .el-input {
-    font-size: 14px;
-  }
-  .login-form .el-button {
-    font-size: 14px;
-    padding: 10px 16px;
-  }
-  .reset-password-section {
-    padding-top: 16px;
-  }
-  .reset-password-section h3 {
-    font-size: 14px;
-  }
-  .reset-token-section {
-    margin-top: 6px;
-  }
-  .reset-success-box {
-    padding: 18px 0;
-  }
 }
 
 @media (max-width: 480px) {
-  .login-page {
-    padding: 12px;
-  }
   .login-card {
     padding: 28px 20px;
     border-radius: 14px;
   }
   .login-header h1 {
     font-size: 20px;
-  }
-  .login-header p {
-    font-size: 13px;
-  }
-  .login-form .el-input {
-    font-size: 13px;
-  }
-  .login-form .el-button {
-    font-size: 13px;
-    padding: 8px 14px;
-  }
-  .reset-password-section {
-    padding-top: 14px;
-  }
-  .reset-password-section h3 {
-    font-size: 13px;
-  }
-  .reset-success-box {
-    padding: 16px 0;
   }
 }
 </style>

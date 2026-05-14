@@ -53,4 +53,32 @@ export const aiApi = {
   smartRoute(text: string) {
     return api.post('/ai/smart-route', { text }, { timeout: 60000 })
   },
+
+  nudgeReflect() {
+    return api.post('/ai/nudge-reflect', {}, { timeout: 120000 })
+  },
+
+  selfRefine(pressureLevel: 'low' | 'medium' | 'high' = 'medium') {
+    return api.post('/ai/self-refine', { pressure_level: pressureLevel }, { timeout: 120000 })
+  },
+
+  buildUserProfile() {
+    return api.post('/ai/user-profile', {}, { timeout: 120000 })
+  },
+
+  extractFacts(messages: Array<{ role: string; content: string }>) {
+    return api.post('/ai/extract-facts', { messages }, { timeout: 120000 })
+  },
+
+  consolidate(newFacts: any[]) {
+    return api.post('/ai/consolidate', { new_facts: newFacts }, { timeout: 120000 })
+  },
+
+  processConversation(messages: Array<{ role: string; content: string }>) {
+    return api.post('/ai/process-conversation', { messages }, { timeout: 120000 })
+  },
+
+  assembleContext(query: string, tokenBudget?: number) {
+    return api.post('/ai/context-assemble', { query, token_budget: tokenBudget || 4000 }, { timeout: 120000 })
+  },
 }

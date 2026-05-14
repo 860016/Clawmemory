@@ -217,8 +217,9 @@ func (s *WikiService) GetStats(userID uint) (map[string]interface{}, error) {
 }
 
 func (s *WikiService) Search(userID uint, query string, limit int) ([]models.WikiPage, error) {
+	escaped := escapeLikeQuery(query)
 	var pages []models.WikiPage
-	err := s.db.Where("user_id = ? AND (title LIKE ? OR content LIKE ?)", userID, "%"+query+"%", "%"+query+"%").
+	err := s.db.Where("user_id = ? AND (title LIKE ? OR content LIKE ?)", userID, "%"+escaped+"%", "%"+escaped+"%").
 		Order("updated_at DESC").
 		Limit(limit).
 		Find(&pages).Error

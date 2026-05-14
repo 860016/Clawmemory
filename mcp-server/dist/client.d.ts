@@ -32,6 +32,8 @@ export declare class ClawMemoryClient {
         layer?: string;
         source?: string;
         memory_type?: string;
+        visibility?: string;
+        source_agent?: string;
     }): Promise<unknown>;
     batchSaveMemories(memories: Array<{
         key: string;
@@ -39,6 +41,8 @@ export declare class ClawMemoryClient {
         layer?: string;
         source?: string;
         memory_type?: string;
+        visibility?: string;
+        source_agent?: string;
     }>): Promise<unknown>;
     searchMemories(query: string, limit?: number): Promise<MemoryItem[]>;
     getContext(query: string, limit?: number): Promise<ContextResult>;
@@ -58,6 +62,7 @@ export declare class ClawMemoryClient {
         summary?: string;
         title?: string;
         project_path?: string;
+        visibility?: string;
     }): Promise<unknown>;
     trackSession(sessionId: string, metadata?: string): Promise<unknown>;
 }

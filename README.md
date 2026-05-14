@@ -1,4 +1,4 @@
-# ClawMemory v2.19.0 — AI 记忆管理中枢
+# ClawMemory v2.21.0 — AI 记忆管理中枢
 
 **ClawMemory** 是一款为 AI 助手设计的**长期记忆管理系统**。它让 AI 能够"记住"过去的对话、知识和上下文，实现跨会话的智能记忆检索与关联。
 
@@ -62,7 +62,7 @@
 - **API Key 认证**：安全的第三方应用接入
 - **外部 API**：`/api/v1/external/memories` 供 OpenClaw 等写入记忆
 - **批量导入**：支持批量写入记忆（最多 100 条/次）
-- **OpenClaw 自动同步**：安装后自动监控 `~/.openclaw/` 目录，每 60 秒增量同步新对话
+- **OpenClaw 实时同步**：安装后自动监控 `~/.openclaw/` 目录，基于 fsnotify 实时监听文件变更，2秒防抖合并
 
 ### 🔐 安全特性
 - JWT 认证 + API Key 双重认证机制
@@ -246,6 +246,34 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 ---
 
 ## 📝 更新日志
+
+### v2.21.0 (2026-05-14)
+- 🔒 安全：JWT Secret 未设置时自动生成安全密钥（32字节随机）
+- 🔒 安全：SQL LIKE 查询添加转义，防止通配符注入
+- 🔒 安全：CORS 配置收紧，移除通配符，使用白名单
+- 🔒 安全：API Key 权限分级，区分只读/读写/管理员权限
+- ⚡ 性能：语义搜索预过滤，先 SQLite FTS5 再向量搜索
+- ⚡ 性能：GraphRAG N² 复杂度优化，限制关系数量
+- ⚡ 性能：Embedding 缓存 LRU 实现，减少重复计算
+- 🛡️ 可靠性：AI 服务超时和重试机制（指数退避）
+- 🛡️ 可靠性：数据库连接池配置优化
+- 🛡️ 可靠性：NudgeReflect/SelfRefine 添加事务支持
+- 🐛 修复：Rate Limiter 内存泄漏，添加定期清理
+- 🐛 修复：路由重复注册，清理冗余路由
+- 🐛 修复：导出接口二次认证（GET 改 POST）
+- 🏗️ 架构：全局单例改为依赖注入（AppContainer）
+- 🏗️ 架构：前端全局错误拦截增强
+- 🧹 改进：52 处 bug 修复（并发安全、资源泄漏、错误处理等）
+
+### v2.20.0 (2026-05-11)
+- ⚡ 重构：OpenClaw 同步从 60 秒轮询改为 fsnotify 实时文件监听，2 秒防抖合并
+- ⚡ 新增：支持多 IDE 目录实时监控（OpenClaw/Trae CN/CodeBuddy CN）
+- ⚡ 新增：fsnotify 初始化失败时自动降级为轮询模式
+- 🔧 改进：外部 API 支持 visibility 和 source_agent 字段
+- 🔧 改进：GetPlatform 默认值从 "openclaw" 改为 "clawmemory"
+- 🔧 改进：记忆回写服务新增 clawmemory 和 trae 目标
+- 🏗️ 架构：Pro 功能分离为独立仓库 ClawMemory-Pro（闭源），主仓库保持 MIT 开源
+- 🏗️ 架构：引入 ProProvider 接口，开源版使用 Stub 实现，Pro 版使用真实实现
 
 ### v2.19.0 (2026-05-08)
 - 🔮 新增：Dialectic Reasoning 多轮推理引擎（用户自带 AI 模型，零额外费用）

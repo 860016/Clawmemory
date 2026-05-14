@@ -2,6 +2,7 @@ package services
 
 import (
 	"math"
+	"sort"
 	"strings"
 
 	"clawmemory/internal/models"
@@ -24,7 +25,7 @@ func (s *RecommendService) RecommendForMemory(userID uint, memoryID uint, limit 
 	}
 
 	var memories []models.Memory
-	s.db.Where("user_id = ? AND status != ? AND id != ?", userID, "trashed", memoryID).Find(&memories)
+	_ = s.db.Where("user_id = ? AND status != ? AND id != ?", userID, "trashed", memoryID).Limit(5000).Find(&memories).Error
 
 	targetTokens := tokenize(target.Key + " " + target.Value)
 	if len(targetTokens) == 0 {
@@ -72,13 +73,9 @@ func (s *RecommendService) RecommendForMemory(userID uint, memoryID uint, limit 
 		}
 	}
 
-	for i := 0; i < len(scored_memories)-1; i++ {
-		for j := i + 1; j < len(scored_memories); j++ {
-			if scored_memories[j].Score > scored_memories[i].Score {
-				scored_memories[i], scored_memories[j] = scored_memories[j], scored_memories[i]
-			}
-		}
-	}
+	sort.Slice(scored_memories, func(i, j int) bool {
+		return scored_memories[i].Score > scored_memories[j].Score
+	})
 
 	if limit > len(scored_memories) {
 		limit = len(scored_memories)
@@ -107,7 +104,7 @@ func (s *RecommendService) RecommendForMemory(userID uint, memoryID uint, limit 
 
 func (s *RecommendService) RecommendByContext(userID uint, context string, limit int) (map[string]interface{}, error) {
 	var memories []models.Memory
-	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Find(&memories)
+	_ = s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error
 
 	if len(memories) == 0 || context == "" {
 		return map[string]interface{}{"recommendations": []map[string]interface{}{}}, nil
@@ -135,13 +132,9 @@ func (s *RecommendService) RecommendByContext(userID uint, context string, limit
 		}
 	}
 
-	for i := 0; i < len(scored_memories)-1; i++ {
-		for j := i + 1; j < len(scored_memories); j++ {
-			if scored_memories[j].Score > scored_memories[i].Score {
-				scored_memories[i], scored_memories[j] = scored_memories[j], scored_memories[i]
-			}
-		}
-	}
+	sort.Slice(scored_memories, func(i, j int) bool {
+		return scored_memories[i].Score > scored_memories[j].Score
+	})
 
 	if limit > len(scored_memories) {
 		limit = len(scored_memories)
