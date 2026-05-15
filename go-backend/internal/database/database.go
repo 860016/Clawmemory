@@ -99,5 +99,23 @@ func runPreMigrations(db *gorm.DB) error {
 		}
 	}
 
+	if db.Migrator().HasTable(&models.User{}) {
+		if db.Migrator().HasColumn(&models.User{}, "is_founder") {
+			result := db.Model(&models.User{}).
+				Where("is_founder = ? AND role = ?", false, "admin").
+				Update("is_founder", true)
+			if result.RowsAffected > 0 {
+				fmt.Printf("[DB] set %d existing admin users as founder\n", result.RowsAffected)
+			}
+		}
+	}
+
+	if db.Migrator().HasTable(&models.AuditLog{}) {
+		result := db.Where("created_at < datetime('now', '-90 day')").Delete(&models.AuditLog{})
+		if result.RowsAffected > 0 {
+			fmt.Printf("[DB] cleaned up %d audit logs older than 90 days\n", result.RowsAffected)
+		}
+	}
+
 	return nil
 }

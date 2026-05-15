@@ -33,6 +33,8 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		public.GET("/auth/init-status", handleInitStatus(authService))
 		public.POST("/auth/set-password", middleware.LoginRateLimit(), handleSetPassword(authService))
 		public.POST("/auth/login", middleware.LoginRateLimit(), handleLogin(authService))
+		public.POST("/auth/refresh", handleRefreshToken(authService))
+		public.POST("/auth/login-status", handleLoginStatus(authService))
 		public.POST("/auth/register", middleware.LoginRateLimit(), handleRegister(authService))
 		public.POST("/auth/register-with-invitation", middleware.LoginRateLimit(), handleRegisterWithInvitation(authService))
 		public.POST("/auth/forgot-password", middleware.LoginRateLimit(), handleForgotPassword(authService))

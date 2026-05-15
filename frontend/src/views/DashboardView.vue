@@ -280,6 +280,36 @@
         </template>
       </el-alert>
 
+      <div v-if="showOnboarding" class="onboarding-card">
+        <div class="onboarding-header">
+          <h2>{{ $t('dashboard.welcome') }}</h2>
+          <el-button text @click="dismissOnboarding"><el-icon><Close /></el-icon></el-button>
+        </div>
+        <div class="onboarding-steps">
+          <div class="onboarding-step" @click="$router.push('/settings')">
+            <div class="step-icon">1️⃣</div>
+            <div class="step-info">
+              <div class="step-title">{{ $t('dashboard.onboardStep1Title') }}</div>
+              <div class="step-desc">{{ $t('dashboard.onboardStep1Desc') }}</div>
+            </div>
+          </div>
+          <div class="onboarding-step" @click="$router.push('/settings?section=security')">
+            <div class="step-icon">2️⃣</div>
+            <div class="step-info">
+              <div class="step-title">{{ $t('dashboard.onboardStep2Title') }}</div>
+              <div class="step-desc">{{ $t('dashboard.onboardStep2Desc') }}</div>
+            </div>
+          </div>
+          <div class="onboarding-step" @click="$router.push('/memories')">
+            <div class="step-icon">3️⃣</div>
+            <div class="step-info">
+              <div class="step-title">{{ $t('dashboard.onboardStep3Title') }}</div>
+              <div class="step-desc">{{ $t('dashboard.onboardStep3Desc') }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-icon-wrap mem-icon">🧠</div>
@@ -446,6 +476,12 @@ const stats = ref<any>({
   passwordSet: true,
 })
 
+const showOnboarding = ref(!localStorage.getItem('cm_onboarded'))
+function dismissOnboarding() {
+  showOnboarding.value = false
+  localStorage.setItem('cm_onboarded', '1')
+}
+
 // Skills state
 const scanning = ref(false)
 const scanned = ref(false)
@@ -492,7 +528,7 @@ onMounted(async () => {
   try {
     const { data } = await axios.get('/stats')
     stats.value = data
-  } catch {}
+  } catch { stats.value = { total_memories: 0, total_entities: 0, total_relations: 0, total_wiki_pages: 0 } }
   loadChromaDBStatus()
 })
 
@@ -503,7 +539,7 @@ async function loadChromaDBStatus() {
     if (data.available && data.memoryCount) {
       chromadbMemoryCount.value = data.memoryCount
     }
-  } catch {}
+  } catch { chromadbInstalled.value = false }
 }
 
 // Auto-scan skills when switching to skills tab
@@ -583,7 +619,7 @@ async function loadUsageStats() {
   try {
     const { data } = await axios.get('/stats/usage', { params: { days: statsPeriod.value } })
     usageStats.value = data
-  } catch {}
+  } catch { usageStats.value = { dailyTrend: [], dailyTokenTrend: [] } }
 }
 
 // Chart computed values
@@ -746,6 +782,16 @@ function formatNumber(n: number) {
 }
 
 .period-selector { flex-shrink: 0; }
+
+.onboarding-card { background: var(--cm-bg-secondary); border: 1px solid rgba(16,185,129,0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+.onboarding-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.onboarding-header h2 { font-size: 18px; font-weight: 600; color: var(--cm-text); margin: 0; }
+.onboarding-steps { display: flex; flex-direction: column; gap: 10px; }
+.onboarding-step { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; background: var(--cm-bg); cursor: pointer; transition: all 0.2s; }
+.onboarding-step:hover { background: rgba(16,185,129,0.08); transform: translateX(4px); }
+.step-icon { font-size: 24px; flex-shrink: 0; }
+.step-title { font-size: 14px; font-weight: 500; color: var(--cm-text); }
+.step-desc { font-size: 12px; color: var(--cm-text-muted); margin-top: 2px; }
 
 .stats-grid {
   display: grid;

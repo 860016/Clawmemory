@@ -648,7 +648,7 @@ async function loadBackupSchedule() {
   try {
     const { data } = await proApi.getBackupSchedule()
     backupSchedule.value = data
-  } catch {}
+  } catch { backupSchedule.value = { enabled: false, interval_hours: 24 } }
 }
 
 async function saveBackupSchedule() {
@@ -694,7 +694,7 @@ async function loadCompressConfig() {
   try {
     const { data } = await proApi.getCompressConfig()
     compressConfig.value = { auto_enabled: data.auto_enabled || false, threshold: data.threshold || 1000, level: data.level || 'light' }
-  } catch {}
+  } catch { compressConfig.value = { auto_enabled: false, threshold: 1000, level: 'light' } }
 }
 
 async function loadEvolutionInsights() {

@@ -8,15 +8,20 @@ import (
 
 // User 用户
 type User struct {
-	ID             uint      `gorm:"primarykey" json:"id"`
-	Username       string    `gorm:"uniqueIndex;not null" json:"username"`
-	Password       string    `gorm:"not null" json:"-"`
-	Email          string    `json:"email"`
-	Role           string    `gorm:"size:20;default:user" json:"role"`
-	TokenVersion   int       `gorm:"default:1" json:"token_version"`
-	InvitationCode string    `gorm:"size:50" json:"-"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID               uint       `gorm:"primarykey" json:"id"`
+	Username         string     `gorm:"uniqueIndex;not null" json:"username"`
+	Password         string     `gorm:"not null" json:"-"`
+	Email            string     `json:"email"`
+	Role             string     `gorm:"size:20;default:user" json:"role"`
+	IsFounder        bool       `gorm:"default:false" json:"is_founder"`
+	TokenVersion     int        `gorm:"default:1" json:"token_version"`
+	InvitationCode   string     `gorm:"size:50" json:"-"`
+	FailedAttempts   int        `gorm:"default:0" json:"-"`
+	LockedUntil      *time.Time `json:"-"`
+	RefreshToken     string     `gorm:"size:500" json:"-"`
+	RefreshTokenExp  *time.Time `json:"-"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
 // Memory 记忆

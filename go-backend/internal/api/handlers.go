@@ -73,13 +73,16 @@ func handleSetPassword(authService *services.AuthService) gin.HandlerFunc {
 			username = "admin"
 		}
 
-		token, err := authService.SetPasswordWithUsername(username, req.Password)
+		result, err := authService.SetPasswordWithUsername(username, req.Password)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"access_token": token})
+		c.JSON(http.StatusOK, gin.H{
+			"access_token":  result.AccessToken,
+			"refresh_token": result.RefreshToken,
+		})
 	}
 }
 
@@ -88,6 +91,7 @@ func handleLogin(authService *services.AuthService) gin.HandlerFunc {
 		var req struct {
 			Username string `json:"username"`
 			Password string `json:"password" binding:"required"`
+			Captcha  string `json:"captcha"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -98,13 +102,24 @@ func handleLogin(authService *services.AuthService) gin.HandlerFunc {
 			req.Username = "admin"
 		}
 
-		token, err := authService.Login(req.Username, req.Password)
+		result, err := authService.Login(req.Username, req.Password, req.Captcha)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			status := http.StatusUnauthorized
+			resp := gin.H{"error": err.Error()}
+			if result != nil {
+				resp["requires_captcha"] = result.RequiresCaptcha
+				if result.LockedUntil != nil {
+					resp["locked_until"] = result.LockedUntil
+				}
+			}
+			c.JSON(status, resp)
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"access_token": token})
+		c.JSON(http.StatusOK, gin.H{
+			"access_token":  result.AccessToken,
+			"refresh_token": result.RefreshToken,
+		})
 	}
 }
 
@@ -123,8 +138,10 @@ func handleGetMe(authService *services.AuthService) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"id":       user.ID,
-			"username": user.Username,
+			"id":         user.ID,
+			"username":   user.Username,
+			"role":       user.Role,
+			"is_founder": user.IsFounder,
 		})
 	}
 }
@@ -132,23 +149,26 @@ func handleGetMe(authService *services.AuthService) gin.HandlerFunc {
 func handleRegister(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			Username string `json:"username" binding:"required"`
-			Password string `json:"password" binding:"required"`
+			Username       string `json:"username" binding:"required"`
+			Password       string `json:"password" binding:"required"`
+			InvitationCode string `json:"invitation_code"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		user, err := authService.Register(req.Username, req.Password)
+		user, err := authService.RegisterWithInvitation(req.Username, req.Password, req.InvitationCode)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
 		c.JSON(http.StatusCreated, gin.H{
-			"id":       user.ID,
-			"username": user.Username,
+			"id":         user.ID,
+			"username":   user.Username,
+			"role":       user.Role,
+			"is_founder": user.IsFounder,
 		})
 	}
 }
@@ -188,59 +208,10 @@ func handleResetPassword(authService *services.AuthService) gin.HandlerFunc {
 
 func handleForgotPassword(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		passwordSet, err := authService.CheckInitStatus()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check init status"})
-			return
-		}
-		if !passwordSet {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "no password set yet, please set a password first"})
-			return
-		}
-
-		var req struct {
-			Username    string `json:"username"`
-			NewPassword string `json:"new_password"`
-			Confirm     bool   `json:"confirm"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if !req.Confirm {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "confirm is required"})
-			return
-		}
-		if req.Username == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "username is required", "hint": "use terminal command: ./clawmemory --reset-password NEW_PASSWORD"})
-			return
-		}
-		if req.NewPassword == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password is required"})
-			return
-		}
-		if len(req.NewPassword) < 6 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password must be at least 6 characters"})
-			return
-		}
-
-		var user models.User
-		if err := authService.FindFirstUser(&user); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "no user found", "hint": "use terminal command: ./clawmemory --reset-password NEW_PASSWORD"})
-			return
-		}
-
-		if user.Username != req.Username {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "username mismatch", "hint": "use terminal command: ./clawmemory --reset-password NEW_PASSWORD"})
-			return
-		}
-
-		if err := authService.ResetPassword(user.ID, req.NewPassword); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{"message": "password reset successful"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "password reset is only available via terminal command",
+			"hint":  "Run: ./clawmemory --reset-password NEW_PASSWORD",
+		})
 	}
 }
 
@@ -272,6 +243,62 @@ func handleChangePassword(authService *services.AuthService) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "password changed successfully"})
+	}
+}
+
+func handleRefreshToken(authService *services.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			RefreshToken string `json:"refresh_token" binding:"required"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "refresh_token is required"})
+			return
+		}
+
+		result, err := authService.RefreshAccessToken(req.RefreshToken)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"access_token":  result.AccessToken,
+			"refresh_token": result.RefreshToken,
+		})
+	}
+}
+
+func handleLoginStatus(authService *services.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Username string `json:"username"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if req.Username == "" {
+			c.JSON(http.StatusOK, gin.H{
+				"requires_captcha": false,
+				"locked":           false,
+			})
+			return
+		}
+
+		locked, lockedUntil, failedAttempts := authService.IsAccountLocked(req.Username)
+		requiresCaptcha := failedAttempts >= services.MaxFailedAttempts
+
+		resp := gin.H{
+			"requires_captcha": requiresCaptcha,
+			"locked":           locked,
+			"failed_attempts":  failedAttempts,
+		}
+		if lockedUntil != nil {
+			resp["locked_until"] = lockedUntil
+		}
+		c.JSON(http.StatusOK, resp)
 	}
 }
 
@@ -354,6 +381,9 @@ func handleListMemories(db *gorm.DB) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{
 			"items": memories,
 			"total": total,
+			"page":  page,
+			"size":  size,
+			"pages": (total + int64(size) - 1) / int64(size),
 		})
 	}
 }
@@ -1414,7 +1444,7 @@ func handleListEntities(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"items": entities, "total": total})
+		c.JSON(http.StatusOK, gin.H{"items": entities, "total": total, "page": page, "size": size, "pages": (total + int64(size) - 1) / int64(size)})
 	}
 }
 
@@ -1455,7 +1485,7 @@ func handleListRelations(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"items": relations, "total": total})
+		c.JSON(http.StatusOK, gin.H{"items": relations, "total": total, "page": page, "size": size, "pages": (total + int64(size) - 1) / int64(size)})
 	}
 }
 
@@ -1515,7 +1545,7 @@ func handleListWiki(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"items": pages, "total": total})
+		c.JSON(http.StatusOK, gin.H{"items": pages, "total": total, "page": page, "size": size, "pages": (total + int64(size) - 1) / int64(size)})
 	}
 }
 
@@ -1776,7 +1806,7 @@ func handleListReports(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"items": reports, "total": total})
+		c.JSON(http.StatusOK, gin.H{"items": reports, "total": total, "page": page, "size": size, "pages": (total + int64(size) - 1) / int64(size)})
 	}
 }
 
@@ -4706,7 +4736,7 @@ func handleListProjects(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"items": projects, "total": total})
+		c.JSON(http.StatusOK, gin.H{"items": projects, "total": total, "page": page, "size": size, "pages": (total + int64(size) - 1) / int64(size)})
 	}
 }
 

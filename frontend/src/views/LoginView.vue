@@ -31,6 +31,23 @@
           size="large"
           show-password
         />
+        <el-alert
+          v-if="loginLocked"
+          type="error"
+          :closable="false"
+          style="margin-bottom: 0"
+        >
+          <template #title>{{ $t('login.accountLocked') }}</template>
+          <p style="margin: 4px 0 0; font-size: 12px; color: var(--cm-text-muted)">{{ $t('login.accountLockedHint') }}</p>
+        </el-alert>
+        <el-alert
+          v-if="requiresCaptcha && !loginLocked"
+          type="warning"
+          :closable="false"
+          style="margin-bottom: 0"
+        >
+          <template #title>{{ $t('login.captchaRequired') }}</template>
+        </el-alert>
         <el-button type="primary" @click="handleLogin" :loading="loading" size="large" class="login-btn">
           {{ $t('login.login') }}
         </el-button>
@@ -67,6 +84,7 @@
           :placeholder="$t('login.invitationCodePlaceholder')"
           size="large"
         />
+        <p class="hint">{{ $t('login.invitationCodeHint') }}</p>
         <el-button type="primary" @click="handleRegister" :loading="loading" size="large" class="login-btn">
           {{ $t('login.register') }}
         </el-button>
@@ -132,34 +150,20 @@
 
     <!-- Forgot Password Dialog -->
     <el-dialog v-model="showForgotDialog" :title="$t('login.forgotPassword')" width="440px" :close-on-click-modal="false">
-      <div v-if="!resetMessage">
-        <el-alert type="info" :closable="false" style="margin-bottom: 16px">
-          <template #title>{{ $t('login.forgotStep2Title') }}</template>
-          <p style="margin: 8px 0 0; font-size: 13px; color: var(--cm-text-muted)">{{ $t('login.forgotStep2Desc') }}</p>
-        </el-alert>
-        <div class="reset-token-section">
-          <el-input v-model="forgotUsername" :placeholder="$t('login.usernamePlaceholder')" size="large" style="margin-bottom: 12px" />
-          <el-input v-model="newPassword" type="password" show-password :placeholder="$t('login.newPasswordPlaceholder')" size="large" />
-          <el-button type="primary" @click="handleResetPassword" :loading="loading" size="large" style="margin-top: 12px; width: 100%">
-            {{ $t('login.resetPassword') }}
-          </el-button>
+      <el-alert type="warning" :closable="false" style="margin-bottom: 16px">
+        <template #title>{{ $t('login.forgotPasswordOnlyTerminal') }}</template>
+      </el-alert>
+      <div class="cli-hint">
+        <p>{{ $t('login.cliResetHint') }}</p>
+        <div class="cli-commands">
+          <div class="cli-platform">Windows:</div>
+          <code>clawmemory.exe --reset-password NEW_PASSWORD</code>
+          <div class="cli-platform">Linux/macOS:</div>
+          <code>./clawmemory --reset-password NEW_PASSWORD</code>
         </div>
-        <div class="cli-hint">
-          <p>{{ $t('login.cliResetHint') }}</p>
-          <div class="cli-commands">
-            <div class="cli-platform">Windows:</div>
-            <code>clawmemory.exe --reset-password NEW_PASSWORD</code>
-            <div class="cli-platform">Linux/macOS:</div>
-            <code>./clawmemory --reset-password NEW_PASSWORD</code>
-          </div>
-        </div>
-      </div>
-      <div v-else class="reset-success-box">
-        <el-icon color="#10B981" :size="40"><SuccessFilled /></el-icon>
-        <p style="margin: 12px 0 0; color: var(--cm-text); font-weight: 600">{{ resetMessage }}</p>
       </div>
       <template #footer>
-        <el-button @click="showForgotDialog = false; resetMessage = ''; newPassword = ''">{{ $t('common.cancel') }}</el-button>
+        <el-button @click="showForgotDialog = false">{{ $t('common.close') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -197,6 +201,8 @@ const regConfirmPassword = ref('')
 const invitationCode = ref('')
 
 const passwordInput = ref<any>(null)
+const requiresCaptcha = ref(false)
+const loginLocked = ref(false)
 
 function focusPassword() {
   passwordInput.value?.focus()
@@ -232,10 +238,20 @@ async function handleLogin() {
       password: password.value,
     })
     localStorage.setItem('token', data.access_token)
+    if (data.refresh_token) {
+      localStorage.setItem('refresh_token', data.refresh_token)
+    }
     const redirect = route.query.redirect as string
     router.push(redirect || '/')
   } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('login.wrongPassword')))
+    const resp = e.response?.data || {}
+    if (resp.requires_captcha) {
+      requiresCaptcha.value = true
+    }
+    if (resp.locked_until) {
+      loginLocked.value = true
+    }
+    ElMessage.error(translateError(resp.error || resp.detail, t('login.wrongPassword')))
   } finally {
     loading.value = false
   }
@@ -301,6 +317,9 @@ async function handleSetPassword() {
     const { data } = await axios.post('/auth/set-password', payload)
     if (data.access_token) {
       localStorage.setItem('token', data.access_token)
+      if (data.refresh_token) {
+        localStorage.setItem('refresh_token', data.refresh_token)
+      }
       passwordSet.value = true
       await fetchAutoApiKey()
       loginMode.value = 'setup-complete'

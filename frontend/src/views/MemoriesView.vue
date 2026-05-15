@@ -3,17 +3,22 @@
     <div class="page-header">
       <h1>🧠 {{ $t('memories.title') }}</h1>
       <div class="header-actions">
-        <el-button @click="showExtractDialog = true">
-          <el-icon><MagicStick /></el-icon> {{ $t('memories.extractMemory') }}
-        </el-button>
-        <el-button type="warning" @click="aiConflictScan" :loading="aiScanning" plain>
-          <el-icon><Warning /></el-icon> {{ $t('memories.aiConflictScan') }}
-        </el-button>
-        <el-button @click="handleOpenClawScan">
-          <el-icon><Upload /></el-icon> {{ $t('memories.importOpenClaw') }}
-        </el-button>
+        <template v-if="!mobileActionsCollapsed">
+          <el-button @click="showExtractDialog = true">
+            <el-icon><MagicStick /></el-icon> {{ $t('memories.extractMemory') }}
+          </el-button>
+          <el-button type="warning" @click="aiConflictScan" :loading="aiScanning" plain>
+            <el-icon><Warning /></el-icon> {{ $t('memories.aiConflictScan') }}
+          </el-button>
+          <el-button @click="handleOpenClawScan">
+            <el-icon><Upload /></el-icon> {{ $t('memories.importOpenClaw') }}
+          </el-button>
+        </template>
         <el-button type="primary" @click="openAddDialog">
           <el-icon><Plus /></el-icon> {{ $t('memories.addMemory') }}
+        </el-button>
+        <el-button class="mobile-toggle-btn" @click="mobileActionsCollapsed = !mobileActionsCollapsed">
+          <el-icon><component :is="mobileActionsCollapsed ? 'ArrowDown' : 'ArrowUp'" /></el-icon>
         </el-button>
       </div>
     </div>
@@ -94,7 +99,16 @@
     </div>
 
     <div v-else class="memory-list">
-      <div class="memory-card" v-for="m in memories" :key="m.id">
+      <div v-if="loadingList" class="skeleton-list">
+        <div class="skeleton-card" v-for="i in 5" :key="i">
+          <div class="skeleton-line" style="width: 40%; height: 16px;"></div>
+          <div class="skeleton-line" style="width: 80%; height: 14px; margin-top: 10px;"></div>
+          <div class="skeleton-line" style="width: 60%; height: 14px; margin-top: 6px;"></div>
+        </div>
+      </div>
+      <template v-else>
+        <el-empty v-if="memories.length === 0" :description="$t('common.noData')" />
+        <div v-for="m in memories" :key="m.id" class="memory-card">
         <div class="card-top">
           <span class="layer-tag" :class="m.layer">{{ layerLabels[m.layer] || m.layer }}</span>
           <span class="importance" :class="importanceClass(m.importance)">{{ (m.importance * 100).toFixed(0) }}%</span>
@@ -129,6 +143,7 @@
           </div>
         </div>
       </div>
+      </template>
     </div>
 
     <div class="pagination" v-if="total > pageSize">
@@ -326,6 +341,8 @@ const total = ref(0)
 const showAddDialog = ref(false)
 const editingMemory = ref<any>(null)
 const saving = ref(false)
+const loadingList = ref(true)
+const mobileActionsCollapsed = ref(window.innerWidth <= 768)
 
 // OpenClaw import state
 const showImportDialog = ref(false)
@@ -356,7 +373,7 @@ async function loadConnectedAgents() {
   try {
     const { data } = await agentApi.getConnected()
     connectedAgents.value = data.agents || []
-  } catch {}
+  } catch { connectedAgents.value = [] }
 }
 
 const showExtractDialog = ref(false)
@@ -388,6 +405,7 @@ function openAddDialog() {
 }
 
 async function loadMemories() {
+  loadingList.value = true
   try {
     const params: any = { page: currentPage.value, size: pageSize }
     if (currentLayer.value) params.layer = currentLayer.value
@@ -397,7 +415,8 @@ async function loadMemories() {
     const { data } = await axios.get('/memories', { params })
     memories.value = data.items || []
     total.value = data.total || 0
-  } catch {}
+  } catch { memories.value = []; total.value = 0 }
+  finally { loadingList.value = false }
 }
 
 async function handleSearch() {
@@ -509,7 +528,11 @@ async function deleteMemory(id: number) {
     ElMessage.success(t('memories.deleted'))
     searchResults.value = []
     await loadMemories()
-  } catch {}
+  } catch (e: any) {
+    if (e !== 'cancel' && e?.message !== 'cancel') {
+      ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+    }
+  }
 }
 
 async function decryptMemory(m: any) {
@@ -672,6 +695,11 @@ async function doSaveMemory(payload: any) {
 .section-title { font-size: 14px; font-weight: 600; color: var(--cm-text-muted); margin-bottom: 12px; }
 .memory-list, .search-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
 .memory-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 16px; transition: all 0.2s ease; position: relative; overflow: hidden; }
+
+.skeleton-list { display: flex; flex-direction: column; gap: 12px; }
+.skeleton-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 16px; }
+.skeleton-line { background: linear-gradient(90deg, var(--cm-border) 25%, rgba(16,185,129,0.08) 50%, var(--cm-border) 75%); background-size: 200% 100%; animation: skeleton-pulse 1.5s ease-in-out infinite; border-radius: 4px; }
+@keyframes skeleton-pulse { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 .memory-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--cm-primary), transparent); opacity: 0; transition: opacity 0.3s; }
 .memory-card:hover { border-color: rgba(16,185,129,0.3); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
 .memory-card:hover::before { opacity: 1; }
@@ -723,7 +751,15 @@ async function doSaveMemory(payload: any) {
 .import-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 0; }
 .loading-spin { animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.mobile-toggle-btn { display: none; }
 @media (max-width: 768px) {
+  .mobile-toggle-btn { display: inline-flex; }
+  .header-actions {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
   .memories-page {
     padding: 16px;
   }

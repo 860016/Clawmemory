@@ -26,6 +26,7 @@ func CORS() gin.HandlerFunc {
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key, X-Platform")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Max-Age", "86400")
 		c.Writer.Header().Set("Vary", "Origin")
 
 		if c.Request.Method == "OPTIONS" {
@@ -56,17 +57,26 @@ func isOriginAllowed(origin string) bool {
 		"http://localhost",
 		"http://127.0.0.1",
 		"http://0.0.0.0",
+		"https://localhost",
+		"https://127.0.0.1",
 	}
 	for _, prefix := range allowedLocalhosts {
 		if strings.HasPrefix(origin, prefix) {
 			return true
 		}
 	}
-	if strings.HasPrefix(origin, "http://192.168.") || strings.HasPrefix(origin, "http://10.") {
+	if strings.HasPrefix(origin, "http://192.168.") || strings.HasPrefix(origin, "https://192.168.") {
 		return true
 	}
-	if strings.HasPrefix(origin, "http://172.") {
-		parts := strings.SplitN(strings.TrimPrefix(origin, "http://172."), ".", 2)
+	if strings.HasPrefix(origin, "http://10.") || strings.HasPrefix(origin, "https://10.") {
+		return true
+	}
+	if strings.HasPrefix(origin, "http://172.") || strings.HasPrefix(origin, "https://172.") {
+		trimmed := origin
+		if strings.HasPrefix(trimmed, "https://") {
+			trimmed = "http://" + strings.TrimPrefix(trimmed, "https://")
+		}
+		parts := strings.SplitN(strings.TrimPrefix(trimmed, "http://172."), ".", 2)
 		if len(parts) > 0 {
 			var second int
 			if _, err := fmt.Sscanf(parts[0], "%d", &second); err == nil && second >= 16 && second <= 31 {

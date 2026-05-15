@@ -4,6 +4,11 @@
       <h1>⚙️ {{ $t('settings.title') }}</h1>
     </div>
 
+    <div class="settings-layout">
+      <nav class="settings-nav">
+        <a v-for="s in sections" :key="s.id" :class="{ active: activeSection === s.id }" @click.prevent="scrollToSection(s.id)">{{ s.icon }} {{ s.label }}</a>
+      </nav>
+
     <div class="settings-grid">
       <!-- 授权管理 -->
       <div class="settings-card" :class="{ 'section-highlight': activeSection === 'license' }" id="settings-license">
@@ -599,11 +604,12 @@
         <el-button type="primary" @click="copyAgentsMD">{{ $t('settings.agentsMdCopy') }}</el-button>
       </template>
     </el-dialog>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -615,6 +621,17 @@ import { reasoningApi } from '../api/go-reasoning'
 const { t } = useI18n()
 const route = useRoute()
 const activeSection = ref((route.query.section as string) || '')
+const sections = [
+  { id: 'license', icon: '🔑', label: computed(() => t('settings.license')) },
+  { id: 'ai', icon: '🧠', label: computed(() => t('settings.aiConfig')) },
+  { id: 'security', icon: '🔒', label: computed(() => t('settings.security')) },
+  { id: 'risk-switches', icon: '🛡️', label: computed(() => t('settings.riskControl')) },
+  { id: 'reasoning', icon: '🤔', label: computed(() => t('settings.reasoningConfig')) },
+  { id: 'openclaw', icon: '🌐', label: 'OpenClaw' },
+  { id: 'data', icon: '💾', label: computed(() => t('settings.dataManagement')) },
+  { id: 'decay', icon: '⏳', label: computed(() => t('settings.memoryDecay')) },
+  { id: 'system', icon: '🖥️', label: computed(() => t('settings.systemInfo')) },
+]
 const license = ref<any>({ active: false, tier: 'oss', features: [] })
 const activating = ref(false)
 const licenseKey = ref('')
@@ -758,25 +775,39 @@ watch(() => route.query.section, (section) => {
 function scrollToSection(section: string) {
   const el = document.getElementById(`settings-${section}`)
   if (el) {
+    activeSection.value = section
     el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     el.classList.add('section-highlight')
     setTimeout(() => el.classList.remove('section-highlight'), 2000)
   }
 }
 
+onMounted(() => {
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        const id = entry.target.id?.replace('settings-', '')
+        if (id) activeSection.value = id
+      }
+    }
+  }, { threshold: 0.3 })
+  document.querySelectorAll('.settings-card[id]').forEach((el) => observer.observe(el))
+  onUnmounted(() => observer.disconnect())
+})
+
 function changeLocale(locale: 'zh' | 'en') {
   setLocale(locale)
 }
 
 async function loadLicense() {
-  try { const { data } = await axios.get('/license/info'); license.value = data } catch {}
+  try { const { data } = await axios.get('/license/info'); license.value = data } catch { license.value = null }
 }
 
 async function loadApiKeys() {
   try {
     const { data } = await axios.get('/api-keys')
     apiKeys.value = data.items || []
-  } catch {}
+  } catch { apiKeys.value = [] }
 }
 
 function openApiKeyDialog() {
@@ -917,7 +948,7 @@ async function loadRecordSensitiveSetting() {
   try {
     const { data } = await axios.get('/settings')
     recordSensitive.value = !!data.record_sensitive_content
-  } catch {}
+  } catch { recordSensitive.value = false }
 }
 
 const riskSwitches = ref<Record<string, boolean>>({
@@ -936,7 +967,7 @@ async function loadRiskSwitches() {
     if (data.switches) {
       riskSwitches.value = { ...riskSwitches.value, ...data.switches }
     }
-  } catch {}
+  } catch { /* use defaults */ }
 }
 
 async function saveRiskSwitches() {
@@ -970,11 +1001,11 @@ async function updateRecordSensitive() {
 }
 
 async function loadInitStatus() {
-  try { const { data } = await axios.get('/auth/init-status'); passwordSet.value = data.password_set } catch {}
+  try { const { data } = await axios.get('/auth/init-status'); passwordSet.value = data.password_set } catch { passwordSet.value = true }
 }
 
 async function loadInstallStatus() {
-  try { const { data } = await axios.get('/install-status'); coreEngine.value = data.checks?.security_engine || 'python'; if (data.version) appVersion.value = data.version } catch {}
+  try { const { data } = await axios.get('/install-status'); coreEngine.value = data.checks?.security_engine || 'python'; if (data.version) appVersion.value = data.version } catch { coreEngine.value = 'go' }
 }
 
 async function checkForUpdate() {
@@ -1101,14 +1132,14 @@ async function loadDecaySettings() {
     const { data } = await axios.get('/memories/decay/settings')
     decayEnabled.value = data.enabled
     decayInfo.value = data
-  } catch {}
+  } catch { decayEnabled.value = false }
 }
 
 async function loadDecayStats() {
   try {
     const { data } = await axios.get('/memories/decay/stats')
     decayStats.value = data.stats || data
-  } catch {}
+  } catch { decayStats.value = null }
 }
 
 async function updateDecaySettings() {
@@ -1133,7 +1164,11 @@ async function emptyTrash() {
     await axios.delete('/memories/trash')
     ElMessage.success(t('settings.trashEmptied'))
     await loadDecayStats()
-  } catch {}
+  } catch (e: any) {
+    if (e !== 'cancel' && e?.message !== 'cancel') {
+      ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+    }
+  }
 }
 
 async function checkHealth() {
@@ -1181,7 +1216,7 @@ async function loadAIUsage() {
   try {
     const { data } = await aiApi.getUsage()
     aiUsage.value = data
-  } catch {}
+  } catch { aiUsage.value = null }
 }
 
 async function testAIConnection() {
@@ -1277,7 +1312,7 @@ async function loadAIProviders() {
   try {
     const { data } = await aiApi.getProviders()
     aiProviders.value = data.providers || []
-  } catch {}
+  } catch { aiProviders.value = [] }
 }
 
 function onAIProviderChange() {
@@ -1362,7 +1397,12 @@ watch(showAgentsMdPreview, async (v) => {
 </script>
 
 <style scoped>
-.settings-page { padding: 28px; max-width: 1000px; margin: 0 auto; }
+.settings-page { padding: 28px; max-width: 1200px; margin: 0 auto; }
+.settings-layout { display: flex; gap: 20px; }
+.settings-nav { position: sticky; top: 80px; min-width: 140px; height: fit-content; display: flex; flex-direction: column; gap: 2px; }
+.settings-nav a { padding: 6px 10px; border-radius: 6px; font-size: 13px; color: var(--cm-text-muted); cursor: pointer; transition: all 0.2s; white-space: nowrap; text-decoration: none; }
+.settings-nav a:hover { color: var(--cm-text); background: var(--cm-bg-secondary); }
+.settings-nav a.active { color: #10B981; background: rgba(16,185,129,0.1); font-weight: 500; }
 .page-header { margin-bottom: 24px; }
 .page-header h1 { font-size: 24px; font-weight: 700; color: var(--cm-text); margin: 0; }
 .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 16px; }

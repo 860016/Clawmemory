@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"time"
 
 	"clawmemory/internal/models"
 )
@@ -16,12 +17,15 @@ type MemoryServiceInterface interface {
 }
 
 type AuthServiceInterface interface {
-	Login(username, password string) (string, error)
+	Login(username, password, captcha string) (*LoginResult, error)
 	RegisterWithInvitation(username, password, invitationCode string) (*models.User, error)
 	ChangePassword(userID uint, oldPassword, newPassword string) error
 	ResetPassword(userID uint, newPassword string) error
 	IncrementTokenVersion(userID uint) error
 	GetUserByID(userID uint) (*models.User, error)
+	RefreshAccessToken(refreshToken string) (*LoginResult, error)
+	IsAccountLocked(username string) (bool, *time.Time, int)
+	RequiresCaptcha(username string) bool
 }
 
 type APIKeyServiceInterface interface {

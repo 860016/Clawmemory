@@ -316,21 +316,21 @@ async function loadAllPages() {
   try {
     const { data } = await wikiApi.listPages()
     allPages.value = data.items || data || []
-  } catch {}
+  } catch { allPages.value = [] }
 }
 
 async function loadStats() {
   try {
     const { data } = await wikiApi.getStats()
     if (data) stats.value = data
-  } catch {}
+  } catch { /* stats keep default */ }
 }
 
 async function checkLLMAvailability() {
   try {
     const { data } = await wikiApi.getConfig()
     llmAvailable.value = data?.llm_available || false
-  } catch {}
+  } catch { llmAvailable.value = false }
 }
 
 async function handleSearch() {
@@ -414,7 +414,11 @@ async function deleteCurrentPage() {
     viewingPage.value = null
     searchResults.value = []
     await Promise.all([loadPages(), loadCategories(), loadStats()])
-  } catch {}
+  } catch (e: any) {
+    if (e !== 'cancel' && e?.message !== 'cancel') {
+      ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+    }
+  }
 }
 
 async function markComplete(page: any) {
