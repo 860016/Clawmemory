@@ -169,7 +169,8 @@ export = {
       }
 
       let turnCount = 0;
-      let pendingMessages: Array<{ role: string; content: unknown }> = [];
+      let lastAssembleSessionId = "";
+      let lastAssembleMessages: Array<{ role: string; content: unknown }> = [];
 
       return {
         info: {
@@ -186,8 +187,7 @@ export = {
           if (isNoisyContent(content)) {
             return { ingested: false };
           }
-          pendingMessages.push(message);
-          console.log(`[ClawMemory] ingest: buffered message (role=${message.role}, pending=${pendingMessages.length})`);
+          console.log(`[ClawMemory] ingest called (role=${message.role}) — but relying on assemble→afterTurn bridge for actual write`);
           return { ingested: true };
         },
 
@@ -195,16 +195,7 @@ export = {
           if (!enableAutoIngest) {
             return { ingested: false };
           }
-          const filtered = messages.filter(m => !isNoisyContent(extractContent(m.content)));
-          if (filtered.length === 0) {
-            return { ingested: false };
-          }
-          const items = filtered.map(m => ({
-            key: `${sessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-            value: `[${m.role}] ${extractContent(m.content)}`,
-          }));
-          await writeMemoryBatch(items);
-          console.log(`[ClawMemory] ingestBatch: wrote ${items.length} messages for session ${sessionId}`);
+          console.log(`[ClawMemory] ingestBatch called (${messages.length} messages) — but relying on assemble→afterTurn bridge for actual write`);
           return { ingested: true };
         },
 
@@ -218,12 +209,14 @@ export = {
           } catch {}
 
           if (enableAutoIngest) {
-            const allMessages = messages
-              ? messages.filter(m => !isNoisyContent(extractContent(m.content)))
-              : pendingMessages.filter(m => !isNoisyContent(extractContent(m.content)));
+            const sourceMessages = (messages && messages.length > 0)
+              ? messages
+              : (lastAssembleSessionId === sessionId ? lastAssembleMessages : []);
 
-            if (allMessages.length > 0) {
-              const items = allMessages.map(m => ({
+            const filtered = sourceMessages.filter(m => !isNoisyContent(extractContent(m.content)));
+
+            if (filtered.length > 0) {
+              const items = filtered.map(m => ({
                 key: `${sessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
                 value: `[${m.role}] ${extractContent(m.content)}`,
               }));
@@ -234,15 +227,20 @@ export = {
               } catch (err) {
                 console.error("[ClawMemory] afterTurn write failed:", err);
               }
+            } else {
+              console.log(`[ClawMemory] afterTurn: no non-noisy messages to write for session ${sessionId}`);
             }
 
-            pendingMessages = [];
+            lastAssembleMessages = [];
           }
 
           return { ok: true };
         },
 
         async assemble({ sessionId, messages, tokenBudget }: { sessionId: string; messages: Array<{ role: string; content: unknown }>; tokenBudget: number }) {
+          lastAssembleSessionId = sessionId;
+          lastAssembleMessages = messages.slice();
+
           const lastUserMsg = extractLastUserMessage(messages);
           let systemPromptAddition = "";
 
@@ -277,8 +275,8 @@ export = {
         },
 
         async compact({ sessionId }: { sessionId: string; force: boolean }) {
-          if (pendingMessages.length > 0 && enableAutoIngest) {
-            const filtered = pendingMessages.filter(m => !isNoisyContent(extractContent(m.content)));
+          if (lastAssembleMessages.length > 0 && lastAssembleSessionId === sessionId && enableAutoIngest) {
+            const filtered = lastAssembleMessages.filter(m => !isNoisyContent(extractContent(m.content)));
             if (filtered.length > 0) {
               const items = filtered.map(m => ({
                 key: `${sessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -286,19 +284,19 @@ export = {
               }));
               try {
                 await writeMemoryBatch(items);
-                console.log(`[ClawMemory] compact: flushed ${items.length} pending messages for session ${sessionId}`);
+                console.log(`[ClawMemory] compact: flushed ${items.length} messages for session ${sessionId}`);
               } catch (err) {
                 console.error("[ClawMemory] compact flush failed:", err);
               }
             }
-            pendingMessages = [];
+            lastAssembleMessages = [];
           }
           return { ok: true, compacted: true };
         },
 
         async dispose() {
-          if (pendingMessages.length > 0 && enableAutoIngest) {
-            console.warn(`[ClawMemory] dispose: ${pendingMessages.length} pending messages will be lost`);
+          if (lastAssembleMessages.length > 0) {
+            console.warn(`[ClawMemory] dispose: ${lastAssembleMessages.length} cached messages from last assemble will be lost`);
           }
         },
       };

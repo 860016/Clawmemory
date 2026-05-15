@@ -113,7 +113,8 @@ export = function register(api: OpenClawPluginApi): void {
     }
 
     let turnCount = 0;
-    let pendingMessages: Message[] = [];
+    let lastAssembleSessionId = "";
+    let lastAssembleMessages: Message[] = [];
 
     async function clawMemoryRequest(
       method: string,
@@ -292,9 +293,7 @@ export = function register(api: OpenClawPluginApi): void {
           return { ingested: false };
         }
 
-        pendingMessages.push(message);
-        console.log(`[ClawMemory] ingest: buffered message (role=${message.role}, pending=${pendingMessages.length})`);
-
+        console.log(`[ClawMemory] ingest called (role=${message.role}) — but relying on assemble→afterTurn bridge for actual write`);
         return { ingested: true };
       },
 
@@ -303,20 +302,7 @@ export = function register(api: OpenClawPluginApi): void {
           return { ingested: false };
         }
 
-        const filtered = messages.filter(m => !isNoisyContent(extractContent(m.content)));
-
-        if (filtered.length === 0) {
-          return { ingested: false };
-        }
-
-        const items = filtered.map(m => ({
-          key: `${sessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          value: `[${m.role}] ${extractContent(m.content)}`,
-        }));
-
-        await writeMemoryBatch(items);
-
-        console.log(`[ClawMemory] ingestBatch: wrote ${items.length} messages for session ${sessionId}`);
+        console.log(`[ClawMemory] ingestBatch called (${messages.length} messages) — but relying on assemble→afterTurn bridge for actual write`);
         return { ingested: true };
       },
 
@@ -324,27 +310,33 @@ export = function register(api: OpenClawPluginApi): void {
         turnCount++;
         await trackSession(sessionId, `last_active:${new Date().toISOString()}`);
 
-        if (config.enableAutoIngest) {
-          const allMessages = messages
-            ? messages.filter(m => !isNoisyContent(extractContent(m.content)))
-            : pendingMessages.filter(m => !isNoisyContent(extractContent(m.content)));
-
-          if (allMessages.length > 0) {
-            const items = allMessages.map(m => ({
-              key: `${sessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-              value: `[${m.role}] ${extractContent(m.content)}`,
-            }));
-
-            try {
-              await writeMemoryBatch(items);
-              console.log(`[ClawMemory] afterTurn: wrote ${items.length} messages for session ${sessionId}`);
-            } catch (err) {
-              console.error("[ClawMemory] afterTurn write failed:", err);
-            }
-          }
-
-          pendingMessages = [];
+        if (!config.enableAutoIngest) {
+          return { ok: true };
         }
+
+        const sourceMessages = (messages && messages.length > 0)
+          ? messages
+          : (lastAssembleSessionId === sessionId ? lastAssembleMessages : []);
+
+        const filtered = sourceMessages.filter(m => !isNoisyContent(extractContent(m.content)));
+
+        if (filtered.length > 0) {
+          const items = filtered.map(m => ({
+            key: `${sessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            value: `[${m.role}] ${extractContent(m.content)}`,
+          }));
+
+          try {
+            await writeMemoryBatch(items);
+            console.log(`[ClawMemory] afterTurn: wrote ${items.length} messages for session ${sessionId}`);
+          } catch (err) {
+            console.error("[ClawMemory] afterTurn write failed:", err);
+          }
+        } else {
+          console.log(`[ClawMemory] afterTurn: no non-noisy messages to write for session ${sessionId}`);
+        }
+
+        lastAssembleMessages = [];
 
         if (config.enableReasoning && turnCount % (config.reasoningInterval || 5) === 0) {
           dialecticReason(
@@ -358,6 +350,9 @@ export = function register(api: OpenClawPluginApi): void {
       },
 
       async assemble({ sessionId, messages, tokenBudget }: AssembleParams) {
+        lastAssembleSessionId = sessionId;
+        lastAssembleMessages = messages.slice();
+
         const lastUserMsg = extractLastUserMessage(messages);
 
         let systemPromptAddition = "";
@@ -393,8 +388,8 @@ export = function register(api: OpenClawPluginApi): void {
       },
 
       async compact({ sessionId, force }: CompactParams) {
-        if (pendingMessages.length > 0 && config.enableAutoIngest) {
-          const filtered = pendingMessages.filter(m => !isNoisyContent(extractContent(m.content)));
+        if (lastAssembleMessages.length > 0 && lastAssembleSessionId === sessionId && config.enableAutoIngest) {
+          const filtered = lastAssembleMessages.filter(m => !isNoisyContent(extractContent(m.content)));
           if (filtered.length > 0) {
             const items = filtered.map(m => ({
               key: `${sessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -402,19 +397,19 @@ export = function register(api: OpenClawPluginApi): void {
             }));
             try {
               await writeMemoryBatch(items);
-              console.log(`[ClawMemory] compact: flushed ${items.length} pending messages for session ${sessionId}`);
+              console.log(`[ClawMemory] compact: flushed ${items.length} messages for session ${sessionId}`);
             } catch (err) {
               console.error("[ClawMemory] compact flush failed:", err);
             }
           }
-          pendingMessages = [];
+          lastAssembleMessages = [];
         }
         return { ok: true, compacted: true };
       },
 
       async dispose() {
-        if (pendingMessages.length > 0 && config.enableAutoIngest) {
-          console.warn(`[ClawMemory] dispose: ${pendingMessages.length} pending messages will be lost`);
+        if (lastAssembleMessages.length > 0) {
+          console.warn(`[ClawMemory] dispose: ${lastAssembleMessages.length} cached messages from last assemble will be lost`);
         }
       },
     };
