@@ -803,6 +803,8 @@ export default {
     pluginInstallTitle: 'Context Engine Plugin (Recommended)',
     pluginInstallDesc: 'After installing the ClawMemory plugin, AI clients will automatically record conversations to ClawMemory and inject relevant memories into context before responding',
     pluginConfigHint: 'Configure the plugin in client config file (e.g. openclaw.json):',
+    apiKeyHowToGet: '💡 Create an API Key with "Full" permission in "Authorization Management" above and paste it here',
+    apiKeyEnvFallback: '⚠️ Legacy CLAWMEMORY_API_KEY env var still works as fallback, but plugin config apiKey is recommended',
     agentsMdCopy: 'Copy AGENTS.md',
     agentsMdPreview: 'Preview',
     agentsMdCopied: 'AGENTS.md content copied to clipboard',

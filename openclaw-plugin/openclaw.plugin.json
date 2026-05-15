@@ -1,0 +1,50 @@
+{
+  "id": "clawmemory",
+  "name": "ClawMemory Context Engine",
+  "description": "Use ClawMemory as OpenClaw's memory backend. Automatically records conversations and injects relevant memories into context.",
+  "kind": "context-engine",
+  "version": "1.0.0",
+  "entry": "dist/plugin-entry.js",
+  "configSchema": {
+    "baseUrl": {
+      "type": "string",
+      "default": "http://localhost:8765",
+      "description": "ClawMemory server base URL"
+    },
+    "apiKey": {
+      "type": "string",
+      "default": "",
+      "description": "ClawMemory API key (create one in Settings > Authorization Management)"
+    },
+    "maxContextMemories": {
+      "type": "number",
+      "default": 5,
+      "description": "Maximum number of memories to inject into context"
+    },
+    "enableAutoIngest": {
+      "type": "boolean",
+      "default": true,
+      "description": "Automatically record conversations to ClawMemory"
+    },
+    "enableReasoning": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable dialectic reasoning for deeper analysis"
+    },
+    "reasoningInterval": {
+      "type": "number",
+      "default": 5,
+      "description": "Run reasoning every N turns"
+    },
+    "reasoningDepth": {
+      "type": "number",
+      "default": 1,
+      "description": "Reasoning depth (1=single, 2=audit, 3=reconcile)"
+    },
+    "reasoningLevel": {
+      "type": "string",
+      "default": "low",
+      "description": "Reasoning level: low, medium, high"
+    }
+  }
+}

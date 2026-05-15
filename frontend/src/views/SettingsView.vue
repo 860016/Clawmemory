@@ -342,6 +342,12 @@
           <code style="display: block; padding: 8px; background: var(--cm-bg); border-radius: 4px; font-size: 11px; word-break: break-all; color: var(--cm-accent); margin-top: 4px">
             { "plugins": { "slots": { "contextEngine": "clawmemory" }, "entries": { "clawmemory": { "enabled": true, "config": { "baseUrl": "http://localhost:8765", "apiKey": "cm_..." } } } } }
           </code>
+          <el-alert type="info" :closable="false" style="margin-top: 8px; font-size: 11px">
+            <template #title>{{ $t('settings.apiKeyHowToGet') }}</template>
+          </el-alert>
+          <el-alert type="warning" :closable="false" style="margin-top: 4px; font-size: 11px">
+            <template #title>{{ $t('settings.apiKeyEnvFallback') }}</template>
+          </el-alert>
         </div>
         <div style="margin-top: 12px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
           <div style="font-weight: 600; margin-bottom: 6px">{{ $t('settings.agentsMdTitle') }}</div>

@@ -803,6 +803,8 @@ export default {
     pluginInstallTitle: 'Context Engine 插件（推荐）',
     pluginInstallDesc: '安装 ClawMemory 插件后，AI 客户端会自动将对话写入 ClawMemory，并在回复前检索相关记忆注入上下文',
     pluginConfigHint: '在客户端配置文件中配置插件（如 openclaw.json）：',
+    apiKeyHowToGet: '💡 apiKey 请在上方「授权管理」中创建 API Key 后填入，选择「完整权限」即可',
+    apiKeyEnvFallback: '⚠️ 旧版 CLAWMEMORY_API_KEY 环境变量仍可作为 fallback，但推荐使用插件配置中的 apiKey',
     agentsMdCopy: '复制 AGENTS.md',
     agentsMdPreview: '预览',
     agentsMdCopied: 'AGENTS.md 内容已复制到剪贴板',
