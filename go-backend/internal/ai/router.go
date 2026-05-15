@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"clawmemory/internal/models"
 	"clawmemory/internal/services"
 
 	"gorm.io/gorm"
@@ -14,7 +15,6 @@ import (
 
 type AIRouter struct {
 	db            *gorm.DB
-	freeProvider  Provider
 	mu            sync.RWMutex
 	providerCache map[uint]cachedProvider
 	usageMu       sync.Mutex
@@ -36,7 +36,6 @@ type cachedProvider struct {
 func NewAIRouter(db *gorm.DB) *AIRouter {
 	r := &AIRouter{
 		db:            db,
-		freeProvider:  NewNVIDIAFreeProvider(),
 		providerCache: make(map[uint]cachedProvider),
 		usageBuffer:   make(map[uint]*usageEntry),
 		lastFlush:     time.Now(),
@@ -114,10 +113,7 @@ func (r *AIRouter) Chat(ctx context.Context, userID uint, isPro bool, messages [
 	}
 
 	if err := provider.Validate(); err != nil {
-		if isPro {
-			return nil, fmt.Errorf("AI provider config error: %w (please check your AI settings)", err)
-		}
-		return nil, fmt.Errorf("free AI provider unavailable: %w", err)
+		return nil, fmt.Errorf("AI provider config error: %w (please configure an AI provider in Settings > Reasoning)", err)
 	}
 
 	return provider.Chat(ctx, messages, opts)
@@ -133,10 +129,6 @@ func (r *AIRouter) Embed(ctx context.Context, userID uint, isPro bool, texts []s
 }
 
 func (r *AIRouter) getProvider(userID uint, isPro bool) (Provider, error) {
-	if !isPro {
-		return r.freeProvider, nil
-	}
-
 	r.mu.RLock()
 	if cached, ok := r.providerCache[userID]; ok && time.Now().Before(cached.expiredAt) {
 		r.mu.RUnlock()
@@ -144,7 +136,7 @@ func (r *AIRouter) getProvider(userID uint, isPro bool) (Provider, error) {
 	}
 	r.mu.RUnlock()
 
-	provider, err := r.loadProProvider(userID)
+	provider, err := r.loadProvider(userID, isPro)
 	if err != nil {
 		return nil, err
 	}
@@ -159,21 +151,78 @@ func (r *AIRouter) getProvider(userID uint, isPro bool) (Provider, error) {
 	return provider, nil
 }
 
+func (r *AIRouter) loadProvider(userID uint, isPro bool) (Provider, error) {
+	provider, err := r.loadFromReasoningConfig(userID)
+	if err == nil && provider != nil {
+		return provider, nil
+	}
+
+	if isPro {
+		proProvider, err := r.loadProProvider(userID)
+		if err != nil {
+			return nil, err
+		}
+		return proProvider, nil
+	}
+
+	return nil, fmt.Errorf("no AI provider configured. Please configure an AI provider in Settings > Reasoning")
+}
+
+func (r *AIRouter) loadFromReasoningConfig(userID uint) (Provider, error) {
+	var config models.ReasoningConfig
+	if err := r.db.Where("user_id = ? AND enabled = ?", userID, true).First(&config).Error; err != nil {
+		return nil, err
+	}
+
+	if config.APIKey == "" && config.Provider != "ollama" {
+		return nil, fmt.Errorf("reasoning config has no API key")
+	}
+
+	baseURL := config.BaseURL
+	if baseURL == "" {
+		switch config.Provider {
+		case "openai":
+			baseURL = "https://api.openai.com/v1"
+		case "anthropic":
+			baseURL = "https://api.anthropic.com/v1"
+		case "openrouter":
+			baseURL = "https://openrouter.ai/api/v1"
+		case "ollama":
+			baseURL = "http://localhost:11434/v1"
+		case "deepseek":
+			baseURL = "https://api.deepseek.com/v1"
+		default:
+			baseURL = ""
+		}
+	}
+
+	model := config.Model
+	if model == "" {
+		model = defaultModel(config.Provider)
+	}
+
+	cfg := ProviderConfig{
+		ID:      config.Provider,
+		Type:    config.Provider,
+		APIKey:  config.APIKey,
+		BaseURL: baseURL,
+		Model:   model,
+	}
+
+	return NewOpenAICompatibleProvider(cfg), nil
+}
+
 func (r *AIRouter) loadProProvider(userID uint) (Provider, error) {
 	settingsSvc := services.NewSettingsService(r.db)
 
 	providerID, _ := settingsSvc.GetByKey(userID, "ai_provider_id")
 	if providerID == nil {
-		return r.freeProvider, nil
+		return nil, fmt.Errorf("no AI provider configured")
 	}
 
 	pid, ok := providerID.(string)
 	if !ok || pid == "" {
-		return r.freeProvider, nil
-	}
-
-	if pid == "nvidia-nim" {
-		return NewNVIDIAFreeProvider(), nil
+		return nil, fmt.Errorf("no AI provider configured")
 	}
 
 	cfg := ProviderConfig{ID: pid}
@@ -225,14 +274,18 @@ func (r *AIRouter) InvalidateUserCache(userID uint) {
 
 func (r *AIRouter) GetCurrentUserConfig(userID uint, isPro bool) map[string]interface{} {
 	result := map[string]interface{}{
-		"provider_id":         "nvidia-nim",
-		"model":               "nvidia/llama-3.1-nemotron-70b-instruct",
 		"is_pro":              isPro,
 		"available_providers": AllProviders,
 	}
 
+	reasoningProvider, reasoningModel := r.getReasoningConfigInfo(userID)
+	if reasoningProvider != "" {
+		result["provider_id"] = reasoningProvider
+		result["model"] = reasoningModel
+		result["provider_source"] = "reasoning"
+	}
+
 	if !isPro {
-		result["free_only"] = true
 		result["available_providers"] = func() []ProviderInfo {
 			var free []ProviderInfo
 			for _, p := range AllProviders {
@@ -248,8 +301,9 @@ func (r *AIRouter) GetCurrentUserConfig(userID uint, isPro bool) map[string]inte
 	settingsSvc := services.NewSettingsService(r.db)
 
 	if v, _ := settingsSvc.GetByKey(userID, "ai_provider_id"); v != nil {
-		if s, ok := v.(string); ok {
+		if s, ok := v.(string); ok && s != "" {
 			result["provider_id"] = s
+			result["provider_source"] = "pro_config"
 		}
 	}
 	if v, _ := settingsSvc.GetByKey(userID, "ai_model"); v != nil {
@@ -269,6 +323,14 @@ func (r *AIRouter) GetCurrentUserConfig(userID uint, isPro bool) map[string]inte
 	}
 
 	return result
+}
+
+func (r *AIRouter) getReasoningConfigInfo(userID uint) (provider string, model string) {
+	var config models.ReasoningConfig
+	if err := r.db.Where("user_id = ? AND enabled = ?", userID, true).First(&config).Error; err != nil {
+		return "", ""
+	}
+	return config.Provider, config.Model
 }
 
 func (r *AIRouter) UpdateProConfig(userID uint, data map[string]interface{}) error {
@@ -378,12 +440,14 @@ func (r *AIRouter) IncrementUsage(userID uint, tokensIn, tokensOut int) {
 
 func defaultModel(providerID string) string {
 	switch providerID {
-	case "nvidia-nim":
-		return "nvidia/llama-3.1-nemotron-70b-instruct"
 	case "deepseek":
 		return "deepseek-chat"
 	case "openai":
 		return "gpt-4o-mini"
+	case "ollama":
+		return "llama3"
+	case "openrouter":
+		return "openai/gpt-4o-mini"
 	default:
 		return "gpt-4o-mini"
 	}

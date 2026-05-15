@@ -29,6 +29,8 @@ func NewOpenAICompatibleProvider(cfg ProviderConfig) *OpenAICompatibleProvider {
 		baseURL = defaultBaseURL(cfg.Type)
 	}
 
+	isFree := cfg.ID == "ollama"
+
 	return &OpenAICompatibleProvider{
 		providerID: cfg.ID,
 		name:       providerName(cfg.ID),
@@ -36,22 +38,8 @@ func NewOpenAICompatibleProvider(cfg ProviderConfig) *OpenAICompatibleProvider {
 		apiKey:     cfg.APIKey,
 		model:      cfg.Model,
 		embedModel: cfg.EmbedModel,
-		free:       cfg.ID == "nvidia-nim",
-		proOnly:    cfg.ID != "nvidia-nim",
-		httpClient: &http.Client{Timeout: 120 * time.Second},
-	}
-}
-
-func NewNVIDIAFreeProvider() *OpenAICompatibleProvider {
-	return &OpenAICompatibleProvider{
-		providerID: "nvidia-nim",
-		name:       "NVIDIA NIM (Free)",
-		baseURL:    "https://integrate.api.nvidia.com/v1",
-		apiKey:     "",
-		model:      "nvidia/llama-3.1-nemotron-70b-instruct",
-		embedModel: "nvidia/llama-3.2-nv-embedqa-1b-v2",
-		free:       true,
-		proOnly:    false,
+		free:       isFree,
+		proOnly:    !isFree,
 		httpClient: &http.Client{Timeout: 120 * time.Second},
 	}
 }
@@ -224,12 +212,14 @@ func (p *OpenAICompatibleProvider) Embed(ctx context.Context, texts []string) (*
 
 func defaultBaseURL(providerType string) string {
 	switch providerType {
-	case "nvidia-nim":
-		return "https://integrate.api.nvidia.com/v1"
 	case "deepseek":
 		return "https://api.deepseek.com/v1"
 	case "openai":
 		return "https://api.openai.com/v1"
+	case "ollama":
+		return "http://localhost:11434/v1"
+	case "openrouter":
+		return "https://openrouter.ai/api/v1"
 	default:
 		return ""
 	}
@@ -237,12 +227,14 @@ func defaultBaseURL(providerType string) string {
 
 func providerName(id string) string {
 	switch id {
-	case "nvidia-nim":
-		return "NVIDIA NIM (Free)"
 	case "deepseek":
 		return "DeepSeek"
 	case "openai":
 		return "OpenAI"
+	case "ollama":
+		return "Ollama (Local)"
+	case "openrouter":
+		return "OpenRouter"
 	case "custom":
 		return "Custom Provider"
 	default:

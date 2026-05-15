@@ -29,7 +29,7 @@ func handleAIConfigUpdate(aiRouter *ai.AIRouter, provider services.ProProvider) 
 		if !provider.IsPro() {
 			c.JSON(http.StatusForbidden, gin.H{
 				"error":   "Pro license required",
-				"message": "AI provider customization requires a Pro license. Free users can only use NVIDIA NIM free models.",
+				"message": "AI provider customization requires a Pro license. Free users can configure an AI provider in Settings > Reasoning.",
 			})
 			return
 		}

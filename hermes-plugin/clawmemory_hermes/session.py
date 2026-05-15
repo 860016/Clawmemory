@@ -8,6 +8,10 @@ from typing import Any
 
 from .client import ClawMemoryClient
 
+logger = __import__("logging").getLogger("clawmemory_hermes.session")
+
+AUTO_FLUSH_THRESHOLD = 10
+
 
 class SessionManager:
     def __init__(self, client: ClawMemoryClient, strategy: str = "per-directory") -> None:
@@ -47,31 +51,68 @@ class SessionManager:
 
     def on_user_message(self, content: str) -> None:
         self._pending_messages.append({"role": "user", "content": content})
+        self._auto_flush_check()
 
     def on_assistant_message(self, content: str) -> None:
         self._pending_messages.append({"role": "assistant", "content": content})
+        self._auto_flush_check()
+
+    def _auto_flush_check(self) -> None:
+        if len(self._pending_messages) >= AUTO_FLUSH_THRESHOLD:
+            logger.info("Auto-flushing %d pending messages", len(self._pending_messages))
+            self.flush()
 
     def flush(self) -> None:
         if not self._pending_messages:
             return
 
-        combined = "\n".join(
-            f"[{m['role']}] {m['content']}" for m in self._pending_messages
-        )
-        key = f"{self.session_id}_turn_{self._turn_count}_{int(datetime.now().timestamp())}"
+        try:
+            if len(self._pending_messages) == 1:
+                m = self._pending_messages[0]
+                key = f"{self.session_id}_{m['role']}_{int(datetime.now().timestamp())}"
+                self.client.save_memory(
+                    key=key,
+                    value=f"[{m['role']}] {m['content']}",
+                    layer="episodic",
+                    source="hermes",
+                    memory_type="conversation",
+                )
+            else:
+                items = []
+                for m in self._pending_messages:
+                    key = f"{self.session_id}_{m['role']}_{int(datetime.now().timestamp())}_{hash(m['content'][:50])}"
+                    items.append({
+                        "key": key,
+                        "value": f"[{m['role']}] {m['content']}",
+                        "layer": "episodic",
+                        "source": "hermes",
+                        "memory_type": "conversation",
+                    })
+                self.client.batch_save_memories(items)
 
-        self.client.save_memory(
-            key=key,
-            value=combined,
-            layer="episodic",
-            source="hermes",
-            memory_type="conversation",
-        )
+            logger.info("Flushed %d messages for session %s", len(self._pending_messages), self.session_id)
+        except Exception as e:
+            logger.error("Flush failed, attempting individual writes: %s", e)
+            for m in self._pending_messages:
+                try:
+                    key = f"{self.session_id}_{m['role']}_{int(datetime.now().timestamp())}"
+                    self.client.save_memory(
+                        key=key,
+                        value=f"[{m['role']}] {m['content']}",
+                        layer="episodic",
+                        source="hermes",
+                        memory_type="conversation",
+                    )
+                except Exception as inner_err:
+                    logger.error("Individual write also failed: %s", inner_err)
 
-        self.client.track_session(
-            self.session_id,
-            metadata=f"turns:{self._turn_count} last_active:{datetime.now().isoformat()}",
-        )
+        try:
+            self.client.track_session(
+                self.session_id,
+                metadata=f"turns:{self._turn_count} last_active:{datetime.now().isoformat()}",
+            )
+        except Exception as e:
+            logger.error("Session track failed: %s", e)
 
         self._pending_messages.clear()
 

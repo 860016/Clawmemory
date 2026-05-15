@@ -31,12 +31,24 @@ class ClawMemoryClient:
 
     def _request(self, method: str, path: str, body: dict | None = None) -> Any:
         url = self._url(path)
-        if method == "GET":
-            resp = self._client.get(url)
-        else:
-            resp = self._client.post(url, json=body or {})
-        resp.raise_for_status()
-        return resp.json()
+        max_retries = 2
+        last_err: Exception | None = None
+        for attempt in range(max_retries + 1):
+            try:
+                if method == "GET":
+                    resp = self._client.get(url)
+                else:
+                    resp = self._client.post(url, json=body or {})
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                last_err = e
+                logger.error("ClawMemory API request failed (attempt %d/%d): %s %s - %s",
+                             attempt + 1, max_retries + 1, method, path, e)
+                if attempt < max_retries:
+                    import time
+                    time.sleep((attempt + 1) * 1.0)
+        raise last_err
 
     def save_memory(
         self,

@@ -87,8 +87,8 @@
         <div class="setting-item" v-if="aiConfig">
           <span>{{ $t('settings.aiProvider') }}</span>
           <span class="setting-desc">
-            <el-tag :type="aiConfig.provider_id === 'nvidia-nim' ? 'success' : 'primary'" size="small">
-              {{ aiConfig.provider_name || aiConfig.provider_id }}
+            <el-tag :type="aiConfig.provider_source === 'reasoning' ? 'success' : 'primary'" size="small">
+              {{ aiConfig.provider_name || aiConfig.provider_id || $t('settings.aiNotConfigured') }}
             </el-tag>
             <el-tag v-if="aiConfig.is_pro" type="warning" size="small" style="margin-left: 4px">Pro</el-tag>
           </span>
@@ -118,9 +118,9 @@
           <span>{{ $t('settings.aiUsage') }}</span>
           <span class="setting-desc">{{ aiUsage.total_calls || 0 }} {{ $t('settings.aiCalls') }}</span>
         </div>
-        <div class="ai-free-hint" v-if="aiConfig && !aiConfig.is_pro" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px; color: var(--cm-text-muted)">
-          <div style="font-weight: 600; margin-bottom: 4px">{{ $t('settings.aiFreeHint') }}</div>
-          <div>{{ $t('settings.aiFreeHintDesc') }}</div>
+        <div class="ai-config-hint" v-if="aiConfig && !aiConfig.provider_id" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px; color: var(--cm-text-muted)">
+          <div style="font-weight: 600; margin-bottom: 4px">{{ $t('settings.aiConfigHint') }}</div>
+          <div>{{ $t('settings.aiConfigHintDesc') }}</div>
         </div>
       </div>
 
@@ -766,7 +766,7 @@ const showAIConfigDialog = ref(false)
 const aiSaving = ref(false)
 const aiProviders = ref<any[]>([])
 const aiForm = ref<any>({
-  provider_id: 'nvidia-nim',
+  provider_id: '',
   model: '',
   api_key: '',
   base_url: '',
@@ -1523,7 +1523,7 @@ watch(showAIConfigDialog, async (v) => {
   if (v) {
     await loadAIProviders()
     if (aiConfig.value) {
-      aiForm.value.provider_id = aiConfig.value.provider_id || 'nvidia-nim'
+      aiForm.value.provider_id = aiConfig.value.provider_id || ''
       aiForm.value.model = aiConfig.value.model || ''
       aiForm.value.api_key = ''
       aiForm.value.base_url = aiConfig.value.base_url || ''

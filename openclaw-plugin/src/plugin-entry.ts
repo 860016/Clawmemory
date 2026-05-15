@@ -95,16 +95,60 @@ export = {
       }
 
       async function writeMemory(key: string, value: string, layer?: string, memoryType?: string): Promise<void> {
-        try {
-          await clawMemoryRequest("POST", "/memories", {
-            key,
-            value,
-            layer: layer || "episodic",
-            source: "openclaw",
-            memory_type: memoryType || "conversation",
-          });
-        } catch (err) {
-          console.error("[ClawMemory] Write memory failed:", err);
+        const maxRetries = 2;
+        let lastErr: unknown;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            await clawMemoryRequest("POST", "/memories", {
+              key,
+              value,
+              layer: layer || "episodic",
+              source: "openclaw",
+              memory_type: memoryType || "conversation",
+            });
+            return;
+          } catch (err) {
+            lastErr = err;
+            console.error(`[ClawMemory] Write memory failed (attempt ${attempt + 1}/${maxRetries + 1}):`, err);
+            if (attempt < maxRetries) {
+              await new Promise(r => setTimeout(r, (attempt + 1) * 1000));
+            }
+          }
+        }
+        console.error("[ClawMemory] Write memory failed after all retries:", lastErr);
+      }
+
+      async function writeMemoryBatch(items: Array<{ key: string; value: string; layer?: string; memoryType?: string }>): Promise<void> {
+        if (items.length === 0) return;
+        if (items.length === 1) {
+          await writeMemory(items[0].key, items[0].value, items[0].layer, items[0].memoryType);
+          return;
+        }
+        const maxRetries = 2;
+        let lastErr: unknown;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            await clawMemoryRequest("POST", "/memories/batch", {
+              memories: items.map(item => ({
+                key: item.key,
+                value: item.value,
+                layer: item.layer || "episodic",
+                source: "openclaw",
+                memory_type: item.memoryType || "conversation",
+              })),
+            });
+            return;
+          } catch (err) {
+            lastErr = err;
+            console.error(`[ClawMemory] Batch write failed (attempt ${attempt + 1}/${maxRetries + 1}):`, err);
+            if (attempt < maxRetries) {
+              await new Promise(r => setTimeout(r, (attempt + 1) * 1000));
+            }
+          }
+        }
+        console.error("[ClawMemory] Batch write failed after all retries, falling back to individual writes:", lastErr);
+        for (const item of items) {
+          await writeMemory(item.key, item.value, item.layer, item.memoryType);
         }
       }
 
@@ -125,6 +169,7 @@ export = {
       }
 
       let turnCount = 0;
+      let pendingMessages: Array<{ role: string; content: unknown }> = [];
 
       return {
         info: {
@@ -141,10 +186,8 @@ export = {
           if (isNoisyContent(content)) {
             return { ingested: false };
           }
-          await writeMemory(
-            `${sessionId}_${message.role}_${Date.now()}`,
-            `[${message.role}] ${content}`
-          );
+          pendingMessages.push(message);
+          console.log(`[ClawMemory] ingest: buffered message (role=${message.role}, pending=${pendingMessages.length})`);
           return { ingested: true };
         },
 
@@ -156,14 +199,16 @@ export = {
           if (filtered.length === 0) {
             return { ingested: false };
           }
-          const combined = filtered
-            .map(m => `[${m.role}] ${extractContent(m.content)}`)
-            .join("\n");
-          await writeMemory(`${sessionId}_batch_${Date.now()}`, combined);
+          const items = filtered.map(m => ({
+            key: `${sessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            value: `[${m.role}] ${extractContent(m.content)}`,
+          }));
+          await writeMemoryBatch(items);
+          console.log(`[ClawMemory] ingestBatch: wrote ${items.length} messages for session ${sessionId}`);
           return { ingested: true };
         },
 
-        async afterTurn({ sessionId }: { sessionId: string }) {
+        async afterTurn({ sessionId, messages }: { sessionId: string; messages?: Array<{ role: string; content: unknown }> }) {
           turnCount++;
           try {
             await clawMemoryRequest("POST", "/sessions/track", {
@@ -171,23 +216,33 @@ export = {
               metadata: `last_active:${new Date().toISOString()}`,
             });
           } catch {}
+
+          if (enableAutoIngest) {
+            const allMessages = messages
+              ? messages.filter(m => !isNoisyContent(extractContent(m.content)))
+              : pendingMessages.filter(m => !isNoisyContent(extractContent(m.content)));
+
+            if (allMessages.length > 0) {
+              const items = allMessages.map(m => ({
+                key: `${sessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                value: `[${m.role}] ${extractContent(m.content)}`,
+              }));
+
+              try {
+                await writeMemoryBatch(items);
+                console.log(`[ClawMemory] afterTurn: wrote ${items.length} messages for session ${sessionId}`);
+              } catch (err) {
+                console.error("[ClawMemory] afterTurn write failed:", err);
+              }
+            }
+
+            pendingMessages = [];
+          }
+
           return { ok: true };
         },
 
         async assemble({ sessionId, messages, tokenBudget }: { sessionId: string; messages: Array<{ role: string; content: unknown }>; tokenBudget: number }) {
-          if (enableAutoIngest && messages.length > 0) {
-            const lastMsg = messages[messages.length - 1];
-            if (lastMsg) {
-              const content = extractContent(lastMsg.content);
-              if (!isNoisyContent(content)) {
-                writeMemory(
-                  `${sessionId}_${lastMsg.role}_${Date.now()}`,
-                  `[${lastMsg.role}] ${content}`
-                ).catch(() => {});
-              }
-            }
-          }
-
           const lastUserMsg = extractLastUserMessage(messages);
           let systemPromptAddition = "";
 
@@ -221,11 +276,31 @@ export = {
           };
         },
 
-        async compact() {
+        async compact({ sessionId }: { sessionId: string; force: boolean }) {
+          if (pendingMessages.length > 0 && enableAutoIngest) {
+            const filtered = pendingMessages.filter(m => !isNoisyContent(extractContent(m.content)));
+            if (filtered.length > 0) {
+              const items = filtered.map(m => ({
+                key: `${sessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                value: `[${m.role}] ${extractContent(m.content)}`,
+              }));
+              try {
+                await writeMemoryBatch(items);
+                console.log(`[ClawMemory] compact: flushed ${items.length} pending messages for session ${sessionId}`);
+              } catch (err) {
+                console.error("[ClawMemory] compact flush failed:", err);
+              }
+            }
+            pendingMessages = [];
+          }
           return { ok: true, compacted: true };
         },
 
-        async dispose() {},
+        async dispose() {
+          if (pendingMessages.length > 0 && enableAutoIngest) {
+            console.warn(`[ClawMemory] dispose: ${pendingMessages.length} pending messages will be lost`);
+          }
+        },
       };
     });
   },

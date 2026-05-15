@@ -60,24 +60,6 @@ type ProviderConfig struct {
 
 var AllProviders = []ProviderInfo{
 	{
-		ID:          "nvidia-nim",
-		Name:        "NVIDIA NIM (Free)",
-		Type:        "openai_compatible",
-		Models:      []string{"nvidia/llama-3.1-nemotron-70b-instruct", "nvidia/mistralai/mixtral-8x22b-instruct-v0.1", "nvidia/deepseek-ai/deepseek-r1"},
-		Free:        true,
-		ProOnly:     false,
-		Description: "NVIDIA NIM free models, available for all users",
-	},
-	{
-		ID:          "nvidia-nim-embed",
-		Name:        "NVIDIA NIM Embedding (Free)",
-		Type:        "openai_compatible",
-		Models:      []string{"nvidia/llama-3.2-nv-embedqa-1b-v2", "nvidia/embed-qa-4"},
-		Free:        true,
-		ProOnly:     false,
-		Description: "NVIDIA NIM free embedding models for semantic search",
-	},
-	{
 		ID:          "deepseek",
 		Name:        "DeepSeek",
 		Type:        "openai_compatible",
@@ -94,6 +76,15 @@ var AllProviders = []ProviderInfo{
 		Free:        false,
 		ProOnly:     true,
 		Description: "OpenAI GPT models",
+	},
+	{
+		ID:          "ollama",
+		Name:        "Ollama (Local)",
+		Type:        "openai_compatible",
+		Models:      []string{"llama3", "mistral", "qwen2"},
+		Free:        true,
+		ProOnly:     false,
+		Description: "Local Ollama models, free and private",
 	},
 	{
 		ID:          "custom",
