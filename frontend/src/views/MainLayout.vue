@@ -78,7 +78,7 @@
           <div class="sidebar-section" v-for="group in currentSubNav" :key="group.label">
             <div class="sidebar-group-title" v-if="group.label && !sidebarCollapsed">{{ $t(group.label) }}</div>
             <router-link
-              v-for="item in group.items"
+              v-for="item in group.items.filter((i: any) => !i.adminOnly || authStore.isFounder)"
               :key="item.path"
               :to="item.path"
               class="sidebar-item-v2"
@@ -300,7 +300,7 @@ function isSubNavActive(item: { path: string }) {
   return route.path === item.path && !Object.keys(route.query).length
 }
 
-const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: string; label: string; icon?: any }> }>> = {
+const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: string; label: string; icon?: any; adminOnly?: boolean }> }>> = {
   '/': [
     { items: [
       { path: '/', label: 'nav.overview', icon: HomeFilled },
@@ -339,9 +339,16 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
   '/settings': [
     { items: [
       { path: '/settings?section=license', label: 'settings.license', icon: Promotion },
+      { path: '/settings?section=ai', label: 'settings.aiConfig', icon: Cpu },
       { path: '/settings?section=security', label: 'settings.security', icon: Lock },
-      { path: '/settings?section=data', label: 'settings.data', icon: Coin },
-      { path: '/settings?section=system', label: 'settings.system', icon: Monitor },
+      { path: '/settings?section=risk-switches', label: 'settings.riskControl', icon: Warning },
+      { path: '/settings?section=reasoning', label: 'settings.reasoningConfig', icon: MagicStick },
+      { path: '/settings?section=openclaw', label: 'settings.openclaw', icon: Connection },
+      { path: '/settings?section=data', label: 'settings.dataManagement', icon: Coin },
+      { path: '/settings?section=decay', label: 'settings.memoryDecay', icon: Timer },
+      { path: '/settings?section=system', label: 'settings.systemInfo', icon: Monitor },
+      { path: '/settings?section=invitations', label: 'settings.invitationManage', icon: Share, adminOnly: true },
+      { path: '/settings?section=users', label: 'settings.userManage', icon: User, adminOnly: true },
     ]}
   ],
 }
@@ -355,11 +362,11 @@ const currentSubNav = computed(() => {
 })
 
 const currentSubNavItems = computed(() => {
-  const items: Array<{ path: string; label: string; icon?: any }> = []
+  const items: Array<{ path: string; label: string; icon?: any; adminOnly?: boolean }> = []
   currentSubNav.value.forEach(group => {
     items.push(...group.items)
   })
-  return items
+  return items.filter(item => !item.adminOnly || authStore.isFounder)
 })
 
 const searchLoading = ref(false)

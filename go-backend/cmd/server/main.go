@@ -26,7 +26,8 @@ import (
 )
 
 func main() {
-	resetPassword := flag.String("reset-password", "", "Reset admin password")
+	resetPassword := flag.String("reset-password", "", "Reset user password. Usage: --reset-password NEW_PASSWORD or --reset-password USERNAME:NEW_PASSWORD")
+	resetUser := flag.String("reset-user", "", "Specify username for password reset (optional, defaults to first user)")
 	showVersion := flag.Bool("version", false, "Show version info")
 	flag.Parse()
 
@@ -63,7 +64,13 @@ func main() {
 	}
 
 	if *resetPassword != "" {
-		resetAdminPassword(db, *resetPassword)
+		username := *resetUser
+		password := *resetPassword
+		if idx := indexByte(password, ':'); idx > 0 {
+			username = password[:idx]
+			password = password[idx+1:]
+		}
+		resetAdminPassword(db, username, password)
 		os.Exit(0)
 	}
 
@@ -208,29 +215,53 @@ func autoCreateAPIKey(db *gorm.DB) {
 	log.Printf("========================================")
 }
 
-func resetAdminPassword(db *gorm.DB, newPassword string) {
+func indexByte(s string, c byte) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] == c {
+			return i
+		}
+	}
+	return -1
+}
+
+func resetAdminPassword(db *gorm.DB, username, newPassword string) {
 	if len(newPassword) < 6 {
 		log.Fatal("Error: password must be at least 6 characters")
 	}
 
-	var user models.User
-	if err := db.First(&user).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	if username == "" {
+		var userCount int64
+		db.Model(&models.User{}).Count(&userCount)
+		if userCount == 0 {
 			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 			if err != nil {
 				log.Fatal("Error: failed to hash password:", err)
 			}
-			user = models.User{
-				Username: "admin",
-				Password: string(hashedPassword),
-				Role:     "admin",
+			user := models.User{
+				Username:  "admin",
+				Password:  string(hashedPassword),
+				Role:      "admin",
+				IsFounder: true,
 			}
 			if err := db.Create(&user).Error; err != nil {
 				log.Fatal("Error: failed to create admin user:", err)
 			}
-			fmt.Printf("✅ Admin user created with password reset successfully.\n")
+			fmt.Println("✅ Founder account 'admin' created with password set successfully.")
 			fmt.Println("Please restart the server without --reset-password flag.")
 			return
+		}
+		var firstUser models.User
+		if err := db.Order("id ASC").First(&firstUser).Error; err != nil {
+			log.Fatal("Error: failed to query user:", err)
+		}
+		username = firstUser.Username
+		fmt.Printf("No username specified, resetting password for first user '%s'\n", username)
+	}
+
+	var user models.User
+	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			log.Fatalf("Error: user '%s' not found", username)
 		}
 		log.Fatal("Error: failed to query user:", err)
 	}
@@ -240,10 +271,21 @@ func resetAdminPassword(db *gorm.DB, newPassword string) {
 		log.Fatal("Error: failed to hash password:", err)
 	}
 
-	if err := db.Model(&user).Update("password", string(hashedPassword)).Error; err != nil {
+	if err := db.Model(&user).Updates(map[string]interface{}{
+		"password":        string(hashedPassword),
+		"token_version":   gorm.Expr("token_version + 1"),
+		"failed_attempts": 0,
+		"locked_until":    nil,
+		"refresh_token":   "",
+	}).Error; err != nil {
 		log.Fatal("Error: failed to update password:", err)
 	}
 
 	fmt.Printf("✅ Password for user '%s' has been reset successfully.\n", user.Username)
 	fmt.Println("Please restart the server without --reset-password flag.")
+	fmt.Println()
+	fmt.Println("Usage examples:")
+	fmt.Println("  ./clawmemory --reset-password NEW_PASSWORD              (reset first user)")
+	fmt.Println("  ./clawmemory --reset-password admin:NEW_PASSWORD       (reset specific user)")
+	fmt.Println("  ./clawmemory --reset-password NEW_PASSWORD --reset-user admin")
 }

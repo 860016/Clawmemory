@@ -54,6 +54,9 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.POST("/auth/reset-password", handleResetPassword(authService))
 		authorized.POST("/auth/revoke-tokens", handleRevokeAllTokens(db, authService))
 
+		authorized.GET("/users", handleListUsers(db))
+		authorized.POST("/users/reset-password", handleAdminResetUserPassword(db, authService))
+
 		authorized.GET("/invitations", handleListInvitations(db))
 		authorized.POST("/invitations", handleCreateInvitation(db))
 		authorized.DELETE("/invitations/:id", handleDeleteInvitation(db))

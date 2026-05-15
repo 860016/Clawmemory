@@ -6,6 +6,7 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('token'))
   const username = ref<string>(localStorage.getItem('cm_username') || '')
   const role = ref('user')
+  const isFounder = ref(false)
 
   const isLoggedIn = computed(() => !!token.value)
 
@@ -14,6 +15,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = data.access_token
     username.value = user || 'admin'
     role.value = data.role || 'user'
+    isFounder.value = data.is_founder || data.role === 'admin'
     localStorage.setItem('token', data.access_token)
     localStorage.setItem('cm_username', username.value)
   }
@@ -40,6 +42,7 @@ export const useAuthStore = defineStore('auth', () => {
       const { data } = await axios.get('/auth/me')
       username.value = data.username || data.name || ''
       role.value = data.role || 'user'
+      isFounder.value = data.is_founder || data.role === 'admin'
       localStorage.setItem('cm_username', username.value)
     } catch {}
   }
@@ -48,12 +51,13 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     username.value = ''
     role.value = 'user'
+    isFounder.value = false
     localStorage.removeItem('token')
     localStorage.removeItem('cm_username')
   }
 
   return {
-    token, username, role, isLoggedIn,
+    token, username, role, isFounder, isLoggedIn,
     login, register, setPassword, fetchMe, logout,
   }
 })

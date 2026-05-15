@@ -5,11 +5,7 @@
     </div>
 
     <div class="settings-layout">
-      <nav class="settings-nav" v-if="!isMobile">
-        <a v-for="s in sections" :key="s.id" :class="{ active: activeSection === s.id }" @click.prevent="scrollToSection(s.id)">{{ s.icon }} {{ s.label }}</a>
-      </nav>
-
-    <div class="settings-grid">
+      <div class="settings-grid">
       <!-- 授权管理 -->
       <div class="settings-card" :class="{ 'section-highlight': activeSection === 'license' }" id="settings-license">
         <div class="card-title">🔑 {{ $t('settings.license') }}</div>
@@ -513,6 +509,59 @@
           <span class="setting-desc code-hint">{{ cliResetCommand }}</span>
         </div>
       </div>
+
+      <!-- 邀请码管理 (仅创始账号可见) -->
+      <div class="settings-card" :class="{ 'section-highlight': activeSection === 'invitations' }" id="settings-invitations" v-if="isFounder">
+        <div class="card-title">🎫 {{ $t('settings.invitationManage') }}</div>
+        <p class="section-desc">{{ $t('settings.invitationManageDesc') }}</p>
+        <div class="setting-item">
+          <span>{{ $t('settings.createInvitation') }}</span>
+          <div class="invitation-create-form">
+            <el-input-number v-model="newInvitationMaxUses" :min="1" :max="100" size="small" style="width: 120px" />
+            <span class="form-label">{{ $t('settings.invitationMaxUses') }}</span>
+            <el-input-number v-model="newInvitationExpiresHours" :min="0" size="small" style="width: 120px" />
+            <span class="form-label">{{ $t('settings.invitationExpires') }}</span>
+            <span class="form-label" v-if="newInvitationExpiresHours === 0">{{ $t('settings.invitationNeverExpires') }}</span>
+            <el-button type="primary" size="small" @click="handleCreateInvitation" :loading="creatingInvitation">{{ $t('settings.createInvitation') }}</el-button>
+          </div>
+        </div>
+        <div class="invitation-list" v-if="invitations.length > 0">
+          <div class="invitation-item" v-for="inv in invitations" :key="inv.id">
+            <div class="invitation-code-row">
+              <code class="invitation-code">{{ inv.code }}</code>
+              <el-button size="small" text @click="copyInvitationCode(inv.code)">{{ $t('settings.invitationCopy') }}</el-button>
+              <el-tag size="small" :type="getInvitationTagType(inv)">{{ getInvitationStatus(inv) }}</el-tag>
+              <el-button size="small" text type="danger" @click="handleDeleteInvitation(inv.id)">{{ $t('settings.invitationDelete') }}</el-button>
+            </div>
+            <div class="invitation-meta">
+              <span>{{ inv.used_count }}/{{ inv.max_uses }} {{ $t('settings.invitationUsed') }}</span>
+              <span v-if="inv.expires_at">· {{ $t('settings.invitationExpires') }}: {{ formatDate(inv.expires_at) }}</span>
+              <span v-else>· {{ $t('settings.invitationNeverExpires') }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="empty-hint" v-else>{{ $t('settings.invitationNoCodes') }}</div>
+      </div>
+
+      <!-- 用户管理 (仅创始账号可见) -->
+      <div class="settings-card" :class="{ 'section-highlight': activeSection === 'users' }" id="settings-users" v-if="isFounder">
+        <div class="card-title">👥 {{ $t('settings.userManage') }}</div>
+        <p class="section-desc">{{ $t('settings.userManageDesc') }}</p>
+        <div class="user-list" v-if="users.length > 0">
+          <div class="user-item" v-for="u in users" :key="u.id">
+            <div class="user-info">
+              <span class="user-name">{{ u.username }}</span>
+              <el-tag size="small" :type="u.is_founder ? 'danger' : u.role === 'admin' ? 'warning' : 'info'">
+                {{ u.is_founder ? $t('settings.userFounder') : u.role === 'admin' ? $t('settings.userAdmin') : $t('settings.userNormal') }}
+              </el-tag>
+              <span class="user-time">{{ $t('settings.userCreatedAt') }}: {{ formatDate(u.created_at) }}</span>
+            </div>
+            <div class="user-actions" v-if="!u.is_founder">
+              <el-button size="small" type="warning" @click="openResetUserPasswordDialog(u)">{{ $t('settings.userResetPassword') }}</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <el-dialog v-model="showPasswordDialog" :title="passwordSet ? $t('settings.changePassword') : $t('settings.setPassword')" width="400px" :fullscreen="isMobile">
@@ -527,6 +576,19 @@
       <template #footer>
         <el-button @click="showPasswordDialog = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" @click="handleSetPassword" :loading="settingPassword">{{ $t('common.save') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showResetUserPasswordDialog" :title="$t('settings.userResetPassword')" width="400px" :fullscreen="isMobile">
+      <p style="margin-bottom: 12px; color: var(--cm-text-muted)">{{ t('settings.userResetPasswordConfirm', [resetTargetUser?.username]) }}</p>
+      <el-form label-position="top">
+        <el-form-item :label="$t('settings.newPassword')">
+          <el-input v-model="resetUserNewPassword" type="password" show-password :placeholder="$t('settings.passwordMinLen')" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showResetUserPasswordDialog = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="handleResetUserPassword" :loading="resettingUserPassword">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
 
@@ -617,9 +679,11 @@ import axios from '../api/go-client'
 import { setLocale, getLocale, translateError } from '../i18n'
 import { aiApi } from '../api/go-ai'
 import { reasoningApi } from '../api/go-reasoning'
+import { useAuthStore } from '../stores/auth'
 
 const { t } = useI18n()
 const route = useRoute()
+const authStore = useAuthStore()
 const isMobile = ref(window.innerWidth <= 768)
 const activeSection = ref((route.query.section as string) || '')
 const sections = [
@@ -674,6 +738,17 @@ const healthGrade = computed(() => {
 })
 
 const dedupResult = ref<any>(null)
+
+const isFounder = computed(() => authStore.isFounder)
+const invitations = ref<any[]>([])
+const newInvitationMaxUses = ref(1)
+const newInvitationExpiresHours = ref(0)
+const creatingInvitation = ref(false)
+const users = ref<any[]>([])
+const showResetUserPasswordDialog = ref(false)
+const resetTargetUser = ref<any>(null)
+const resetUserNewPassword = ref('')
+const resettingUserPassword = ref(false)
 const dedupLoading = ref(false)
 
 const aiConfig = ref<any>(null)
@@ -761,6 +836,10 @@ function formatDate(dateStr: string): string {
 
 onMounted(async () => {
   await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys(), loadRecordSensitiveSetting(), loadConnectedAgents(), loadAgentSyncStatus(), loadRiskSwitches(), loadAIConfig(), loadAIUsage(), loadReasoningConfig()])
+  if (authStore.isFounder) {
+    loadInvitations()
+    loadUsers()
+  }
   if (activeSection.value) {
     nextTick(() => scrollToSection(activeSection.value))
   }
@@ -1003,6 +1082,90 @@ async function updateRecordSensitive() {
 
 async function loadInitStatus() {
   try { const { data } = await axios.get('/auth/init-status'); passwordSet.value = data.password_set } catch { passwordSet.value = true }
+}
+
+async function loadInvitations() {
+  try {
+    const { data } = await axios.get('/invitations')
+    invitations.value = data.items || []
+  } catch { invitations.value = [] }
+}
+
+async function loadUsers() {
+  try {
+    const { data } = await axios.get('/users')
+    users.value = data.items || []
+  } catch { users.value = [] }
+}
+
+async function handleCreateInvitation() {
+  creatingInvitation.value = true
+  try {
+    await axios.post('/invitations', {
+      max_uses: newInvitationMaxUses.value,
+      expires_in_hours: newInvitationExpiresHours.value || 0,
+    })
+    ElMessage.success(t('settings.createInvitation') + ' ✓')
+    await loadInvitations()
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
+  } finally {
+    creatingInvitation.value = false
+  }
+}
+
+async function handleDeleteInvitation(id: number) {
+  try {
+    await axios.delete(`/invitations/${id}`)
+    await loadInvitations()
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
+  }
+}
+
+function copyInvitationCode(code: string) {
+  navigator.clipboard.writeText(code)
+  ElMessage.success(t('settings.invitationCopied'))
+}
+
+function getInvitationStatus(inv: any) {
+  if (inv.used_count >= inv.max_uses) return t('settings.invitationUsed')
+  if (inv.expires_at && new Date(inv.expires_at) < new Date()) return t('settings.invitationExpired')
+  return t('settings.invitationUnused')
+}
+
+function getInvitationTagType(inv: any) {
+  if (inv.used_count >= inv.max_uses) return 'info'
+  if (inv.expires_at && new Date(inv.expires_at) < new Date()) return 'danger'
+  return 'success'
+}
+
+function openResetUserPasswordDialog(user: any) {
+  resetTargetUser.value = user
+  resetUserNewPassword.value = ''
+  showResetUserPasswordDialog.value = true
+}
+
+async function handleResetUserPassword() {
+  if (!resetTargetUser.value || resetUserNewPassword.value.length < 6) {
+    ElMessage.warning(t('settings.passwordMinLen'))
+    return
+  }
+  resettingUserPassword.value = true
+  try {
+    await axios.post('/users/reset-password', {
+      user_id: resetTargetUser.value.id,
+      new_password: resetUserNewPassword.value,
+    })
+    ElMessage.success(t('settings.userResetPasswordSuccess', [resetTargetUser.value.username]))
+    showResetUserPasswordDialog.value = false
+    resetTargetUser.value = null
+    resetUserNewPassword.value = ''
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
+  } finally {
+    resettingUserPassword.value = false
+  }
 }
 
 async function loadInstallStatus() {
@@ -1400,10 +1563,6 @@ watch(showAgentsMdPreview, async (v) => {
 <style scoped>
 .settings-page { padding: 28px; max-width: 1200px; margin: 0 auto; }
 .settings-layout { display: flex; gap: 20px; }
-.settings-nav { position: sticky; top: 80px; min-width: 140px; height: fit-content; display: flex; flex-direction: column; gap: 2px; }
-.settings-nav a { padding: 6px 10px; border-radius: 6px; font-size: 13px; color: var(--cm-text-muted); cursor: pointer; transition: all 0.2s; white-space: nowrap; text-decoration: none; }
-.settings-nav a:hover { color: var(--cm-text); background: var(--cm-bg-secondary); }
-.settings-nav a.active { color: #10B981; background: rgba(16,185,129,0.1); font-weight: 500; }
 .page-header { margin-bottom: 24px; }
 .page-header h1 { font-size: 24px; font-weight: 700; color: var(--cm-text); margin: 0; }
 .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 16px; }
@@ -1431,6 +1590,20 @@ watch(showAgentsMdPreview, async (v) => {
 .license-input { width: 260px; }
 .pro-install-status { margin-top: 12px; padding: 12px; background: rgba(16,185,129,0.05); border-radius: 8px; }
 .status-text { font-size: 13px; color: var(--cm-text); margin-bottom: 8px; }
+.section-desc { font-size: 13px; color: var(--cm-text-muted); margin: 0 0 12px; }
+.invitation-create-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.form-label { font-size: 12px; color: var(--cm-text-muted); white-space: nowrap; }
+.invitation-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.invitation-item { padding: 10px; background: var(--cm-bg); border-radius: 8px; border: 1px solid var(--cm-border); }
+.invitation-code-row { display: flex; align-items: center; gap: 8px; }
+.invitation-code { font-family: monospace; font-size: 12px; padding: 4px 8px; background: rgba(16,185,129,0.06); border-radius: 4px; user-select: all; word-break: break-all; }
+.invitation-meta { font-size: 12px; color: var(--cm-text-muted); margin-top: 6px; }
+.empty-hint { font-size: 13px; color: var(--cm-text-muted); text-align: center; padding: 20px; }
+.user-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.user-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--cm-bg); border-radius: 8px; border: 1px solid var(--cm-border); }
+.user-info { display: flex; align-items: center; gap: 8px; }
+.user-name { font-weight: 500; font-size: 14px; }
+.user-time { font-size: 12px; color: var(--cm-text-muted); }
 .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--cm-border); font-size: 14px; color: var(--cm-text); }
 .setting-desc { color: var(--cm-text-muted); font-size: 13px; }
 .update-link { color: var(--cm-primary, #6366f1); text-decoration: none; margin-left: 8px; font-weight: 500; }

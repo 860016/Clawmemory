@@ -54,8 +54,8 @@ func handleCreateInvitation(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		var req struct {
-			MaxUses   int  `json:"max_uses"`
-			ExpiresIn int  `json:"expires_in_hours"`
+			MaxUses   int `json:"max_uses"`
+			ExpiresIn int `json:"expires_in_hours"`
 		}
 		c.ShouldBindJSON(&req)
 
@@ -135,5 +135,63 @@ func handleRevokeAllTokens(db *gorm.DB, authService *services.AuthService) gin.H
 
 		auditLog(db, c, "auth.revoke_all", strconv.Itoa(int(userID)), "all tokens revoked")
 		c.JSON(http.StatusOK, gin.H{"message": "all tokens have been revoked, please login again"})
+	}
+}
+
+func handleListUsers(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+
+		invSvc := services.NewInvitationService(db)
+		if !invSvc.IsAdmin(userID) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "only admins can list users"})
+			return
+		}
+
+		type UserInfo struct {
+			ID          uint       `json:"id"`
+			Username    string     `json:"username"`
+			Role        string     `json:"role"`
+			IsFounder   bool       `json:"is_founder"`
+			CreatedAt   time.Time  `json:"created_at"`
+			LockedUntil *time.Time `json:"locked_until,omitempty"`
+		}
+
+		var users []UserInfo
+		if err := db.Table("users").Select("id, username, role, is_founder, created_at, locked_until").Order("id ASC").Find(&users).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"items": users})
+	}
+}
+
+func handleAdminResetUserPassword(db *gorm.DB, authService *services.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		adminID := middleware.GetUserID(c)
+
+		invSvc := services.NewInvitationService(db)
+		if !invSvc.IsAdmin(adminID) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "only admins can reset user passwords"})
+			return
+		}
+
+		var req struct {
+			UserID      uint   `json:"user_id" binding:"required"`
+			NewPassword string `json:"new_password" binding:"required,min=6"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if err := authService.ResetPassword(req.UserID, req.NewPassword); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		auditLog(db, c, "auth.admin_reset_password", strconv.Itoa(int(req.UserID)), "password reset by admin")
+		c.JSON(http.StatusOK, gin.H{"message": "password reset successfully"})
 	}
 }

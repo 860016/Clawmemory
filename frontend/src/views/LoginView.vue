@@ -83,8 +83,13 @@
           v-model="invitationCode"
           :placeholder="$t('login.invitationCodePlaceholder')"
           size="large"
-        />
-        <p class="hint">{{ $t('login.invitationCodeHint') }}</p>
+        >
+          <template #prepend>
+            <span style="font-size: 12px; color: #10B981; white-space: nowrap;">🎫</span>
+          </template>
+        </el-input>
+        <p class="hint invitation-hint">{{ $t('login.invitationCodeHint') }}</p>
+        <p class="hint warning-hint" v-if="!invitationCode">{{ $t('login.invitationCodeRequired') }}</p>
         <el-button type="primary" @click="handleRegister" :loading="loading" size="large" class="login-btn">
           {{ $t('login.register') }}
         </el-button>
@@ -149,17 +154,56 @@
     </div>
 
     <!-- Forgot Password Dialog -->
-    <el-dialog v-model="showForgotDialog" :title="$t('login.forgotPassword')" width="440px" :close-on-click-modal="false">
-      <el-alert type="warning" :closable="false" style="margin-bottom: 16px">
-        <template #title>{{ $t('login.forgotPasswordOnlyTerminal') }}</template>
-      </el-alert>
-      <div class="cli-hint">
-        <p>{{ $t('login.cliResetHint') }}</p>
-        <div class="cli-commands">
-          <div class="cli-platform">Windows:</div>
-          <code>clawmemory.exe --reset-password NEW_PASSWORD</code>
-          <div class="cli-platform">Linux/macOS:</div>
-          <code>./clawmemory --reset-password NEW_PASSWORD</code>
+    <el-dialog v-model="showForgotDialog" :title="$t('login.forgotPassword')" width="480px" :close-on-click-modal="false">
+      <div class="forgot-section">
+        <el-alert type="info" :closable="false" style="margin-bottom: 16px">
+          <template #title>{{ $t('login.forgotPasswordOnlyTerminal') }}</template>
+        </el-alert>
+
+        <div class="forgot-username-field">
+          <label class="forgot-label">{{ $t('login.forgotUsernameLabel') }}</label>
+          <el-input
+            v-model="forgotUsername"
+            :placeholder="$t('login.forgotUsernamePlaceholder')"
+            size="large"
+          />
+        </div>
+
+        <div class="forgot-tabs">
+          <button :class="['forgot-tab', { active: forgotMode === 'founder' }]" @click="forgotMode = 'founder'">{{ $t('settings.userFounder') }}</button>
+          <button :class="['forgot-tab', { active: forgotMode === 'user' }]" @click="forgotMode = 'user'">{{ $t('settings.userNormal') }}</button>
+        </div>
+
+        <div v-if="forgotMode === 'founder'" class="forgot-content">
+          <el-alert type="success" :closable="false" style="margin-bottom: 12px">
+            <template #title>{{ $t('login.forgotPasswordFounder') }}</template>
+          </el-alert>
+          <div class="cli-hint">
+            <p>{{ $t('login.cliResetHint') }}</p>
+            <div class="cli-commands">
+              <div class="cli-platform">Windows:</div>
+              <code>clawmemory.exe --reset-password NEW_PASSWORD</code>
+              <code v-if="forgotUsername">clawmemory.exe --reset-password {{ forgotUsername }}:NEW_PASSWORD</code>
+              <div class="cli-platform">Linux/macOS:</div>
+              <code>./clawmemory --reset-password NEW_PASSWORD</code>
+              <code v-if="forgotUsername">./clawmemory --reset-password {{ forgotUsername }}:NEW_PASSWORD</code>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="forgot-content">
+          <el-alert type="warning" :closable="false" style="margin-bottom: 12px">
+            <template #title>{{ $t('login.forgotPasswordUser') }}</template>
+          </el-alert>
+          <div class="cli-hint">
+            <p>{{ $t('login.cliResetHintWithUser') }}</p>
+            <div class="cli-commands">
+              <div class="cli-platform">Windows:</div>
+              <code>clawmemory.exe --reset-password USERNAME:NEW_PASSWORD</code>
+              <div class="cli-platform">Linux/macOS:</div>
+              <code>./clawmemory --reset-password USERNAME:NEW_PASSWORD</code>
+            </div>
+          </div>
         </div>
       </div>
       <template #footer>
@@ -190,8 +234,9 @@ const loading = ref(false)
 const passwordSet = ref(true)
 const resetMessage = ref('')
 const showForgotDialog = ref(false)
-const newPassword = ref('')
 const forgotUsername = ref('')
+const forgotMode = ref<'founder' | 'user'>('founder')
+const newPassword = ref('')
 const autoApiKey = ref('')
 const apiKeyCopied = ref(false)
 
@@ -514,6 +559,8 @@ async function handleResetPassword() {
   text-align: center;
   margin: 0;
 }
+.invitation-hint { color: var(--cm-text-muted); font-size: 12px; }
+.warning-hint { color: #E6A23C; font-size: 12px; font-weight: 500; }
 
 .login-btn {
   width: 100%;
@@ -595,6 +642,15 @@ async function handleResetPassword() {
   user-select: all;
   word-break: break-all;
 }
+
+.forgot-section { display: flex; flex-direction: column; gap: 12px; }
+.forgot-username-field { display: flex; flex-direction: column; gap: 6px; }
+.forgot-label { font-size: 13px; font-weight: 500; color: var(--cm-text); }
+.forgot-tabs { display: flex; gap: 8px; }
+.forgot-tab { padding: 6px 14px; border-radius: 6px; font-size: 13px; border: 1px solid var(--cm-border); background: var(--cm-bg); color: var(--cm-text-muted); cursor: pointer; transition: all 0.2s; }
+.forgot-tab:hover { border-color: #10B981; color: var(--cm-text); }
+.forgot-tab.active { background: rgba(16,185,129,0.1); border-color: #10B981; color: #10B981; font-weight: 500; }
+.forgot-content { margin-top: 4px; }
 
 .reset-success-box {
   display: flex;
