@@ -155,7 +155,7 @@
     </div>
 
     <!-- Detail Dialog for Scanned Skills -->
-    <el-dialog v-model="detailVisible" :title="detailSkill?.name" width="600px">
+    <el-dialog v-model="detailVisible" :title="detailSkill?.name" width="600px" :fullscreen="isMobile">
       <div v-if="detailSkill" class="skill-detail">
         <div class="detail-row"><strong>{{ $t('skills.name') }}:</strong> {{ detailSkill.name }}</div>
         <div class="detail-row"><strong>{{ $t('skills.description') }}:</strong> {{ detailSkill.description || '—' }}</div>
@@ -178,7 +178,7 @@
     </el-dialog>
 
     <!-- Detail Dialog for Learned Skills -->
-    <el-dialog v-model="learnedDetailVisible" :title="learnedDetailSkill?.name" width="650px">
+    <el-dialog v-model="learnedDetailVisible" :title="learnedDetailSkill?.name" width="650px" :fullscreen="isMobile">
       <div v-if="learnedDetailSkill" class="skill-detail">
         <div class="detail-row"><strong>{{ $t('skills.name') }}:</strong> {{ learnedDetailSkill.name }}</div>
         <div class="detail-row"><strong>{{ $t('skills.description') }}:</strong> {{ learnedDetailSkill.description || '—' }}</div>
@@ -252,6 +252,7 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 
 const activeTab = ref<'learned' | 'scanned'>('learned')
+const isMobile = ref(window.innerWidth <= 768)
 
 const scanning = ref(false)
 const scanned = ref(false)

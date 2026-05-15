@@ -45,7 +45,7 @@
         </div>
         <div v-if="!globalSkills.length && !workspaceSkills.length" class="empty-hint">{{ $t('skills.noSkills') }}</div>
       </div>
-      <el-dialog v-model="skillDetailVisible" :title="skillDetail?.name" width="650px">
+      <el-dialog v-model="skillDetailVisible" :title="skillDetail?.name" width="650px" :fullscreen="isMobile">
         <div v-if="skillDetail" style="font-size:14px;line-height:1.8">
           <div class="detail-row"><strong>{{ $t('skills.name') }}:</strong> {{ skillDetail.name }}</div>
           <div class="detail-row"><strong>{{ $t('skills.description') }}:</strong> {{ skillDetail.description || '—' }}</div>
@@ -470,6 +470,7 @@ const { t } = useI18n()
 const route = useRoute()
 const activeTab = computed(() => (route.query.tab as string) || '')
 
+const isMobile = ref(window.innerWidth <= 768)
 const stats = ref<any>({
   memoryCount: 0, entityCount: 0, relationCount: 0, projectCount: 0,
   layerStats: {}, recentMemories: [], license: { tier: 'oss', active: false },
@@ -1048,6 +1049,9 @@ function formatNumber(n: number) {
     flex-wrap: wrap;
     gap: 4px;
   }
+  .onboarding-steps { gap: 8px; }
+  .onboarding-step { padding: 10px; gap: 10px; }
+  .onboarding-header h2 { font-size: 16px; }
 }
 
 @media (max-width: 480px) {

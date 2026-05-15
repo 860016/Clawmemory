@@ -150,7 +150,7 @@
       <el-pagination v-model:current-page="currentPage" :page-size="pageSize" :total="total" layout="prev, pager, next" @current-change="loadMemories" />
     </div>
 
-    <el-dialog v-model="showAddDialog" :title="editingMemory ? $t('memories.editTitle') : $t('memories.addTitle')" width="600px" class="custom-dialog">
+    <el-dialog v-model="showAddDialog" :title="editingMemory ? $t('memories.editTitle') : $t('memories.addTitle')" width="600px" :fullscreen="isMobile" class="custom-dialog">
       <el-form label-position="top">
         <el-form-item :label="$t('memories.layer')">
           <el-select v-model="form.layer" style="width: 100%">
@@ -204,7 +204,7 @@
     </el-dialog>
 
     <!-- OpenClaw 导入对话框 -->
-    <el-dialog v-model="showImportDialog" :title="$t('memories.importTitle')" width="650px">
+    <el-dialog v-model="showImportDialog" :title="$t('memories.importTitle')" width="650px" :fullscreen="isMobile">
       <div v-if="!scanResult">
         <el-alert v-if="scanError" :title="scanError" type="error" show-icon :closable="false" style="margin-bottom: 16px" />
         <p style="color: var(--cm-text-muted); margin-bottom: 16px">
@@ -272,7 +272,7 @@
     </el-dialog>
 
     <!-- Extract Memory Dialog -->
-    <el-dialog v-model="showExtractDialog" :title="$t('memories.extractTitle')" width="700px" class="custom-dialog">
+    <el-dialog v-model="showExtractDialog" :title="$t('memories.extractTitle')" width="700px" :fullscreen="isMobile" class="custom-dialog">
       <el-input v-model="extractContent" type="textarea" :rows="8" :placeholder="$t('memories.extractPlaceholder')" />
       <div v-if="extractResult" style="margin-top: 16px">
         <el-divider content-position="left">{{ $t('memories.extractedCount', { count: extractResult.count }) }}</el-divider>
@@ -297,7 +297,7 @@
     </el-dialog>
 
     <!-- Secret Warning Dialog -->
-    <el-dialog v-model="showSecretWarning" :title="$t('memories.secretWarningTitle')" width="500px">
+    <el-dialog v-model="showSecretWarning" :title="$t('memories.secretWarningTitle')" width="500px" :fullscreen="isMobile">
       <el-alert type="error" show-icon :closable="false" style="margin-bottom: 12px">
         <template #title>{{ $t('memories.secretWarningMsg') }}</template>
       </el-alert>
@@ -343,6 +343,7 @@ const editingMemory = ref<any>(null)
 const saving = ref(false)
 const loadingList = ref(true)
 const mobileActionsCollapsed = ref(window.innerWidth <= 768)
+const isMobile = ref(window.innerWidth <= 768)
 
 // OpenClaw import state
 const showImportDialog = ref(false)

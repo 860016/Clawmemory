@@ -152,6 +152,7 @@
       width="600px"
       :show-close="false"
       class="search-modal"
+      :fullscreen="isMobile"
     >
       <div class="search-container">
         <div class="search-input-wrapper">

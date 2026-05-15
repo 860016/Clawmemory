@@ -5,7 +5,7 @@
     </div>
 
     <div class="settings-layout">
-      <nav class="settings-nav">
+      <nav class="settings-nav" v-if="!isMobile">
         <a v-for="s in sections" :key="s.id" :class="{ active: activeSection === s.id }" @click.prevent="scrollToSection(s.id)">{{ s.icon }} {{ s.label }}</a>
       </nav>
 
@@ -515,7 +515,7 @@
       </div>
     </div>
 
-    <el-dialog v-model="showPasswordDialog" :title="passwordSet ? $t('settings.changePassword') : $t('settings.setPassword')" width="400px">
+    <el-dialog v-model="showPasswordDialog" :title="passwordSet ? $t('settings.changePassword') : $t('settings.setPassword')" width="400px" :fullscreen="isMobile">
       <el-form label-position="top">
         <el-form-item v-if="passwordSet" :label="$t('settings.oldPassword')">
           <el-input v-model="oldPassword" type="password" show-password :placeholder="$t('settings.oldPasswordPlaceholder')" />
@@ -530,7 +530,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showApiKeyDialog" :title="$t('settings.createApiKey')" width="460px" :close-on-click-modal="false">
+    <el-dialog v-model="showApiKeyDialog" :title="$t('settings.createApiKey')" width="460px" :fullscreen="isMobile" :close-on-click-modal="false">
       <div v-if="!newApiKeyRaw">
         <el-form label-position="top">
           <el-form-item :label="$t('settings.apiKeyName')">
@@ -566,7 +566,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showAIConfigDialog" :title="$t('settings.aiConfigure')" width="520px" :close-on-click-modal="false">
+    <el-dialog v-model="showAIConfigDialog" :title="$t('settings.aiConfigure')" width="520px" :fullscreen="isMobile" :close-on-click-modal="false">
       <el-form label-position="top">
         <el-form-item :label="$t('settings.aiProvider')">
           <el-select v-model="aiForm.provider_id" @change="onAIProviderChange" style="width: 100%">
@@ -595,7 +595,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showAgentsMdPreview" :title="$t('settings.agentsMdTitle')" width="640px">
+    <el-dialog v-model="showAgentsMdPreview" :title="$t('settings.agentsMdTitle')" width="640px" :fullscreen="isMobile">
       <div style="max-height: 500px; overflow-y: auto; padding: 12px; background: var(--cm-bg-secondary); border-radius: 6px; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; line-height: 1.6">
 {{ agentsMdContent }}
       </div>
@@ -620,6 +620,7 @@ import { reasoningApi } from '../api/go-reasoning'
 
 const { t } = useI18n()
 const route = useRoute()
+const isMobile = ref(window.innerWidth <= 768)
 const activeSection = ref((route.query.section as string) || '')
 const sections = [
   { id: 'license', icon: '🔑', label: computed(() => t('settings.license')) },

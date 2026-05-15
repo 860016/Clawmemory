@@ -88,7 +88,7 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog v-model="showRuleDialog" :title="editingRule ? $t('sharing.editRule') : $t('sharing.createRule')" width="480px">
+    <el-dialog v-model="showRuleDialog" :title="editingRule ? $t('sharing.editRule') : $t('sharing.createRule')" width="480px" :fullscreen="isMobile">
       <el-form label-width="100px">
         <el-form-item :label="$t('sharing.ruleFrom')">
           <el-input v-model="ruleForm.from_agent" />
@@ -131,6 +131,7 @@ import { sharingApi } from '../api/go-sharing'
 const { t } = useI18n()
 
 const activeTab = ref('pending')
+const isMobile = ref(window.innerWidth <= 768)
 const pendingShares = ref<any[]>([])
 const outboundShares = ref<any[]>([])
 const shareRules = ref<any[]>([])
@@ -303,4 +304,15 @@ onMounted(() => {
 .rule-card { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--cm-bg-secondary); border-radius: 8px; border: 1px solid var(--cm-border); }
 .rule-info { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .rule-actions { display: flex; gap: 8px; }
+
+@media (max-width: 768px) {
+  .sharing-view { padding: 16px; }
+  .page-header h2 { font-size: 18px; }
+  .share-card { padding: 12px; }
+  .rule-card { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .rule-actions { width: 100%; }
+  .rule-actions .el-button { flex: 1; }
+  .share-actions { flex-wrap: wrap; }
+  .share-actions .el-button { flex: 1; min-width: 0; }
+}
 </style>

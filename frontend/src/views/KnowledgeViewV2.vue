@@ -180,7 +180,7 @@
       </div>
     </el-drawer>
 
-    <el-dialog v-model="showCreateDialog" :title="$t('knowledge.addEntity')" width="480px" :close-on-click-modal="false">
+    <el-dialog v-model="showCreateDialog" :title="$t('knowledge.addEntity')" width="480px" :fullscreen="isMobile" :close-on-click-modal="false">
       <div class="form-field">
         <label>{{ $t('knowledge.entityName') }} *</label>
         <input v-model="formData.name" class="field-input" :placeholder="$t('knowledge.entityNamePlaceholder')" />
@@ -206,7 +206,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showEditDialog" :title="$t('knowledge.editEntity')" width="480px" :close-on-click-modal="false">
+    <el-dialog v-model="showEditDialog" :title="$t('knowledge.editEntity')" width="480px" :fullscreen="isMobile" :close-on-click-modal="false">
       <div class="form-field">
         <label>{{ $t('knowledge.entityName') }} *</label>
         <input v-model="formData.name" class="field-input" />
@@ -232,7 +232,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showRelationDialog" :title="$t('knowledge.addRelation')" width="480px" :close-on-click-modal="false">
+    <el-dialog v-model="showRelationDialog" :title="$t('knowledge.addRelation')" width="480px" :fullscreen="isMobile" :close-on-click-modal="false">
       <div class="form-field">
         <label>{{ $t('knowledge.sourceEntity') }}</label>
         <select v-model="relationForm.source_id" class="field-input">
@@ -268,6 +268,7 @@ import cytoscape from 'cytoscape'
 import { aiApi } from '../api/go-ai'
 
 const { t } = useI18n()
+const isMobile = ref(window.innerWidth <= 768)
 
 const entities = ref<any[]>([])
 const relations = ref<any[]>([])
@@ -1072,4 +1073,99 @@ async function aiExtract() {
   font-size: 14px;
 }
 .close-btn:hover { background: var(--cm-bg-tertiary, #f0f0f0); }
+
+@media (max-width: 768px) {
+  .page-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 12px;
+  }
+  .hero-content h1 {
+    font-size: 20px;
+  }
+  .hero-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .search-box input {
+    width: 100%;
+    flex: 1;
+  }
+  .hero-actions .el-button {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    font-size: 12px;
+  }
+  .filter-bar {
+    padding: 10px 16px;
+    gap: 6px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .filter-chip {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+  .content-area {
+    padding: 16px;
+  }
+  .cards-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .entity-card {
+    padding: 14px;
+    border-radius: 12px;
+  }
+  .card-top { gap: 10px; }
+  .card-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+    border-radius: 10px;
+  }
+  .card-title-area h3 { font-size: 14px; }
+  .card-desc { font-size: 12px; }
+  .graph-view {
+    flex-direction: column;
+    min-height: 350px;
+  }
+  .graph-container { min-height: 300px; }
+  .graph-detail-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--cm-border, #e5e5e5);
+    max-height: 300px;
+  }
+  .state-block { padding: 40px 16px; }
+  .state-block.empty { padding: 60px 16px; }
+  .meta-grid { grid-template-columns: 1fr; }
+  .drawer-actions { flex-direction: column; }
+  .drawer-actions .el-button { width: 100%; }
+}
+
+@media (max-width: 480px) {
+  .page-hero { padding: 12px; }
+  .hero-content h1 { font-size: 18px; }
+  .hero-actions .el-button { font-size: 11px; padding: 8px 10px; }
+  .content-area { padding: 12px; }
+  .entity-card { padding: 12px; }
+  .card-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
+    border-radius: 8px;
+  }
+  .card-title-area h3 { font-size: 13px; }
+  .card-desc { font-size: 11px; -webkit-line-clamp: 2; }
+  .rel-item { flex-wrap: wrap; gap: 6px; padding: 8px 10px; font-size: 12px; }
+  .empty-circle { width: 60px; height: 60px; font-size: 28px; }
+}
 </style>

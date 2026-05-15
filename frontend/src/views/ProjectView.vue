@@ -90,7 +90,7 @@
       </div>
     </div>
 
-    <el-dialog v-model="showDetail" :title="currentProject?.name || ''" width="720px" top="5vh" class="project-detail-dialog" destroy-on-close>
+    <el-dialog v-model="showDetail" :title="currentProject?.name || ''" width="720px" :fullscreen="isMobile" top="5vh" class="project-detail-dialog" destroy-on-close>
       <div v-if="currentProject" class="project-detail">
         <div class="detail-header">
           <div class="detail-status">
@@ -181,7 +181,7 @@
       </div>
     </el-dialog>
 
-    <el-dialog v-model="showCreate" :title="editingProject ? $t('project.edit') : $t('project.create')" width="560px" destroy-on-close>
+    <el-dialog v-model="showCreate" :title="editingProject ? $t('project.edit') : $t('project.create')" width="560px" :fullscreen="isMobile" destroy-on-close>
       <el-form :model="form" label-width="100px">
         <el-form-item :label="$t('project.name')">
           <el-input v-model="form.name" :placeholder="$t('project.namePlaceholder')" />
@@ -218,7 +218,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showAddNote" :title="$t('project.addNote')" width="500px" destroy-on-close>
+    <el-dialog v-model="showAddNote" :title="$t('project.addNote')" width="500px" :fullscreen="isMobile" destroy-on-close>
       <el-form :model="noteForm" label-width="80px">
         <el-form-item :label="$t('project.noteContent')">
           <el-input type="textarea" v-model="noteForm.content" :rows="4" :placeholder="$t('project.notePlaceholder')" />
@@ -257,6 +257,7 @@ import projectApi from '../api/project'
 const { t } = useI18n()
 
 const projects = ref<any[]>([])
+const isMobile = ref(window.innerWidth <= 768)
 const loading = ref(false)
 const searchQuery = ref('')
 const filterStatus = ref('')
@@ -843,5 +844,18 @@ onMounted(loadProjects)
 
 .context-input {
   font-family: monospace;
+}
+
+@media (max-width: 768px) {
+  .project-page { padding: 16px; }
+  .page-header h1 { font-size: 20px; }
+  .header-actions { width: 100%; flex-wrap: wrap; }
+  .header-actions .el-button { flex: 1; min-width: 0; }
+  .project-grid { grid-template-columns: 1fr; }
+  .project-card { padding: 14px; }
+  .detail-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .detail-stats { flex-wrap: wrap; }
+  .notes-list { gap: 8px; }
+  .note-card { padding: 10px; }
 }
 </style>

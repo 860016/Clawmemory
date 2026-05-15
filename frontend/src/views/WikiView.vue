@@ -164,7 +164,7 @@
     </div>
 
     <!-- 编辑对话框 -->
-    <el-dialog v-model="showEditor" :title="isEditing ? $t('wiki.editPage') : $t('wiki.newPage')" width="800px" top="5vh" :close-on-click-modal="false">
+    <el-dialog v-model="showEditor" :title="isEditing ? $t('wiki.editPage') : $t('wiki.newPage')" width="800px" :fullscreen="isMobile" top="5vh" :close-on-click-modal="false">
       <el-form label-position="top">
         <div class="editor-row">
           <el-form-item :label="$t('wiki.titleField')" class="editor-title">
@@ -205,7 +205,7 @@
     </el-dialog>
 
     <!-- AI 提取对话框 -->
-    <el-dialog v-model="showExtractDialog" :title="$t('wiki.extractFromConversation')" width="700px" top="10vh" :close-on-click-modal="false">
+    <el-dialog v-model="showExtractDialog" :title="$t('wiki.extractFromConversation')" width="700px" :fullscreen="isMobile" top="10vh" :close-on-click-modal="false">
       <el-form label-position="top">
         <el-form-item :label="$t('wiki.conversationContent')">
           <el-input v-model="extractForm.conversation" type="textarea" :rows="12" :placeholder="$t('wiki.conversationPlaceholder')" />
@@ -239,6 +239,7 @@ import { translateError } from '../i18n'
 const { t } = useI18n()
 const route = useRoute()
 const pages = ref<any[]>([])
+const isMobile = ref(window.innerWidth <= 768)
 const allPages = ref<any[]>([])
 const categories = ref<string[]>([])
 const searchResults = ref<any[]>([])

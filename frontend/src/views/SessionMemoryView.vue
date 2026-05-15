@@ -40,7 +40,7 @@
 
     <el-empty v-if="!sessions.length" :description="$t('sessionMemory.empty')" />
 
-    <el-dialog v-model="showDetailDialog" :title="detailSession?.title || $t('sessionMemory.untitled')" width="800px" class="custom-dialog">
+    <el-dialog v-model="showDetailDialog" :title="detailSession?.title || $t('sessionMemory.untitled')" width="800px" :fullscreen="isMobile" class="custom-dialog">
       <div v-if="detailSession" class="session-detail">
         <div class="detail-meta">
           <el-tag size="small" :type="detailSession.status === 'active' ? 'success' : 'info'">{{ detailSession.status }}</el-tag>
@@ -65,7 +65,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showAddDialog" :title="editingSession ? $t('sessionMemory.editTitle') : $t('sessionMemory.addTitle')" width="700px" class="custom-dialog">
+    <el-dialog v-model="showAddDialog" :title="editingSession ? $t('sessionMemory.editTitle') : $t('sessionMemory.addTitle')" width="700px" :fullscreen="isMobile" class="custom-dialog">
       <el-form label-position="top">
         <el-form-item :label="$t('sessionMemory.sessionId')">
           <el-input v-model="sessionForm.session_id" :placeholder="$t('sessionMemory.sessionIdPlaceholder')" />
@@ -119,6 +119,7 @@ import { translateError } from '../i18n'
 
 const { t } = useI18n()
 const sessions = ref<any[]>([])
+const isMobile = ref(window.innerWidth <= 768)
 const filterSessionId = ref('')
 const filterStatus = ref('')
 const showDetailDialog = ref(false)
@@ -233,4 +234,16 @@ function formatTime(ts: string) {
 .card-meta { font-size: 11px; color: var(--cm-text-placeholder); }
 .card-actions { display: flex; gap: 4px; }
 .detail-meta { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; font-size: 13px; color: var(--cm-text-muted); }
+
+@media (max-width: 768px) {
+  .session-memory-page { padding: 16px; }
+  .page-header h1 { font-size: 20px; }
+  .session-list { grid-template-columns: 1fr; }
+  .session-card { padding: 14px; }
+  .card-title { font-size: 14px; }
+  .card-preview { font-size: 12px; }
+  .toolbar { gap: 10px; }
+  .header-actions { width: 100%; }
+  .header-actions .el-button { flex: 1; }
+}
 </style>
