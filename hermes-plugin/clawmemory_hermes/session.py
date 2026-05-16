@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import uuid
 from datetime import datetime
@@ -28,17 +29,21 @@ class SessionManager:
             self._session_id = self._resolve_session_id()
         return self._session_id
 
+    @property
+    def turn_count(self) -> int:
+        return self._turn_count
+
     def _resolve_session_id(self) -> str:
         if self.strategy == "global":
             return "hermes-global"
         if self.strategy == "per-repo":
             git_dir = self._find_git_dir()
             if git_dir:
-                return f"hermes-repo-{hash(git_dir)}"
+                return f"hermes-repo-{hashlib.sha256(git_dir.encode()).hexdigest()[:12]}"
             return "hermes-global"
         if self.strategy == "per-directory":
             cwd = os.getcwd()
-            return f"hermes-dir-{hash(cwd)}"
+            return f"hermes-dir-{hashlib.sha256(cwd.encode()).hexdigest()[:12]}"
         return f"hermes-session-{uuid.uuid4().hex[:8]}"
 
     def _find_git_dir(self) -> str | None:
@@ -66,6 +71,7 @@ class SessionManager:
         if not self._pending_messages:
             return
 
+        batch_succeeded = False
         try:
             if len(self._pending_messages) == 1:
                 m = self._pending_messages[0]
@@ -77,10 +83,11 @@ class SessionManager:
                     source="hermes",
                     memory_type="conversation",
                 )
+                batch_succeeded = True
             else:
                 items = []
                 for m in self._pending_messages:
-                    key = f"{self.session_id}_{m['role']}_{int(datetime.now().timestamp())}_{hash(m['content'][:50])}"
+                    key = f"{self.session_id}_{m['role']}_{int(datetime.now().timestamp())}_{hashlib.sha256(m['content'][:50].encode()).hexdigest()[:8]}"
                     items.append({
                         "key": key,
                         "value": f"[{m['role']}] {m['content']}",
@@ -89,22 +96,24 @@ class SessionManager:
                         "memory_type": "conversation",
                     })
                 self.client.batch_save_memories(items)
+                batch_succeeded = True
 
             logger.info("Flushed %d messages for session %s", len(self._pending_messages), self.session_id)
         except Exception as e:
-            logger.error("Flush failed, attempting individual writes: %s", e)
-            for m in self._pending_messages:
-                try:
-                    key = f"{self.session_id}_{m['role']}_{int(datetime.now().timestamp())}"
-                    self.client.save_memory(
-                        key=key,
-                        value=f"[{m['role']}] {m['content']}",
-                        layer="episodic",
-                        source="hermes",
-                        memory_type="conversation",
-                    )
-                except Exception as inner_err:
-                    logger.error("Individual write also failed: %s", inner_err)
+            if not batch_succeeded:
+                logger.error("Flush failed, attempting individual writes: %s", e)
+                for m in self._pending_messages:
+                    try:
+                        key = f"{self.session_id}_{m['role']}_{int(datetime.now().timestamp())}"
+                        self.client.save_memory(
+                            key=key,
+                            value=f"[{m['role']}] {m['content']}",
+                            layer="episodic",
+                            source="hermes",
+                            memory_type="conversation",
+                        )
+                    except Exception as inner_err:
+                        logger.error("Individual write also failed: %s", inner_err)
 
         try:
             self.client.track_session(

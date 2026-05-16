@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -47,6 +48,10 @@ func NewMemoryService(db *gorm.DB) *MemoryService {
 }
 
 func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*MemoryModel, error) {
+	if err := ValidateMemoryCreate(data); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	tags := "[]"
 	if t, ok := data["tags"].([]interface{}); ok {
 		tagStrings := make([]string, 0, len(t))
@@ -61,7 +66,7 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 
 	memory := &models.Memory{
 		UserID:      userID,
-		Layer:       getString(data, "layer", "short"),
+		Layer:       getString(data, "layer", "episodic"),
 		Key:         getString(data, "key", ""),
 		Value:       getString(data, "value", ""),
 		Importance:  getFloat(data, "importance", 0.5),

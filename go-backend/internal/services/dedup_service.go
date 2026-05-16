@@ -36,7 +36,8 @@ type DuplicateMemory struct {
 
 func (s *DedupService) Scan(userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
-	if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error; err != nil {
+	if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").
+		Order("importance DESC").Limit(1000).Find(&memories).Error; err != nil {
 		return nil, fmt.Errorf("failed to load memories: %w", err)
 	}
 

@@ -203,7 +203,7 @@ func newRateLimiter(limit int, window time.Duration) *rateLimiter {
 		requests: make(map[string][]time.Time),
 		limit:    limit,
 		window:   window,
-		maxKeys:  100000,
+		maxKeys:  10000,
 	}
 }
 

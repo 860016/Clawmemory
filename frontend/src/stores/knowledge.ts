@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { knowledgeApi } from '../api/knowledge'
+import { knowledgeApi } from '../api/go-knowledge'
 
 export const useKnowledgeStore = defineStore('knowledge', () => {
   const entities = ref<any[]>([])
@@ -34,9 +34,11 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   }
 
   async function fetchRelations(page = 1, size = 20) {
-    const resp = await knowledgeApi.listRelations({ page, size })
-    relations.value = resp.data.items ?? resp.data
-    relationTotal.value = resp.data.total ?? relations.value.length
+    const resp = await knowledgeApi.listRelations()
+    const items = resp.data.items ?? resp.data
+    const start = (page - 1) * size
+    relations.value = items.slice(start, start + size)
+    relationTotal.value = items.length
   }
 
   async function createRelation(data: { source_id: number; target_id: number; relation_type: string; properties?: Record<string, any> }) {
@@ -51,7 +53,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   }
 
   async function fetchGraphData(depth?: number) {
-    const resp = await knowledgeApi.getGraphData({ depth })
+    const resp = await knowledgeApi.getGraph()
     graphData.value = resp.data
   }
 

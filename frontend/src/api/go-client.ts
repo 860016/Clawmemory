@@ -27,7 +27,9 @@ async function tryRefreshToken(): Promise<string | null> {
       refresh_token: refreshToken,
     })
     localStorage.setItem('token', data.access_token)
-    localStorage.setItem('refresh_token', data.refresh_token)
+    if (data.refresh_token) {
+      localStorage.setItem('refresh_token', data.refresh_token)
+    }
     return data.access_token
   } catch {
     localStorage.removeItem('token')

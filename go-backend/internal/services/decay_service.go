@@ -37,10 +37,6 @@ func (s *DecayService) GetStats(userID uint) (*DecayStatsResult, error) {
 
 func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 	now := time.Now()
-	var memories []models.Memory
-	if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error; err != nil {
-		return nil, fmt.Errorf("failed to load memories: %w", err)
-	}
 
 	archived := 0
 	trashed := 0
@@ -48,74 +44,93 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 	reinforced := 0
 	locked := 0
 
-	for i := range memories {
-		m := &memories[i]
-		daysSinceAccess := now.Sub(m.UpdatedAt).Hours() / 24
-		if m.LastAccessedAt != nil {
-			daysSinceAccess = now.Sub(*m.LastAccessedAt).Hours() / 24
+	batchSize := 200
+	offset := 0
+
+	for {
+		var memories []models.Memory
+		if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").
+			Order("importance ASC").Limit(batchSize).Offset(offset).Find(&memories).Error; err != nil {
+			return nil, fmt.Errorf("failed to load memories: %w", err)
+		}
+		if len(memories) == 0 {
+			break
 		}
 
-		newImportance := m.Importance
-		newStatus := m.Status
-		newDecayStage := m.DecayStage
+		for i := range memories {
+			m := &memories[i]
+			daysSinceAccess := now.Sub(m.UpdatedAt).Hours() / 24
+			if m.LastAccessedAt != nil {
+				daysSinceAccess = now.Sub(*m.LastAccessedAt).Hours() / 24
+			}
 
-		if m.ReinforceCount >= 5 {
-			reinforced++
-			continue
-		}
+			newImportance := m.Importance
+			newStatus := m.Status
+			newDecayStage := m.DecayStage
 
-		if m.Layer == "core" {
-			locked++
-			if daysSinceAccess > 365 {
-				newImportance = m.Importance * 0.98
+			if m.ReinforceCount >= 5 {
+				reinforced++
+				continue
+			}
+
+			if m.Layer == "core" {
+				locked++
+				if daysSinceAccess > 365 {
+					newImportance = m.Importance * 0.98
+					newDecayStage = 1
+					adjusted++
+				}
+				newImportance = math.Max(newImportance, 0.7)
+				if newImportance != m.Importance || newDecayStage != m.DecayStage {
+					updates := map[string]interface{}{
+						"importance":  newImportance,
+						"decay_stage": newDecayStage,
+					}
+					s.db.Model(m).Updates(updates)
+				}
+				continue
+			}
+
+			halfLife := layerHalfLife(m.Layer, m.ReinforceCount)
+			decayFactor := math.Pow(0.5, daysSinceAccess/halfLife)
+			newImportance = m.Importance * decayFactor
+
+			thresholds := layerThresholds(m.Layer)
+
+			if newImportance < thresholds.trash {
+				newStatus = "trashed"
+				newDecayStage = 3
+				trashedNow := now
+				m.TrashedAt = &trashedNow
+				trashed++
+			} else if newImportance < thresholds.archive {
+				newStatus = "archived"
+				newDecayStage = 2
+				archived++
+			} else if newImportance < m.Importance*0.95 {
 				newDecayStage = 1
 				adjusted++
 			}
-			newImportance = math.Max(newImportance, 0.7)
-			if newImportance != m.Importance || newDecayStage != m.DecayStage {
+
+			newImportance = math.Max(newImportance, 0.05)
+
+			if newImportance != m.Importance || newStatus != m.Status || newDecayStage != m.DecayStage {
 				updates := map[string]interface{}{
 					"importance":  newImportance,
+					"status":      newStatus,
 					"decay_stage": newDecayStage,
+				}
+				if m.TrashedAt != nil {
+					updates["trashed_at"] = *m.TrashedAt
 				}
 				s.db.Model(m).Updates(updates)
 			}
-			continue
 		}
 
-		halfLife := layerHalfLife(m.Layer, m.ReinforceCount)
-		decayFactor := math.Pow(0.5, daysSinceAccess/halfLife)
-		newImportance = m.Importance * decayFactor
-
-		thresholds := layerThresholds(m.Layer)
-
-		if newImportance < thresholds.trash {
-			newStatus = "trashed"
-			newDecayStage = 3
-			trashedNow := now
-			m.TrashedAt = &trashedNow
-			trashed++
-		} else if newImportance < thresholds.archive {
-			newStatus = "archived"
-			newDecayStage = 2
-			archived++
-		} else if newImportance < m.Importance*0.95 {
-			newDecayStage = 1
-			adjusted++
+		if len(memories) < batchSize {
+			break
 		}
-
-		newImportance = math.Max(newImportance, 0.05)
-
-		if newImportance != m.Importance || newStatus != m.Status || newDecayStage != m.DecayStage {
-			updates := map[string]interface{}{
-				"importance":  newImportance,
-				"status":      newStatus,
-				"decay_stage": newDecayStage,
-			}
-			if m.TrashedAt != nil {
-				updates["trashed_at"] = *m.TrashedAt
-			}
-			s.db.Model(m).Updates(updates)
-		}
+		offset += batchSize
 	}
 
 	return map[string]interface{}{
@@ -212,18 +227,8 @@ func (s *DecayService) AutoCleanupTrash(userID uint) (int64, error) {
 	}
 
 	cutoff := time.Now().AddDate(0, 0, -retainDays)
-	var trashMemories []models.Memory
-	_ = s.db.Where("user_id = ? AND status = ? AND trashed_at < ?", userID, "trashed", cutoff).Find(&trashMemories).Error
-
-	count := int64(len(trashMemories))
-	if count > 0 {
-		ids := make([]uint, len(trashMemories))
-		for i, m := range trashMemories {
-			ids[i] = m.ID
-		}
-		s.db.Where("id IN ?", ids).Delete(&models.Memory{})
-	}
-	return count, nil
+	result := s.db.Where("user_id = ? AND status = ? AND trashed_at < ?", userID, "trashed", cutoff).Delete(&models.Memory{})
+	return result.RowsAffected, nil
 }
 
 func (s *DecayService) GetPruneSuggestions(userID uint) ([]map[string]interface{}, error) {

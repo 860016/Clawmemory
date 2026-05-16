@@ -422,7 +422,8 @@ func (s *SearchService) graphTraversalSearch(userID uint, query string, limit in
 	}
 
 	var allMemories []models.Memory
-	if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&allMemories).Error; err != nil {
+	if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").
+		Order("importance DESC").Limit(500).Find(&allMemories).Error; err != nil {
 		log.Printf("[Search] graph search memories db error: %v", err)
 		return nil
 	}

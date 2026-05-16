@@ -82,11 +82,11 @@ class ClawMemoryProvider(MemoryProvider):
 
         if (
             self.enable_reasoning
-            and self.session._turn_count % self.reasoning_interval == 0
+            and self.session.turn_count % self.reasoning_interval == 0
         ):
             try:
                 self.session.reason(
-                    f"Auto reasoning at turn {self.session._turn_count}",
+                    f"Auto reasoning at turn {self.session.turn_count}",
                     depth=self.reasoning_depth,
                     level=self.reasoning_level,
                 )

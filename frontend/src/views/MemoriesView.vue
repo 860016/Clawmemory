@@ -34,6 +34,10 @@
       </el-select>
       <el-radio-group v-model="currentLayer" @change="loadMemories" size="default">
         <el-radio-button label="">{{ $t('memories.all') }}</el-radio-button>
+        <el-radio-button label="core">Core</el-radio-button>
+        <el-radio-button label="context">Context</el-radio-button>
+        <el-radio-button label="episodic">Episodic</el-radio-button>
+        <el-radio-button label="semantic">Semantic</el-radio-button>
         <el-radio-button label="preference">{{ $t('memories.preference') }}</el-radio-button>
         <el-radio-button label="knowledge">{{ $t('memories.knowledge') }}</el-radio-button>
         <el-radio-button label="short_term">{{ $t('memories.shortTerm') }}</el-radio-button>
@@ -42,10 +46,12 @@
       <el-select v-model="currentMemoryType" @change="loadMemories" :placeholder="$t('memories.memoryType')" clearable style="width: 140px">
         <el-option :label="$t('memories.all')" value="" />
         <el-option label="Knowledge" value="knowledge" />
-        <el-option label="Feedback" value="feedback" />
-        <el-option label="Project" value="project" />
-        <el-option label="Reference" value="reference" />
-        <el-option label="User" value="user" />
+        <el-option label="Preference" value="preference" />
+        <el-option label="Instruction" value="instruction" />
+        <el-option label="Context" value="context" />
+        <el-option label="Fact" value="fact" />
+        <el-option label="Episodic" value="episodic" />
+        <el-option label="Conversation" value="conversation" />
       </el-select>
       <el-select v-model="currentSourceAgent" @change="loadMemories" :placeholder="$t('memories.sourceAgent')" clearable style="width: 140px">
         <el-option :label="$t('memories.all')" value="" />
@@ -154,8 +160,13 @@
       <el-form label-position="top">
         <el-form-item :label="$t('memories.layer')">
           <el-select v-model="form.layer" style="width: 100%">
+            <el-option label="Core (core)" value="core" />
+            <el-option label="Context (context)" value="context" />
+            <el-option label="Detail (detail)" value="detail" />
             <el-option :label="$t('memories.preference') + ' (preference)'" value="preference" />
             <el-option :label="$t('memories.knowledge') + ' (knowledge)'" value="knowledge" />
+            <el-option label="Episodic (episodic)" value="episodic" />
+            <el-option label="Semantic (semantic)" value="semantic" />
             <el-option :label="$t('memories.shortTerm') + ' (short_term)'" value="short_term" />
             <el-option :label="$t('memories.private') + ' (private)'" value="private" />
           </el-select>
@@ -163,10 +174,12 @@
         <el-form-item :label="$t('memories.memoryType')">
           <el-select v-model="form.memory_type" style="width: 100%">
             <el-option label="Knowledge" value="knowledge" />
-            <el-option label="User" value="user" />
-            <el-option label="Feedback" value="feedback" />
-            <el-option label="Project" value="project" />
-            <el-option label="Reference" value="reference" />
+            <el-option label="Preference" value="preference" />
+            <el-option label="Instruction" value="instruction" />
+            <el-option label="Context" value="context" />
+            <el-option label="Fact" value="fact" />
+            <el-option label="Episodic" value="episodic" />
+            <el-option label="Conversation" value="conversation" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('memories.titleField')">
@@ -356,6 +369,11 @@ const importing = ref(false)
 const form = ref({ layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '', memory_type: 'knowledge', visibility: 'private', source_agent: '' })
 
 const layerLabels: Record<string, string> = {
+  core: 'Core',
+  context: 'Context',
+  detail: 'Detail',
+  episodic: 'Episodic',
+  semantic: 'Semantic',
   preference: t('memories.preference'),
   knowledge: t('memories.knowledge'),
   short_term: t('memories.shortTerm'),
@@ -413,7 +431,7 @@ async function loadMemories() {
     if (currentMemoryType.value) params.memory_type = currentMemoryType.value
     if (currentSourceAgent.value) params.source_agent = currentSourceAgent.value
     if (currentVisibility.value) params.visibility = currentVisibility.value
-    const { data } = await axios.get('/memories', { params })
+    const { data } = await memoryApi.list(params)
     memories.value = data.items || []
     total.value = data.total || 0
   } catch { memories.value = []; total.value = 0 }
@@ -425,9 +443,7 @@ async function handleSearch() {
 
   if (searchMode.value === 'smart') {
     try {
-      const { data } = await axios.get('/memories/smart-load', {
-        params: { q: searchQuery.value, token_budget: 2000, load_level: 'auto' }
-      })
+      const { data } = await memoryApi.smartLoad({ q: searchQuery.value, token_budget: 2000, load_level: 'auto' })
       smartLoadResult.value = data
       searchResults.value = (data.memories || []).map((m: any) => ({
         ...m,
@@ -445,9 +461,9 @@ async function handleSearch() {
     return
   }
 
-  const endpoint = searchMode.value === 'semantic' ? '/memories/search/semantic' : '/memories/search/keyword'
+  const searchFn = searchMode.value === 'semantic' ? memoryApi.searchSemantic : memoryApi.searchKeyword
   try {
-    const { data } = await axios.get(endpoint, { params: { q: searchQuery.value, limit: 20 } })
+    const { data } = await searchFn(searchQuery.value, 20)
     const results = data.items || data || []
     searchResults.value = results.map((m: any) => ({
       ...m,
@@ -466,7 +482,7 @@ async function handleSearch() {
 
 async function reinforceMemory(id: number) {
   try {
-    await axios.post(`/memories/${id}/reinforce`)
+    await memoryApi.reinforce(id)
     ElMessage.success(t('memories.reinforced'))
     await loadMemories()
     if (searchResults.value.length) handleSearch()
@@ -525,7 +541,7 @@ async function aiConflictScan() {
 async function deleteMemory(id: number) {
   try {
     await ElMessageBox.confirm(t('memories.deleteConfirm'), t('common.confirm'), { type: 'warning' })
-    await axios.delete(`/memories/${id}`)
+    await memoryApi.delete(id)
     ElMessage.success(t('memories.deleted'))
     searchResults.value = []
     await loadMemories()
@@ -538,7 +554,7 @@ async function deleteMemory(id: number) {
 
 async function decryptMemory(m: any) {
   try {
-    const { data } = await axios.post(`/memories/${m.id}/decrypt`)
+    const { data } = await memoryApi.get(m.id)
     if (data.encrypted) {
       m.value = data.value
       m.is_encrypted = false
@@ -674,8 +690,8 @@ function forceSaveWithSecret() {
 async function doSaveMemory(payload: any) {
   saving.value = true
   try {
-    if (editingMemory.value) await axios.put(`/memories/${editingMemory.value.id}`, payload)
-    else await axios.post('/memories', payload)
+    if (editingMemory.value) await memoryApi.update(editingMemory.value.id, payload)
+    else await memoryApi.create(payload)
     ElMessage.success(t('common.success'))
     showAddDialog.value = false
     editingMemory.value = null

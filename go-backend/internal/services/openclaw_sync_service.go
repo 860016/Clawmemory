@@ -99,7 +99,10 @@ func GetOpenClawSyncService(db *gorm.DB) *OpenClawSyncService {
 	syncServiceMu.Lock()
 	defer syncServiceMu.Unlock()
 
-	if globalSyncService == nil {
+	if globalSyncService == nil || globalSyncService.db != db {
+		if globalSyncService != nil && globalSyncService.stopChan != nil {
+			close(globalSyncService.stopChan)
+		}
 		globalSyncService = &OpenClawSyncService{
 			db:              db,
 			memService:      NewMemoryService(db),
@@ -798,10 +801,11 @@ func (s *OpenClawSyncService) extractSqliteMemories(dbPath string) []memoryPrevi
 	if err != nil {
 		return nil
 	}
-	sqlDB, _ := db.DB()
-	if sqlDB != nil {
-		defer sqlDB.Close()
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil
 	}
+	defer sqlDB.Close()
 
 	var previews []memoryPreview
 	agentName := filepath.Base(filepath.Dir(dbPath))

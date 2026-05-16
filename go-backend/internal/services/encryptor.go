@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -17,7 +18,6 @@ import (
 
 const (
 	pbkdf2Iterations = 100000
-	pbkdf2Salt       = "clawmemory-v2-enc-salt"
 	keyVersionV1     = "v1"
 	keyVersionV2     = "v2"
 )
@@ -40,7 +40,20 @@ func NewEncryptor(secretKey string) (*Encryptor, error) {
 }
 
 func deriveKeyV2(secret string) []byte {
-	return pbkdf2.Key([]byte(secret), []byte(pbkdf2Salt), pbkdf2Iterations, 32, sha256.New)
+	salt := getEncryptionSalt()
+	return pbkdf2.Key([]byte(secret), []byte(salt), pbkdf2Iterations, 32, sha256.New)
+}
+
+func getEncryptionSalt() string {
+	if salt := os.Getenv("ENCRYPTION_SALT"); salt != "" {
+		return salt
+	}
+	secretKey := os.Getenv("SECRET_KEY")
+	if secretKey != "" && secretKey != "clawmemory-default-secret-change-me" {
+		h := sha256.Sum256([]byte("clawmemory-salt-" + secretKey))
+		return hex.EncodeToString(h[:16])
+	}
+	return "clawmemory-v2-enc-salt"
 }
 
 func deriveKeyV1(secret string) []byte {

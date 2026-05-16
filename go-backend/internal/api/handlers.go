@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -987,6 +988,7 @@ func handleExternalBatchPushConversations(db *gorm.DB) gin.HandlerFunc {
 		syncService := services.GetOpenClawSyncService(db)
 		totalCreated := 0
 		totalMessages := 0
+		var errorDetails []string
 
 		for _, turn := range req.Turns {
 			if turn.AgentName == "" {
@@ -997,6 +999,7 @@ func handleExternalBatchPushConversations(db *gorm.DB) gin.HandlerFunc {
 			}
 			created, err := syncService.PushConversation(userID, turn)
 			if err != nil {
+				errorDetails = append(errorDetails, fmt.Sprintf("session=%s: %v", turn.SessionID, err))
 				continue
 			}
 			totalCreated += created
@@ -1010,6 +1013,7 @@ func handleExternalBatchPushConversations(db *gorm.DB) gin.HandlerFunc {
 			"created":  totalCreated,
 			"messages": totalMessages,
 			"platform": platform,
+			"errors":   len(errorDetails),
 		})
 	}
 }
@@ -1101,7 +1105,9 @@ func handleExternalSessionTrack(db *gorm.DB) gin.HandlerFunc {
 			}
 		} else {
 			if req.Metadata != "" {
-				_ = db.Model(&session).Update("current_state", req.Metadata).Error
+				if err := db.Model(&session).Update("current_state", req.Metadata).Error; err != nil {
+					log.Printf("[SessionTrack] failed to update metadata for session %s: %v", session.SessionID, err)
+				}
 			}
 		}
 
@@ -3403,10 +3409,11 @@ func extractSqliteMemories(dbPath string, previews []memoryPreview, agentCountMa
 	if err != nil {
 		return previews, agentCountMap
 	}
-	sqlDB, _ := db.DB()
-	if sqlDB != nil {
-		defer sqlDB.Close()
+	sqlDB, err := db.DB()
+	if err != nil {
+		return previews, agentCountMap
 	}
+	defer sqlDB.Close()
 
 	type TableName struct {
 		Name string
@@ -5491,6 +5498,14 @@ func handleExternalBatchCreateMemories(db *gorm.DB) gin.HandlerFunc {
 
 		svc := services.NewMemoryService(db)
 		var created, errorsCount int
+		var errorDetails []string
+
+		tx := db.Begin()
+		if tx.Error != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to begin transaction"})
+			return
+		}
+		svcTx := services.NewMemoryService(tx)
 
 		for _, m := range req.Memories {
 			key, _ := m["key"].(string)
@@ -5520,7 +5535,7 @@ func handleExternalBatchCreateMemories(db *gorm.DB) gin.HandlerFunc {
 				reqVisibility = "private"
 			}
 
-			_, err := svc.Create(userID, map[string]interface{}{
+			_, err := svcTx.Create(userID, map[string]interface{}{
 				"key":          key,
 				"value":        value,
 				"layer":        getString(m, "layer", "episodic"),
@@ -5533,9 +5548,21 @@ func handleExternalBatchCreateMemories(db *gorm.DB) gin.HandlerFunc {
 			})
 			if err != nil {
 				errorsCount++
+				errorDetails = append(errorDetails, fmt.Sprintf("key=%s: %v", key, err))
 				continue
 			}
 			created++
+		}
+
+		if errorsCount > 0 && created == 0 {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "all items failed", "details": errorDetails})
+			return
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "transaction commit failed"})
+			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{

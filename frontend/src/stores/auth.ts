@@ -44,7 +44,9 @@ export const useAuthStore = defineStore('auth', () => {
       role.value = data.role || 'user'
       isFounder.value = data.is_founder || data.role === 'admin'
       localStorage.setItem('cm_username', username.value)
-    } catch {}
+    } catch (e: any) {
+      console.warn('[Auth] fetchMe failed:', e?.message || e)
+    }
   }
 
   function logout() {

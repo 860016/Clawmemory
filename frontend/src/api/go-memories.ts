@@ -30,10 +30,6 @@ export const memoryApi = {
   forceAgentSync: () => api.post('/agent-sync/force'),
   toggleAgentSync: (enabled: boolean) => api.post('/agent-sync/toggle', { enabled }),
   getAgentsMD: () => api.get('/agent/agents-md'),
-
-  scanOpenClaw: () => api.get('/agent-memories/scan'),
-  scanOpenClawAgent: (agentName: string) => api.get(`/agent-memories/scan/${agentName}`),
-  importOpenClaw: (data: any) => api.post('/agent-memories/import', data),
 }
 
 export const sessionMemoryApi = {

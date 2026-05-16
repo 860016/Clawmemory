@@ -180,8 +180,19 @@ func (s *KnowledgeService) UpdateEntity(userID uint, id uint, data map[string]in
 }
 
 func (s *KnowledgeService) DeleteEntity(userID uint, id uint) error {
-	s.db.Where("(source_id = ? OR target_id = ?) AND user_id = ?", id, id, userID).Delete(&models.Relation{})
-	return s.db.Where("id = ? AND user_id = ?", id, userID).Delete(&models.Entity{}).Error
+	tx := s.db.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+	if err := tx.Where("(source_id = ? OR target_id = ?) AND user_id = ?", id, id, userID).Delete(&models.Relation{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete relations: %w", err)
+	}
+	if err := tx.Where("id = ? AND user_id = ?", id, userID).Delete(&models.Entity{}).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete entity: %w", err)
+	}
+	return tx.Commit().Error
 }
 
 func (s *KnowledgeService) DeleteRelation(userID uint, id uint) error {

@@ -171,6 +171,7 @@ export = {
       let turnCount = 0;
       let lastAssembleSessionId = "";
       let lastAssembleMessages: Array<{ role: string; content: unknown }> = [];
+      let afterTurnWritten = false;
 
       return {
         info: {
@@ -201,6 +202,7 @@ export = {
 
         async afterTurn({ sessionId, messages }: { sessionId: string; messages?: Array<{ role: string; content: unknown }> }) {
           turnCount++;
+          afterTurnWritten = true;
           try {
             await clawMemoryRequest("POST", "/sessions/track", {
               session_id: sessionId,
@@ -209,9 +211,15 @@ export = {
           } catch {}
 
           if (enableAutoIngest) {
-            const sourceMessages = (messages && messages.length > 0)
-              ? messages
-              : (lastAssembleSessionId === sessionId ? lastAssembleMessages : []);
+            let sourceMessages: Array<{ role: string; content: unknown }>;
+
+            if (messages && messages.length > 0) {
+              sourceMessages = messages;
+            } else if (lastAssembleSessionId === sessionId && lastAssembleMessages.length > 0) {
+              sourceMessages = lastAssembleMessages;
+            } else {
+              sourceMessages = [];
+            }
 
             const filtered = sourceMessages.filter(m => !isNoisyContent(extractContent(m.content)));
 
@@ -240,6 +248,7 @@ export = {
         async assemble({ sessionId, messages, tokenBudget }: { sessionId: string; messages: Array<{ role: string; content: unknown }>; tokenBudget: number }) {
           lastAssembleSessionId = sessionId;
           lastAssembleMessages = messages.slice();
+          afterTurnWritten = false;
 
           const lastUserMsg = extractLastUserMessage(messages);
           let systemPromptAddition = "";
@@ -275,7 +284,7 @@ export = {
         },
 
         async compact({ sessionId }: { sessionId: string; force: boolean }) {
-          if (lastAssembleMessages.length > 0 && lastAssembleSessionId === sessionId && enableAutoIngest) {
+          if (!afterTurnWritten && lastAssembleMessages.length > 0 && lastAssembleSessionId === sessionId && enableAutoIngest) {
             const filtered = lastAssembleMessages.filter(m => !isNoisyContent(extractContent(m.content)));
             if (filtered.length > 0) {
               const items = filtered.map(m => ({
@@ -290,13 +299,28 @@ export = {
               }
             }
             lastAssembleMessages = [];
+            afterTurnWritten = true;
           }
           return { ok: true, compacted: true };
         },
 
         async dispose() {
-          if (lastAssembleMessages.length > 0) {
-            console.warn(`[ClawMemory] dispose: ${lastAssembleMessages.length} cached messages from last assemble will be lost`);
+          if (lastAssembleMessages.length > 0 && !afterTurnWritten) {
+            console.warn(`[ClawMemory] dispose: flushing ${lastAssembleMessages.length} cached messages`);
+            const filtered = lastAssembleMessages.filter(m => !isNoisyContent(extractContent(m.content)));
+            if (filtered.length > 0) {
+              const items = filtered.map(m => ({
+                key: `dispose_${lastAssembleSessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                value: `[${m.role}] ${extractContent(m.content)}`,
+              }));
+              try {
+                await writeMemoryBatch(items);
+                console.log(`[ClawMemory] dispose: wrote ${items.length} messages`);
+              } catch (err) {
+                console.error("[ClawMemory] dispose flush failed:", err);
+              }
+            }
+            lastAssembleMessages = [];
           }
         },
       };

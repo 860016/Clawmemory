@@ -69,7 +69,12 @@ func (s *SmartLoadService) SmartLoad(userID uint, query string, tokenBudget int,
 	}
 
 	var memories []models.Memory
-	_ = s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error
+	dbQuery := s.db.Where("user_id = ? AND status = ?", userID, "active")
+	if query != "" {
+		escaped := escapeLike(query)
+		dbQuery = dbQuery.Where("key LIKE ? OR value LIKE ? OR tags LIKE ?", "%"+escaped+"%", "%"+escaped+"%", "%"+escaped+"%")
+	}
+	_ = dbQuery.Order("importance DESC, access_count DESC").Limit(500).Find(&memories).Error
 
 	if len(memories) == 0 {
 		return &SmartLoadResult{
@@ -408,7 +413,9 @@ func (s *SmartLoadService) GenerateAndSaveSummary(userID uint, memoryID uint) (s
 	}
 
 	summary := generateSummary(memory.Key, memory.Value)
-	s.db.Model(&memory).Update("summary", summary)
+	if err := s.db.Model(&memory).Update("summary", summary).Error; err != nil {
+		return "", fmt.Errorf("failed to save summary: %w", err)
+	}
 	return summary, nil
 }
 
@@ -419,10 +426,17 @@ func (s *SmartLoadService) BatchGenerateSummaries(userID uint) (int, error) {
 	}
 
 	count := 0
+	var errorsCount int
 	for _, m := range memories {
 		summary := generateSummary(m.Key, m.Value)
-		s.db.Model(&m).Update("summary", summary)
+		if err := s.db.Model(&m).Update("summary", summary).Error; err != nil {
+			errorsCount++
+			continue
+		}
 		count++
+	}
+	if errorsCount > 0 {
+		return count, fmt.Errorf("%d of %d summaries failed to save", errorsCount, len(memories))
 	}
 	return count, nil
 }
