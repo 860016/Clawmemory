@@ -111,6 +111,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useIsMobile } from '../composables/useIsMobile'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
@@ -119,7 +120,7 @@ import { translateError } from '../i18n'
 
 const { t } = useI18n()
 const sessions = ref<any[]>([])
-const isMobile = ref(window.innerWidth <= 768)
+const { isMobile } = useIsMobile()
 const filterSessionId = ref('')
 const filterStatus = ref('')
 const showDetailDialog = ref(false)
@@ -144,7 +145,7 @@ async function loadSessions() {
     if (filterStatus.value) params.status = filterStatus.value
     const { data } = await sessionMemoryApi.list(params)
     sessions.value = data.items || []
-  } catch {}
+  } catch { sessions.value = [] }
 }
 
 function openDetail(s: any) {
@@ -200,7 +201,7 @@ async function deleteSession(id: number) {
     await sessionMemoryApi.delete(id)
     ElMessage.success(t('common.success'))
     await loadSessions()
-  } catch {}
+  } catch { /* user cancelled or delete failed */ }
 }
 
 function getPreview(s: any) {

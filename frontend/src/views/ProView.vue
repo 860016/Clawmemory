@@ -3,11 +3,11 @@
     <div class="page-hero">
       <div class="hero-content">
         <h1>🚀 {{ $t('pro.title') }}</h1>
-        <span class="pro-badge" v-if="isPro">PRO</span>
+        <span class="pro-badge">PRO</span>
       </div>
     </div>
 
-    <div class="pro-grid" v-if="isPro">
+    <div class="pro-grid">
       <div class="mode-banner">
         <span>⚡ {{ $t('pro.localProMode') }}</span>
       </div>
@@ -453,28 +453,6 @@
       </div>
 
     </div>
-
-    <!-- Not Pro - blurred overlay -->
-    <div v-else class="pro-locked" @click="$router.push('/settings')">
-      <div class="locked-content">
-        <div class="locked-cards">
-          <div class="locked-card" v-for="i in 6" :key="i">
-            <div class="locked-card-header"></div>
-            <div class="locked-card-body">
-              <div class="locked-line w80"></div>
-              <div class="locked-line w60"></div>
-              <div class="locked-line w40"></div>
-            </div>
-          </div>
-        </div>
-        <div class="locked-overlay">
-          <div class="locked-icon">🔒</div>
-          <h2>{{ $t('pro.unlockPro') }}</h2>
-          <p>{{ $t('pro.upsellDesc') }}</p>
-          <el-button type="primary" size="large" @click.stop="$router.push('/settings')">{{ $t('pro.viewPricing') }}</el-button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -483,14 +461,12 @@ import { ref, reactive, onMounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import axios from '../api/go-client'
-import proApi from '../api/pro'
+import { proApi } from '../api/go-pro'
 import { translateError } from '../i18n'
 
 const { t } = useI18n()
 const route = useRoute()
 
-const isPro = ref(false)
 const loading = ref<Record<string, boolean>>({})
 const activeSection = ref((route.query.section as string) || '')
 const showHelp = reactive<Record<string, boolean>>({
@@ -525,18 +501,10 @@ const prefetchContext = ref('')
 const prefetchResult = ref<any>(null)
 
 onMounted(async () => {
-  try {
-    const { data } = await axios.get('/license/info')
-    isPro.value = data.tier === 'pro' || data.active === true
-  } catch {
-    isPro.value = false
-  }
-  if (isPro.value) {
-    loadDecayStats()
-    loadTokenStats()
-    loadBackupSchedule()
-    loadCompressConfig()
-  }
+  loadDecayStats()
+  loadTokenStats()
+  loadBackupSchedule()
+  loadCompressConfig()
   if (activeSection.value) {
     nextTick(() => scrollToSection(activeSection.value))
   }
@@ -615,7 +583,7 @@ async function testRoute() {
   if (!testMessage.value) return
   loading.value.route = true
   try {
-    const { data } = await proApi.routeToken(testMessage.value)
+    const { data } = await proApi.routeModel(testMessage.value)
     routeResult.value = { selected_model: data.model || data.provider, complexity: data.estimated_tokens > 500 ? 'high' : data.estimated_tokens > 200 ? 'medium' : 'low' }
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
@@ -1052,94 +1020,12 @@ async function runPrefetch() {
 .prefetch-result { margin-top: 8px; }
 .prefetch-count { font-size: 13px; color: var(--cm-primary, #6366f1); font-weight: 500; }
 
-/* ===== Pro Locked (Not Activated) ===== */
-.pro-locked {
-  flex: 1;
-  cursor: pointer;
-  overflow: hidden;
-}
-
-.locked-content {
-  position: relative;
-  height: 100%;
-  padding: 28px;
-}
-
-.locked-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
-  filter: blur(6px);
-  opacity: 0.4;
-  pointer-events: none;
-  user-select: none;
-}
-
-.locked-card {
-  background: var(--cm-bg-primary, #fff);
-  border: 1px solid var(--cm-border, #e5e5e5);
-  border-radius: 14px;
-  overflow: hidden;
-}
-
-.locked-card-header {
-  height: 48px;
-  background: var(--cm-bg-secondary, #f5f5f5);
-  border-bottom: 1px solid var(--cm-border, #e5e5e5);
-}
-
-.locked-card-body {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.locked-line {
-  height: 12px;
-  background: var(--cm-bg-tertiary, #f0f0f0);
-  border-radius: 6px;
-}
-
-.locked-line.w80 { width: 80%; }
-.locked-line.w60 { width: 60%; }
-.locked-line.w40 { width: 40%; }
-
-.locked-overlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  z-index: 10;
-}
-
-.locked-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.locked-overlay h2 {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--cm-text, #1a1a1a);
-  margin: 0 0 12px;
-}
-
-.locked-overlay p {
-  color: var(--cm-text-secondary, #666);
-  margin-bottom: 24px;
-  max-width: 400px;
-  line-height: 1.6;
-}
-
 @media (max-width: 768px) {
   .pro-grid {
     grid-template-columns: 1fr;
     padding: 16px;
   }
   .page-hero { padding: 16px; }
-  .locked-cards { grid-template-columns: 1fr; }
   .compress-levels { flex-direction: column; }
   .router-test { flex-direction: column; }
   .conflict-values { flex-direction: column; }

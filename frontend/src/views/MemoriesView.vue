@@ -327,11 +327,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import { useIsMobile } from '../composables/useIsMobile'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Upload, Loading, MagicStick, Warning } from '@element-plus/icons-vue'
-import axios from '../api/go-client'
 import { translateError } from '../i18n'
 import { memoryApi } from '../api/go-memories'
 import { agentApi } from '../api/go-agents'
@@ -356,7 +356,7 @@ const editingMemory = ref<any>(null)
 const saving = ref(false)
 const loadingList = ref(true)
 const mobileActionsCollapsed = ref(window.innerWidth <= 768)
-const isMobile = ref(window.innerWidth <= 768)
+const { isMobile } = useIsMobile()
 
 // OpenClaw import state
 const showImportDialog = ref(false)

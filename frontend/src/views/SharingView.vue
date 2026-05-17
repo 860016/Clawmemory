@@ -68,7 +68,7 @@
           <el-icon class="is-loading" :size="24"><Loading /></el-icon>
         </div>
         <div v-else-if="shareRules.length === 0" class="empty-state">
-          <el-empty description="暂无自动共享规则" />
+          <el-empty :description="t('sharing.noAutoRules')" />
         </div>
         <div v-else class="rule-list">
           <div v-for="rule in shareRules" :key="rule.id" class="rule-card">
@@ -123,6 +123,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useIsMobile } from '../composables/useIsMobile'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
@@ -131,7 +132,7 @@ import { sharingApi } from '../api/go-sharing'
 const { t } = useI18n()
 
 const activeTab = ref('pending')
-const isMobile = ref(window.innerWidth <= 768)
+const { isMobile } = useIsMobile()
 const pendingShares = ref<any[]>([])
 const outboundShares = ref<any[]>([])
 const shareRules = ref<any[]>([])

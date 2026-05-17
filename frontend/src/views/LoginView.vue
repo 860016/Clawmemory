@@ -219,8 +219,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { SuccessFilled } from '@element-plus/icons-vue'
-import axios from '../api/go-client'
 import { translateError } from '../i18n'
+import { authApi } from '../api/go-auth'
+import { settingsApi } from '../api/go-settings'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -262,7 +263,7 @@ onMounted(async () => {
   }
 
   try {
-    const { data } = await axios.get('/auth/init-status')
+    const { data } = await authApi.getInitStatus()
     passwordSet.value = data.password_set
     if (!data.password_set) {
       loginMode.value = 'setup'
@@ -278,7 +279,7 @@ async function handleLogin() {
   if (!password.value) return
   loading.value = true
   try {
-    const { data } = await axios.post('/auth/login', {
+    const { data } = await authApi.login({
       username: username.value || 'admin',
       password: password.value,
     })
@@ -324,7 +325,7 @@ async function handleRegister() {
     if (invitationCode.value) {
       payload.invitation_code = invitationCode.value
     }
-    await axios.post('/auth/register-with-invitation', payload)
+    await authApi.registerWithInvitation(payload)
     ElMessage.success(t('login.registerSuccess'))
     username.value = regUsername.value
     password.value = regPassword.value
@@ -359,7 +360,7 @@ async function handleSetPassword() {
     if (setupUsername.value) {
       payload.username = setupUsername.value
     }
-    const { data } = await axios.post('/auth/set-password', payload)
+    const { data } = await authApi.setPassword(payload)
     if (data.access_token) {
       localStorage.setItem('token', data.access_token)
       if (data.refresh_token) {
@@ -379,7 +380,7 @@ async function handleSetPassword() {
         if (setupUsername.value) {
           loginPayload.username = setupUsername.value
         }
-        const { data: loginData } = await axios.post('/auth/login', loginPayload)
+        const { data: loginData } = await authApi.login(loginPayload)
         localStorage.setItem('token', loginData.access_token)
         passwordSet.value = true
         router.push('/')
@@ -397,13 +398,13 @@ async function handleSetPassword() {
 
 async function fetchAutoApiKey() {
   try {
-    const { data } = await axios.get('/api-keys')
+    const { data } = await settingsApi.getApiKeys()
     const items = data.items || []
     if (items.length > 0) {
       autoApiKey.value = ''
       return
     }
-    const { data: created } = await axios.post('/api-keys', { name: 'ClawMemory Auto' })
+    const { data: created } = await settingsApi.createApiKey({ name: 'ClawMemory Auto' })
     autoApiKey.value = created.key || ''
   } catch (e) {
     console.error('Failed to fetch auto API key:', e)
@@ -433,7 +434,7 @@ async function handleResetPassword() {
   }
   loading.value = true
   try {
-    await axios.post('/auth/forgot-password', {
+    await authApi.forgotPassword({
       username: forgotUsername.value || 'admin',
       new_password: newPassword.value,
       confirm: true,

@@ -10,8 +10,6 @@ import (
 
 type ProProvider = proprovider.ProProvider
 
-var ErrProRequired = proprovider.ErrProRequired
-
 var globalProProvider ProProvider
 
 func InitProProvider(db *gorm.DB, cfg *config.Config) ProProvider {

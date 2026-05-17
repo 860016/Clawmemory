@@ -416,22 +416,15 @@
 
         <div class="card">
           <div class="card-header">
-            <h3>🔑 {{ $t('dashboard.licenseStatus') }}</h3>
+            <h3>🔑 {{ $t('dashboard.proStatus') }}</h3>
           </div>
-          <div class="license-info">
-            <div class="license-tier" :class="stats.license.tier">
-              <span class="tier-icon">{{ stats.license.tier === 'oss' ? '◇' : '◆' }}</span>
-              <span>{{ stats.license.tier === 'oss' ? $t('dashboard.freeVersion') : $t('dashboard.proVersion') }}</span>
+          <div class="pro-info">
+            <div class="pro-tier">
+              <span class="tier-icon">◆</span>
+              <span>{{ $t('dashboard.proVersion') }}</span>
             </div>
-            <div v-if="stats.license.active" class="license-detail">
-              <div v-if="stats.license.type">{{ $t('settings.version') }}：{{ stats.license.type === 'pro_annual' ? $t('dashboard.annual') : $t('dashboard.lifetime') }}</div>
-              <div v-if="stats.license.expires_at">{{ $t('dashboard.expires') }}：{{ stats.license.expires_at }}</div>
-              <div v-if="stats.license.device_slot">{{ $t('dashboard.device') }}：{{ stats.license.device_slot }}</div>
+            <div class="pro-detail">
               <el-button type="primary" size="small" style="margin-top: 8px" @click="$router.push('/pro')">{{ $t('nav.pro') }} →</el-button>
-            </div>
-            <div v-else class="upgrade-hint">
-              <p>{{ $t('dashboard.upgradeHint') }}</p>
-              <el-button type="primary" size="small" @click="$router.push('/settings')">{{ $t('dashboard.viewUpgrade') }}</el-button>
             </div>
           </div>
         </div>
@@ -460,20 +453,23 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useIsMobile } from '../composables/useIsMobile'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import axios from '../api/go-client'
 import { translateError } from '../i18n'
+import { statsApi } from '../api/go-stats'
+import { chromadbApi } from '../api/go-chromadb'
+import { openClawSkillsApi } from '../api/go-openclaw-skills'
 
 const { t } = useI18n()
 const route = useRoute()
 const activeTab = computed(() => (route.query.tab as string) || '')
 
-const isMobile = ref(window.innerWidth <= 768)
+const { isMobile } = useIsMobile()
 const stats = ref<any>({
   memoryCount: 0, entityCount: 0, relationCount: 0, projectCount: 0,
-  layerStats: {}, recentMemories: [], license: { tier: 'oss', active: false },
+  layerStats: {}, recentMemories: [], license: { tier: 'pro', active: true },
   passwordSet: true,
 })
 
@@ -527,7 +523,7 @@ const syncing = ref(false)
 
 onMounted(async () => {
   try {
-    const { data } = await axios.get('/stats')
+    const { data } = await statsApi.getOverview()
     stats.value = data
   } catch { stats.value = { total_memories: 0, total_entities: 0, total_relations: 0, total_wiki_pages: 0 } }
   loadChromaDBStatus()
@@ -535,7 +531,7 @@ onMounted(async () => {
 
 async function loadChromaDBStatus() {
   try {
-    const { data } = await axios.get('/chromadb/status')
+    const { data } = await chromadbApi.getStatus()
     chromadbInstalled.value = data.available
     if (data.available && data.memoryCount) {
       chromadbMemoryCount.value = data.memoryCount
@@ -552,7 +548,7 @@ watch(activeTab, (tab) => {
 async function scanSkills() {
   scanning.value = true
   try {
-    const { data } = await axios.get('/openclaw-skills/scan')
+    const { data } = await openClawSkillsApi.scan()
     globalSkills.value = data.global_skills || []
     workspaceSkills.value = data.workspace_skills || []
     scanned.value = true
@@ -568,7 +564,7 @@ async function scanSkills() {
 async function checkChromaDB() {
   installing.value = true
   try {
-    const { data } = await axios.get('/chromadb/status')
+    const { data } = await chromadbApi.getStatus()
     if (data.available) {
       chromadbInstalled.value = true
       chromadbMemoryCount.value = data.memoryCount || 0
@@ -586,7 +582,7 @@ async function checkChromaDB() {
 async function syncChromaDB() {
   syncing.value = true
   try {
-    const { data } = await axios.post('/chromadb/sync')
+    const { data } = await chromadbApi.sync()
     chromadbMemoryCount.value = data.synced || 0
     ElMessage.success(t('dashboard.syncSuccess', { count: data.synced }))
   } catch (e: any) {
@@ -606,8 +602,9 @@ function copyText(text: string) {
 
 async function showSkillDetail(skill: any) {
   try {
-    const { data } = await axios.get('/openclaw-skills/detail', {
-      params: { skill_dir: skill.skill_dir, scope: skill.scope },
+    const { data } = await openClawSkillsApi.getDetail({
+      skill_dir: skill.skill_dir,
+      scope: skill.scope,
     })
     skillDetail.value = data
   } catch {
@@ -618,7 +615,7 @@ async function showSkillDetail(skill: any) {
 
 async function loadUsageStats() {
   try {
-    const { data } = await axios.get('/stats/usage', { params: { days: statsPeriod.value } })
+    const { data } = await statsApi.getUsage(statsPeriod.value)
     usageStats.value = data
   } catch { usageStats.value = { dailyTrend: [], dailyTokenTrend: [] } }
 }
@@ -909,12 +906,8 @@ function formatNumber(n: number) {
 .accessed-layer-badge.private { background: rgba(233,30,99,0.15); color: #e91e63; }
 .accessed-count { font-size: 13px; color: var(--cm-text-muted); white-space: nowrap; }
 
-.license-tier { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; margin-bottom: 12px; }
-.license-tier.oss { color: var(--cm-text-muted); }
-.license-tier.pro { color: #10B981; }
-.license-detail { font-size: 13px; color: var(--cm-text-muted); line-height: 1.8; }
-.upgrade-hint { margin-top: 8px; font-size: 13px; color: var(--cm-text-muted); }
-.upgrade-hint p { margin: 0 0 8px; }
+.pro-tier { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #10B981; }
+.pro-detail { font-size: 13px; color: var(--cm-text-muted); line-height: 1.8; }
 
 .recent-memories { display: flex; flex-direction: column; gap: 8px; }
 .memory-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; background: var(--cm-bg); border: 1px solid var(--cm-border); }
@@ -1041,7 +1034,7 @@ function formatNumber(n: number) {
   .memory-time {
     font-size: 10px;
   }
-  .license-tier {
+  .pro-tier {
     font-size: 16px;
   }
   .period-selector .el-radio-group {

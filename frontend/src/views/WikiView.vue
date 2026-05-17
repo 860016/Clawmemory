@@ -228,18 +228,19 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useIsMobile } from '../composables/useIsMobile'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, ArrowLeft, MagicStick } from '@element-plus/icons-vue'
 import { marked } from 'marked'
-import wikiApi from '../api/wiki'
+import { wikiApi } from '../api/go-wiki'
 import { translateError } from '../i18n'
 
 const { t } = useI18n()
 const route = useRoute()
 const pages = ref<any[]>([])
-const isMobile = ref(window.innerWidth <= 768)
+const { isMobile } = useIsMobile()
 const allPages = ref<any[]>([])
 const categories = ref<string[]>([])
 const searchResults = ref<any[]>([])
@@ -301,35 +302,35 @@ async function loadPages() {
     const params: any = {}
     if (selectedCategory.value) params.category = selectedCategory.value
     if (selectedStatus.value) params.status = selectedStatus.value
-    const { data } = await wikiApi.listPages(params)
+    const { data } = await wikiApi.list(params)
     pages.value = data.items || data || []
   } catch { pages.value = [] }
 }
 
 async function loadCategories() {
   try {
-    const { data } = await wikiApi.getCategories()
+    const { data } = await wikiApi.categories()
     categories.value = data || []
   } catch { categories.value = [] }
 }
 
 async function loadAllPages() {
   try {
-    const { data } = await wikiApi.listPages()
+    const { data } = await wikiApi.list()
     allPages.value = data.items || data || []
   } catch { allPages.value = [] }
 }
 
 async function loadStats() {
   try {
-    const { data } = await wikiApi.getStats()
+    const { data } = await wikiApi.stats()
     if (data) stats.value = data
   } catch { /* stats keep default */ }
 }
 
 async function checkLLMAvailability() {
   try {
-    const { data } = await wikiApi.getConfig()
+    const { data } = await wikiApi.config()
     llmAvailable.value = data?.llm_available || false
   } catch { llmAvailable.value = false }
 }
@@ -357,7 +358,7 @@ function openExtractDialog() {
 
 async function viewPage(id: number) {
   try {
-    const { data } = await wikiApi.getPage(id)
+    const { data } = await wikiApi.get(id)
     viewingPage.value = data
   } catch (e: any) {
     ElMessage.error(t('common.failed'))
@@ -390,9 +391,9 @@ async function savePage() {
       status: pageForm.value.status,
     }
     if (isEditing.value && currentPageId.value) {
-      await wikiApi.updatePage(currentPageId.value, payload)
+      await wikiApi.update(currentPageId.value, payload)
     } else {
-      await wikiApi.createPage(payload)
+      await wikiApi.create(payload)
     }
     ElMessage.success(t('common.success'))
     showEditor.value = false
@@ -410,7 +411,7 @@ async function deleteCurrentPage() {
   if (!id) return
   try {
     await ElMessageBox.confirm(t('wiki.deleteConfirm'), t('common.confirm'), { type: 'warning' })
-    await wikiApi.deletePage(id)
+    await wikiApi.delete(id)
     ElMessage.success(t('wiki.deleted'))
     viewingPage.value = null
     searchResults.value = []
@@ -435,7 +436,7 @@ async function markComplete(page: any) {
 
 async function refinePage(page: any) {
   try {
-    await wikiApi.refinePage(page.id, '')
+    await wikiApi.refine(page.id, {})
     ElMessage.success(t('wiki.pageRefined'))
     await Promise.all([loadPages(), loadStats()])
     if (viewingPage.value?.id === page.id) {
@@ -451,7 +452,7 @@ async function extractKnowledge() {
   }
   extracting.value = true
   try {
-    await wikiApi.extractFromConversation(extractForm.value.conversation, extractForm.value.is_complete)
+    await wikiApi.aiExtract({ conversation: extractForm.value.conversation, is_complete: extractForm.value.is_complete })
     ElMessage.success(t('wiki.extractSuccess'))
     showExtractDialog.value = false
     await Promise.all([loadPages(), loadStats()])

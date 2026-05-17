@@ -1,0 +1,1 @@
+import{c as o,a3 as s,a as t}from"./vue-vendor-Dy_jdWNn.js";function d(e=768){const n=t(window.innerWidth<=e);function i(){n.value=window.innerWidth<=e}return o(()=>window.addEventListener("resize",i)),s(()=>window.removeEventListener("resize",i)),{isMobile:n}}export{d as u};

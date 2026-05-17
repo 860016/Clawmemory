@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import api from '../../api/go-client'
-import { knowledgeApi } from '../../api/knowledge'
+import { knowledgeApi } from '../../api/go-knowledge'
 
 vi.mock('../../api/go-client')
 const mockedApi = vi.mocked(api)
@@ -56,11 +56,9 @@ describe('knowledge API', () => {
     const mockResponse = { data: [{ id: 1, source_id: 1, target_id: 2, relation_type: 'related' }] }
     mockedApi.get.mockResolvedValue(mockResponse)
 
-    const result = await knowledgeApi.listRelations({ page: 1, size: 20 })
+    const result = await knowledgeApi.listRelations()
 
-    expect(mockedApi.get).toHaveBeenCalledWith('/knowledge/relations', {
-      params: { page: 1, size: 20 },
-    })
+    expect(mockedApi.get).toHaveBeenCalledWith('/knowledge/relations')
     expect(result.data).toEqual(mockResponse.data)
   })
 
@@ -79,11 +77,9 @@ describe('knowledge API', () => {
     const mockResponse = { data: { nodes: [], edges: [] } }
     mockedApi.get.mockResolvedValue(mockResponse)
 
-    const result = await knowledgeApi.getGraphData({ depth: 2 })
+    const result = await knowledgeApi.getGraph()
 
-    expect(mockedApi.get).toHaveBeenCalledWith('/knowledge/graph', {
-      params: { depth: 2 },
-    })
+    expect(mockedApi.get).toHaveBeenCalledWith('/knowledge/graph')
     expect(result.data).toEqual(mockResponse.data)
   })
 })

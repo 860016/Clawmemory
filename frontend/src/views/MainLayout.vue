@@ -210,7 +210,10 @@ import {
   DocumentChecked, Star, Timer, Compass, CircleCheck, SuccessFilled, Memo,
   DArrowLeft, DArrowRight, Loading
 } from '@element-plus/icons-vue'
-import axios from '../api/go-client'
+import { statsApi } from '../api/go-stats'
+import { memoryApi } from '../api/go-memories'
+import { wikiApi } from '../api/go-wiki'
+import projectApi from '../api/project'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -224,12 +227,11 @@ const showSearch = ref(false)
 const searchQuery = ref('')
 const searchInput = ref<HTMLInputElement>()
 
-const tier = ref('oss')
-const tierLabel = computed(() => tier.value === 'oss' ? t('tier.free') : t('tier.pro'))
-const tierClass = computed(() => tier.value === 'oss' ? 'tier-free' : 'tier-pro')
+const tier = ref('pro')
+const tierLabel = computed(() => t('tier.pro'))
+const tierClass = computed(() => 'tier-pro')
 const storagePercent = ref(0)
 
-// Handle window resize
 const handleResize = () => {
   isMobile.value = window.innerWidth <= 768
   if (!isMobile.value) {
@@ -240,26 +242,14 @@ const handleResize = () => {
 onMounted(() => {
   window.addEventListener('resize', handleResize)
   handleResize()
-  try {
-    axios.get('/license/info').then(({ data }) => {
-      tier.value = data.tier || 'oss'
-    }).catch(() => {
-      tier.value = 'oss'
-    })
-    axios.get('/stats').then(({ data }) => {
-      const total = data.memory_count || 0
-      const maxFree = 500
-      const maxPro = 50000
-      const max = tier.value === 'pro' ? maxPro : maxFree
-      storagePercent.value = Math.min(Math.round((total / max) * 100), 100)
-    }).catch(() => {
-      storagePercent.value = 0
-    })
-  } catch {
-    tier.value = 'oss'
-  }
+  statsApi.getOverview().then(({ data }) => {
+    const total = data.memory_count || 0
+    const maxPro = 50000
+    storagePercent.value = Math.min(Math.round((total / maxPro) * 100), 100)
+  }).catch(() => {
+    storagePercent.value = 0
+  })
   
-  // Keyboard shortcut for search
   document.addEventListener('keydown', handleKeydown)
 })
 
@@ -338,7 +328,6 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
   ],
   '/settings': [
     { items: [
-      { path: '/settings?section=license', label: 'settings.license', icon: Promotion },
       { path: '/settings?section=ai', label: 'settings.aiConfig', icon: Cpu },
       { path: '/settings?section=security', label: 'settings.security', icon: Lock },
       { path: '/settings?section=risk-switches', label: 'settings.riskControl', icon: Warning },
@@ -387,9 +376,9 @@ async function performSearch(q: string) {
   searchLoading.value = true
   try {
     const [memRes, wikiRes, projRes] = await Promise.allSettled([
-      axios.get('/memories/search/keyword', { params: { q, limit: 5 }, _silent: true } as any),
-      axios.get('/wiki/search', { params: { q, limit: 5 }, _silent: true } as any),
-      axios.get('/projects/search', { params: { q, limit: 5 }, _silent: true } as any),
+      memoryApi.searchKeyword(q, 5),
+      wikiApi.search(q, 5),
+      projectApi.search(q, 5),
     ])
     const results: typeof searchResults.value = []
     if (memRes.status === 'fulfilled' && memRes.value.data?.items?.length) {
@@ -607,11 +596,6 @@ function handleUserCommand(command: string) {
   border-radius: var(--cm-radius-full);
   font-size: 12px;
   font-weight: 600;
-}
-
-.tier-badge-v2.tier-free {
-  background: var(--cm-bg-tertiary);
-  color: var(--cm-text-tertiary);
 }
 
 .tier-badge-v2.tier-pro {

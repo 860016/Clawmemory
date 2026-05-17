@@ -1,11 +1,6 @@
 import axios from './go-client'
 
 export const proApi = {
-  getLicenseInfo: () => axios.get('/license/info'),
-  activate: (licenseKey: string) =>
-    axios.post('/license/activate', { license_key: licenseKey }),
-  deactivate: () => axios.post('/license/deactivate'),
-
   getDecayStats: () => axios.get('/pro/decay/stats'),
   applyDecay: () => axios.post('/pro/decay/apply'),
   reinforceMemory: (memoryId: number) => axios.post(`/pro/reinforce/${memoryId}`),

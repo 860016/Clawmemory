@@ -40,8 +40,6 @@ func main() {
 
 	cfg := config.Load()
 	services.InitProProvider(db, cfg)
-	proProvider := services.GetProProvider().(*services.LocalProProvider)
-	proProvider.ActivateLicense("CLAW-TEST-1234-5678-9ABC")
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte("test123"), bcrypt.DefaultCost)
 	db.Create(&models.User{Username: "testuser", Password: string(hash), Role: "admin"})

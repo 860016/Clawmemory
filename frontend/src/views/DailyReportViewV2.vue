@@ -254,9 +254,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import axios from '../api/go-client'
 import { translateError } from '../i18n'
 import { aiApi } from '../api/go-ai'
+import { reportApi } from '../api/go-reports'
 import {
   ArrowLeft, ArrowRight, MagicStick, Loading,
   Document, Connection, Download, Share,
@@ -276,7 +276,7 @@ async function loadReports() {
   loading.value = true
   try {
     const dateStr = currentDate.value.toISOString().split('T')[0]
-    const { data } = await axios.get(`/reports/${dateStr}`)
+    const { data } = await reportApi.getByDate(dateStr)
     const list = Array.isArray(data) ? data : (data.items || [data])
     reports.value = list.map(parseReport)
     if (reports.value.length > 0 && !selectedReport.value) {
@@ -377,7 +377,7 @@ async function generateReport() {
   generating.value = true
   try {
     const dateStr = currentDate.value.toISOString().split('T')[0]
-    const { data } = await axios.post('/reports/generate', { date: dateStr })
+    const { data } = await reportApi.generate(dateStr)
     ElMessage.success(t('dailyReport.generated'))
     await loadReports()
     if (data) selectedReport.value = parseReport(data)

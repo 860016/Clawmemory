@@ -23,6 +23,13 @@ export const memoryApi = {
     api.post('/memories/extract-and-save', { content, auto_save: autoSave }),
   scanSecrets: (content: string) => api.post('/memories/scan-secrets', { content }),
 
+  getDecaySettings: () => api.get('/memories/decay/settings'),
+  getDecayStats: () => api.get('/memories/decay/stats'),
+  updateDecaySettings: (data: { enabled: boolean }) => api.put('/memories/decay/settings', data),
+  getHealth: () => api.get('/memories/health'),
+  scanDedup: () => api.get('/memories/dedup/scan'),
+  emptyTrash: () => api.delete('/memories/trash'),
+
   scanAgentMemories: () => api.get('/agent-memories/scan'),
   scanAgent: (agentName: string) => api.get(`/agent-memories/scan/${agentName}`),
   importAgentMemories: (data: any) => api.post('/agent-memories/import', data),

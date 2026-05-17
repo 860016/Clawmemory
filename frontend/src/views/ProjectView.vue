@@ -246,6 +246,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useIsMobile } from '../composables/useIsMobile'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -257,7 +258,7 @@ import projectApi from '../api/project'
 const { t } = useI18n()
 
 const projects = ref<any[]>([])
-const isMobile = ref(window.innerWidth <= 768)
+const { isMobile } = useIsMobile()
 const loading = ref(false)
 const searchQuery = ref('')
 const filterStatus = ref('')

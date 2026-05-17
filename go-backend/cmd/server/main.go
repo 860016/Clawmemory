@@ -92,25 +92,7 @@ func main() {
 
 	autoCreateAPIKey(db)
 
-	if !proProvider.SelfCheck() {
-		log.Println("⚠️  Integrity check warning: binary may have been modified")
-	}
-
-	if proProvider.IsPro() {
-		log.Printf("✅ Pro license active (tier: %s)", proProvider.GetTier())
-	} else {
-		log.Printf("ℹ️  Running in OSS mode")
-	}
-
-	go func() {
-		ticker := time.NewTicker(1 * time.Hour)
-		defer ticker.Stop()
-		for range ticker.C {
-			if err := proProvider.Heartbeat(); err != nil {
-				log.Printf("License heartbeat failed: %v", err)
-			}
-		}
-	}()
+	log.Printf("✅ Pro features active (tier: %s)", proProvider.GetTier())
 
 	syncService := services.GetOpenClawSyncService(db)
 	go syncService.Start()

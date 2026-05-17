@@ -46,6 +46,7 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 
 	batchSize := 200
 	offset := 0
+	totalProcessed := 0
 
 	for {
 		var memories []models.Memory
@@ -130,11 +131,12 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 		if len(memories) < batchSize {
 			break
 		}
+		totalProcessed += len(memories)
 		offset += batchSize
 	}
 
 	return map[string]interface{}{
-		"processed":  len(memories),
+		"processed":  totalProcessed,
 		"archived":   archived,
 		"trashed":    trashed,
 		"adjusted":   adjusted,

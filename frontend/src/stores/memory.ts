@@ -39,14 +39,16 @@ export const useMemoryStore = defineStore('memory', () => {
 
   async function searchKeyword(q: string) {
     const resp = await memoryApi.searchKeyword(q)
-    memories.value = resp.data
-    total.value = resp.data.length
+    const items = Array.isArray(resp.data) ? resp.data : (resp.data.items || [])
+    memories.value = items
+    total.value = items.length
   }
 
   async function searchSemantic(q: string) {
     const resp = await memoryApi.searchSemantic(q)
-    memories.value = resp.data
-    total.value = resp.data.length
+    const items = Array.isArray(resp.data) ? resp.data : (resp.data.items || [])
+    memories.value = items
+    total.value = items.length
   }
 
   return {

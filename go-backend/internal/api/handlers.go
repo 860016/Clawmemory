@@ -1,4 +1,4 @@
-package api
+﻿package api
 
 import (
 	"context"
@@ -22,7 +22,6 @@ import (
 	"clawmemory/internal/models"
 	"clawmemory/internal/services"
 
-	proprovider "github.com/860016/clawmemory-pro/proprovider"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/gin-gonic/gin"
@@ -311,46 +310,6 @@ func handleInstallStatus(db *gorm.DB) gin.HandlerFunc {
 			},
 			"version": config.AppVersion,
 		})
-	}
-}
-
-// License handlers
-func handleLicenseInfo(provider services.ProProvider) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, provider.GetLicenseInfo())
-	}
-}
-
-func handleLicenseActivate(provider services.ProProvider) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req struct {
-			LicenseKey string `json:"license_key" binding:"required"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		result, err := provider.ActivateLicense(req.LicenseKey)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		provider.InvalidateCache()
-		c.JSON(http.StatusOK, result)
-	}
-}
-
-func handleLicenseDeactivate(provider services.ProProvider) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		err := provider.DeactivateLicense()
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		provider.InvalidateCache()
-		c.JSON(http.StatusOK, gin.H{"deactivated": true, "message": "license deactivated successfully"})
 	}
 }
 
@@ -1966,35 +1925,12 @@ func handleUpdateSettings(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func proErrorHandler(c *gin.Context, err error) {
-	if proErr, ok := err.(*proprovider.ProError); ok {
-		c.JSON(proErr.Code, gin.H{"error": proErr.Message})
-		return
-	}
-	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-}
-
-func checkPro(provider services.ProProvider, c *gin.Context) bool {
-	if !provider.IsPro() {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Pro license required"})
-		return false
-	}
-	if !provider.SelfCheck() {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Integrity check failed"})
-		return false
-	}
-	return true
-}
-
 func handleProDecayStats(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 		result, err := provider.DecayStats(userID)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2003,9 +1939,6 @@ func handleProDecayStats(provider services.ProProvider, db *gorm.DB) gin.Handler
 
 func handleProDecayApply(aiSvc *ai.AIService, provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
@@ -2015,7 +1948,7 @@ func handleProDecayApply(aiSvc *ai.AIService, provider services.ProProvider, db 
 		if err != nil {
 			result, err = provider.DecayApply(userID)
 			if err != nil {
-				proErrorHandler(c, err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 			result["mode"] = "local_fallback"
@@ -2048,9 +1981,6 @@ func handleProDecayApply(aiSvc *ai.AIService, provider services.ProProvider, db 
 
 func handleProReinforce(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 		idStr := c.Param("id")
 		id, err := strconv.ParseUint(idStr, 10, 64)
@@ -2060,7 +1990,7 @@ func handleProReinforce(provider services.ProProvider, db *gorm.DB) gin.HandlerF
 		}
 		result, err := provider.ReinforceMemory(userID, uint(id))
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2069,13 +1999,10 @@ func handleProReinforce(provider services.ProProvider, db *gorm.DB) gin.HandlerF
 
 func handleProPruneSuggest(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 		result, err := provider.PruneSuggest(userID)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2084,9 +2011,6 @@ func handleProPruneSuggest(provider services.ProProvider, db *gorm.DB) gin.Handl
 
 func handleProConflictScan(aiSvc *ai.AIService, provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
@@ -2096,7 +2020,7 @@ func handleProConflictScan(aiSvc *ai.AIService, provider services.ProProvider, d
 		if err != nil {
 			result, err = provider.ConflictScan(userID)
 			if err != nil {
-				proErrorHandler(c, err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 			result["mode"] = "local_fallback"
@@ -2108,9 +2032,6 @@ func handleProConflictScan(aiSvc *ai.AIService, provider services.ProProvider, d
 
 func handleProConflictResolve(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 		var req struct {
 			Strategy string `json:"strategy"`
@@ -2124,7 +2045,7 @@ func handleProConflictResolve(provider services.ProProvider, db *gorm.DB) gin.Ha
 		}
 		result, err := provider.ConflictResolve(userID, index, req.Strategy)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2133,9 +2054,6 @@ func handleProConflictResolve(provider services.ProProvider, db *gorm.DB) gin.Ha
 
 func handleProTokenRoute(aiSvc *ai.AIService, provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		message := c.Query("message")
 		contextLength := 0
 		if cl := c.Query("context_length"); cl != "" {
@@ -2157,7 +2075,7 @@ func handleProTokenRoute(aiSvc *ai.AIService, provider services.ProProvider, db 
 
 		result, err := provider.TokenRoute(message, contextLength)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		result["mode"] = "local_fallback"
@@ -2167,13 +2085,10 @@ func handleProTokenRoute(aiSvc *ai.AIService, provider services.ProProvider, db 
 
 func handleProTokenStats(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 		result, err := provider.TokenStats(userID)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2182,9 +2097,6 @@ func handleProTokenStats(provider services.ProProvider, db *gorm.DB) gin.Handler
 
 func handleProAIExtract(aiSvc *ai.AIService, provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
@@ -2194,7 +2106,7 @@ func handleProAIExtract(aiSvc *ai.AIService, provider services.ProProvider, db *
 		if err != nil {
 			result, err = provider.AIExtract(userID)
 			if err != nil {
-				proErrorHandler(c, err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 			result["mode"] = "local_fallback"
@@ -2206,9 +2118,6 @@ func handleProAIExtract(aiSvc *ai.AIService, provider services.ProProvider, db *
 
 func handleProAutoGraph(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 		var req struct {
 			Overwrite bool `json:"overwrite"`
@@ -2216,7 +2125,7 @@ func handleProAutoGraph(provider services.ProProvider, db *gorm.DB) gin.HandlerF
 		c.ShouldBindJSON(&req)
 		result, err := provider.AutoGraph(userID, req.Overwrite)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2225,13 +2134,10 @@ func handleProAutoGraph(provider services.ProProvider, db *gorm.DB) gin.HandlerF
 
 func handleProBackupSchedule(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 		result, err := provider.BackupSchedule(userID)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2240,9 +2146,6 @@ func handleProBackupSchedule(provider services.ProProvider, db *gorm.DB) gin.Han
 
 func handleProSetBackupSchedule(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		var req struct {
 			Enabled       bool `json:"enabled"`
 			IntervalHours int  `json:"interval_hours"`
@@ -2254,7 +2157,7 @@ func handleProSetBackupSchedule(provider services.ProProvider, db *gorm.DB) gin.
 		userID := middleware.GetUserID(c)
 		result, err := provider.SetBackupSchedule(userID, req.Enabled, req.IntervalHours)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2263,9 +2166,6 @@ func handleProSetBackupSchedule(provider services.ProProvider, db *gorm.DB) gin.
 
 func handleProCompressPreview(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		var req struct {
 			Level string `json:"level"`
 		}
@@ -2276,7 +2176,7 @@ func handleProCompressPreview(provider services.ProProvider, db *gorm.DB) gin.Ha
 		userID := middleware.GetUserID(c)
 		result, err := provider.CompressPreview(userID, req.Level)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2285,9 +2185,6 @@ func handleProCompressPreview(provider services.ProProvider, db *gorm.DB) gin.Ha
 
 func handleProCompressApply(aiSvc *ai.AIService, provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		var req struct {
 			Level   string                 `json:"level"`
 			Options map[string]interface{} `json:"options"`
@@ -2335,7 +2232,7 @@ func handleProCompressApply(aiSvc *ai.AIService, provider services.ProProvider, 
 
 		result, err := provider.CompressApply(userID, req.Level)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		result["mode"] = "local_fallback"
@@ -2345,13 +2242,10 @@ func handleProCompressApply(aiSvc *ai.AIService, provider services.ProProvider, 
 
 func handleProCompressConfig(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 		result, err := provider.CompressConfig(userID)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2360,9 +2254,6 @@ func handleProCompressConfig(provider services.ProProvider, db *gorm.DB) gin.Han
 
 func handleProSetCompressConfig(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		var req map[string]interface{}
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2371,7 +2262,7 @@ func handleProSetCompressConfig(provider services.ProProvider, db *gorm.DB) gin.
 		userID := middleware.GetUserID(c)
 		result, err := provider.SetCompressConfig(userID, req)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2380,13 +2271,10 @@ func handleProSetCompressConfig(provider services.ProProvider, db *gorm.DB) gin.
 
 func handleProEvolutionInsights(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 		result, err := provider.EvolutionInsights(userID)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2395,9 +2283,6 @@ func handleProEvolutionInsights(provider services.ProProvider, db *gorm.DB) gin.
 
 func handleProEvolutionDiscover(aiSvc *ai.AIService, provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
@@ -2407,7 +2292,7 @@ func handleProEvolutionDiscover(aiSvc *ai.AIService, provider services.ProProvid
 		if err != nil {
 			result, err = provider.EvolutionDiscover(userID)
 			if err != nil {
-				proErrorHandler(c, err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 			result["mode"] = "local_fallback"
@@ -2419,13 +2304,10 @@ func handleProEvolutionDiscover(aiSvc *ai.AIService, provider services.ProProvid
 
 func handleProEvolutionInfer(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 		result, err := provider.EvolutionInfer(userID)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2434,13 +2316,10 @@ func handleProEvolutionInfer(provider services.ProProvider, db *gorm.DB) gin.Han
 
 func handleProEvolutionImportance(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		userID := middleware.GetUserID(c)
 		result, err := provider.EvolutionImportance(userID)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -2449,9 +2328,6 @@ func handleProEvolutionImportance(provider services.ProProvider, db *gorm.DB) gi
 
 func handleProEvolutionPrefetch(provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkPro(provider, c) {
-			return
-		}
 		var req struct {
 			Context string `json:"context" binding:"required"`
 		}
@@ -2462,7 +2338,7 @@ func handleProEvolutionPrefetch(provider services.ProProvider, db *gorm.DB) gin.
 		userID := middleware.GetUserID(c)
 		result, err := provider.EvolutionPrefetch(userID, req.Context)
 		if err != nil {
-			proErrorHandler(c, err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, result)
@@ -5496,7 +5372,6 @@ func handleExternalBatchCreateMemories(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		svc := services.NewMemoryService(db)
 		var created, errorsCount int
 		var errorDetails []string
 

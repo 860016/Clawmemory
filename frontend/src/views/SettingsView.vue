@@ -6,69 +6,6 @@
 
     <div class="settings-layout">
       <div class="settings-grid">
-      <!-- 授权管理 -->
-      <div class="settings-card" :class="{ 'section-highlight': activeSection === 'license' }" id="settings-license">
-        <div class="card-title">🔑 {{ $t('settings.license') }}</div>
-        <div class="license-status" v-if="license.active">
-          <div class="status-row">
-            <span class="status-label">{{ $t('settings.version') }}</span>
-            <span class="status-value pro">{{ license.tier === 'enterprise' ? 'Enterprise' : 'Pro' }}</span>
-          </div>
-          <div class="status-row" v-if="license.key_hash">
-            <span class="status-label">{{ $t('settings.licenseKey') }}</span>
-            <span class="status-value">{{ license.key_hash }}••••</span>
-          </div>
-          <div class="status-row" v-if="license.expires_at">
-            <span class="status-label">{{ $t('settings.expiresAt') }}</span>
-            <span class="status-value" :class="{ 'text-warning': isExpiringSoon }">{{ formatDate(license.expires_at) }}</span>
-          </div>
-          <div class="status-row" v-if="license.device_slot">
-            <span class="status-label">{{ $t('settings.deviceSlot') }}</span>
-            <span class="status-value">{{ license.device_slot }}</span>
-          </div>
-          <div class="status-row" v-if="license.fingerprint">
-            <span class="status-label">{{ $t('settings.deviceFingerprint') }}</span>
-            <span class="status-value">{{ license.fingerprint }}•••</span>
-          </div>
-          <div class="status-row">
-            <span class="status-label">{{ $t('settings.features') }}</span>
-            <div class="feature-tags">
-              <span class="ftag" v-for="f in license.features" :key="f">{{ featureLabels[f] || f }}</span>
-            </div>
-          </div>
-          <div class="status-row" v-if="!license.is_valid && license.active">
-            <span class="status-label">{{ $t('settings.licenseStatus') }}</span>
-            <span class="status-value text-warning">{{ $t('settings.gracePeriodWarning') }}</span>
-          </div>
-          <el-button type="danger" plain size="small" @click="deactivateLicense" style="margin-top: 12px">{{ $t('settings.cancelLicense') }}</el-button>
-        </div>
-        <div v-else class="license-free">
-          <div class="free-badge">{{ $t('settings.freeBadge') }}</div>
-          <p class="free-desc">{{ $t('settings.freeDesc') }}</p>
-          <div class="pricing">
-            <div class="price-card">
-              <div class="price-name">Pro {{ $t('settings.proAnnual') }}</div>
-              <div class="price-amount">{{ $t('settings.proAnnualPrice') }}</div>
-              <ul class="price-features">
-                <li v-for="(f, i) in $tm('settings.proFeatures')" :key="i">{{ f }}</li>
-              </ul>
-            </div>
-            <div class="price-card featured">
-              <div class="price-badge">{{ $t('settings.recommended') }}</div>
-              <div class="price-name">Pro {{ $t('settings.proLifetime') }}</div>
-              <div class="price-amount">{{ $t('settings.proLifetimePrice') }}</div>
-              <ul class="price-features">
-                <li v-for="(f, i) in $tm('settings.lifetimeExtra')" :key="i">{{ f }}</li>
-              </ul>
-            </div>
-          </div>
-          <div class="activate-section">
-            <el-input v-model="licenseKey" :placeholder="$t('settings.licensePlaceholder')" class="license-input" />
-            <el-button type="primary" @click="activateLicense" :loading="activating">{{ $t('settings.activateLicense') }}</el-button>
-          </div>
-        </div>
-      </div>
-
       <!-- 语言设置 -->
       <div class="settings-card">
         <div class="card-title">◇ {{ currentLocale === 'zh' ? 'Language' : '界面语言' }}</div>
@@ -678,22 +615,26 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useIsMobile } from '../composables/useIsMobile'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import axios from '../api/go-client'
 import { setLocale, getLocale, translateError } from '../i18n'
 import { aiApi } from '../api/go-ai'
 import { reasoningApi } from '../api/go-reasoning'
+import { settingsApi } from '../api/go-settings'
+import { riskSwitchApi } from '../api/go-sharing'
+import { memoryApi } from '../api/go-memories'
+import { authApi } from '../api/go-auth'
+import { agentApi } from '../api/go-agents'
 import { useAuthStore } from '../stores/auth'
 
 const { t } = useI18n()
 const route = useRoute()
 const authStore = useAuthStore()
-const isMobile = ref(window.innerWidth <= 768)
+const { isMobile } = useIsMobile()
 const activeSection = ref((route.query.section as string) || '')
 const sections = [
-  { id: 'license', icon: '🔑', label: computed(() => t('settings.license')) },
   { id: 'ai', icon: '🧠', label: computed(() => t('settings.aiConfig')) },
   { id: 'security', icon: '🔒', label: computed(() => t('settings.security')) },
   { id: 'risk-switches', icon: '🛡️', label: computed(() => t('settings.riskControl')) },
@@ -703,9 +644,6 @@ const sections = [
   { id: 'decay', icon: '⏳', label: computed(() => t('settings.memoryDecay')) },
   { id: 'system', icon: '🖥️', label: computed(() => t('settings.systemInfo')) },
 ]
-const license = ref<any>({ active: false, tier: 'oss', features: [] })
-const activating = ref(false)
-const licenseKey = ref('')
 const exporting = ref(false)
 const exportPassword = ref('')
 const passwordSet = ref(false)
@@ -798,39 +736,6 @@ const reasoningForm = ref<any>({
   max_tokens: 1000,
 })
 
-const featureLabels: Record<string, string> = {
-  ai_extract: t('settings.featAiExtract'),
-  auto_graph: t('settings.featAutoGraph'),
-  unlimited_graph: t('settings.featUnlimitedGraph'),
-  auto_decay: t('settings.featAutoDecay'),
-  decay_report: t('settings.featDecayReport'),
-  prune_suggest: t('settings.featPruneSuggest'),
-  reinforce: t('settings.featReinforce'),
-  conflict_scan: t('settings.featConflictScan'),
-  conflict_merge: t('settings.featConflictMerge'),
-  smart_router: t('settings.featSmartRouter'),
-  token_stats: t('settings.featTokenStats'),
-  wiki: t('settings.featWiki'),
-  auto_backup: t('settings.featAutoBackup'),
-  compress: t('settings.featCompress'),
-  evolution: t('settings.featEvolution'),
-  api_access: t('settings.featApiAccess'),
-  sso: t('settings.featSso'),
-  audit_log: t('settings.featAuditLog'),
-  time_travel: t('settings.featTimeTravel'),
-  offline_mode: t('settings.featOfflineMode'),
-}
-
-const isExpiringSoon = computed(() => {
-  if (!license.value.expires_at) return false
-  try {
-    const exp = new Date(license.value.expires_at)
-    const now = new Date()
-    const daysLeft = (exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-    return daysLeft < 30 && daysLeft > 0
-  } catch { return false }
-})
-
 function formatDate(dateStr: string): string {
   if (!dateStr) return ''
   try {
@@ -841,7 +746,7 @@ function formatDate(dateStr: string): string {
 }
 
 onMounted(async () => {
-  await Promise.all([loadLicense(), loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys(), loadRecordSensitiveSetting(), loadConnectedAgents(), loadAgentSyncStatus(), loadRiskSwitches(), loadAIConfig(), loadAIUsage(), loadReasoningConfig()])
+  await Promise.all([loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys(), loadRecordSensitiveSetting(), loadConnectedAgents(), loadAgentSyncStatus(), loadRiskSwitches(), loadAIConfig(), loadAIUsage(), loadReasoningConfig()])
   if (authStore.isFounder) {
     loadInvitations()
     loadUsers()
@@ -885,13 +790,9 @@ function changeLocale(locale: 'zh' | 'en') {
   setLocale(locale)
 }
 
-async function loadLicense() {
-  try { const { data } = await axios.get('/license/info'); license.value = data } catch { license.value = null }
-}
-
 async function loadApiKeys() {
   try {
-    const { data } = await axios.get('/api-keys')
+    const { data } = await settingsApi.getApiKeys()
     apiKeys.value = data.items || []
   } catch { apiKeys.value = [] }
 }
@@ -922,7 +823,7 @@ async function createApiKey() {
     const payload: any = { name: newApiKeyName.value.trim() }
     const perm = permMap[newApiKeyPerm.value]
     if (perm) payload.permissions = perm
-    const { data } = await axios.post('/api-keys', payload)
+    const { data } = await settingsApi.createApiKey(payload)
     newApiKeyRaw.value = data.key
     ElMessage.success(t('settings.apiKeyCreated'))
     await loadApiKeys()
@@ -960,7 +861,7 @@ async function deleteApiKey(id: number) {
     await ElMessageBox.confirm(t('settings.apiKeyDeleteConfirm'), t('common.confirm'), { type: 'warning' })
   } catch { return }
   try {
-    await axios.delete(`/api-keys/${id}`)
+    await settingsApi.deleteApiKey(id)
     ElMessage.success(t('common.success'))
     await loadApiKeys()
   } catch (e: any) {
@@ -982,7 +883,7 @@ const agentSyncLoading = ref(false)
 async function loadConnectedAgents() {
   agentScanLoading.value = true
   try {
-    const { data } = await axios.get('/agents/connected')
+    const { data } = await agentApi.getConnected()
     connectedAgents.value = data.agents || []
   } catch {
     connectedAgents.value = []
@@ -994,7 +895,7 @@ async function loadConnectedAgents() {
 async function loadAgentSyncStatus() {
   agentSyncLoading.value = true
   try {
-    const { data } = await axios.get('/agent-sync/status')
+    const { data } = await agentApi.getSyncStatus()
     agentSyncStatus.value = data
     agentAutoSync.value = data.auto_sync_enabled
   } catch {
@@ -1007,7 +908,7 @@ async function loadAgentSyncStatus() {
 async function toggleAgentSync() {
   agentSyncLoading.value = true
   try {
-    await axios.post('/agent-sync/toggle', { enabled: agentAutoSync.value })
+    await agentApi.toggleSync(agentAutoSync.value)
     ElMessage.success(t('common.success'))
   } catch (e: any) {
     agentAutoSync.value = !agentAutoSync.value
@@ -1020,7 +921,7 @@ async function toggleAgentSync() {
 async function forceAgentSync() {
   agentSyncLoading.value = true
   try {
-    const { data } = await axios.post('/agent-sync/force')
+    const { data } = await agentApi.forceSync()
     ElMessage.success(t('settings.syncCompleted', { count: data.synced_count || 0 }))
     await loadAgentSyncStatus()
   } catch (e: any) {
@@ -1032,7 +933,7 @@ async function forceAgentSync() {
 
 async function loadRecordSensitiveSetting() {
   try {
-    const { data } = await axios.get('/settings')
+    const { data } = await settingsApi.get()
     recordSensitive.value = !!data.record_sensitive_content
   } catch { recordSensitive.value = false }
 }
@@ -1049,7 +950,7 @@ const riskSwitches = ref<Record<string, boolean>>({
 
 async function loadRiskSwitches() {
   try {
-    const { data } = await axios.get('/risk-switches')
+    const { data } = await riskSwitchApi.getSwitches()
     if (data.switches) {
       riskSwitches.value = { ...riskSwitches.value, ...data.switches }
     }
@@ -1068,7 +969,7 @@ async function saveRiskSwitches() {
     return
   }
   try {
-    await axios.put('/risk-switches', { switches: riskSwitches.value })
+    await riskSwitchApi.setSwitches(riskSwitches.value)
     ElMessage.success(t('riskSwitch.updated'))
   } catch (e: any) {
     await loadRiskSwitches()
@@ -1078,7 +979,7 @@ async function saveRiskSwitches() {
 
 async function updateRecordSensitive() {
   try {
-    await axios.put('/settings', { record_sensitive_content: recordSensitive.value })
+    await settingsApi.update({ record_sensitive_content: recordSensitive.value })
     ElMessage.success(t('common.success'))
   } catch (e: any) {
     recordSensitive.value = !recordSensitive.value
@@ -1087,19 +988,19 @@ async function updateRecordSensitive() {
 }
 
 async function loadInitStatus() {
-  try { const { data } = await axios.get('/auth/init-status'); passwordSet.value = data.password_set } catch { passwordSet.value = true }
+  try { const { data } = await authApi.getInitStatus(); passwordSet.value = data.password_set } catch { passwordSet.value = true }
 }
 
 async function loadInvitations() {
   try {
-    const { data } = await axios.get('/invitations')
+    const { data } = await settingsApi.getInvitations()
     invitations.value = data.items || []
   } catch { invitations.value = [] }
 }
 
 async function loadUsers() {
   try {
-    const { data } = await axios.get('/users')
+    const { data } = await settingsApi.listUsers()
     users.value = data.items || []
   } catch { users.value = [] }
 }
@@ -1107,7 +1008,7 @@ async function loadUsers() {
 async function handleCreateInvitation() {
   creatingInvitation.value = true
   try {
-    await axios.post('/invitations', {
+    await settingsApi.createInvitation({
       max_uses: newInvitationMaxUses.value,
       expires_in_hours: newInvitationExpiresHours.value || 0,
     })
@@ -1122,7 +1023,7 @@ async function handleCreateInvitation() {
 
 async function handleDeleteInvitation(id: number) {
   try {
-    await axios.delete(`/invitations/${id}`)
+    await settingsApi.deleteInvitation(id)
     await loadInvitations()
   } catch (e: any) {
     ElMessage.error(e.response?.data?.error || t('common.failed'))
@@ -1159,7 +1060,7 @@ async function handleResetUserPassword() {
   }
   resettingUserPassword.value = true
   try {
-    await axios.post('/users/reset-password', {
+    await settingsApi.resetUserPassword({
       user_id: resetTargetUser.value.id,
       new_password: resetUserNewPassword.value,
     })
@@ -1175,13 +1076,13 @@ async function handleResetUserPassword() {
 }
 
 async function loadInstallStatus() {
-  try { const { data } = await axios.get('/install-status'); coreEngine.value = data.checks?.security_engine || 'python'; if (data.version) appVersion.value = data.version } catch { coreEngine.value = 'go' }
+  try { const { data } = await settingsApi.getInstallStatus(); coreEngine.value = data.checks?.security_engine || 'python'; if (data.version) appVersion.value = data.version } catch { coreEngine.value = 'go' }
 }
 
 async function checkForUpdate() {
   updateChecking.value = true
   try {
-    const { data } = await axios.get('/check-update')
+    const { data } = await settingsApi.checkUpdate()
     updateInfo.value = {
       checked: true,
       has_update: data.has_update || false,
@@ -1199,7 +1100,7 @@ async function checkForUpdate() {
 async function exportData() {
   exporting.value = true
   try {
-    const { data } = await axios.post('/data/export', { password: exportPassword.value })
+    const { data } = await settingsApi.exportData(exportPassword.value)
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -1215,7 +1116,7 @@ async function importData(file: File) {
   reader.onload = async (e) => {
     try {
       const jsonData = JSON.parse(e.target?.result as string)
-      await axios.post('/data/import', jsonData)
+      await settingsApi.importData(jsonData)
       ElMessage.success(t('settings.importSuccess'))
     } catch (e: any) {
       ElMessage.error(translateError(e.response?.data?.error, t('settings.importFailed')))
@@ -1225,72 +1126,16 @@ async function importData(file: File) {
   return false
 }
 
-async function activateLicense() {
-  if (!licenseKey.value) return
-  if (licenseKey.value.trim().length < 8) {
-    ElMessage.warning(t('settings.licenseKeyTooShort'))
-    return
-  }
-  activating.value = true
-  try {
-    const { data } = await axios.post('/license/activate', { license_key: licenseKey.value.trim() })
-    if (data.valid || data.active) {
-      ElMessage.success(t('settings.activated'))
-      licenseKey.value = ''
-      await loadLicense()
-    } else {
-      ElMessage.error(data.message || t('common.failed'))
-    }
-  } catch (e: any) {
-    const detail = e.response?.data?.error || e.response?.data?.detail
-    if (typeof detail === 'string') {
-      if (detail.includes('connect license server') || detail.includes('connection refused')) {
-        ElMessage.error(t('settings.licenseServerUnreachable'))
-      } else if (detail.includes('already bound') || detail.includes('设备已绑定')) {
-        ElMessage.error(t('settings.deviceAlreadyBound'))
-      } else if (detail.includes('expired') || detail.includes('已过期')) {
-        ElMessage.error(t('settings.licenseExpired'))
-      } else if (detail.includes('invalid') || detail.includes('无效')) {
-        ElMessage.error(t('settings.licenseInvalid'))
-      } else if (detail.includes('rate limit') || detail.includes('too many')) {
-        ElMessage.error(t('settings.licenseRateLimited'))
-      } else {
-        ElMessage.error(translateError(detail, t('common.failed')))
-      }
-    } else {
-      ElMessage.error(t('common.failed'))
-    }
-  } finally { activating.value = false }
-}
-
-async function deactivateLicense() {
-  try {
-    await ElMessageBox.confirm(t('settings.cancelConfirm'), t('common.confirm'), { type: 'warning' })
-  } catch { return }
-  try {
-    await axios.post('/license/deactivate')
-    ElMessage.success(t('settings.canceled')); await loadLicense()
-  } catch (e: any) {
-    const detail = e.response?.data?.error || ''
-    if (detail.includes('connect') || detail.includes('server')) {
-      ElMessage.warning(t('settings.deactivateServerWarning'))
-      await loadLicense()
-    } else {
-      ElMessage.error(translateError(detail, t('common.failed')))
-    }
-  }
-}
-
 async function handleSetPassword() {
   if (newPassword.value.length < 6) { ElMessage.warning(t('settings.passwordMinLen')); return }
   settingPassword.value = true
   try {
     if (passwordSet.value) {
       // 修改密码 — 验证旧密码
-      await axios.post('/auth/change-password', { old_password: oldPassword.value, new_password: newPassword.value })
+      await authApi.changePassword({ old_password: oldPassword.value, new_password: newPassword.value })
     } else {
       // 首次设置密码
-      await axios.post('/auth/set-password', { password: newPassword.value })
+      await authApi.setPassword({ password: newPassword.value })
     }
     ElMessage.success(t('settings.passwordSet')); showPasswordDialog.value = false; oldPassword.value = ''; newPassword.value = ''; passwordSet.value = true
   } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
@@ -1299,7 +1144,7 @@ async function handleSetPassword() {
 
 async function loadDecaySettings() {
   try {
-    const { data } = await axios.get('/memories/decay/settings')
+    const { data } = await memoryApi.getDecaySettings()
     decayEnabled.value = data.enabled
     decayInfo.value = data
   } catch { decayEnabled.value = false }
@@ -1307,7 +1152,7 @@ async function loadDecaySettings() {
 
 async function loadDecayStats() {
   try {
-    const { data } = await axios.get('/memories/decay/stats')
+    const { data } = await memoryApi.getDecayStats()
     decayStats.value = data.stats || data
   } catch { decayStats.value = null }
 }
@@ -1315,7 +1160,7 @@ async function loadDecayStats() {
 async function updateDecaySettings() {
   decayLoading.value = true
   try {
-    await axios.put('/memories/decay/settings', { enabled: decayEnabled.value })
+    await memoryApi.updateDecaySettings({ enabled: decayEnabled.value })
     ElMessage.success(decayEnabled.value ? t('settings.decayEnabled') : t('settings.decayDisabled'))
   } catch {
     ElMessage.error(t('common.failed'))
@@ -1331,7 +1176,7 @@ async function viewTrash() {
 async function emptyTrash() {
   try {
     await ElMessageBox.confirm(t('settings.emptyTrashConfirm'), t('settings.confirm'), { type: 'warning' })
-    await axios.delete('/memories/trash')
+    await memoryApi.emptyTrash()
     ElMessage.success(t('settings.trashEmptied'))
     await loadDecayStats()
   } catch (e: any) {
@@ -1344,7 +1189,7 @@ async function emptyTrash() {
 async function checkHealth() {
   healthLoading.value = true
   try {
-    const { data } = await axios.get('/memories/health')
+    const { data } = await memoryApi.getHealth()
     healthScore.value = data
   } catch {
     ElMessage.error(t('common.failed'))
@@ -1356,7 +1201,7 @@ async function checkHealth() {
 async function scanDedup() {
   dedupLoading.value = true
   try {
-    const { data } = await axios.get('/memories/dedup/scan')
+    const { data } = await memoryApi.scanDedup()
     dedupResult.value = data
     if (data.total_duplicates > 0) {
       ElMessage.warning(t('settings.foundDuplicates', { count: data.total_duplicates }))
@@ -1510,7 +1355,7 @@ async function saveAIConfig() {
   } catch (e: any) {
     const errMsg = e.response?.data?.error || ''
     if (e.response?.status === 403) {
-      ElMessage.error(t('settings.aiProRequired'))
+      ElMessage.error(t('settings.aiConfigRequired'))
     } else {
       ElMessage.error(translateError(errMsg, t('common.failed')))
     }
@@ -1534,7 +1379,7 @@ watch(showAIConfigDialog, async (v) => {
 async function loadAgentsMD() {
   agentsMdLoading.value = true
   try {
-    const { data } = await axios.get('/agent/agents-md')
+    const { data } = await agentApi.getAgentsMD()
     agentsMdContent.value = data.content || ''
   } catch {
     agentsMdContent.value = ''
@@ -1575,25 +1420,12 @@ watch(showAgentsMdPreview, async (v) => {
 .settings-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 20px; transition: border-color 0.3s, box-shadow 0.3s; }
 .settings-card.section-highlight { border-color: #10B981; box-shadow: 0 0 0 2px rgba(16,185,129,0.2); }
 .card-title { font-size: 16px; font-weight: 600; color: var(--cm-text); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--cm-border); }
-.license-status .status-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; }
 .status-label { color: var(--cm-text-muted); font-size: 13px; }
 .status-value { font-size: 13px; color: var(--cm-text); }
 .status-value.pro { color: #10B981; font-weight: 600; }
 .status-value.text-warning { color: #F59E0B; font-weight: 600; }
 .feature-tags { display: flex; flex-wrap: wrap; gap: 4px; max-width: 280px; justify-content: flex-end; }
 .ftag { padding: 1px 8px; background: rgba(16,185,129,0.12); color: #10B981; border-radius: 4px; font-size: 11px; }
-.license-free { text-align: center; }
-.free-badge { font-size: 18px; font-weight: 600; color: var(--cm-text-muted); margin-bottom: 8px; }
-.free-desc { color: var(--cm-text-muted); font-size: 13px; margin-bottom: 16px; }
-.pricing { display: flex; gap: 12px; margin-bottom: 16px; }
-.price-card { flex: 1; background: var(--cm-bg); border: 1px solid var(--cm-border); border-radius: 10px; padding: 16px; position: relative; }
-.price-card.featured { border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.04); }
-.price-badge { position: absolute; top: -8px; right: 12px; background: #10B981; color: var(--cm-bg); font-size: 10px; padding: 2px 8px; border-radius: 8px; font-weight: 600; }
-.price-name { font-size: 14px; font-weight: 600; color: var(--cm-text); margin-bottom: 4px; }
-.price-amount { font-size: 24px; font-weight: 700; color: #10B981; }
-.price-features { list-style: none; padding: 0; margin: 8px 0 0; font-size: 12px; color: var(--cm-text-muted); line-height: 1.8; text-align: left; }
-.activate-section { display: flex; gap: 8px; justify-content: center; }
-.license-input { width: 260px; }
 .pro-install-status { margin-top: 12px; padding: 12px; background: rgba(16,185,129,0.05); border-radius: 8px; }
 .status-text { font-size: 13px; color: var(--cm-text); margin-bottom: 8px; }
 .section-desc { font-size: 13px; color: var(--cm-text-muted); margin: 0 0 12px; }
@@ -1627,9 +1459,6 @@ watch(showAgentsMdPreview, async (v) => {
   .settings-grid {
     grid-template-columns: 1fr;
   }
-  .pricing {
-    flex-direction: column;
-  }
   .settings-page {
     padding: 16px;
   }
@@ -1644,34 +1473,13 @@ watch(showAgentsMdPreview, async (v) => {
     align-items: flex-start;
     gap: 8px;
   }
-  .license-input {
-    width: 100%;
-  }
-  .activate-section {
-    flex-direction: column;
-  }
-  .activate-section .el-button {
-    width: 100%;
-  }
-  .price-card {
-    padding: 16px;
-  }
-  .price-name {
-    font-size: 16px;
-  }
-  .price-amount {
-    font-size: 20px;
-  }
-  .price-features {
-    font-size: 11px;
-  }
+}
   .decay-stage-info {
     grid-template-columns: 1fr;
   }
   .stage-item {
     padding: 6px 10px;
   }
-}
 
 @media (max-width: 480px) {
   .settings-page {

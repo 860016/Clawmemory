@@ -1,5 +1,10 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import i18n from '../i18n'
+
+function t(key: string) {
+  return i18n.global.t(key)
+}
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -57,7 +62,7 @@ api.interceptors.response.use(
 
     if (error.code === 'ECONNABORTED' || error.code === 'ERR_CANCELED' || error.message?.includes('timeout')) {
       if (!originalRequest?._silent) {
-        ElMessage.error('请求超时，请稍后重试')
+        ElMessage.error(t('common.requestTimeout'))
       }
       return Promise.reject(error)
     }
@@ -97,18 +102,15 @@ api.interceptors.response.use(
       }
     } else if (status === 403) {
       if (!originalRequest?._silent) {
-        ElMessage.warning('权限不足，无法执行此操作')
+        ElMessage.warning(t('common.permissionDenied'))
       }
     } else if (status === 429) {
-      ElMessage.warning('请求过于频繁，请稍后重试')
+      ElMessage.warning(t('common.tooFrequent'))
     } else {
       let msg = error.response?.data?.error || error.response?.data?.detail || error.response?.data?.message || 'Request failed'
       if (typeof msg === 'string') {
-        if (msg.includes('Pro license required') || msg.includes('Pro feature not authorized')) {
-          msg = '此功能需要 Pro 授权'
-        }
         if (msg.includes('missing token') || msg.includes('invalid token')) {
-          msg = '登录已过期，请重新登录'
+          msg = t('common.loginExpired')
         }
         if (!originalRequest?._silent) {
           ElMessage.error(msg)

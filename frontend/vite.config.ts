@@ -18,6 +18,7 @@ export default defineConfig({
   },
   build: {
     outDir: '../go-backend/frontend_dist',
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks: {

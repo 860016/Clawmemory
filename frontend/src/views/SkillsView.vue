@@ -243,16 +243,17 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useIsMobile } from '../composables/useIsMobile'
 import { MagicStick, Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import axios from '../api/go-client'
 import { skillsApi } from '../api/go-skills'
+import { openClawSkillsApi } from '../api/go-openclaw-skills'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 
 const activeTab = ref<'learned' | 'scanned'>('learned')
-const isMobile = ref(window.innerWidth <= 768)
+const { isMobile } = useIsMobile()
 
 const scanning = ref(false)
 const scanned = ref(false)
@@ -289,7 +290,7 @@ function parseJSON(str: string) {
 async function scanSkills() {
   scanning.value = true
   try {
-    const { data } = await axios.get('/openclaw-skills/scan')
+    const { data } = await openClawSkillsApi.scan()
     globalSkills.value = data.global_skills || []
     workspaceSkills.value = data.workspace_skills || []
     scanned.value = true
@@ -304,8 +305,9 @@ async function scanSkills() {
 
 async function showDetail(skill: any) {
   try {
-    const { data } = await axios.get('/openclaw-skills/detail', {
-      params: { skill_dir: skill.skill_dir, scope: skill.scope },
+    const { data } = await openClawSkillsApi.getDetail({
+      skill_dir: skill.skill_dir,
+      scope: skill.scope,
     })
     detailSkill.value = data
   } catch {

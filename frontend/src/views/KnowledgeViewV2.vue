@@ -259,16 +259,17 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { useIsMobile } from '../composables/useIsMobile'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Connection, Edit, Delete, Loading, MagicStick } from '@element-plus/icons-vue'
-import axios from '../api/go-client'
 import { translateError } from '../i18n'
 import { useI18n } from 'vue-i18n'
 import cytoscape from 'cytoscape'
 import { aiApi } from '../api/go-ai'
+import { knowledgeApi } from '../api/go-knowledge'
 
 const { t } = useI18n()
-const isMobile = ref(window.innerWidth <= 768)
+const { isMobile } = useIsMobile()
 
 const entities = ref<any[]>([])
 const relations = ref<any[]>([])
@@ -356,8 +357,8 @@ async function loadData() {
   error.value = ''
   try {
     const [entRes, relRes] = await Promise.all([
-      axios.get('/knowledge/entities', { params: { page: 1, size: 500 } }),
-      axios.get('/knowledge/relations', { params: { page: 1, size: 500 } }),
+      knowledgeApi.listEntities({ page: 1, size: 500 }),
+      knowledgeApi.listRelations(),
     ])
     entities.value = entRes.data.items || entRes.data || []
     relations.value = relRes.data.items || relRes.data || []
@@ -391,7 +392,7 @@ async function createEntity() {
     return
   }
   try {
-    const { data } = await axios.post('/knowledge/entities', formData.value)
+    const { data } = await knowledgeApi.createEntity(formData.value)
     entities.value.unshift(data)
     showCreateDialog.value = false
     ElMessage.success(t('common.created'))
@@ -403,7 +404,7 @@ async function createEntity() {
 async function updateEntity() {
   if (!editingEntity.value) return
   try {
-    const { data } = await axios.put(`/knowledge/entities/${editingEntity.value.id}`, formData.value)
+    const { data } = await knowledgeApi.updateEntity(editingEntity.value.id, formData.value)
     const idx = entities.value.findIndex(e => e.id === editingEntity.value.id)
     if (idx >= 0) entities.value[idx] = data
     showEditDialog.value = false
@@ -416,7 +417,7 @@ async function updateEntity() {
 async function confirmDelete(id: number) {
   try {
     await ElMessageBox.confirm(t('knowledge.confirmDelete'), t('common.confirm'), { type: 'warning' })
-    await axios.delete(`/knowledge/entities/${id}`)
+    await knowledgeApi.deleteEntity(id)
     entities.value = entities.value.filter(e => e.id !== id)
     relations.value = relations.value.filter(r => r.source_id !== id && r.target_id !== id)
     ElMessage.success(t('common.deleted'))
@@ -429,7 +430,7 @@ async function createRelation() {
     return
   }
   try {
-    const { data } = await axios.post('/knowledge/relations', relationForm.value)
+    const { data } = await knowledgeApi.createRelation(relationForm.value)
     relations.value.unshift(data)
     showRelationDialog.value = false
     ElMessage.success(t('common.created'))
@@ -580,7 +581,7 @@ async function aiExtract() {
   } catch (e: any) {
     const errMsg = e.response?.data?.error || ''
     if (e.response?.status === 403) {
-      ElMessage.warning(t('knowledge.aiExtractPro'))
+      ElMessage.warning(t('knowledge.aiExtractConfig'))
     } else {
       ElMessage.error(translateError(errMsg, t('common.failed')))
     }

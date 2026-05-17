@@ -41,14 +41,11 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		public.GET("/install-status", handleInstallStatus(db))
 		public.GET("/check-update", handleCheckUpdate)
 		public.GET("/health", handleHealthCheck(db))
-		public.POST("/license/activate", middleware.LoginRateLimit(), handleLicenseActivate(proProvider))
 	}
 
 	authorized := r.Group("/api/v1")
 	authorized.Use(middleware.Auth(cfg, db), middleware.JWTRateLimit())
 	{
-		authorized.GET("/license/info", handleLicenseInfo(proProvider))
-		authorized.POST("/license/deactivate", handleLicenseDeactivate(proProvider))
 		authorized.GET("/auth/me", handleGetMe(authService))
 		authorized.POST("/auth/change-password", handleChangePassword(authService))
 		authorized.POST("/auth/reset-password", handleResetPassword(authService))

@@ -11,4 +11,8 @@ export const authApi = {
     axios.post('/auth/reset-password', data),
   changePassword: (data: { old_password: string; new_password: string }) =>
     axios.post('/auth/change-password', data),
+  forgotPassword: (data: { email?: string; username?: string; new_password?: string; confirm?: boolean }) =>
+    axios.post('/auth/forgot-password', data),
+  registerWithInvitation: (data: { username: string; password: string; invitation_code?: string }) =>
+    axios.post('/auth/register-with-invitation', data),
 }

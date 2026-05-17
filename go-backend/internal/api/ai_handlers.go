@@ -26,19 +26,6 @@ func handleAIConfig(aiRouter *ai.AIRouter, provider services.ProProvider) gin.Ha
 
 func handleAIConfigUpdate(aiRouter *ai.AIRouter, provider services.ProProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !provider.IsPro() {
-			c.JSON(http.StatusForbidden, gin.H{
-				"error":   "Pro license required",
-				"message": "AI provider customization requires a Pro license. Free users can configure an AI provider in Settings > Reasoning.",
-			})
-			return
-		}
-
-		if !provider.IsFeatureEnabled("ai-config-update") {
-			c.JSON(http.StatusForbidden, gin.H{"error": "License verification failed"})
-			return
-		}
-
 		userID := middleware.GetUserID(c)
 		var data map[string]interface{}
 		if err := c.ShouldBindJSON(&data); err != nil {
@@ -83,24 +70,9 @@ func handleAIUsage(aiRouter *ai.AIRouter) gin.HandlerFunc {
 
 func handleAIProviders(provider services.ProProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		isPro := provider.IsPro()
-
-		providers := ai.AllProviders
-		if !isPro {
-			providers = func() []ai.ProviderInfo {
-				var free []ai.ProviderInfo
-				for _, p := range ai.AllProviders {
-					if p.Free {
-						free = append(free, p)
-					}
-				}
-				return free
-			}()
-		}
-
 		c.JSON(http.StatusOK, gin.H{
-			"providers": providers,
-			"is_pro":    isPro,
+			"providers": ai.AllProviders,
+			"is_pro":    true,
 		})
 	}
 }
@@ -123,26 +95,8 @@ func handleAIExtract(aiSvc *ai.AIService, provider services.ProProvider) gin.Han
 	}
 }
 
-func checkProWithProvider(provider services.ProProvider, feature string, c *gin.Context) bool {
-	if !provider.IsPro() {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Pro license required"})
-		return false
-	}
-
-	if !provider.IsFeatureEnabled(feature) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "License verification failed"})
-		return false
-	}
-
-	return true
-}
-
 func handleAIConflictScan(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkProWithProvider(provider, "ai-conflict-scan", c) {
-			return
-		}
-
 		userID := middleware.GetUserID(c)
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
@@ -160,10 +114,6 @@ func handleAIConflictScan(aiSvc *ai.AIService, provider services.ProProvider) gi
 
 func handleAIDecayEvaluate(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkProWithProvider(provider, "ai-decay-evaluate", c) {
-			return
-		}
-
 		userID := middleware.GetUserID(c)
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
@@ -204,10 +154,6 @@ func handleAIDailyReport(aiSvc *ai.AIService, provider services.ProProvider, db 
 
 func handleAIWikiGenerate(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkProWithProvider(provider, "ai-wiki-generate", c) {
-			return
-		}
-
 		userID := middleware.GetUserID(c)
 
 		var data struct {
@@ -233,10 +179,6 @@ func handleAIWikiGenerate(aiSvc *ai.AIService, provider services.ProProvider) gi
 
 func handleAICompress(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkProWithProvider(provider, "ai-compress", c) {
-			return
-		}
-
 		userID := middleware.GetUserID(c)
 
 		var data struct {
@@ -262,10 +204,6 @@ func handleAICompress(aiSvc *ai.AIService, provider services.ProProvider) gin.Ha
 
 func handleAIDiscoverRelations(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkProWithProvider(provider, "ai-discover-relations", c) {
-			return
-		}
-
 		userID := middleware.GetUserID(c)
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
@@ -283,10 +221,6 @@ func handleAIDiscoverRelations(aiSvc *ai.AIService, provider services.ProProvide
 
 func handleAISmartRoute(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkProWithProvider(provider, "ai-smart-route", c) {
-			return
-		}
-
 		userID := middleware.GetUserID(c)
 
 		var data struct {
@@ -394,10 +328,6 @@ func handleAIProcessConversation(aiSvc *ai.AIService, provider services.ProProvi
 
 func handleAIAssembleContext(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkProWithProvider(provider, "ai-context-assemble", c) {
-			return
-		}
-
 		userID := middleware.GetUserID(c)
 
 		var data struct {
@@ -442,10 +372,6 @@ func handleAINudgeReflect(aiSvc *ai.AIService, provider services.ProProvider) gi
 
 func handleAISelfRefine(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkProWithProvider(provider, "ai-self-refine", c) {
-			return
-		}
-
 		userID := middleware.GetUserID(c)
 
 		var data struct {
@@ -474,10 +400,6 @@ func handleAISelfRefine(aiSvc *ai.AIService, provider services.ProProvider) gin.
 
 func handleAIUserProfile(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkProWithProvider(provider, "ai-user-profile", c) {
-			return
-		}
-
 		userID := middleware.GetUserID(c)
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
@@ -701,10 +623,6 @@ func handleSkillPatch(db *gorm.DB) gin.HandlerFunc {
 
 func handleSkillImprove(db *gorm.DB, aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !checkProWithProvider(provider, "skill-improve", c) {
-			return
-		}
-
 		userID := middleware.GetUserID(c)
 		skillIDStr := c.Param("id")
 

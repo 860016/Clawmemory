@@ -1,43 +1,43 @@
-import axios from './go-client'
+import api from './go-client'
 
 export default {
   list(params?: any) {
-    return axios.get('/projects', { params })
+    return api.get('/projects', { params })
   },
   get(id: number) {
-    return axios.get(`/projects/${id}`)
+    return api.get(`/projects/${id}`)
   },
   create(data: any) {
-    return axios.post('/projects', data)
+    return api.post('/projects', data)
   },
   update(id: number, data: any) {
-    return axios.put(`/projects/${id}`, data)
+    return api.put(`/projects/${id}`, data)
   },
   delete(id: number) {
-    return axios.delete(`/projects/${id}`)
+    return api.delete(`/projects/${id}`)
   },
   search(query: string, limit = 20) {
-    return axios.get('/projects/search', { params: { q: query, limit } })
+    return api.get('/projects/search', { params: { q: query, limit } })
   },
   categories() {
-    return axios.get('/projects/categories')
+    return api.get('/projects/categories')
   },
   context(name: string) {
-    return axios.get('/projects/context', { params: { name } })
+    return api.get('/projects/context', { params: { name } })
   },
   getNotes(projectId: number) {
-    return axios.get(`/projects/${projectId}/notes`)
+    return api.get(`/projects/${projectId}/notes`)
   },
   addNote(projectId: number, data: any) {
-    return axios.post(`/projects/${projectId}/notes`, data)
+    return api.post(`/projects/${projectId}/notes`, data)
   },
   updateNote(noteId: number, data: any) {
-    return axios.put(`/projects/notes/${noteId}`, data)
+    return api.put(`/projects/notes/${noteId}`, data)
   },
   deleteNote(noteId: number) {
-    return axios.delete(`/projects/notes/${noteId}`)
+    return api.delete(`/projects/notes/${noteId}`)
   },
   extractMemories(projectId: number) {
-    return axios.post(`/projects/${projectId}/extract-memories`)
+    return api.post(`/projects/${projectId}/extract-memories`)
   },
 }
