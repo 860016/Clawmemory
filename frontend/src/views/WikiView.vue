@@ -436,8 +436,12 @@ async function markComplete(page: any) {
 
 async function refinePage(page: any) {
   try {
-    await wikiApi.refine(page.id, {})
-    ElMessage.success(t('wiki.pageRefined'))
+    const { data } = await wikiApi.refine(page.id, {})
+    if (data.message && !data.content) {
+      ElMessage.warning(data.message)
+    } else {
+      ElMessage.success(t('wiki.pageRefined'))
+    }
     await Promise.all([loadPages(), loadStats()])
     if (viewingPage.value?.id === page.id) {
       await viewPage(page.id)
@@ -452,8 +456,12 @@ async function extractKnowledge() {
   }
   extracting.value = true
   try {
-    await wikiApi.aiExtract({ conversation: extractForm.value.conversation, is_complete: extractForm.value.is_complete })
-    ElMessage.success(t('wiki.extractSuccess'))
+    const { data } = await wikiApi.aiExtract({ conversation: extractForm.value.conversation, is_complete: extractForm.value.is_complete })
+    if (data.message && !data.pages) {
+      ElMessage.warning(data.message)
+    } else {
+      ElMessage.success(t('wiki.extractSuccess'))
+    }
     showExtractDialog.value = false
     await Promise.all([loadPages(), loadStats()])
   } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }

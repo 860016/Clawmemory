@@ -25,6 +25,7 @@ var ValidPermissions = map[string]bool{
 	"conversations:write": true,
 	"sessions:write":      true,
 	"reason:execute":      true,
+	"ai:execute":          true,
 	"read":                true,
 	"write":               true,
 	"admin":               true,
@@ -39,7 +40,7 @@ func NewAPIKeyService(db *gorm.DB) *APIKeyService {
 }
 
 func (s *APIKeyService) Create(userID uint, name string) (*models.APIKey, string, error) {
-	return s.CreateWithPermissions(userID, name, "memories:read,memories:write,conversations:write,sessions:write,reason:execute", "")
+	return s.CreateWithPermissions(userID, name, "memories:read,memories:write,conversations:write,sessions:write,reason:execute,ai:execute", "")
 }
 
 func (s *APIKeyService) CreateWithPermissions(userID uint, name, permissions, agentName string) (*models.APIKey, string, error) {

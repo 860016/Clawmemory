@@ -16,7 +16,7 @@ type EmbeddingProvider interface {
 }
 
 type AIEmbedRouter interface {
-	AIEmbed(ctx context.Context, userID uint, isPro bool, texts []string) ([][]float64, error)
+	AIEmbed(ctx context.Context, userID uint, texts []string) ([][]float64, error)
 }
 
 type lruEntry struct {
@@ -194,7 +194,7 @@ func (s *EmbeddingService) tryAIEmbed(texts []string) ([][]float64, error) {
 	if s.aiRouter != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
-		vectors, err := s.aiRouter.AIEmbed(ctx, 1, false, texts)
+		vectors, err := s.aiRouter.AIEmbed(ctx, 1, texts)
 		if err == nil && len(vectors) > 0 {
 			return vectors, nil
 		}

@@ -52,6 +52,18 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
+	layer := getString(data, "layer", "episodic")
+
+	if layer == "core" {
+		var coreCount int64
+		s.db.Model(&models.Memory{}).Where(
+			"user_id = ? AND layer = ? AND status != ?", userID, "core", "trashed",
+		).Count(&coreCount)
+		if coreCount >= 50 {
+			return nil, fmt.Errorf("core memory capacity reached (%d/50). Consolidate or archive existing core memories first", coreCount)
+		}
+	}
+
 	tags := "[]"
 	if t, ok := data["tags"].([]interface{}); ok {
 		tagStrings := make([]string, 0, len(t))
@@ -66,7 +78,7 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 
 	memory := &models.Memory{
 		UserID:      userID,
-		Layer:       getString(data, "layer", "episodic"),
+		Layer:       layer,
 		Key:         getString(data, "key", ""),
 		Value:       getString(data, "value", ""),
 		Importance:  getFloat(data, "importance", 0.5),

@@ -106,8 +106,8 @@ func (r *AIRouter) flushUsage() {
 	}
 }
 
-func (r *AIRouter) Chat(ctx context.Context, userID uint, isPro bool, messages []Message, opts ChatOptions) (*ChatResponse, error) {
-	provider, err := r.getProvider(userID, isPro)
+func (r *AIRouter) Chat(ctx context.Context, userID uint, messages []Message, opts ChatOptions) (*ChatResponse, error) {
+	provider, err := r.getProvider(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -119,8 +119,8 @@ func (r *AIRouter) Chat(ctx context.Context, userID uint, isPro bool, messages [
 	return provider.Chat(ctx, messages, opts)
 }
 
-func (r *AIRouter) Embed(ctx context.Context, userID uint, isPro bool, texts []string) (*EmbeddingResponse, error) {
-	provider, err := r.getProvider(userID, isPro)
+func (r *AIRouter) Embed(ctx context.Context, userID uint, texts []string) (*EmbeddingResponse, error) {
+	provider, err := r.getProvider(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (r *AIRouter) Embed(ctx context.Context, userID uint, isPro bool, texts []s
 	return provider.Embed(ctx, texts)
 }
 
-func (r *AIRouter) getProvider(userID uint, isPro bool) (Provider, error) {
+func (r *AIRouter) getProvider(userID uint) (Provider, error) {
 	r.mu.RLock()
 	if cached, ok := r.providerCache[userID]; ok && time.Now().Before(cached.expiredAt) {
 		r.mu.RUnlock()
@@ -136,7 +136,7 @@ func (r *AIRouter) getProvider(userID uint, isPro bool) (Provider, error) {
 	}
 	r.mu.RUnlock()
 
-	provider, err := r.loadProvider(userID, isPro)
+	provider, err := r.loadProvider(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -151,21 +151,18 @@ func (r *AIRouter) getProvider(userID uint, isPro bool) (Provider, error) {
 	return provider, nil
 }
 
-func (r *AIRouter) loadProvider(userID uint, isPro bool) (Provider, error) {
+func (r *AIRouter) loadProvider(userID uint) (Provider, error) {
 	provider, err := r.loadFromReasoningConfig(userID)
 	if err == nil && provider != nil {
 		return provider, nil
 	}
 
-	if isPro {
-		proProvider, err := r.loadProProvider(userID)
-		if err != nil {
-			return nil, err
-		}
-		return proProvider, nil
+	userProvider, err := r.loadUserProvider(userID)
+	if err != nil {
+		return nil, fmt.Errorf("no AI provider configured. Please configure an AI provider in Settings > Reasoning")
 	}
 
-	return nil, fmt.Errorf("no AI provider configured. Please configure an AI provider in Settings > Reasoning")
+	return userProvider, nil
 }
 
 func (r *AIRouter) loadFromReasoningConfig(userID uint) (Provider, error) {
@@ -212,7 +209,7 @@ func (r *AIRouter) loadFromReasoningConfig(userID uint) (Provider, error) {
 	return NewOpenAICompatibleProvider(cfg), nil
 }
 
-func (r *AIRouter) loadProProvider(userID uint) (Provider, error) {
+func (r *AIRouter) loadUserProvider(userID uint) (Provider, error) {
 	settingsSvc := services.NewSettingsService(r.db)
 
 	providerID, _ := settingsSvc.GetByKey(userID, "ai_provider_id")
@@ -272,9 +269,8 @@ func (r *AIRouter) InvalidateUserCache(userID uint) {
 	r.mu.Unlock()
 }
 
-func (r *AIRouter) GetCurrentUserConfig(userID uint, isPro bool) map[string]interface{} {
+func (r *AIRouter) GetCurrentUserConfig(userID uint) map[string]interface{} {
 	result := map[string]interface{}{
-		"is_pro":              isPro,
 		"available_providers": AllProviders,
 	}
 
@@ -283,19 +279,6 @@ func (r *AIRouter) GetCurrentUserConfig(userID uint, isPro bool) map[string]inte
 		result["provider_id"] = reasoningProvider
 		result["model"] = reasoningModel
 		result["provider_source"] = "reasoning"
-	}
-
-	if !isPro {
-		result["available_providers"] = func() []ProviderInfo {
-			var free []ProviderInfo
-			for _, p := range AllProviders {
-				if p.Free {
-					free = append(free, p)
-				}
-			}
-			return free
-		}()
-		return result
 	}
 
 	settingsSvc := services.NewSettingsService(r.db)
@@ -362,8 +345,8 @@ func (r *AIRouter) UpdateProConfig(userID uint, data map[string]interface{}) err
 	return nil
 }
 
-func (r *AIRouter) TestConnection(userID uint, isPro bool) (map[string]interface{}, error) {
-	provider, err := r.getProvider(userID, isPro)
+func (r *AIRouter) TestConnection(userID uint) (map[string]interface{}, error) {
+	provider, err := r.getProvider(userID)
 	if err != nil {
 		return nil, err
 	}

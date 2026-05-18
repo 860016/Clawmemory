@@ -37,7 +37,6 @@ type ProviderInfo struct {
 	Type        string   `json:"type"`
 	Models      []string `json:"models"`
 	Free        bool     `json:"free"`
-	ProOnly     bool     `json:"pro_only"`
 	Description string   `json:"description"`
 }
 
@@ -65,7 +64,6 @@ var AllProviders = []ProviderInfo{
 		Type:        "openai_compatible",
 		Models:      []string{"deepseek-chat", "deepseek-reasoner"},
 		Free:        false,
-		ProOnly:     true,
 		Description: "DeepSeek V3 / R1, excellent Chinese support",
 	},
 	{
@@ -74,7 +72,6 @@ var AllProviders = []ProviderInfo{
 		Type:        "openai_compatible",
 		Models:      []string{"gpt-4o-mini", "gpt-4o", "gpt-4-turbo"},
 		Free:        false,
-		ProOnly:     true,
 		Description: "OpenAI GPT models",
 	},
 	{
@@ -83,7 +80,6 @@ var AllProviders = []ProviderInfo{
 		Type:        "openai_compatible",
 		Models:      []string{"llama3", "mistral", "qwen2"},
 		Free:        true,
-		ProOnly:     false,
 		Description: "Local Ollama models, free and private",
 	},
 	{
@@ -92,7 +88,6 @@ var AllProviders = []ProviderInfo{
 		Type:        "openai_compatible",
 		Models:      []string{},
 		Free:        false,
-		ProOnly:     true,
 		Description: "Any OpenAI-compatible API endpoint",
 	},
 }
@@ -110,16 +105,6 @@ func FreeProviderIDs() []string {
 	var ids []string
 	for _, p := range AllProviders {
 		if p.Free {
-			ids = append(ids, p.ID)
-		}
-	}
-	return ids
-}
-
-func ProProviderIDs() []string {
-	var ids []string
-	for _, p := range AllProviders {
-		if p.ProOnly {
 			ids = append(ids, p.ID)
 		}
 	}

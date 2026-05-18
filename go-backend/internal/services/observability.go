@@ -335,17 +335,9 @@ func (h *HealthChecker) Check() HealthStatus {
 		}
 	}
 
-	provider := GetProProvider()
-	if provider != nil && provider.IsPro() {
-		status.Checks["license"] = CheckResult{
-			Status: "healthy",
-			Detail: fmt.Sprintf("tier: %s", provider.GetTier()),
-		}
-	} else {
-		status.Checks["license"] = CheckResult{
-			Status: "healthy",
-			Detail: "OSS mode",
-		}
+	status.Checks["license"] = CheckResult{
+		Status: "healthy",
+		Detail: "open source (all features enabled)",
 	}
 
 	embSvc := GetEmbeddingService()

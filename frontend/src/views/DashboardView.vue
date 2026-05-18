@@ -53,7 +53,7 @@
           <div class="detail-row"><strong>{{ $t('skills.author') }}:</strong> {{ skillDetail.author }}</div>
           <div class="detail-row"><strong>{{ $t('skills.scope') }}:</strong> {{ skillDetail.scope }}</div>
           <div class="detail-row" v-if="skillDetail.tags?.length">
-            <strong>{{ $t('pro.tags') }}:</strong>
+            <strong>{{ $t('advanced.tags') }}:</strong>
             <el-tag v-for="tag in skillDetail.tags" :key="tag" size="small" style="margin:2px">{{ tag }}</el-tag>
           </div>
           <div class="detail-row" v-if="skillDetail.files?.length">
@@ -61,7 +61,7 @@
             <div class="file-list">{{ skillDetail.files.join(', ') }}</div>
           </div>
           <div class="detail-body" v-if="skillDetail.body_full">
-            <strong>{{ $t('pro.content') }}:</strong>
+            <strong>{{ $t('advanced.content') }}:</strong>
             <pre>{{ skillDetail.body_full }}</pre>
           </div>
         </div>
@@ -416,15 +416,15 @@
 
         <div class="card">
           <div class="card-header">
-            <h3>🔑 {{ $t('dashboard.proStatus') }}</h3>
+            <h3>🔑 {{ $t('dashboard.advancedStatus') }}</h3>
           </div>
-          <div class="pro-info">
-            <div class="pro-tier">
+          <div class="advanced-info">
+            <div class="advanced-tier">
               <span class="tier-icon">◆</span>
-              <span>{{ $t('dashboard.proVersion') }}</span>
+              <span>{{ $t('dashboard.advancedVersion') }}</span>
             </div>
-            <div class="pro-detail">
-              <el-button type="primary" size="small" style="margin-top: 8px" @click="$router.push('/pro')">{{ $t('nav.pro') }} →</el-button>
+            <div class="advanced-detail">
+              <el-button type="primary" size="small" style="margin-top: 8px" @click="$router.push('/advanced')">{{ $t('nav.advanced') }} →</el-button>
             </div>
           </div>
         </div>
@@ -469,7 +469,7 @@ const activeTab = computed(() => (route.query.tab as string) || '')
 const { isMobile } = useIsMobile()
 const stats = ref<any>({
   memoryCount: 0, entityCount: 0, relationCount: 0, projectCount: 0,
-  layerStats: {}, recentMemories: [], license: { tier: 'pro', active: true },
+  layerStats: {}, recentMemories: [], license: { tier: 'advanced', active: true },
   passwordSet: true,
 })
 
@@ -525,7 +525,7 @@ onMounted(async () => {
   try {
     const { data } = await statsApi.getOverview()
     stats.value = data
-  } catch { stats.value = { total_memories: 0, total_entities: 0, total_relations: 0, total_wiki_pages: 0 } }
+  } catch { stats.value = { memoryCount: 0, entityCount: 0, relationCount: 0, projectCount: 0, layerStats: {}, recentMemories: [], license: { tier: 'advanced', active: true }, passwordSet: true } }
   loadChromaDBStatus()
 })
 
@@ -906,8 +906,8 @@ function formatNumber(n: number) {
 .accessed-layer-badge.private { background: rgba(233,30,99,0.15); color: #e91e63; }
 .accessed-count { font-size: 13px; color: var(--cm-text-muted); white-space: nowrap; }
 
-.pro-tier { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #10B981; }
-.pro-detail { font-size: 13px; color: var(--cm-text-muted); line-height: 1.8; }
+.advanced-tier { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #10B981; }
+.advanced-detail { font-size: 13px; color: var(--cm-text-muted); line-height: 1.8; }
 
 .recent-memories { display: flex; flex-direction: column; gap: 8px; }
 .memory-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; background: var(--cm-bg); border: 1px solid var(--cm-border); }
@@ -1034,7 +1034,7 @@ function formatNumber(n: number) {
   .memory-time {
     font-size: 10px;
   }
-  .pro-tier {
+  .advanced-tier {
     font-size: 16px;
   }
   .period-selector .el-radio-group {

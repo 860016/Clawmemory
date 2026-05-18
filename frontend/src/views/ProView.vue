@@ -1,32 +1,32 @@
 <template>
-  <div class="pro-page">
+  <div class="advanced-page">
     <div class="page-hero">
       <div class="hero-content">
-        <h1>🚀 {{ $t('pro.title') }}</h1>
-        <span class="pro-badge">PRO</span>
+        <h1>🚀 {{ $t('advanced.title') }}</h1>
+        <span class="advanced-badge">Advanced</span>
       </div>
     </div>
 
-    <div class="pro-grid">
+    <div class="advanced-grid">
       <div class="mode-banner">
-        <span>⚡ {{ $t('pro.localProMode') }}</span>
+        <span>⚡ {{ $t('advanced.localAdvancedMode') }}</span>
       </div>
 
       <!-- Memory Decay -->
-      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'decay' }" id="pro-decay">
+      <div class="advanced-card" :class="{ 'section-highlight': activeSection === 'decay' }" id="advanced-decay">
         <div class="card-header">
           <span class="card-icon">📉</span>
-          <span class="card-title">{{ $t('pro.decay') }}</span>
+          <span class="card-title">{{ $t('advanced.decay') }}</span>
           <div class="card-help" @mouseenter="showHelp.decay = true" @mouseleave="showHelp.decay = false">
             <span class="help-icon">ⓘ</span>
             <div class="help-popup" v-if="showHelp.decay">
-              <div class="help-title">{{ $t('pro.decay') }}</div>
-              <div class="help-text">{{ $t('pro.decayHelp') }}</div>
+              <div class="help-title">{{ $t('advanced.decay') }}</div>
+              <div class="help-text">{{ $t('advanced.decayHelp') }}</div>
               <div class="help-stages">
-                <div class="help-stage"><span class="stage-dot green"></span>{{ $t('pro.decayStage1') }}</div>
-                <div class="help-stage"><span class="stage-dot yellow"></span>{{ $t('pro.decayStage2') }}</div>
-                <div class="help-stage"><span class="stage-dot orange"></span>{{ $t('pro.decayStage3') }}</div>
-                <div class="help-stage"><span class="stage-dot red"></span>{{ $t('pro.decayStage4') }}</div>
+                <div class="help-stage"><span class="stage-dot green"></span>{{ $t('advanced.decayStage1') }}</div>
+                <div class="help-stage"><span class="stage-dot yellow"></span>{{ $t('advanced.decayStage2') }}</div>
+                <div class="help-stage"><span class="stage-dot orange"></span>{{ $t('advanced.decayStage3') }}</div>
+                <div class="help-stage"><span class="stage-dot red"></span>{{ $t('advanced.decayStage4') }}</div>
               </div>
             </div>
           </div>
@@ -35,27 +35,27 @@
           <div class="stats-row" v-if="decayStats">
             <div class="stat-item">
               <span class="stat-value">{{ decayStats.total }}</span>
-              <span class="stat-label">{{ $t('pro.totalMemories') }}</span>
+              <span class="stat-label">{{ $t('advanced.totalMemories') }}</span>
             </div>
             <div class="stat-item">
-              <span class="stat-value warn">{{ decayStats.prune_candidates }}</span>
-              <span class="stat-label">{{ $t('pro.pruneCandidates') }}</span>
+              <span class="stat-value warn">{{ decayStats.archived }}</span>
+              <span class="stat-label">{{ $t('advanced.pruneCandidates') }}</span>
             </div>
             <div class="stat-item">
               <span class="stat-value">{{ decayStats.avg_importance }}</span>
-              <span class="stat-label">{{ $t('pro.avgImportance') }}</span>
+              <span class="stat-label">{{ $t('advanced.avgImportance') }}</span>
             </div>
           </div>
           <div class="card-actions">
             <el-button @click="loadDecayStats" :disabled="loading.decay" :loading="loading.decay">
-              {{ $t('pro.refreshStats') }}
+              {{ $t('advanced.refreshStats') }}
             </el-button>
             <el-button type="primary" @click="applyDecay" :disabled="loading.applyDecay" :loading="loading.applyDecay">
-              {{ $t('pro.applyDecay') }}
+              {{ $t('advanced.applyDecay') }}
             </el-button>
           </div>
           <div v-if="pruneSuggestions.length" class="prune-section">
-            <div class="sub-title">{{ $t('pro.pruneSuggestions') }} ({{ pruneSuggestions.length }})</div>
+            <div class="sub-title">{{ $t('advanced.pruneSuggestions') }} ({{ pruneSuggestions.length }})</div>
             <div class="prune-list">
               <div v-for="s in pruneSuggestions.slice(0, 10)" :key="s.memory_id" class="prune-item">
                 <span class="prune-key">{{ s.key }}</span>
@@ -69,15 +69,15 @@
       </div>
 
       <!-- Conflict Scan -->
-      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'conflicts' }" id="pro-conflicts">
+      <div class="advanced-card" :class="{ 'section-highlight': activeSection === 'conflicts' }" id="advanced-conflicts">
         <div class="card-header">
           <span class="card-icon">⚠️</span>
-          <span class="card-title">{{ $t('pro.conflicts') }}</span>
+          <span class="card-title">{{ $t('advanced.conflicts') }}</span>
           <div class="card-help" @mouseenter="showHelp.conflicts = true" @mouseleave="showHelp.conflicts = false">
             <span class="help-icon">ⓘ</span>
             <div class="help-popup" v-if="showHelp.conflicts">
-              <div class="help-title">{{ $t('pro.conflicts') }}</div>
-              <div class="help-text">{{ $t('pro.conflictsHelp') }}</div>
+              <div class="help-title">{{ $t('advanced.conflicts') }}</div>
+              <div class="help-text">{{ $t('advanced.conflictsHelp') }}</div>
             </div>
           </div>
         </div>
@@ -85,36 +85,36 @@
           <div class="stats-row" v-if="conflictSummary">
             <div class="stat-item">
               <span class="stat-value warn">{{ conflictSummary.total }}</span>
-              <span class="stat-label">{{ $t('pro.conflictCount') }}</span>
+              <span class="stat-label">{{ $t('advanced.conflictCount') }}</span>
             </div>
             <div class="stat-item">
               <span class="stat-value">{{ conflictSummary.auto_resolvable }}</span>
-              <span class="stat-label">{{ $t('pro.autoResolvable') }}</span>
+              <span class="stat-label">{{ $t('advanced.autoResolvable') }}</span>
             </div>
             <div class="stat-item">
               <span class="stat-value danger">{{ conflictSummary.needs_review }}</span>
-              <span class="stat-label">{{ $t('pro.needsReview') }}</span>
+              <span class="stat-label">{{ $t('advanced.needsReview') }}</span>
             </div>
           </div>
           <div class="card-actions">
             <el-button @click="scanConflicts" :disabled="loading.conflicts" :loading="loading.conflicts">
-              {{ $t('pro.scanConflicts') }}
+              {{ $t('advanced.scanConflicts') }}
             </el-button>
           </div>
           <div v-if="conflicts.length" class="conflict-list">
             <div v-for="(c, i) in conflicts.slice(0, 10)" :key="i" class="conflict-item">
               <div class="conflict-key">{{ c.key }}</div>
-              <div class="conflict-values">
-                <span class="val-a">{{ c.value_a?.substring(0, 60) }}</span>
+              <div class="conflict-values" v-if="c.memories && c.memories.length >= 2">
+                <span class="val-a">{{ c.memories[0].value?.substring(0, 60) }}</span>
                 <span class="vs">vs</span>
-                <span class="val-b">{{ c.value_b?.substring(0, 60) }}</span>
+                <span class="val-b">{{ c.memories[1].value?.substring(0, 60) }}</span>
               </div>
               <div class="conflict-meta">
-                <el-tag size="small" :type="c.severity === 'high' ? 'danger' : c.severity === 'medium' ? 'warning' : 'info'">
+                <el-tag size="small" :type="c.severity === 'exact_duplicate' ? 'danger' : c.severity === 'similar_content' ? 'warning' : 'info'">
                   {{ c.severity }}
                 </el-tag>
-                <el-button v-if="c.severity === 'low'" size="small" type="primary" @click="resolveConflict(i, 'merge')">
-                  {{ $t('pro.merge') }}
+                <el-button v-if="c.severity !== 'exact_duplicate'" size="small" type="primary" @click="resolveConflict(i, 'merge')">
+                  {{ $t('advanced.merge') }}
                 </el-button>
               </div>
             </div>
@@ -123,43 +123,43 @@
       </div>
 
       <!-- Smart Router -->
-      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'router' }" id="pro-router">
+      <div class="advanced-card" :class="{ 'section-highlight': activeSection === 'router' }" id="advanced-router">
         <div class="card-header">
           <span class="card-icon">🧠</span>
-          <span class="card-title">{{ $t('pro.smartRouter') }}</span>
+          <span class="card-title">{{ $t('advanced.smartRouter') }}</span>
           <div class="card-help" @mouseenter="showHelp.router = true" @mouseleave="showHelp.router = false">
             <span class="help-icon">ⓘ</span>
             <div class="help-popup" v-if="showHelp.router">
-              <div class="help-title">{{ $t('pro.smartRouter') }}</div>
-              <div class="help-text">{{ $t('pro.smartRouterHelp') }}</div>
+              <div class="help-title">{{ $t('advanced.smartRouter') }}</div>
+              <div class="help-text">{{ $t('advanced.smartRouterHelp') }}</div>
             </div>
           </div>
         </div>
         <div class="card-body">
-          <p class="card-desc">{{ $t('pro.smartRouterDesc') }}</p>
+          <p class="card-desc">{{ $t('advanced.smartRouterDesc') }}</p>
           <div class="router-test">
-            <el-input v-model="testMessage" :placeholder="$t('pro.testMessage')" size="small" />
+            <el-input v-model="testMessage" :placeholder="$t('advanced.testMessage')" size="small" />
             <el-button type="primary" @click="testRoute" :disabled="loading.route" :loading="loading.route">
-              {{ $t('pro.testRoute') }}
+              {{ $t('advanced.testRoute') }}
             </el-button>
           </div>
           <div v-if="routeResult" class="route-result">
-            <div class="route-model">{{ $t('pro.selectedModel') }}: <strong>{{ routeResult.selected_model }}</strong></div>
-            <div class="route-complexity">{{ $t('pro.complexity') }}: {{ routeResult.complexity }}</div>
+            <div class="route-model">{{ $t('advanced.selectedModel') }}: <strong>{{ routeResult.selected_model }}</strong></div>
+            <div class="route-complexity">{{ $t('advanced.complexity') }}: {{ routeResult.complexity }}</div>
           </div>
         </div>
       </div>
 
       <!-- Token Stats -->
-      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'tokenStats' }" id="pro-tokenStats">
+      <div class="advanced-card" :class="{ 'section-highlight': activeSection === 'tokenStats' }" id="advanced-tokenStats">
         <div class="card-header">
           <span class="card-icon">📊</span>
-          <span class="card-title">{{ $t('pro.tokenStats') }}</span>
+          <span class="card-title">{{ $t('advanced.tokenStats') }}</span>
           <div class="card-help" @mouseenter="showHelp.tokenStats = true" @mouseleave="showHelp.tokenStats = false">
             <span class="help-icon">ⓘ</span>
             <div class="help-popup" v-if="showHelp.tokenStats">
-              <div class="help-title">{{ $t('pro.tokenStats') }}</div>
-              <div class="help-text">{{ $t('pro.tokenStatsHelp') }}</div>
+              <div class="help-title">{{ $t('advanced.tokenStats') }}</div>
+              <div class="help-text">{{ $t('advanced.tokenStatsHelp') }}</div>
             </div>
           </div>
         </div>
@@ -167,112 +167,112 @@
           <div class="stats-row" v-if="tokenStatData">
             <div class="stat-item">
               <span class="stat-value">{{ tokenStatData.total_estimated_tokens }}</span>
-              <span class="stat-label">{{ $t('pro.totalTokens') }}</span>
+              <span class="stat-label">{{ $t('advanced.totalTokens') }}</span>
             </div>
             <div class="stat-item">
               <span class="stat-value">{{ tokenStatData.avg_tokens_per_memory }}</span>
-              <span class="stat-label">{{ $t('pro.avgTokens') }}</span>
+              <span class="stat-label">{{ $t('advanced.avgTokens') }}</span>
             </div>
           </div>
           <div class="card-actions">
             <el-button @click="loadTokenStats" :disabled="loading.tokenStats" :loading="loading.tokenStats">
-              {{ $t('pro.refreshTokens') }}
+              {{ $t('advanced.refreshTokens') }}
             </el-button>
           </div>
         </div>
       </div>
 
       <!-- AI Extract -->
-      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'extract' }" id="pro-extract">
+      <div class="advanced-card" :class="{ 'section-highlight': activeSection === 'extract' }" id="advanced-extract">
         <div class="card-header">
           <span class="card-icon">🔍</span>
-          <span class="card-title">{{ $t('pro.aiExtract') }}</span>
+          <span class="card-title">{{ $t('advanced.aiExtract') }}</span>
           <div class="card-help" @mouseenter="showHelp.extract = true" @mouseleave="showHelp.extract = false">
             <span class="help-icon">ⓘ</span>
             <div class="help-popup" v-if="showHelp.extract">
-              <div class="help-title">{{ $t('pro.aiExtract') }}</div>
-              <div class="help-text">{{ $t('pro.aiExtractHelp') }}</div>
+              <div class="help-title">{{ $t('advanced.aiExtract') }}</div>
+              <div class="help-text">{{ $t('advanced.aiExtractHelp') }}</div>
             </div>
           </div>
         </div>
         <div class="card-body">
-          <p class="card-desc">{{ $t('pro.aiExtractDesc') }}</p>
+          <p class="card-desc">{{ $t('advanced.aiExtractDesc') }}</p>
           <div class="card-actions">
             <el-button type="primary" @click="runAiExtract" :disabled="loading.extract" :loading="loading.extract">
-              {{ $t('pro.runExtract') }}
+              {{ $t('advanced.runExtract') }}
             </el-button>
           </div>
           <div v-if="extractResult" class="extract-result">
             <div class="stat-item">
               <span class="stat-value">{{ extractResult.entities_extracted }}</span>
-              <span class="stat-label">{{ $t('pro.entitiesExtracted') }}</span>
+              <span class="stat-label">{{ $t('advanced.entitiesExtracted') }}</span>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Auto Graph -->
-      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'graph' }" id="pro-graph">
+      <div class="advanced-card" :class="{ 'section-highlight': activeSection === 'graph' }" id="advanced-graph">
         <div class="card-header">
           <span class="card-icon">🕸️</span>
-          <span class="card-title">{{ $t('pro.autoGraph') }}</span>
+          <span class="card-title">{{ $t('advanced.autoGraph') }}</span>
           <div class="card-help" @mouseenter="showHelp.graph = true" @mouseleave="showHelp.graph = false">
             <span class="help-icon">ⓘ</span>
             <div class="help-popup" v-if="showHelp.graph">
-              <div class="help-title">{{ $t('pro.autoGraph') }}</div>
-              <div class="help-text">{{ $t('pro.autoGraphHelp') }}</div>
+              <div class="help-title">{{ $t('advanced.autoGraph') }}</div>
+              <div class="help-text">{{ $t('advanced.autoGraphHelp') }}</div>
             </div>
           </div>
         </div>
         <div class="card-body">
-          <p class="card-desc">{{ $t('pro.autoGraphDesc') }}</p>
+          <p class="card-desc">{{ $t('advanced.autoGraphDesc') }}</p>
           <div class="card-actions">
             <el-button @click="runAutoGraph(false)" :disabled="loading.graph" :loading="loading.graph">
-              {{ $t('pro.generateGraph') }}
+              {{ $t('advanced.generateGraph') }}
             </el-button>
             <el-button type="danger" @click="runAutoGraph(true)" :disabled="loading.graph" :loading="loading.graph">
-              {{ $t('pro.regenerateGraph') }}
+              {{ $t('advanced.regenerateGraph') }}
             </el-button>
           </div>
           <div v-if="graphResult" class="graph-result">
             <div class="stat-item">
-              <span class="stat-value">{{ graphResult.entities_created }}</span>
-              <span class="stat-label">{{ $t('pro.newEntities') }}</span>
+              <span class="stat-value">{{ graphResult.total_pairs }}</span>
+              <span class="stat-label">{{ $t('advanced.newEntities') }}</span>
             </div>
             <div class="stat-item">
-              <span class="stat-value">{{ graphResult.relations_created }}</span>
-              <span class="stat-label">{{ $t('pro.newRelations') }}</span>
+              <span class="stat-value">{{ graphResult.created }}</span>
+              <span class="stat-label">{{ $t('advanced.newRelations') }}</span>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Auto Backup -->
-      <div class="pro-card">
+      <div class="advanced-card">
         <div class="card-header">
           <span class="card-icon">💾</span>
-          <span class="card-title">{{ $t('pro.autoBackup') }}</span>
+          <span class="card-title">{{ $t('advanced.autoBackup') }}</span>
           <div class="card-help" @mouseenter="showHelp.backup = true" @mouseleave="showHelp.backup = false">
             <span class="help-icon">ⓘ</span>
             <div class="help-popup" v-if="showHelp.backup">
-              <div class="help-title">{{ $t('pro.autoBackup') }}</div>
-              <div class="help-text">{{ $t('pro.autoBackupHelp') }}</div>
+              <div class="help-title">{{ $t('advanced.autoBackup') }}</div>
+              <div class="help-text">{{ $t('advanced.autoBackupHelp') }}</div>
             </div>
           </div>
         </div>
         <div class="card-body">
           <div class="backup-schedule">
             <div class="setting-item">
-              <span>{{ $t('pro.autoBackupEnabled') }}</span>
+              <span>{{ $t('advanced.autoBackupEnabled') }}</span>
               <el-switch v-model="backupSchedule.enabled" @change="saveBackupSchedule" />
             </div>
             <div class="setting-item" v-if="backupSchedule.enabled">
-              <span>{{ $t('pro.backupInterval') }}</span>
+              <span>{{ $t('advanced.backupInterval') }}</span>
               <el-select v-model="backupSchedule.interval_hours" size="small" @change="saveBackupSchedule" style="width: 140px">
-                <el-option :label="$t('pro.every6h')" :value="6" />
-                <el-option :label="$t('pro.every12h')" :value="12" />
-                <el-option :label="$t('pro.every24h')" :value="24" />
-                <el-option :label="$t('pro.every7d')" :value="168" />
+                <el-option :label="$t('advanced.every6h')" :value="6" />
+                <el-option :label="$t('advanced.every12h')" :value="12" />
+                <el-option :label="$t('advanced.every24h')" :value="24" />
+                <el-option :label="$t('advanced.every7d')" :value="168" />
               </el-select>
             </div>
           </div>
@@ -280,78 +280,74 @@
       </div>
 
       <!-- Memory Compression -->
-      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'compress' }" id="pro-compress">
+      <div class="advanced-card" :class="{ 'section-highlight': activeSection === 'compress' }" id="advanced-compress">
         <div class="card-header">
           <span class="card-icon">🗜️</span>
-          <span class="card-title">{{ $t('pro.compress') }}</span>
+          <span class="card-title">{{ $t('advanced.compress') }}</span>
           <div class="card-help" @mouseenter="showHelp.compress = true" @mouseleave="showHelp.compress = false">
             <span class="help-icon">ⓘ</span>
             <div class="help-popup" v-if="showHelp.compress">
-              <div class="help-title">{{ $t('pro.compress') }}</div>
-              <div class="help-text">{{ $t('pro.compressHelp') }}</div>
+              <div class="help-title">{{ $t('advanced.compress') }}</div>
+              <div class="help-text">{{ $t('advanced.compressHelp') }}</div>
             </div>
           </div>
         </div>
         <div class="card-body">
-          <p class="card-desc">{{ $t('pro.compressDesc') }}</p>
+          <p class="card-desc">{{ $t('advanced.compressDesc') }}</p>
           <div class="compress-levels">
             <div class="level-option" :class="{ active: compressLevel === 'light' }" @click="compressLevel = 'light'">
-              <div class="level-name">{{ $t('pro.compressLight') }}</div>
-              <div class="level-rate">{{ $t('pro.compressLightRate') }}</div>
-              <div class="level-desc">{{ $t('pro.compressLightDesc') }}</div>
+              <div class="level-name">{{ $t('advanced.compressLight') }}</div>
+              <div class="level-rate">{{ $t('advanced.compressLightRate') }}</div>
+              <div class="level-desc">{{ $t('advanced.compressLightDesc') }}</div>
             </div>
             <div class="level-option" :class="{ active: compressLevel === 'medium' }" @click="compressLevel = 'medium'">
-              <div class="level-name">{{ $t('pro.compressMedium') }}</div>
-              <div class="level-rate">{{ $t('pro.compressMediumRate') }}</div>
-              <div class="level-desc">{{ $t('pro.compressMediumDesc') }}</div>
+              <div class="level-name">{{ $t('advanced.compressMedium') }}</div>
+              <div class="level-rate">{{ $t('advanced.compressMediumRate') }}</div>
+              <div class="level-desc">{{ $t('advanced.compressMediumDesc') }}</div>
             </div>
             <div class="level-option" :class="{ active: compressLevel === 'deep' }" @click="compressLevel = 'deep'">
-              <div class="level-name">{{ $t('pro.compressDeep') }}</div>
-              <div class="level-rate">{{ $t('pro.compressDeepRate') }}</div>
-              <div class="level-desc">{{ $t('pro.compressDeepDesc') }}</div>
+              <div class="level-name">{{ $t('advanced.compressDeep') }}</div>
+              <div class="level-rate">{{ $t('advanced.compressDeepRate') }}</div>
+              <div class="level-desc">{{ $t('advanced.compressDeepDesc') }}</div>
             </div>
           </div>
           <div class="card-actions">
             <el-button @click="previewCompress" :disabled="loading.compressPreview" :loading="loading.compressPreview">
-              {{ $t('pro.previewCompress') }}
+              {{ $t('advanced.previewCompress') }}
             </el-button>
             <el-button type="primary" @click="applyCompress" :disabled="loading.compressApply" :loading="loading.compressApply">
-              {{ $t('pro.applyCompress') }}
+              {{ $t('advanced.applyCompress') }}
             </el-button>
           </div>
           <div v-if="compressPreviewData" class="compress-result">
             <div class="stats-row">
               <div class="stat-item">
-                <span class="stat-value">{{ compressPreviewData.original_count }}</span>
-                <span class="stat-label">{{ $t('pro.originalMemories') }}</span>
+                <span class="stat-value">{{ compressPreviewData.total }}</span>
+                <span class="stat-label">{{ $t('advanced.compressedResult') }}</span>
               </div>
               <div class="stat-item">
-                <span class="stat-value warn">{{ compressPreviewData.compressed_count }}</span>
-                <span class="stat-label">{{ $t('pro.compressedResult') }}</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-value" :class="{ success: compressPreviewData.ratio > 0.5 }">{{ Math.round(compressPreviewData.ratio * 100) }}%</span>
-                <span class="stat-label">{{ $t('pro.compressRatio') }}</span>
+                <span class="stat-value">{{ compressPreviewData.threshold }}</span>
+                <span class="stat-label">{{ $t('advanced.compressRatio') }}</span>
               </div>
             </div>
             <div v-if="compressPreviewData.preview" class="compress-details">
               <div v-for="(d, i) in compressPreviewData.preview.slice(0, 5)" :key="i" class="compress-detail-item">
-                <span class="detail-action">{{ $t('pro.compressLayer') }} {{ d.layer }}</span>
-                <span class="detail-target">{{ d.original }} → {{ d.compressed }}</span>
+                <span class="detail-action">{{ d.action }}</span>
+                <span class="detail-target">{{ d.key }} (importance: {{ d.importance?.toFixed(2) }})</span>
               </div>
             </div>
           </div>
           <div class="auto-compress-setting">
             <div class="setting-item">
-              <span>{{ $t('pro.autoCompress') }}</span>
+              <span>{{ $t('advanced.autoCompress') }}</span>
               <el-switch v-model="compressConfig.auto_enabled" @change="saveCompressConfig" />
             </div>
             <div class="setting-item" v-if="compressConfig.auto_enabled">
-              <span>{{ $t('pro.compressThreshold') }}</span>
+              <span>{{ $t('advanced.compressThreshold') }}</span>
               <el-select v-model="compressConfig.threshold" size="small" @change="saveCompressConfig" style="width: 140px">
-                <el-option :label="$t('pro.threshold500')" :value="500" />
-                <el-option :label="$t('pro.threshold1000')" :value="1000" />
-                <el-option :label="$t('pro.threshold2000')" :value="2000" />
+                <el-option :label="$t('advanced.threshold500')" :value="500" />
+                <el-option :label="$t('advanced.threshold1000')" :value="1000" />
+                <el-option :label="$t('advanced.threshold2000')" :value="2000" />
               </el-select>
             </div>
           </div>
@@ -359,94 +355,90 @@
       </div>
 
       <!-- Evolution Engine -->
-      <div class="pro-card" :class="{ 'section-highlight': activeSection === 'evolution' }" id="pro-evolution">
+      <div class="advanced-card" :class="{ 'section-highlight': activeSection === 'evolution' }" id="advanced-evolution">
         <div class="card-header">
           <span class="card-icon">🧬</span>
-          <span class="card-title">{{ $t('pro.evolution') }}</span>
+          <span class="card-title">{{ $t('advanced.evolution') }}</span>
           <div class="card-help" @mouseenter="showHelp.evolution = true" @mouseleave="showHelp.evolution = false">
             <span class="help-icon">ⓘ</span>
             <div class="help-popup" v-if="showHelp.evolution">
-              <div class="help-title">{{ $t('pro.evolution') }}</div>
-              <div class="help-text">{{ $t('pro.evolutionHelp') }}</div>
+              <div class="help-title">{{ $t('advanced.evolution') }}</div>
+              <div class="help-text">{{ $t('advanced.evolutionHelp') }}</div>
             </div>
           </div>
         </div>
         <div class="card-body">
-          <p class="card-desc">{{ $t('pro.evolutionDesc') }}</p>
+          <p class="card-desc">{{ $t('advanced.evolutionDesc') }}</p>
           <div class="evolution-actions">
             <el-button @click="loadEvolutionInsights" :disabled="loading.insights" :loading="loading.insights">
-              {{ $t('pro.evolutionInsights') }}
+              {{ $t('advanced.evolutionInsights') }}
             </el-button>
             <el-button @click="runDiscoverRelations" :disabled="loading.discover" :loading="loading.discover">
-              {{ $t('pro.discoverRelations') }}
+              {{ $t('advanced.discoverRelations') }}
             </el-button>
             <el-button @click="runInferChains" :disabled="loading.infer" :loading="loading.infer">
-              {{ $t('pro.inferChains') }}
+              {{ $t('advanced.inferChains') }}
             </el-button>
             <el-button @click="runImportanceAdjust" :disabled="loading.importance" :loading="loading.importance">
-              {{ $t('pro.importanceAdjust') }}
+              {{ $t('advanced.importanceAdjust') }}
             </el-button>
           </div>
           <div v-if="evolutionInsights" class="evolution-insights">
             <div class="stats-row">
               <div class="stat-item">
                 <span class="stat-value">{{ evolutionInsights.total_memories }}</span>
-                <span class="stat-label">{{ $t('pro.totalMemoriesLabel') }}</span>
+                <span class="stat-label">{{ $t('advanced.totalMemoriesLabel') }}</span>
               </div>
               <div class="stat-item">
                 <span class="stat-value success">{{ evolutionInsights.relations_count }}</span>
-                <span class="stat-label">{{ $t('pro.relationsCount') }}</span>
+                <span class="stat-label">{{ $t('advanced.relationsCount') }}</span>
               </div>
               <div class="stat-item">
                 <span class="stat-value warn">{{ evolutionInsights.discovered_relations }}</span>
-                <span class="stat-label">{{ $t('pro.newDiscoveries') }}</span>
+                <span class="stat-label">{{ $t('advanced.newDiscoveries') }}</span>
               </div>
               <div class="stat-item">
                 <span class="stat-value">{{ evolutionInsights.inferred_chains }}</span>
-                <span class="stat-label">{{ $t('pro.inferChainsLabel') }}</span>
+                <span class="stat-label">{{ $t('advanced.inferChainsLabel') }}</span>
               </div>
             </div>
           </div>
           <div v-if="discoverResult" class="discover-result">
-            <div class="sub-title">{{ $t('pro.discoveredRelations') }} ({{ discoverResult.relations?.length || 0 }})</div>
+            <div class="sub-title">{{ $t('advanced.discoveredRelations') }} ({{ discoverResult.discoveries?.length || 0 }})</div>
             <div class="discover-list">
-              <div v-for="(r, i) in (discoverResult.relations || []).slice(0, 8)" :key="i" class="discover-item">
-                <span class="discover-source">{{ r.source }}</span>
-                <span class="discover-arrow">→</span>
-                <span class="discover-type">{{ r.type }}</span>
-                <span class="discover-arrow">→</span>
-                <span class="discover-target">{{ r.target }}</span>
+              <div v-for="(r, i) in (discoverResult.discoveries || []).slice(0, 8)" :key="i" class="discover-item">
+                <span class="discover-type">{{ r.relation_type }}</span>
+                <span class="discover-arrow">×</span>
+                <span class="discover-count">{{ r.count }}</span>
                 <el-tag size="small" type="info">{{ Math.round(r.confidence * 100) }}%</el-tag>
               </div>
             </div>
           </div>
           <div v-if="inferResult" class="infer-result">
-            <div class="sub-title">{{ $t('pro.inferChainsTitle') }} ({{ inferResult.chains?.length || 0 }})</div>
+            <div class="sub-title">{{ $t('advanced.inferChainsTitle') }} ({{ inferResult.inferences?.length || 0 }})</div>
             <div class="chain-list">
-              <div v-for="(c, i) in (inferResult.chains || []).slice(0, 5)" :key="i" class="chain-item">
+              <div v-for="(c, i) in (inferResult.inferences || []).slice(0, 5)" :key="i" class="chain-item">
                 <div class="chain-nodes">
-                  <span v-for="(n, j) in c.nodes" :key="j" class="chain-node">
-                    {{ n }}<span v-if="j < c.nodes.length - 1" class="chain-arrow"> → </span>
-                  </span>
+                  <span class="chain-node">{{ c.entity_name }}</span>
                 </div>
                 <div class="chain-conclusion">
-                  ∴ {{ c.conclusion }}
+                  {{ c.reason }} ({{ Math.round(c.confidence * 100) }}%)
                 </div>
               </div>
             </div>
           </div>
           <div class="prefetch-section">
             <div class="setting-item">
-              <span>{{ $t('pro.memoryPrefetch') }}</span>
+              <span>{{ $t('advanced.memoryPrefetch') }}</span>
             </div>
             <div class="router-test">
-              <el-input v-model="prefetchContext" :placeholder="$t('pro.prefetchPlaceholder')" size="small" />
+              <el-input v-model="prefetchContext" :placeholder="$t('advanced.prefetchPlaceholder')" size="small" />
               <el-button type="primary" @click="runPrefetch" :disabled="loading.prefetch" :loading="loading.prefetch">
-                {{ $t('pro.prefetch') }}
+                {{ $t('advanced.prefetch') }}
               </el-button>
             </div>
             <div v-if="prefetchResult" class="prefetch-result">
-              <span class="prefetch-count">{{ $t('pro.prefetchMatched', { count: prefetchResult.matched_count }) }}</span>
+              <span class="prefetch-count">{{ $t('advanced.prefetchMatched', { count: prefetchResult.matched_count }) }}</span>
             </div>
           </div>
         </div>
@@ -461,7 +453,7 @@ import { ref, reactive, onMounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { proApi } from '../api/go-pro'
+import { toolboxApi } from '../api/go-toolbox'
 import { translateError } from '../i18n'
 
 const { t } = useI18n()
@@ -518,7 +510,7 @@ watch(() => route.query.section, (section) => {
 })
 
 function scrollToSection(section: string) {
-  const el = document.getElementById(`pro-${section}`)
+  const el = document.getElementById(`advanced-${section}`)
   if (el) {
     el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     el.classList.add('section-highlight')
@@ -529,9 +521,10 @@ function scrollToSection(section: string) {
 async function loadDecayStats() {
   loading.value.decay = true
   try {
-    const { data } = await proApi.getDecayStats()
+    const { data } = await toolboxApi.getDecayStats()
     decayStats.value = data
-    pruneSuggestions.value = data.suggestions || []
+    const { data: pruneData } = await toolboxApi.getPruneSuggestions()
+    pruneSuggestions.value = pruneData.suggestions || []
   } catch (e: any) {
     if (e.response?.status !== 403) ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.decay = false }
@@ -540,8 +533,8 @@ async function loadDecayStats() {
 async function applyDecay() {
   loading.value.applyDecay = true
   try {
-    const { data } = await proApi.applyDecay()
-    ElMessage.success(t('pro.decayApplied', { updated: data.adjusted || data.processed || 0, deleted: data.trashed || 0 }))
+    const { data } = await toolboxApi.applyDecay()
+    ElMessage.success(t('advanced.decayApplied', { updated: data.adjusted || data.processed || 0, deleted: data.trashed || 0 }))
     loadDecayStats()
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
@@ -551,7 +544,7 @@ async function applyDecay() {
 async function scanConflicts() {
   loading.value.conflicts = true
   try {
-    const { data } = await proApi.scanConflicts()
+    const { data } = await toolboxApi.scanConflicts()
     conflicts.value = data.conflicts
     conflictSummary.value = { total: data.total, auto_resolvable: data.auto_resolvable || 0, needs_review: data.needs_review || data.total }
   } catch (e: any) {
@@ -561,8 +554,8 @@ async function scanConflicts() {
 
 async function resolveConflict(index: number, strategy: string) {
   try {
-    await proApi.resolveConflict(index, strategy)
-    ElMessage.success(t('pro.conflictResolved'))
+    await toolboxApi.resolveConflict(index, strategy)
+    ElMessage.success(t('advanced.conflictResolved'))
     scanConflicts()
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
@@ -572,8 +565,8 @@ async function resolveConflict(index: number, strategy: string) {
 async function loadTokenStats() {
   loading.value.tokenStats = true
   try {
-    const { data } = await proApi.getTokenStats()
-    tokenStatData.value = { total_estimated_tokens: data.total_tokens_used, avg_tokens_per_memory: data.total_memories > 0 ? Math.round(data.total_tokens_used / data.total_memories) : 0 }
+    const { data } = await toolboxApi.getTokenStats()
+    tokenStatData.value = { total_estimated_tokens: data.total_tokens, avg_tokens_per_memory: data.memory_count > 0 ? Math.round(data.total_tokens / data.memory_count) : 0 }
   } catch (e: any) {
     if (e.response?.status !== 403) ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.tokenStats = false }
@@ -583,8 +576,8 @@ async function testRoute() {
   if (!testMessage.value) return
   loading.value.route = true
   try {
-    const { data } = await proApi.routeModel(testMessage.value)
-    routeResult.value = { selected_model: data.model || data.provider, complexity: data.estimated_tokens > 500 ? 'high' : data.estimated_tokens > 200 ? 'medium' : 'low' }
+    const { data } = await toolboxApi.routeModel(testMessage.value)
+    routeResult.value = { selected_model: data.recommended_layer || data.strategy, complexity: data.complexity || 'simple' }
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.route = false }
@@ -593,9 +586,9 @@ async function testRoute() {
 async function runAiExtract() {
   loading.value.extract = true
   try {
-    const { data } = await proApi.aiExtract()
-    extractResult.value = { entities_extracted: data.total, relations_extracted: 0 }
-    ElMessage.success(t('pro.extractDone', { entities: data.total, relations: 0 }))
+    const { data } = await toolboxApi.aiExtract()
+    extractResult.value = { entities_extracted: data.extracted, relations_extracted: 0 }
+    ElMessage.success(t('advanced.extractDone', { entities: data.extracted, relations: 0 }))
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.extract = false }
@@ -604,9 +597,9 @@ async function runAiExtract() {
 async function runAutoGraph(overwrite: boolean) {
   loading.value.graph = true
   try {
-    const { data } = await proApi.autoGraph(overwrite)
+    const { data } = await toolboxApi.autoGraph(overwrite)
     graphResult.value = data
-    ElMessage.success(t('pro.graphDone', { entities: data.entities_created, relations: data.relations_created }))
+    ElMessage.success(t('advanced.graphDone', { entities: 0, relations: data.created }))
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.graph = false }
@@ -614,14 +607,14 @@ async function runAutoGraph(overwrite: boolean) {
 
 async function loadBackupSchedule() {
   try {
-    const { data } = await proApi.getBackupSchedule()
+    const { data } = await toolboxApi.getBackupSchedule()
     backupSchedule.value = data
   } catch { backupSchedule.value = { enabled: false, interval_hours: 24 } }
 }
 
 async function saveBackupSchedule() {
   try {
-    await proApi.setBackupSchedule(backupSchedule.value)
+    await toolboxApi.setBackupSchedule(backupSchedule.value)
     ElMessage.success(t('common.success'))
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
@@ -631,7 +624,7 @@ async function saveBackupSchedule() {
 async function previewCompress() {
   loading.value.compressPreview = true
   try {
-    const { data } = await proApi.compressPreview(compressLevel.value)
+    const { data } = await toolboxApi.compressPreview(compressLevel.value)
     compressPreviewData.value = data
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
@@ -641,8 +634,8 @@ async function previewCompress() {
 async function applyCompress() {
   loading.value.compressApply = true
   try {
-    const { data } = await proApi.compressApply(compressLevel.value)
-    ElMessage.success(t('pro.compressDone', { count: data.compressed, ratio: Math.round(data.ratio * 100) }))
+    const { data } = await toolboxApi.compressApply(compressLevel.value)
+    ElMessage.success(t('advanced.compressDone', { count: data.archived, ratio: data.total > 0 ? Math.round(data.archived / data.total * 100) : 0 }))
     compressPreviewData.value = null
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
@@ -651,7 +644,7 @@ async function applyCompress() {
 
 async function saveCompressConfig() {
   try {
-    await proApi.setCompressConfig(compressConfig.value)
+    await toolboxApi.setCompressConfig(compressConfig.value)
     ElMessage.success(t('common.success'))
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
@@ -660,16 +653,17 @@ async function saveCompressConfig() {
 
 async function loadCompressConfig() {
   try {
-    const { data } = await proApi.getCompressConfig()
-    compressConfig.value = { auto_enabled: data.auto_enabled || false, threshold: data.threshold || 1000, level: data.level || 'light' }
+    const { data } = await toolboxApi.getCompressConfig()
+    const cfg = data.config || data
+    compressConfig.value = { auto_enabled: cfg.auto_compress || false, threshold: cfg.threshold || 1000, level: cfg.level || 'light' }
   } catch { compressConfig.value = { auto_enabled: false, threshold: 1000, level: 'light' } }
 }
 
 async function loadEvolutionInsights() {
   loading.value.insights = true
   try {
-    const { data } = await proApi.getEvolutionInsights()
-    evolutionInsights.value = { total_memories: data.total_memories, relations_count: data.total_relations, discovered_relations: data.discovered_relations || 0, inferred_chains: data.inferred_chains || 0 }
+    const { data } = await toolboxApi.getEvolutionInsights()
+    evolutionInsights.value = { total_memories: data.total, relations_count: 0, discovered_relations: 0, inferred_chains: 0 }
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.insights = false }
@@ -678,9 +672,9 @@ async function loadEvolutionInsights() {
 async function runDiscoverRelations() {
   loading.value.discover = true
   try {
-    const { data } = await proApi.discoverRelations()
+    const { data } = await toolboxApi.discoverRelations()
     discoverResult.value = data
-    ElMessage.success(t('pro.discoveredCount', { count: data.relations?.length || 0 }))
+    ElMessage.success(t('advanced.discoveredCount', { count: data.discoveries?.length || 0 }))
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.discover = false }
@@ -689,9 +683,9 @@ async function runDiscoverRelations() {
 async function runInferChains() {
   loading.value.infer = true
   try {
-    const { data } = await proApi.inferChains()
+    const { data } = await toolboxApi.inferChains()
     inferResult.value = data
-    ElMessage.success(t('pro.inferredCount', { count: data.chains?.length || 0 }))
+    ElMessage.success(t('advanced.inferredCount', { count: data.inferences?.length || 0 }))
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.infer = false }
@@ -700,8 +694,8 @@ async function runInferChains() {
 async function runImportanceAdjust() {
   loading.value.importance = true
   try {
-    const { data } = await proApi.getImportanceAdjustments()
-    ElMessage.success(t('pro.adjustedCount', { count: data.total || 0 }))
+    const { data } = await toolboxApi.getImportanceAdjustments()
+    ElMessage.success(t('advanced.adjustedCount', { count: data.total || 0 }))
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.importance = false }
@@ -711,7 +705,7 @@ async function runPrefetch() {
   if (!prefetchContext.value) return
   loading.value.prefetch = true
   try {
-    const { data } = await proApi.prefetchMemories(prefetchContext.value)
+    const { data } = await toolboxApi.prefetchMemories(prefetchContext.value)
     prefetchResult.value = { matched_count: data.total || 0 }
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
@@ -720,7 +714,7 @@ async function runPrefetch() {
 </script>
 
 <style scoped>
-.pro-page {
+.advanced-page {
   min-height: 100%;
   display: flex;
   flex-direction: column;
@@ -749,7 +743,7 @@ async function runPrefetch() {
   margin: 0;
 }
 
-.pro-badge {
+.advanced-badge {
   background: rgba(16,185,129,0.15);
   color: #10B981;
   padding: 2px 10px;
@@ -758,7 +752,7 @@ async function runPrefetch() {
   font-weight: 600;
 }
 
-.pro-grid {
+.advanced-grid {
   padding: 24px 28px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
@@ -780,20 +774,20 @@ async function runPrefetch() {
   font-size: 14px;
 }
 
-.pro-card {
+.advanced-card {
   background: var(--cm-bg-primary, #fff);
   border: 1px solid var(--cm-border, #e5e5e5);
   border-radius: 14px;
   transition: all 0.25s ease;
 }
 
-.pro-card:hover {
+.advanced-card:hover {
   border-color: var(--cm-primary, #6366f1);
   box-shadow: 0 8px 24px rgba(99,102,241,0.12);
   transform: translateY(-2px);
 }
 
-.pro-card.section-highlight {
+.advanced-card.section-highlight {
   border-color: var(--cm-primary, #6366f1);
   box-shadow: 0 0 0 2px rgba(99,102,241,0.2);
   transition: all 0.3s ease;
@@ -1021,7 +1015,7 @@ async function runPrefetch() {
 .prefetch-count { font-size: 13px; color: var(--cm-primary, #6366f1); font-weight: 500; }
 
 @media (max-width: 768px) {
-  .pro-grid {
+  .advanced-grid {
     grid-template-columns: 1fr;
     padding: 16px;
   }
@@ -1033,7 +1027,7 @@ async function runPrefetch() {
 }
 
 @media (max-width: 480px) {
-  .pro-grid { padding: 12px; }
+  .advanced-grid { padding: 12px; }
   .page-hero { padding: 12px; }
   .hero-content h1 { font-size: 20px; }
   .help-popup { width: 240px; right: -10px; }

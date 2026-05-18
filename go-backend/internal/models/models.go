@@ -160,23 +160,6 @@ type DailyReport struct {
 	CreatedAt           time.Time `json:"created_at"`
 }
 
-// License 授权
-type License struct {
-	ID                uint       `gorm:"primarykey" json:"id"`
-	LicenseKey        string     `gorm:"size:100;not null;uniqueIndex" json:"license_key"`
-	Tier              string     `gorm:"size:20;default:oss" json:"tier"`
-	Status            string     `gorm:"size:20;default:inactive" json:"status"`
-	DeviceFingerprint string     `gorm:"size:64" json:"device_fingerprint"`
-	DeviceName        string     `gorm:"size:200" json:"device_name"`
-	ExpiresAt         *time.Time `json:"expires_at"`
-	DeviceSlot        string     `gorm:"size:50" json:"device_slot"`
-	Features          string     `gorm:"type:text" json:"features"`
-	ProDownloadURL    string     `gorm:"size:500" json:"pro_download_url"`
-	ProFallbackURLs   string     `gorm:"type:text" json:"pro_fallback_urls"`
-	ActivatedAt       *time.Time `json:"activated_at"`
-	CreatedAt         time.Time  `json:"created_at"`
-}
-
 // Setting 设置
 type Setting struct {
 	ID     uint   `gorm:"primarykey" json:"id"`
@@ -202,7 +185,7 @@ type APIKey struct {
 	Name        string     `gorm:"size:100;not null" json:"name"`
 	KeyHash     string     `gorm:"size:64;not null;uniqueIndex" json:"-"`
 	KeyPrefix   string     `gorm:"size:8;not null" json:"key_prefix"`
-	Permissions string     `gorm:"size:200;default:memories:read,memories:write,conversations:write,sessions:write,reason:execute" json:"permissions"`
+	Permissions string     `gorm:"size:200;default:memories:read,memories:write,conversations:write,sessions:write,reason:execute,ai:execute" json:"permissions"`
 	AgentName   string     `gorm:"size:50;index" json:"agent_name"`
 	LastUsedAt  *time.Time `json:"last_used_at"`
 	ExpiresAt   *time.Time `json:"expires_at"`

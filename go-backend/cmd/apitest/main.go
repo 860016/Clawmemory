@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"clawmemory/internal/api"
-	"clawmemory/internal/config"
 	"clawmemory/internal/database"
 	"clawmemory/internal/models"
 	"clawmemory/internal/services"
@@ -38,8 +37,7 @@ func main() {
 	}
 	database.Migrate(db)
 
-	cfg := config.Load()
-	services.InitProProvider(db, cfg)
+	_ = services.NewToolboxService(db)
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte("test123"), bcrypt.DefaultCost)
 	db.Create(&models.User{Username: "testuser", Password: string(hash), Role: "admin"})
@@ -117,14 +115,14 @@ func main() {
 	testSkillDetailAPIs()
 	testSuggestionDismiss()
 
-	testSection("Pro APIs", []testCase{
-		{"GET /pro/decay/stats", "GET", "/api/v1/pro/decay/stats", "", nil},
-		{"GET /pro/conflicts/scan", "GET", "/api/v1/pro/conflicts/scan", "", []int{200, 500, 503}},
-		{"GET /pro/token/route", "GET", "/api/v1/pro/token/route", "", nil},
-		{"GET /pro/token/stats", "GET", "/api/v1/pro/token/stats", "", nil},
-		{"GET /pro/prune-suggest", "GET", "/api/v1/pro/prune-suggest", "", nil},
-		{"GET /pro/compress/config", "GET", "/api/v1/pro/compress/config", "", nil},
-		{"GET /pro/evolution/insights", "GET", "/api/v1/pro/evolution/insights", "", nil},
+	testSection("Toolbox APIs", []testCase{
+		{"GET /toolbox/decay/stats", "GET", "/api/v1/toolbox/decay/stats", "", nil},
+		{"GET /toolbox/conflicts/scan", "GET", "/api/v1/toolbox/conflicts/scan", "", []int{200, 500, 503}},
+		{"GET /toolbox/token/route", "GET", "/api/v1/toolbox/token/route", "", nil},
+		{"GET /toolbox/token/stats", "GET", "/api/v1/toolbox/token/stats", "", nil},
+		{"GET /toolbox/prune-suggest", "GET", "/api/v1/toolbox/prune-suggest", "", nil},
+		{"GET /toolbox/compress/config", "GET", "/api/v1/toolbox/compress/config", "", nil},
+		{"GET /toolbox/evolution/insights", "GET", "/api/v1/toolbox/evolution/insights", "", nil},
 	})
 
 	testSection("Backup APIs", []testCase{

@@ -16,17 +16,11 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	cfg := config.Load()
 
 	authService := services.NewAuthService(db, cfg.JWTSecret)
-	proProvider := services.GetProProvider()
 	aiRouter := ai.NewAIRouter(db)
 	aiSvc := ai.NewAIService(aiRouter, db)
-	embedAdapter := &aiEmbeddingAdapter{router: aiRouter, provider: proProvider}
+	embedAdapter := &aiEmbeddingAdapter{router: aiRouter}
 	services.InitEmbeddingService(db, embedAdapter)
 	services.SetEmbeddingAIRouter(embedAdapter)
-
-	if lpp, ok := proProvider.(*services.LocalProProvider); ok {
-		lpp.SetBackupPaths(cfg.BackupsDir, cfg.DatabasePath)
-		lpp.SetAIService(aiSvc)
-	}
 
 	public := r.Group("/api/v1")
 	{
@@ -211,56 +205,53 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.POST("/backups/:filename/restore", handleRestoreBackup(db))
 		authorized.DELETE("/backups/:filename", handleDeleteBackup(db))
 
-		pro := authorized.Group("/pro")
-		{
-			pro.GET("/decay/stats", handleProDecayStats(proProvider, db))
-			pro.POST("/decay/apply", handleProDecayApply(aiSvc, proProvider, db))
-			pro.POST("/reinforce/:id", handleProReinforce(proProvider, db))
-			pro.GET("/prune-suggest", handleProPruneSuggest(proProvider, db))
-			pro.GET("/conflicts/scan", handleProConflictScan(aiSvc, proProvider, db))
-			pro.POST("/conflicts/resolve/:index", handleProConflictResolve(proProvider, db))
-			pro.GET("/token/route", handleProTokenRoute(aiSvc, proProvider, db))
-			pro.GET("/token/stats", handleProTokenStats(proProvider, db))
-			pro.POST("/ai/extract", handleProAIExtract(aiSvc, proProvider, db))
-			pro.POST("/auto-graph", handleProAutoGraph(proProvider, db))
-			pro.GET("/backup/schedule", handleProBackupSchedule(proProvider, db))
-			pro.POST("/backup/schedule", handleProSetBackupSchedule(proProvider, db))
+		toolbox := services.NewToolboxService(db)
 
-			pro.POST("/compress/preview", handleProCompressPreview(proProvider, db))
-			pro.POST("/compress/apply", handleProCompressApply(aiSvc, proProvider, db))
-			pro.GET("/compress/config", handleProCompressConfig(proProvider, db))
-			pro.PUT("/compress/config", handleProSetCompressConfig(proProvider, db))
-
-			pro.GET("/evolution/insights", handleProEvolutionInsights(proProvider, db))
-			pro.POST("/evolution/discover", handleProEvolutionDiscover(aiSvc, proProvider, db))
-			pro.POST("/evolution/infer", handleProEvolutionInfer(proProvider, db))
-			pro.POST("/evolution/importance", handleProEvolutionImportance(proProvider, db))
-			pro.POST("/evolution/prefetch", handleProEvolutionPrefetch(proProvider, db))
-		}
+		authorized.GET("/toolbox/decay/stats", handleToolboxDecayStats(toolbox, db))
+		authorized.POST("/toolbox/decay/apply", handleToolboxDecayApply(aiSvc, toolbox, db))
+		authorized.POST("/toolbox/reinforce/:id", handleToolboxReinforce(toolbox, db))
+		authorized.GET("/toolbox/prune-suggest", handleToolboxPruneSuggest(toolbox, db))
+		authorized.GET("/toolbox/conflicts/scan", handleToolboxConflictScan(aiSvc, toolbox, db))
+		authorized.POST("/toolbox/conflicts/resolve/:index", handleToolboxConflictResolve(toolbox, db))
+		authorized.GET("/toolbox/token/route", handleToolboxTokenRoute(aiSvc, toolbox, db))
+		authorized.GET("/toolbox/token/stats", handleToolboxTokenStats(toolbox, db))
+		authorized.POST("/toolbox/ai/extract", handleToolboxAIExtract(aiSvc, toolbox, db))
+		authorized.POST("/toolbox/auto-graph", handleToolboxAutoGraph(toolbox, db))
+		authorized.GET("/toolbox/backup/schedule", handleToolboxBackupSchedule(toolbox, db))
+		authorized.POST("/toolbox/backup/schedule", handleToolboxSetBackupSchedule(toolbox, db))
+		authorized.POST("/toolbox/compress/preview", handleToolboxCompressPreview(toolbox, db))
+		authorized.POST("/toolbox/compress/apply", handleToolboxCompressApply(aiSvc, toolbox, db))
+		authorized.GET("/toolbox/compress/config", handleToolboxCompressConfig(toolbox, db))
+		authorized.PUT("/toolbox/compress/config", handleToolboxSetCompressConfig(toolbox, db))
+		authorized.GET("/toolbox/evolution/insights", handleToolboxEvolutionInsights(toolbox, db))
+		authorized.POST("/toolbox/evolution/discover", handleToolboxEvolutionDiscover(aiSvc, toolbox, db))
+		authorized.POST("/toolbox/evolution/infer", handleToolboxEvolutionInfer(toolbox, db))
+		authorized.POST("/toolbox/evolution/importance", handleToolboxEvolutionImportance(toolbox, db))
+		authorized.POST("/toolbox/evolution/prefetch", handleToolboxEvolutionPrefetch(toolbox, db))
 
 		aiGroup := authorized.Group("/ai")
 		{
-			aiGroup.GET("/config", handleAIConfig(aiRouter, proProvider))
-			aiGroup.PUT("/config", handleAIConfigUpdate(aiRouter, proProvider))
-			aiGroup.POST("/test", handleAITestConnection(aiRouter, proProvider))
+			aiGroup.GET("/config", handleAIConfig(aiRouter))
+			aiGroup.PUT("/config", handleAIConfigUpdate(aiRouter))
+			aiGroup.POST("/test", handleAITestConnection(aiRouter))
 			aiGroup.GET("/usage", handleAIUsage(aiRouter))
-			aiGroup.GET("/providers", handleAIProviders(proProvider))
+			aiGroup.GET("/providers", handleAIProviders())
 
-			aiGroup.POST("/extract", handleAIExtract(aiSvc, proProvider))
-			aiGroup.POST("/conflict-scan", handleAIConflictScan(aiSvc, proProvider))
-			aiGroup.POST("/decay-evaluate", handleAIDecayEvaluate(aiSvc, proProvider))
-			aiGroup.GET("/daily-report", handleAIDailyReport(aiSvc, proProvider, db))
-			aiGroup.POST("/wiki-generate", handleAIWikiGenerate(aiSvc, proProvider))
-			aiGroup.POST("/compress", handleAICompress(aiSvc, proProvider))
-			aiGroup.POST("/discover-relations", handleAIDiscoverRelations(aiSvc, proProvider))
-			aiGroup.POST("/smart-route", handleAISmartRoute(aiSvc, proProvider))
-			aiGroup.POST("/extract-facts", handleAIExtractFacts(aiSvc, proProvider))
-			aiGroup.POST("/consolidate", handleAIConsolidate(aiSvc, proProvider))
-			aiGroup.POST("/process-conversation", handleAIProcessConversation(aiSvc, proProvider))
-			aiGroup.POST("/context-assemble", handleAIAssembleContext(aiSvc, proProvider))
-			aiGroup.POST("/nudge-reflect", handleAINudgeReflect(aiSvc, proProvider))
-			aiGroup.POST("/self-refine", handleAISelfRefine(aiSvc, proProvider))
-			aiGroup.POST("/user-profile", handleAIUserProfile(aiSvc, proProvider))
+			aiGroup.POST("/extract", handleAIExtract(aiSvc))
+			aiGroup.POST("/conflict-scan", handleAIConflictScan(aiSvc))
+			aiGroup.POST("/decay-evaluate", handleAIDecayEvaluate(aiSvc))
+			aiGroup.GET("/daily-report", handleAIDailyReport(aiSvc, db))
+			aiGroup.POST("/wiki-generate", handleAIWikiGenerate(aiSvc))
+			aiGroup.POST("/compress", handleAICompress(aiSvc))
+			aiGroup.POST("/discover-relations", handleAIDiscoverRelations(aiSvc))
+			aiGroup.POST("/smart-route", handleAISmartRoute(aiSvc))
+			aiGroup.POST("/extract-facts", handleAIExtractFacts(aiSvc))
+			aiGroup.POST("/consolidate", handleAIConsolidate(aiSvc))
+			aiGroup.POST("/process-conversation", handleAIProcessConversation(aiSvc))
+			aiGroup.POST("/context-assemble", handleAIAssembleContext(aiSvc))
+			aiGroup.POST("/nudge-reflect", handleAINudgeReflect(aiSvc))
+			aiGroup.POST("/self-refine", handleAISelfRefine(aiSvc))
+			aiGroup.POST("/user-profile", handleAIUserProfile(aiSvc))
 		}
 
 		skillGroup := authorized.Group("/skills")
@@ -268,11 +259,11 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 			skillGroup.POST("/actions", handleSkillRecordAction(db))
 			skillGroup.POST("/actions/batch", handleSkillRecordAction(db))
 			skillGroup.GET("/detect", handleSkillDetectPatterns(db))
-			skillGroup.POST("/create", handleSkillAutoCreate(db, aiSvc, proProvider))
+			skillGroup.POST("/create", handleSkillAutoCreate(db, aiSvc))
 			skillGroup.GET("/list", handleSkillList(db))
 			skillGroup.GET("/match", handleSkillMatch(db))
 			skillGroup.PATCH("/:id", handleSkillPatch(db))
-			skillGroup.POST("/:id/improve", handleSkillImprove(db, aiSvc, proProvider))
+			skillGroup.POST("/:id/improve", handleSkillImprove(db, aiSvc))
 			skillGroup.POST("/:id/usage", handleSkillRecordUsage(db))
 			skillGroup.GET("/suggestions", handleSkillSuggestions(db))
 			skillGroup.POST("/suggestions/generate", handleSkillSuggestions(db))
@@ -292,17 +283,18 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		external.POST("/sessions/track", handleExternalSessionTrack(db))
 		external.POST("/session-memories", handleExternalCreateSessionMemory(db))
 		external.POST("/reason", handleExternalReason(db))
+		external.POST("/ai/nudge-reflect", handleExternalAINudgeReflect(aiSvc))
+		external.POST("/ai/process-conversation", handleExternalAIProcessConversation(aiSvc))
+		external.POST("/skills/actions", handleExternalSkillRecordAction(db))
 	}
 }
 
 type aiEmbeddingAdapter struct {
-	router   *ai.AIRouter
-	provider services.ProProvider
+	router *ai.AIRouter
 }
 
 func (a *aiEmbeddingAdapter) Embed(ctx context.Context, texts []string) ([][]float64, error) {
-	isPro := a.provider.IsPro()
-	resp, err := a.router.Embed(ctx, 1, isPro, texts)
+	resp, err := a.router.Embed(ctx, 1, texts)
 	if err != nil {
 		return nil, err
 	}
@@ -312,8 +304,8 @@ func (a *aiEmbeddingAdapter) Embed(ctx context.Context, texts []string) ([][]flo
 	return resp.Vectors, nil
 }
 
-func (a *aiEmbeddingAdapter) AIEmbed(ctx context.Context, userID uint, isPro bool, texts []string) ([][]float64, error) {
-	resp, err := a.router.Embed(ctx, userID, isPro, texts)
+func (a *aiEmbeddingAdapter) AIEmbed(ctx context.Context, userID uint, texts []string) ([][]float64, error) {
+	resp, err := a.router.Embed(ctx, userID, texts)
 	if err != nil {
 		return nil, err
 	}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"clawmemory/internal/models"
+	"clawmemory/internal/services"
 
 	"gorm.io/gorm"
 )
@@ -26,14 +27,10 @@ func NewAIService(router *AIRouter, db *gorm.DB) *AIService {
 	}
 }
 
-func (s *AIService) chatWithTemplate(ctx context.Context, userID uint, isPro bool, templateID string, templateData map[string]string) (string, error) {
+func (s *AIService) chatWithTemplate(ctx context.Context, userID uint, templateID string, templateData map[string]string) (string, error) {
 	tmpl, ok := GetPromptTemplate(templateID)
 	if !ok {
 		return "", fmt.Errorf("prompt template not found: %s", templateID)
-	}
-
-	if tmpl.ProOnly && !isPro {
-		return "", fmt.Errorf("prompt template %s requires Pro license", templateID)
 	}
 
 	systemPrompt := RenderPrompt(tmpl.System, templateData)
@@ -45,16 +42,13 @@ func (s *AIService) chatWithTemplate(ctx context.Context, userID uint, isPro boo
 	}
 
 	opts := DefaultChatOptions()
-	if isPro {
-		opts.Temperature = 0.3
-	}
 
 	var resp *ChatResponse
 	var err error
 	maxRetries := 2
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		chatCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
-		resp, err = s.router.Chat(chatCtx, userID, isPro, messages, opts)
+		resp, err = s.router.Chat(chatCtx, userID, messages, opts)
 		cancel()
 
 		if err == nil {
@@ -79,7 +73,7 @@ func (s *AIService) chatWithTemplate(ctx context.Context, userID uint, isPro boo
 	return resp.Content, nil
 }
 
-func (s *AIService) AIExtract(ctx context.Context, userID uint, isPro bool) (map[string]interface{}, error) {
+func (s *AIService) AIExtract(ctx context.Context, userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
 	if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error; err != nil {
 		return nil, fmt.Errorf("failed to load memories: %w", err)
@@ -105,7 +99,7 @@ func (s *AIService) AIExtract(ctx context.Context, userID uint, isPro bool) (map
 		}
 	}
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "extract", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "extract", map[string]string{
 		"Memories": FormatMemoriesForPrompt(memData),
 	})
 	if err != nil {
@@ -170,7 +164,7 @@ func escapeLikeAI(s string) string {
 	return s
 }
 
-func (s *AIService) ConflictScan(ctx context.Context, userID uint, isPro bool) (map[string]interface{}, error) {
+func (s *AIService) ConflictScan(ctx context.Context, userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
 	if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error; err != nil {
 		return nil, fmt.Errorf("failed to load memories: %w", err)
@@ -194,7 +188,7 @@ func (s *AIService) ConflictScan(ctx context.Context, userID uint, isPro bool) (
 		}
 	}
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "conflict_scan", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "conflict_scan", map[string]string{
 		"Memories": FormatMemoriesForPrompt(memData),
 	})
 	if err != nil {
@@ -238,7 +232,7 @@ func (s *AIService) ConflictScan(ctx context.Context, userID uint, isPro bool) (
 	}, nil
 }
 
-func (s *AIService) DecayEvaluate(ctx context.Context, userID uint, isPro bool) (map[string]interface{}, error) {
+func (s *AIService) DecayEvaluate(ctx context.Context, userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
 	if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error; err != nil {
 		return nil, fmt.Errorf("failed to load memories: %w", err)
@@ -267,7 +261,7 @@ func (s *AIService) DecayEvaluate(ctx context.Context, userID uint, isPro bool) 
 		}
 	}
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "decay_evaluate", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "decay_evaluate", map[string]string{
 		"Memories": FormatMemoriesForPrompt(memData),
 	})
 	if err != nil {
@@ -307,7 +301,7 @@ func (s *AIService) DecayEvaluate(ctx context.Context, userID uint, isPro bool) 
 	}, nil
 }
 
-func (s *AIService) GenerateDailyReport(ctx context.Context, userID uint, isPro bool, date string) (map[string]interface{}, error) {
+func (s *AIService) GenerateDailyReport(ctx context.Context, userID uint, date string) (map[string]interface{}, error) {
 	var memoryCount int64
 	s.db.Model(&models.Memory{}).Where("user_id = ? AND DATE(created_at) = ? AND status != ?", userID, date, "trashed").Count(&memoryCount)
 
@@ -327,7 +321,7 @@ func (s *AIService) GenerateDailyReport(ctx context.Context, userID uint, isPro 
 		highlights = "No significant activity today"
 	}
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "daily_report", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "daily_report", map[string]string{
 		"Date":        date,
 		"MemoryCount": fmt.Sprintf("%d", memoryCount),
 		"Highlights":  highlights,
@@ -360,7 +354,7 @@ func (s *AIService) GenerateDailyReport(ctx context.Context, userID uint, isPro 
 	}, nil
 }
 
-func (s *AIService) GenerateWiki(ctx context.Context, userID uint, isPro bool, topic string) (map[string]interface{}, error) {
+func (s *AIService) GenerateWiki(ctx context.Context, userID uint, topic string) (map[string]interface{}, error) {
 	var memories []models.Memory
 	query := s.db.Where("user_id = ? AND status != ?", userID, "trashed")
 	if topic != "" {
@@ -383,7 +377,7 @@ func (s *AIService) GenerateWiki(ctx context.Context, userID uint, isPro bool, t
 		}
 	}
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "wiki_generate", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "wiki_generate", map[string]string{
 		"Topic":    topic,
 		"Memories": FormatMemoriesForPrompt(memData),
 	})
@@ -418,7 +412,7 @@ func (s *AIService) GenerateWiki(ctx context.Context, userID uint, isPro bool, t
 	}, nil
 }
 
-func (s *AIService) CompressMemories(ctx context.Context, userID uint, isPro bool, memoryIDs []uint) (map[string]interface{}, error) {
+func (s *AIService) CompressMemories(ctx context.Context, userID uint, memoryIDs []uint) (map[string]interface{}, error) {
 	var memories []models.Memory
 	s.db.Where("id IN ? AND user_id = ?", memoryIDs, userID).Find(&memories)
 
@@ -436,7 +430,7 @@ func (s *AIService) CompressMemories(ctx context.Context, userID uint, isPro boo
 		}
 	}
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "compress", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "compress", map[string]string{
 		"Memories": FormatMemoriesForPrompt(memData),
 	})
 	if err != nil {
@@ -470,7 +464,7 @@ func (s *AIService) CompressMemories(ctx context.Context, userID uint, isPro boo
 	}, nil
 }
 
-func (s *AIService) DiscoverRelations(ctx context.Context, userID uint, isPro bool) (map[string]interface{}, error) {
+func (s *AIService) DiscoverRelations(ctx context.Context, userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
 	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(30).Find(&memories)
 
@@ -492,7 +486,7 @@ func (s *AIService) DiscoverRelations(ctx context.Context, userID uint, isPro bo
 		}
 	}
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "evolution_discover", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "evolution_discover", map[string]string{
 		"Memories": FormatMemoriesForPrompt(memData),
 	})
 	if err != nil {
@@ -532,8 +526,8 @@ func (s *AIService) DiscoverRelations(ctx context.Context, userID uint, isPro bo
 	}, nil
 }
 
-func (s *AIService) SmartRoute(ctx context.Context, userID uint, isPro bool, text string) (map[string]interface{}, error) {
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "smart_route", map[string]string{
+func (s *AIService) SmartRoute(ctx context.Context, userID uint, text string) (map[string]interface{}, error) {
+	content, err := s.chatWithTemplate(ctx, userID, "smart_route", map[string]string{
 		"Text": text,
 	})
 	if err != nil {
@@ -607,7 +601,7 @@ type ExtractionResult struct {
 	Updates     []FactUpdate          `json:"updates"`
 }
 
-func (s *AIService) ExtractFacts(ctx context.Context, userID uint, isPro bool, messages []map[string]string) (map[string]interface{}, error) {
+func (s *AIService) ExtractFacts(ctx context.Context, userID uint, messages []map[string]string) (map[string]interface{}, error) {
 	var msgBuilder strings.Builder
 	for i, msg := range messages {
 		role := msg["role"]
@@ -639,7 +633,7 @@ func (s *AIService) ExtractFacts(ctx context.Context, userID uint, isPro bool, m
 		existingMemStr = memBuilder.String()
 	}
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "extract_facts", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "extract_facts", map[string]string{
 		"Messages":         msgBuilder.String(),
 		"ExistingMemories": existingMemStr,
 	})
@@ -702,7 +696,7 @@ func (s *AIService) ExtractFacts(ctx context.Context, userID uint, isPro bool, m
 	}, nil
 }
 
-func (s *AIService) ConsolidateMemories(ctx context.Context, userID uint, isPro bool, newFacts []map[string]interface{}) (map[string]interface{}, error) {
+func (s *AIService) ConsolidateMemories(ctx context.Context, userID uint, newFacts []map[string]interface{}) (map[string]interface{}, error) {
 	var factBuilder strings.Builder
 	for i, f := range newFacts {
 		content, _ := f["content"].(string)
@@ -730,7 +724,7 @@ func (s *AIService) ConsolidateMemories(ctx context.Context, userID uint, isPro 
 		existingMemStr = memBuilder.String()
 	}
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "memory_consolidate", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "memory_consolidate", map[string]string{
 		"NewFacts":         factBuilder.String(),
 		"ExistingMemories": existingMemStr,
 	})
@@ -860,7 +854,7 @@ func (s *AIService) ConsolidateMemories(ctx context.Context, userID uint, isPro 
 	}, nil
 }
 
-func (s *AIService) AssembleContext(ctx context.Context, userID uint, isPro bool, query string, tokenBudget int) (map[string]interface{}, error) {
+func (s *AIService) AssembleContext(ctx context.Context, userID uint, query string, tokenBudget int) (map[string]interface{}, error) {
 	var memories []models.Memory
 	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Order("importance DESC").Limit(100).Find(&memories)
 
@@ -885,7 +879,7 @@ func (s *AIService) AssembleContext(ctx context.Context, userID uint, isPro bool
 		tokenBudget = 4000
 	}
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "context_assemble", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "context_assemble", map[string]string{
 		"Query":       query,
 		"TokenBudget": fmt.Sprintf("%d", tokenBudget),
 		"Memories":    memBuilder.String(),
@@ -932,8 +926,8 @@ func (s *AIService) AssembleContext(ctx context.Context, userID uint, isPro bool
 	}, nil
 }
 
-func (s *AIService) ProcessConversation(ctx context.Context, userID uint, isPro bool, messages []map[string]string) (map[string]interface{}, error) {
-	extraction, err := s.ExtractFacts(ctx, userID, isPro, messages)
+func (s *AIService) ProcessConversation(ctx context.Context, userID uint, messages []map[string]string) (map[string]interface{}, error) {
+	extraction, err := s.ExtractFacts(ctx, userID, messages)
 	if err != nil {
 		return nil, fmt.Errorf("extraction phase failed: %w", err)
 	}
@@ -980,7 +974,7 @@ func (s *AIService) ProcessConversation(ctx context.Context, userID uint, isPro 
 		}, nil
 	}
 
-	consolidation, err := s.ConsolidateMemories(ctx, userID, isPro, allNewFacts)
+	consolidation, err := s.ConsolidateMemories(ctx, userID, allNewFacts)
 	if err != nil {
 		return map[string]interface{}{
 			"extraction":      extraction,
@@ -1000,7 +994,7 @@ func (s *AIService) ProcessConversation(ctx context.Context, userID uint, isPro 
 	}, nil
 }
 
-func (s *AIService) NudgeReflect(ctx context.Context, userID uint, isPro bool) (map[string]interface{}, error) {
+func (s *AIService) NudgeReflect(ctx context.Context, userID uint) (map[string]interface{}, error) {
 	var recentHistory []models.MemoryHistory
 	s.db.Where("user_id = ?", userID).Order("created_at DESC").Limit(50).Find(&recentHistory)
 
@@ -1046,7 +1040,7 @@ func (s *AIService) NudgeReflect(ctx context.Context, userID uint, isPro bool) (
 		"detail":  detailCount,
 	})
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "nudge_reflect", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "nudge_reflect", map[string]string{
 		"RecentChanges": string(changesJSON),
 		"UserProfile":   profileJSON,
 		"MemoryStats":   string(statsJSON),
@@ -1165,6 +1159,50 @@ func (s *AIService) NudgeReflect(ctx context.Context, userID uint, isPro bool) (
 		s.updateUserProfile(userID, profileUpdates)
 	}
 
+	var traceCount int64
+	s.db.Model(&models.ActionTrace{}).Where("user_id = ? AND created_at > ?",
+		userID, time.Now().AddDate(0, 0, -7)).Count(&traceCount)
+
+	skillCreated := 0
+	skillImproved := 0
+
+	if traceCount >= 20 {
+		skillSvc := services.NewSkillLearningService(s.db)
+		patterns, err := skillSvc.DetectPatterns(userID)
+		if err == nil && len(patterns) > 0 {
+			worthyPatterns := make([]map[string]interface{}, 0)
+			for _, p := range patterns {
+				if worth, ok := p["worth_skill"].(bool); ok && worth {
+					worthyPatterns = append(worthyPatterns, p)
+				}
+			}
+			if len(worthyPatterns) > 0 {
+				go func() {
+					bgCtx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+					defer cancel()
+					if result, err := s.AISkillCreate(bgCtx, userID, worthyPatterns); err == nil {
+						log.Printf("[NudgeReflect] Auto-created skill from patterns: %v", result)
+					}
+				}()
+				skillCreated = len(worthyPatterns)
+			}
+		}
+
+		var needsImprove []models.Skill
+		s.db.Where("user_id = ? AND status = ?", userID, "needs_improvement").Find(&needsImprove)
+		for _, sk := range needsImprove {
+			skillID := sk.ID
+			go func() {
+				bgCtx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+				defer cancel()
+				if result, err := s.AISkillImprove(bgCtx, userID, skillID); err == nil {
+					log.Printf("[NudgeReflect] Auto-improved skill %d: %v", skillID, result)
+				}
+			}()
+			skillImproved++
+		}
+	}
+
 	now := time.Now()
 	s.db.Model(&models.UserProfile{}).Where("user_id = ?", userID).
 		Updates(map[string]interface{}{"last_nudge_at": &now, "nudge_count": gorm.Expr("nudge_count + 1")})
@@ -1175,11 +1213,13 @@ func (s *AIService) NudgeReflect(ctx context.Context, userID uint, isPro bool) (
 		"forgotten":       forgotten,
 		"insights":        result["insights"],
 		"profile_updates": len(profileUpdates),
+		"skill_created":   skillCreated,
+		"skill_improved":  skillImproved,
 		"nudge_type":      "periodic_reflection",
 	}, nil
 }
 
-func (s *AIService) SelfRefine(ctx context.Context, userID uint, isPro bool, pressureLevel string) (map[string]interface{}, error) {
+func (s *AIService) SelfRefine(ctx context.Context, userID uint, pressureLevel string) (map[string]interface{}, error) {
 	var memories []models.Memory
 	s.db.Where("user_id = ? AND status != ?", userID, "trashed").Order("importance DESC, access_count DESC").Limit(200).Find(&memories)
 
@@ -1211,7 +1251,7 @@ func (s *AIService) SelfRefine(ctx context.Context, userID uint, isPro bool, pre
 
 	memoriesJSON, _ := json.Marshal(memories)
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "self_refine", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "self_refine", map[string]string{
 		"Memories":      string(memoriesJSON),
 		"TargetCount":   fmt.Sprintf("%d", targetCount),
 		"CurrentCount":  fmt.Sprintf("%d", len(memories)),
@@ -1352,7 +1392,7 @@ func (s *AIService) SelfRefine(ctx context.Context, userID uint, isPro bool, pre
 	}, nil
 }
 
-func (s *AIService) BuildUserProfile(ctx context.Context, userID uint, isPro bool) (map[string]interface{}, error) {
+func (s *AIService) BuildUserProfile(ctx context.Context, userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
 	s.db.Where("user_id = ? AND status != ? AND layer IN ?", userID, "trashed",
 		[]string{"core", "context"}).Order("importance DESC").Limit(100).Find(&memories)
@@ -1377,7 +1417,7 @@ func (s *AIService) BuildUserProfile(ctx context.Context, userID uint, isPro boo
 		existingJSON = string(ej)
 	}
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "user_profile_build", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "user_profile_build", map[string]string{
 		"Memories":        string(memoriesJSON),
 		"RecentActivity":  string(activityJSON),
 		"ExistingProfile": existingJSON,
@@ -1493,7 +1533,7 @@ func truncateString(s string, maxLen int) string {
 	return s[:maxLen]
 }
 
-func (s *AIService) AISkillCreate(ctx context.Context, userID uint, isPro bool, patterns []map[string]interface{}) (map[string]interface{}, error) {
+func (s *AIService) AISkillCreate(ctx context.Context, userID uint, patterns []map[string]interface{}) (map[string]interface{}, error) {
 	var traces []models.ActionTrace
 	s.db.Where("user_id = ?", userID).Order("created_at DESC").Limit(100).Find(&traces)
 
@@ -1515,7 +1555,7 @@ func (s *AIService) AISkillCreate(ctx context.Context, userID uint, isPro bool, 
 	tracesJSON, _ := json.Marshal(traces[:min(len(traces), 50)])
 	skillsJSON, _ := json.Marshal(existingSkills)
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "skill_create", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "skill_create", map[string]string{
 		"Patterns":       string(patternsJSON),
 		"Traces":         string(tracesJSON),
 		"ExistingSkills": string(skillsJSON),
@@ -1594,7 +1634,7 @@ func (s *AIService) AISkillCreate(ctx context.Context, userID uint, isPro bool, 
 	}, nil
 }
 
-func (s *AIService) AISkillImprove(ctx context.Context, userID uint, isPro bool, skillID uint) (map[string]interface{}, error) {
+func (s *AIService) AISkillImprove(ctx context.Context, userID uint, skillID uint) (map[string]interface{}, error) {
 	var skill models.Skill
 	if err := s.db.Where("id = ? AND user_id = ?", skillID, userID).First(&skill).Error; err != nil {
 		return nil, fmt.Errorf("skill not found: %w", err)
@@ -1636,7 +1676,7 @@ func (s *AIService) AISkillImprove(ctx context.Context, userID uint, isPro bool,
 	successJSON, _ := json.Marshal(successTraces[:min(len(successTraces), 10)])
 	recentJSON, _ := json.Marshal(recentTraces[:min(len(recentTraces), 30)])
 
-	content, err := s.chatWithTemplate(ctx, userID, isPro, "skill_improve", map[string]string{
+	content, err := s.chatWithTemplate(ctx, userID, "skill_improve", map[string]string{
 		"CurrentSkill":    string(currentSkillJSON),
 		"UsageHistory":    string(usageJSON),
 		"RecentFailures":  string(failJSON),

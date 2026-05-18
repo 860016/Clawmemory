@@ -174,7 +174,7 @@ async function loadPendingShares() {
   pendingLoading.value = true
   try {
     const { data } = await sharingApi.getPendingShares()
-    pendingShares.value = data.shares || data || []
+    pendingShares.value = data.items || data.shares || data || []
   } catch {
     pendingShares.value = []
   } finally {
@@ -186,7 +186,7 @@ async function loadOutboundShares() {
   outboundLoading.value = true
   try {
     const { data } = await sharingApi.getOutboundShares()
-    outboundShares.value = data.shares || data || []
+    outboundShares.value = data.items || data.shares || data || []
   } catch {
     outboundShares.value = []
   } finally {
@@ -198,7 +198,7 @@ async function loadShareRules() {
   rulesLoading.value = true
   try {
     const { data } = await sharingApi.listRules()
-    shareRules.value = data.rules || data || []
+    shareRules.value = data.items || data.rules || data || []
   } catch {
     shareRules.value = []
   } finally {

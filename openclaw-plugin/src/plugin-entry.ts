@@ -2,7 +2,7 @@ export = {
   id: "clawmemory",
   name: "ClawMemory Context Engine",
   description:
-    "Use ClawMemory as OpenClaw's memory backend. Automatically records conversations and injects relevant memories into context.",
+    "Use ClawMemory as OpenClaw's memory backend. Automatically records conversations via ingest and injects relevant memories into context.",
   kind: "context-engine",
   register: function (api: {
     registerContextEngine: (
@@ -20,6 +20,7 @@ export = {
       const apiKey = (config.apiKey as string) || process.env.CLAWMEMORY_API_KEY || "";
       const maxContextMemories = (config.maxContextMemories as number) || 5;
       const enableAutoIngest = (config.enableAutoIngest as boolean) !== false;
+      const ingestDebounceMs = (config.ingestDebounceMs as number) || 500;
 
       if (!apiKey) {
         console.warn("[ClawMemory] No API key configured. Set clawmemory.apiKey in plugin config or CLAWMEMORY_API_KEY env var.");
@@ -73,6 +74,14 @@ export = {
           }
         }
         return "";
+      }
+
+      function generateIngestKey(sessionId: string, message: { role: string; content: unknown }): string {
+        const content = extractContent(message.content);
+        const contentHash = content.length > 100
+          ? content.slice(0, 50) + content.slice(-50) + content.length
+          : content;
+        return `${sessionId}:${message.role}:${contentHash}`;
       }
 
       async function clawMemoryRequest(method: string, path: string, body?: unknown): Promise<unknown> {
@@ -169,9 +178,39 @@ export = {
       }
 
       let turnCount = 0;
-      let lastAssembleSessionId = "";
-      let lastAssembleMessages: Array<{ role: string; content: unknown }> = [];
-      let afterTurnWritten = false;
+      const ingestedKeys = new Set<string>();
+      const pendingIngestQueue: Array<{ key: string; value: string; role: string; sessionId: string; timestamp: number }> = [];
+      let ingestTimer: ReturnType<typeof setTimeout> | null = null;
+
+      async function flushPendingIngests(): Promise<void> {
+        if (pendingIngestQueue.length === 0) return;
+
+        const batch = pendingIngestQueue.splice(0, pendingIngestQueue.length);
+        const items = batch.map(item => ({
+          key: item.key,
+          value: `[${item.role}] ${extractContent(item.value)}`,
+          layer: "episodic" as string,
+          memoryType: "conversation" as string,
+        }));
+
+        try {
+          await writeMemoryBatch(items);
+          console.log(`[ClawMemory] Flushed ${items.length} ingested messages`);
+        } catch (err) {
+          console.error("[ClawMemory] Flush ingest batch failed:", err);
+        }
+      }
+
+      function scheduleIngestFlush(): void {
+        if (ingestTimer) {
+          clearTimeout(ingestTimer);
+        }
+        ingestTimer = setTimeout(() => {
+          flushPendingIngests().catch(err => {
+            console.error("[ClawMemory] Scheduled flush error:", err);
+          });
+        }, ingestDebounceMs);
+      }
 
       return {
         info: {
@@ -184,11 +223,36 @@ export = {
           if (isHeartbeat || !enableAutoIngest) {
             return { ingested: false };
           }
+
           const content = extractContent(message.content);
           if (isNoisyContent(content)) {
             return { ingested: false };
           }
-          console.log(`[ClawMemory] ingest called (role=${message.role}) — but relying on assemble→afterTurn bridge for actual write`);
+
+          const dedupeKey = generateIngestKey(sessionId, message);
+          if (ingestedKeys.has(dedupeKey)) {
+            return { ingested: false };
+          }
+          ingestedKeys.add(dedupeKey);
+
+          if (ingestedKeys.size > 10000) {
+            const iter = ingestedKeys.values();
+            for (let i = 0; i < 5000; i++) {
+              iter.next();
+              ingestedKeys.delete(iter.next().value);
+            }
+          }
+
+          pendingIngestQueue.push({
+            key: `${sessionId}_${message.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            value: content,
+            role: message.role,
+            sessionId,
+            timestamp: Date.now(),
+          });
+
+          scheduleIngestFlush();
+
           return { ingested: true };
         },
 
@@ -196,13 +260,40 @@ export = {
           if (!enableAutoIngest) {
             return { ingested: false };
           }
-          console.log(`[ClawMemory] ingestBatch called (${messages.length} messages) — but relying on assemble→afterTurn bridge for actual write`);
+
+          const filtered = messages.filter(m => {
+            const content = extractContent(m.content);
+            if (isNoisyContent(content)) return false;
+            const dedupeKey = generateIngestKey(sessionId, m);
+            if (ingestedKeys.has(dedupeKey)) return false;
+            ingestedKeys.add(dedupeKey);
+            return true;
+          });
+
+          if (filtered.length === 0) {
+            return { ingested: false };
+          }
+
+          const items = filtered.map(m => ({
+            key: `${sessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            value: `[${m.role}] ${extractContent(m.content)}`,
+            layer: "episodic" as string,
+            memoryType: "conversation" as string,
+          }));
+
+          try {
+            await writeMemoryBatch(items);
+            console.log(`[ClawMemory] ingestBatch: wrote ${items.length} messages for session ${sessionId}`);
+          } catch (err) {
+            console.error("[ClawMemory] ingestBatch write failed:", err);
+          }
+
           return { ingested: true };
         },
 
         async afterTurn({ sessionId, messages }: { sessionId: string; messages?: Array<{ role: string; content: unknown }> }) {
           turnCount++;
-          afterTurnWritten = true;
+
           try {
             await clawMemoryRequest("POST", "/sessions/track", {
               session_id: sessionId,
@@ -210,46 +301,16 @@ export = {
             });
           } catch {}
 
-          if (enableAutoIngest) {
-            let sourceMessages: Array<{ role: string; content: unknown }>;
-
-            if (messages && messages.length > 0) {
-              sourceMessages = messages;
-            } else if (lastAssembleSessionId === sessionId && lastAssembleMessages.length > 0) {
-              sourceMessages = lastAssembleMessages;
-            } else {
-              sourceMessages = [];
-            }
-
-            const filtered = sourceMessages.filter(m => !isNoisyContent(extractContent(m.content)));
-
-            if (filtered.length > 0) {
-              const items = filtered.map(m => ({
-                key: `${sessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                value: `[${m.role}] ${extractContent(m.content)}`,
-              }));
-
-              try {
-                await writeMemoryBatch(items);
-                console.log(`[ClawMemory] afterTurn: wrote ${items.length} messages for session ${sessionId}`);
-              } catch (err) {
-                console.error("[ClawMemory] afterTurn write failed:", err);
-              }
-            } else {
-              console.log(`[ClawMemory] afterTurn: no non-noisy messages to write for session ${sessionId}`);
-            }
-
-            lastAssembleMessages = [];
+          if (ingestTimer) {
+            clearTimeout(ingestTimer);
+            ingestTimer = null;
           }
+          await flushPendingIngests();
 
           return { ok: true };
         },
 
         async assemble({ sessionId, messages, tokenBudget }: { sessionId: string; messages: Array<{ role: string; content: unknown }>; tokenBudget: number }) {
-          lastAssembleSessionId = sessionId;
-          lastAssembleMessages = messages.slice();
-          afterTurnWritten = false;
-
           const lastUserMsg = extractLastUserMessage(messages);
           let systemPromptAddition = "";
 
@@ -284,43 +345,22 @@ export = {
         },
 
         async compact({ sessionId }: { sessionId: string; force: boolean }) {
-          if (!afterTurnWritten && lastAssembleMessages.length > 0 && lastAssembleSessionId === sessionId && enableAutoIngest) {
-            const filtered = lastAssembleMessages.filter(m => !isNoisyContent(extractContent(m.content)));
-            if (filtered.length > 0) {
-              const items = filtered.map(m => ({
-                key: `${sessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                value: `[${m.role}] ${extractContent(m.content)}`,
-              }));
-              try {
-                await writeMemoryBatch(items);
-                console.log(`[ClawMemory] compact: flushed ${items.length} messages for session ${sessionId}`);
-              } catch (err) {
-                console.error("[ClawMemory] compact flush failed:", err);
-              }
-            }
-            lastAssembleMessages = [];
-            afterTurnWritten = true;
+          if (ingestTimer) {
+            clearTimeout(ingestTimer);
+            ingestTimer = null;
           }
+          await flushPendingIngests();
           return { ok: true, compacted: true };
         },
 
         async dispose() {
-          if (lastAssembleMessages.length > 0 && !afterTurnWritten) {
-            console.warn(`[ClawMemory] dispose: flushing ${lastAssembleMessages.length} cached messages`);
-            const filtered = lastAssembleMessages.filter(m => !isNoisyContent(extractContent(m.content)));
-            if (filtered.length > 0) {
-              const items = filtered.map(m => ({
-                key: `dispose_${lastAssembleSessionId}_${m.role}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                value: `[${m.role}] ${extractContent(m.content)}`,
-              }));
-              try {
-                await writeMemoryBatch(items);
-                console.log(`[ClawMemory] dispose: wrote ${items.length} messages`);
-              } catch (err) {
-                console.error("[ClawMemory] dispose flush failed:", err);
-              }
-            }
-            lastAssembleMessages = [];
+          if (ingestTimer) {
+            clearTimeout(ingestTimer);
+            ingestTimer = null;
+          }
+          if (pendingIngestQueue.length > 0) {
+            console.warn(`[ClawMemory] dispose: flushing ${pendingIngestQueue.length} pending messages`);
+            await flushPendingIngests();
           }
         },
       };

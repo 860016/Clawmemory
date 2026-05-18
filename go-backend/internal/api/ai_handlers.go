@@ -15,16 +15,15 @@ import (
 	"gorm.io/gorm"
 )
 
-func handleAIConfig(aiRouter *ai.AIRouter, provider services.ProProvider) gin.HandlerFunc {
+func handleAIConfig(aiRouter *ai.AIRouter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		isPro := provider.IsPro()
-		config := aiRouter.GetCurrentUserConfig(userID, isPro)
+		config := aiRouter.GetCurrentUserConfig(userID)
 		c.JSON(http.StatusOK, config)
 	}
 }
 
-func handleAIConfigUpdate(aiRouter *ai.AIRouter, provider services.ProProvider) gin.HandlerFunc {
+func handleAIConfigUpdate(aiRouter *ai.AIRouter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 		var data map[string]interface{}
@@ -40,17 +39,16 @@ func handleAIConfigUpdate(aiRouter *ai.AIRouter, provider services.ProProvider) 
 
 		c.JSON(http.StatusOK, gin.H{
 			"message": "AI configuration updated",
-			"config":  aiRouter.GetCurrentUserConfig(userID, true),
+			"config":  aiRouter.GetCurrentUserConfig(userID),
 		})
 	}
 }
 
-func handleAITestConnection(aiRouter *ai.AIRouter, provider services.ProProvider) gin.HandlerFunc {
+func handleAITestConnection(aiRouter *ai.AIRouter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		isPro := provider.IsPro()
 
-		result, err := aiRouter.TestConnection(userID, isPro)
+		result, err := aiRouter.TestConnection(userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -68,24 +66,22 @@ func handleAIUsage(aiRouter *ai.AIRouter) gin.HandlerFunc {
 	}
 }
 
-func handleAIProviders(provider services.ProProvider) gin.HandlerFunc {
+func handleAIProviders() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"providers": ai.AllProviders,
-			"is_pro":    true,
 		})
 	}
 }
 
-func handleAIExtract(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAIExtract(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		isPro := provider.IsPro()
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.AIExtract(ctx, userID, isPro)
+		result, err := aiSvc.AIExtract(ctx, userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -95,14 +91,14 @@ func handleAIExtract(aiSvc *ai.AIService, provider services.ProProvider) gin.Han
 	}
 }
 
-func handleAIConflictScan(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAIConflictScan(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.ConflictScan(ctx, userID, true)
+		result, err := aiSvc.ConflictScan(ctx, userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -112,14 +108,14 @@ func handleAIConflictScan(aiSvc *ai.AIService, provider services.ProProvider) gi
 	}
 }
 
-func handleAIDecayEvaluate(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAIDecayEvaluate(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.DecayEvaluate(ctx, userID, true)
+		result, err := aiSvc.DecayEvaluate(ctx, userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -129,10 +125,9 @@ func handleAIDecayEvaluate(aiSvc *ai.AIService, provider services.ProProvider) g
 	}
 }
 
-func handleAIDailyReport(aiSvc *ai.AIService, provider services.ProProvider, db *gorm.DB) gin.HandlerFunc {
+func handleAIDailyReport(aiSvc *ai.AIService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		isPro := provider.IsPro()
 
 		date := c.Query("date")
 		if date == "" {
@@ -142,7 +137,7 @@ func handleAIDailyReport(aiSvc *ai.AIService, provider services.ProProvider, db 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.GenerateDailyReport(ctx, userID, isPro, date)
+		result, err := aiSvc.GenerateDailyReport(ctx, userID, date)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -152,7 +147,7 @@ func handleAIDailyReport(aiSvc *ai.AIService, provider services.ProProvider, db 
 	}
 }
 
-func handleAIWikiGenerate(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAIWikiGenerate(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 
@@ -167,7 +162,7 @@ func handleAIWikiGenerate(aiSvc *ai.AIService, provider services.ProProvider) gi
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.GenerateWiki(ctx, userID, true, data.Topic)
+		result, err := aiSvc.GenerateWiki(ctx, userID, data.Topic)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -177,7 +172,7 @@ func handleAIWikiGenerate(aiSvc *ai.AIService, provider services.ProProvider) gi
 	}
 }
 
-func handleAICompress(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAICompress(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 
@@ -192,7 +187,7 @@ func handleAICompress(aiSvc *ai.AIService, provider services.ProProvider) gin.Ha
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.CompressMemories(ctx, userID, true, data.MemoryIDs)
+		result, err := aiSvc.CompressMemories(ctx, userID, data.MemoryIDs)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -202,14 +197,14 @@ func handleAICompress(aiSvc *ai.AIService, provider services.ProProvider) gin.Ha
 	}
 }
 
-func handleAIDiscoverRelations(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAIDiscoverRelations(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.DiscoverRelations(ctx, userID, true)
+		result, err := aiSvc.DiscoverRelations(ctx, userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -219,7 +214,7 @@ func handleAIDiscoverRelations(aiSvc *ai.AIService, provider services.ProProvide
 	}
 }
 
-func handleAISmartRoute(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAISmartRoute(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 
@@ -234,7 +229,7 @@ func handleAISmartRoute(aiSvc *ai.AIService, provider services.ProProvider) gin.
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 60*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.SmartRoute(ctx, userID, true, data.Text)
+		result, err := aiSvc.SmartRoute(ctx, userID, data.Text)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -244,10 +239,9 @@ func handleAISmartRoute(aiSvc *ai.AIService, provider services.ProProvider) gin.
 	}
 }
 
-func handleAIExtractFacts(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAIExtractFacts(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		isPro := provider.IsPro()
 
 		var data struct {
 			Messages []map[string]string `json:"messages"`
@@ -264,7 +258,7 @@ func handleAIExtractFacts(aiSvc *ai.AIService, provider services.ProProvider) gi
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.ExtractFacts(ctx, userID, isPro, data.Messages)
+		result, err := aiSvc.ExtractFacts(ctx, userID, data.Messages)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -274,10 +268,9 @@ func handleAIExtractFacts(aiSvc *ai.AIService, provider services.ProProvider) gi
 	}
 }
 
-func handleAIConsolidate(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAIConsolidate(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		isPro := provider.IsPro()
 
 		var data struct {
 			Facts []map[string]interface{} `json:"facts"`
@@ -290,7 +283,7 @@ func handleAIConsolidate(aiSvc *ai.AIService, provider services.ProProvider) gin
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.ConsolidateMemories(ctx, userID, isPro, data.Facts)
+		result, err := aiSvc.ConsolidateMemories(ctx, userID, data.Facts)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -300,10 +293,9 @@ func handleAIConsolidate(aiSvc *ai.AIService, provider services.ProProvider) gin
 	}
 }
 
-func handleAIProcessConversation(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAIProcessConversation(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		isPro := provider.IsPro()
 
 		var data struct {
 			Messages []map[string]string `json:"messages"`
@@ -316,7 +308,7 @@ func handleAIProcessConversation(aiSvc *ai.AIService, provider services.ProProvi
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 180*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.ProcessConversation(ctx, userID, isPro, data.Messages)
+		result, err := aiSvc.ProcessConversation(ctx, userID, data.Messages)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -326,7 +318,7 @@ func handleAIProcessConversation(aiSvc *ai.AIService, provider services.ProProvi
 	}
 }
 
-func handleAIAssembleContext(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAIAssembleContext(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 
@@ -342,7 +334,7 @@ func handleAIAssembleContext(aiSvc *ai.AIService, provider services.ProProvider)
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.AssembleContext(ctx, userID, true, data.Query, data.TokenBudget)
+		result, err := aiSvc.AssembleContext(ctx, userID, data.Query, data.TokenBudget)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -352,15 +344,14 @@ func handleAIAssembleContext(aiSvc *ai.AIService, provider services.ProProvider)
 	}
 }
 
-func handleAINudgeReflect(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAINudgeReflect(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		isPro := provider.IsPro()
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.NudgeReflect(ctx, userID, isPro)
+		result, err := aiSvc.NudgeReflect(ctx, userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -370,7 +361,7 @@ func handleAINudgeReflect(aiSvc *ai.AIService, provider services.ProProvider) gi
 	}
 }
 
-func handleAISelfRefine(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAISelfRefine(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 
@@ -388,7 +379,7 @@ func handleAISelfRefine(aiSvc *ai.AIService, provider services.ProProvider) gin.
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.SelfRefine(ctx, userID, true, data.PressureLevel)
+		result, err := aiSvc.SelfRefine(ctx, userID, data.PressureLevel)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -398,14 +389,14 @@ func handleAISelfRefine(aiSvc *ai.AIService, provider services.ProProvider) gin.
 	}
 }
 
-func handleAIUserProfile(aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleAIUserProfile(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.BuildUserProfile(ctx, userID, true)
+		result, err := aiSvc.BuildUserProfile(ctx, userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -492,10 +483,9 @@ func handleSkillDetectPatterns(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func handleSkillAutoCreate(db *gorm.DB, aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleSkillAutoCreate(db *gorm.DB, aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		isPro := provider.IsPro()
 
 		svc := services.NewSkillLearningService(db)
 
@@ -505,7 +495,7 @@ func handleSkillAutoCreate(db *gorm.DB, aiSvc *ai.AIService, provider services.P
 		}
 		_ = c.ShouldBindJSON(&data)
 
-		if data.UseAI && isPro {
+		if data.UseAI {
 			patterns := data.Patterns
 			if len(patterns) == 0 {
 				detected, err := svc.DetectPatterns(userID)
@@ -519,7 +509,7 @@ func handleSkillAutoCreate(db *gorm.DB, aiSvc *ai.AIService, provider services.P
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 			defer cancel()
 
-			result, err := aiSvc.AISkillCreate(ctx, userID, isPro, patterns)
+			result, err := aiSvc.AISkillCreate(ctx, userID, patterns)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
@@ -621,7 +611,7 @@ func handleSkillPatch(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func handleSkillImprove(db *gorm.DB, aiSvc *ai.AIService, provider services.ProProvider) gin.HandlerFunc {
+func handleSkillImprove(db *gorm.DB, aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 		skillIDStr := c.Param("id")
@@ -635,7 +625,7 @@ func handleSkillImprove(db *gorm.DB, aiSvc *ai.AIService, provider services.ProP
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
 		defer cancel()
 
-		result, err := aiSvc.AISkillImprove(ctx, userID, true, skill.ID)
+		result, err := aiSvc.AISkillImprove(ctx, userID, skill.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

@@ -26,6 +26,11 @@
         <el-button @click="generateSuggestions" :loading="suggesting">
           {{ $t('skills.suggestions') }}
         </el-button>
+        <el-select v-model="skillStatusFilter" size="small" style="width: 150px; margin-left: 8px" @change="loadLearnedSkills">
+          <el-option :label="$t('skills.statusActive')" value="active" />
+          <el-option :label="$t('skills.statusNeedsImprovement')" value="needs_improvement" />
+          <el-option :label="$t('skills.statusInactive')" value="inactive" />
+        </el-select>
       </div>
 
       <div v-if="detecting" class="loading-state">
@@ -63,6 +68,7 @@
               <span class="success-rate" v-if="skill.usage_count > 0">
                 {{ Math.round((skill.success_count / skill.usage_count) * 100) }}%
               </span>
+              <el-tag v-if="skill.status === 'needs_improvement'" type="warning" size="small">⚠ {{ $t('skills.needsImprovement') }}</el-tag>
             </div>
           </div>
         </div>
@@ -163,7 +169,7 @@
         <div class="detail-row"><strong>{{ $t('skills.author') }}:</strong> {{ detailSkill.author }}</div>
         <div class="detail-row"><strong>{{ $t('skills.scope') }}:</strong> {{ detailSkill.scope }}</div>
         <div class="detail-row" v-if="detailSkill.tags?.length">
-          <strong>{{ $t('pro.tags') }}:</strong>
+          <strong>{{ $t('advanced.tags') }}:</strong>
           <el-tag v-for="tag in detailSkill.tags" :key="tag" size="small" style="margin: 2px">{{ tag }}</el-tag>
         </div>
         <div class="detail-row" v-if="detailSkill.files?.length">
@@ -171,7 +177,7 @@
           <div class="file-list">{{ detailSkill.files.join(', ') }}</div>
         </div>
         <div class="detail-body" v-if="detailSkill.body_full">
-          <strong>{{ $t('pro.content') }}:</strong>
+          <strong>{{ $t('advanced.content') }}:</strong>
           <pre>{{ detailSkill.body_full }}</pre>
         </div>
       </div>
@@ -232,6 +238,9 @@
           <el-button size="small" @click="improveSkill(learnedDetailSkill.id)" :loading="improving">
             {{ $t('skills.improve') }}
           </el-button>
+          <el-button v-if="learnedDetailSkill.status === 'needs_improvement'" size="small" type="success" @click="reactivateSkill(learnedDetailSkill.id)">
+            {{ $t('skills.reactivate') }}
+          </el-button>
           <el-button size="small" type="danger" @click="deactivateSkill(learnedDetailSkill.id)">
             {{ $t('skills.deactivate') }}
           </el-button>
@@ -271,6 +280,7 @@ const learnedSkills = ref<any[]>([])
 const pendingSuggestions = ref<any[]>([])
 const learnedDetailVisible = ref(false)
 const learnedDetailSkill = ref<any>(null)
+const skillStatusFilter = ref('active')
 
 onMounted(() => {
   loadLearnedSkills()
@@ -318,7 +328,7 @@ async function showDetail(skill: any) {
 
 async function loadLearnedSkills() {
   try {
-    const { data } = await skillsApi.listSkills()
+    const { data } = await skillsApi.listSkills(skillStatusFilter.value)
     learnedSkills.value = data.skills || []
   } catch {
     learnedSkills.value = []
@@ -349,8 +359,12 @@ async function autoCreateSkill() {
       loadLearnedSkills()
     } else if (data.status === 'duplicate') {
       ElMessage.info(data.message)
-    } else if (data.skills && data.skills.length > 0) {
-      ElMessage.success(t('skills.skillsCreated', { count: data.skills.length }))
+    } else if ((data.skills && data.skills.length > 0) || (data.new_skills && data.new_skills.length > 0)) {
+      const count = data.skills?.length || data.new_skills?.length || data.skills_created || 0
+      ElMessage.success(t('skills.skillsCreated', { count }))
+      loadLearnedSkills()
+    } else if (data.skills_created > 0) {
+      ElMessage.success(t('skills.skillsCreated', { count: data.skills_created }))
       loadLearnedSkills()
     }
   } catch (e: any) {
@@ -420,9 +434,10 @@ async function improveSkill(id: number) {
 
 async function deactivateSkill(id: number) {
   try {
+    const currentStatus = learnedDetailSkill.value?.status || 'active'
     await skillsApi.patchSkill(id, {
       field: 'status',
-      old_value: 'active',
+      old_value: currentStatus,
       new_value: 'inactive',
     })
     ElMessage.success(t('skills.deactivated'))
@@ -430,6 +445,21 @@ async function deactivateSkill(id: number) {
     loadLearnedSkills()
   } catch {
     ElMessage.error(t('skills.deactivateFailed'))
+  }
+}
+
+async function reactivateSkill(id: number) {
+  try {
+    await skillsApi.patchSkill(id, {
+      field: 'status',
+      old_value: 'needs_improvement',
+      new_value: 'active',
+    })
+    ElMessage.success(t('skills.reactivated'))
+    learnedDetailVisible.value = false
+    loadLearnedSkills()
+  } catch {
+    ElMessage.error(t('skills.reactivateFailed'))
   }
 }
 </script>

@@ -11,7 +11,6 @@ type PromptTemplate struct {
 	Description string
 	System      string
 	User        string
-	ProOnly     bool
 }
 
 var PromptTemplates = map[string]PromptTemplate{
@@ -19,7 +18,6 @@ var PromptTemplates = map[string]PromptTemplate{
 		ID:          "extract",
 		Name:        "Entity & Relation Extraction",
 		Description: "Extract entities and relations from memories",
-		ProOnly:     false,
 		System: `You are a knowledge graph expert. Extract entities and their relationships from the given memory entries.
 Return ONLY valid JSON, no other text.`,
 		User: `Extract entities and relations from these memories:
@@ -42,7 +40,6 @@ Relation types: works_at, manages, depends_on, located_in, member_of, uses, crea
 		ID:          "conflict_scan",
 		Name:        "Semantic Conflict Detection",
 		Description: "Detect semantic conflicts between memories",
-		ProOnly:     true,
 		System: `You are a data consistency expert. Identify semantic conflicts between memory entries.
 Return ONLY valid JSON, no other text.`,
 		User: `Check these memories for semantic conflicts:
@@ -65,7 +62,6 @@ Return JSON:
 		ID:          "decay_evaluate",
 		Name:        "Smart Decay Evaluation",
 		Description: "AI-powered memory decay assessment",
-		ProOnly:     true,
 		System: `You are a memory management expert. Evaluate which memories should decay, be archived, or kept.
 Return ONLY valid JSON, no other text.`,
 		User: `Evaluate these memories for decay:
@@ -89,7 +85,6 @@ Return JSON:
 		ID:          "daily_report",
 		Name:        "Daily Report Generation",
 		Description: "Generate intelligent daily report from memories",
-		ProOnly:     false,
 		System: `You are a knowledge management assistant. Generate a concise daily report based on the user's memory activity.
 Return ONLY valid JSON, no other text.`,
 		User: `Generate a daily report based on today's activity:
@@ -113,7 +108,6 @@ Return JSON:
 		ID:          "wiki_generate",
 		Name:        "Wiki Auto-Generation",
 		Description: "Auto-generate wiki pages from memories",
-		ProOnly:     true,
 		System: `You are a technical documentation expert. Generate structured wiki documentation from memory entries.
 Return ONLY valid JSON, no other text.`,
 		User: `Generate a wiki document from these memories:
@@ -137,7 +131,6 @@ Return JSON:
 		ID:          "compress",
 		Name:        "Memory Compression",
 		Description: "Compress and refine multiple memories into one",
-		ProOnly:     true,
 		System: `You are an information refinement expert. Merge and compress multiple related memories into a single high-quality entry.
 Return ONLY valid JSON, no other text.`,
 		User: `Compress these related memories into one refined entry:
@@ -165,7 +158,6 @@ Return JSON:
 		ID:          "evolution_discover",
 		Name:        "Deep Relation Discovery",
 		Description: "Discover hidden relationships between memories",
-		ProOnly:     true,
 		System: `You are a knowledge discovery expert. Find hidden, non-obvious relationships between memories.
 Return ONLY valid JSON, no other text.`,
 		User: `Discover deep relationships between these memories:
@@ -189,7 +181,6 @@ Return JSON:
 		ID:          "smart_route",
 		Name:        "Smart Token Router",
 		Description: "Analyze query complexity for optimal model routing",
-		ProOnly:     true,
 		System: `You are a model routing expert. Analyze the complexity of the given text and recommend the appropriate AI model.
 Return ONLY valid JSON, no other text.`,
 		User: `Analyze this text for model routing:
@@ -211,7 +202,6 @@ Return JSON:
 		ID:          "extract_facts",
 		Name:        "Fact & Preference Extraction",
 		Description: "Extract facts, preferences, and relationships from conversation messages",
-		ProOnly:     false,
 		System: `You are a memory extraction specialist. Your job is to analyze conversation messages and extract structured facts, user preferences, and relationships that should be remembered for future interactions.
 
 Rules:
@@ -250,7 +240,6 @@ Return JSON:
 		ID:          "memory_consolidate",
 		Name:        "Memory Consolidation",
 		Description: "Consolidate and deduplicate extracted facts with existing memories",
-		ProOnly:     false,
 		System: `You are a memory consolidation expert. Your job is to merge new facts with existing memories, resolving conflicts and removing duplicates.
 
 Rules:
@@ -292,7 +281,6 @@ Return JSON:
 		ID:          "context_assemble",
 		Name:        "Smart Context Assembly",
 		Description: "Assemble optimal context for LLM from memories based on query",
-		ProOnly:     true,
 		System: `You are a context optimization expert. Given a user query and available memories, select and organize the most relevant context to include in the LLM prompt.
 
 Rules:
@@ -326,7 +314,6 @@ Return JSON:
 		ID:          "nudge_reflect",
 		Name:        "Periodic Nudge Reflection",
 		Description: "Periodically review recent activity and extract high-value knowledge worth persisting",
-		ProOnly:     false,
 		System: `You are a knowledge distillation specialist. Your job is to review recent memory activity and decide what is worth permanently remembering, what should be compressed, and what can be forgotten.
 
 Philosophy: Only remember information that will influence FUTURE behavior. Discard everything else.
@@ -374,7 +361,6 @@ Return JSON:
 		ID:          "self_refine",
 		Name:        "Memory Self-Refinement",
 		Description: "Under capacity pressure, automatically distill memories to retain only the highest-value information",
-		ProOnly:     true,
 		System: `You are a memory refinement engine operating under strict capacity constraints. Your job is to distill a set of memories into a smaller, denser set that preserves maximum information value.
 
 Core principle: Information economy — every character must earn its place.
@@ -420,7 +406,6 @@ Return JSON:
 		ID:          "user_profile_build",
 		Name:        "User Profile Modeling",
 		Description: "Build and maintain a deep user profile from accumulated memories and interactions",
-		ProOnly:     true,
 		System: `You are a user modeling specialist. Your job is to analyze a user's memories and activity patterns to build a comprehensive, evolving user profile.
 
 This profile serves as the "USER.md" equivalent — a compact, high-value representation of WHO the user is, HOW they work, and WHAT they need.
@@ -485,7 +470,6 @@ Return JSON:
 		ID:          "skill_create",
 		Name:        "AI-Enhanced Skill Creation",
 		Description: "Analyze action traces and create a high-quality, reusable Skill document from repetitive patterns",
-		ProOnly:     true,
 		System: `You are a workflow distillation specialist. Your job is to analyze repeated action patterns from a user's coding sessions and create a comprehensive, reusable Skill document.
 
 A Skill is a structured workflow that captures:
@@ -548,7 +532,6 @@ Return JSON:
 		ID:          "skill_improve",
 		Name:        "AI-Enhanced Skill Improvement",
 		Description: "Analyze skill usage history and improve an existing Skill based on success/failure patterns",
-		ProOnly:     true,
 		System: `You are a skill improvement specialist. Your job is to analyze how a Skill has been used and improve it based on real-world outcomes.
 
 Like Hermes Agent's patch-first philosophy: prefer patching (small targeted fixes) over rewriting (complete replacement). Only rewrite when the skill is fundamentally broken.

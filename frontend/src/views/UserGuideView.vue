@@ -163,32 +163,32 @@
         </div>
       </div>
 
-      <div class="guide-card full-width pro-card">
+      <div class="guide-card full-width advanced-card">
         <div class="card-icon">💎</div>
-        <h2>{{ $t('guide.proFeatures') }}</h2>
+        <h2>{{ $t('guide.advancedFeatures') }}</h2>
         <div class="card-content">
-          <div class="pro-sections">
-            <div class="pro-section">
-              <h3>{{ $t('guide.proLocalTitle') }}</h3>
-              <p class="section-desc">{{ $t('guide.proLocalDesc') }}</p>
+          <div class="advanced-sections">
+            <div class="advanced-section">
+              <h3>{{ $t('guide.advancedLocalTitle') }}</h3>
+              <p class="section-desc">{{ $t('guide.advancedLocalDesc') }}</p>
               <ul class="feature-list">
-                <li><span class="check">✓</span> {{ $t('guide.proDecayTitle') }}: {{ $t('guide.proDecayDesc') }}</li>
-                <li><span class="check">✓</span> {{ $t('guide.proConflictTitle') }}: {{ $t('guide.proConflictDesc') }}</li>
-                <li><span class="check">✓</span> {{ $t('guide.proRouterTitle') }}: {{ $t('guide.proRouterDesc') }}</li>
+                <li><span class="check">✓</span> {{ $t('guide.advancedDecayTitle') }}: {{ $t('guide.advancedDecayDesc') }}</li>
+                <li><span class="check">✓</span> {{ $t('guide.advancedConflictTitle') }}: {{ $t('guide.advancedConflictDesc') }}</li>
+                <li><span class="check">✓</span> {{ $t('guide.advancedRouterTitle') }}: {{ $t('guide.advancedRouterDesc') }}</li>
               </ul>
             </div>
-            <div class="pro-section">
-              <h3>{{ $t('guide.proCloudTitle') }}</h3>
-              <p class="section-desc">{{ $t('guide.proCloudDesc') }}</p>
+            <div class="advanced-section">
+              <h3>{{ $t('guide.advancedCloudTitle') }}</h3>
+              <p class="section-desc">{{ $t('guide.advancedCloudDesc') }}</p>
               <ul class="feature-list">
-                <li><span class="check">✓</span> {{ $t('guide.proExtractTitle') }}: {{ $t('guide.proExtractDesc') }}</li>
-                <li><span class="check">✓</span> {{ $t('guide.proTrendTitle') }}: {{ $t('guide.proTrendDesc') }}</li>
-                <li><span class="check">✓</span> {{ $t('guide.proReportTitle') }}: {{ $t('guide.proReportDesc') }}</li>
+                <li><span class="check">✓</span> {{ $t('guide.advancedExtractTitle') }}: {{ $t('guide.advancedExtractDesc') }}</li>
+                <li><span class="check">✓</span> {{ $t('guide.advancedTrendTitle') }}: {{ $t('guide.advancedTrendDesc') }}</li>
+                <li><span class="check">✓</span> {{ $t('guide.advancedReportTitle') }}: {{ $t('guide.advancedReportDesc') }}</li>
               </ul>
             </div>
           </div>
-          <div class="pro-models">
-            <h3>{{ $t('guide.proModelsTitle') }}</h3>
+          <div class="advanced-models">
+            <h3>{{ $t('guide.advancedModelsTitle') }}</h3>
             <div class="model-grid">
               <div class="model-item">OpenAI: GPT-4o / GPT-4-turbo</div>
               <div class="model-item">Anthropic: Claude 3.5 Sonnet</div>
@@ -198,8 +198,8 @@
               <div class="model-item">Qwen: Max / Plus / Turbo</div>
             </div>
           </div>
-          <el-button type="primary" style="margin-top: 16px" @click="$router.push('/pro')">
-            {{ $t('nav.pro') }} →
+          <el-button type="primary" style="margin-top: 16px" @click="$router.push('/advanced')">
+            {{ $t('nav.advanced') }} →
           </el-button>
         </div>
       </div>
@@ -266,14 +266,14 @@
 
       <div class="guide-card full-width">
         <div class="card-icon">⚙️</div>
-        <h2>{{ $t('guide.proFallbackTitle') }}</h2>
+        <h2>{{ $t('guide.advancedFallbackTitle') }}</h2>
         <div class="card-content">
-          <p class="guide-intro">{{ $t('guide.proFallbackIntro') }}</p>
+          <p class="guide-intro">{{ $t('guide.advancedFallbackIntro') }}</p>
           <ul class="feature-list">
-            <li><span class="check">✓</span> {{ $t('guide.proFallbackFeature1') }}</li>
-            <li><span class="check">✓</span> {{ $t('guide.proFallbackFeature2') }}</li>
-            <li><span class="check">✓</span> {{ $t('guide.proFallbackFeature3') }}</li>
-            <li><span class="check">✓</span> {{ $t('guide.proFallbackFeature4') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.advancedFallbackFeature1') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.advancedFallbackFeature2') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.advancedFallbackFeature3') }}</li>
+            <li><span class="check">✓</span> {{ $t('guide.advancedFallbackFeature4') }}</li>
           </ul>
         </div>
       </div>
@@ -346,7 +346,7 @@ function copyCode(code: string) {
   border-color: rgba(139, 92, 246, 0.2);
 }
 
-.guide-card.pro-card {
+.guide-card.advanced-card {
   background: linear-gradient(135deg, var(--cm-bg-secondary) 0%, rgba(16, 185, 129, 0.05) 100%);
   border-color: rgba(16, 185, 129, 0.2);
 }
@@ -589,13 +589,13 @@ function copyCode(code: string) {
   color: var(--cm-text-secondary);
 }
 
-.pro-sections {
+.advanced-sections {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 20px;
 }
 
-.pro-section h3 {
+.advanced-section h3 {
   font-size: 14px;
   font-weight: 600;
   color: var(--cm-text);
@@ -608,13 +608,13 @@ function copyCode(code: string) {
   margin: 0 0 12px;
 }
 
-.pro-models {
+.advanced-models {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--cm-border);
 }
 
-.pro-models h3 {
+.advanced-models h3 {
   font-size: 14px;
   font-weight: 600;
   color: var(--cm-text);
@@ -652,7 +652,7 @@ function copyCode(code: string) {
   .guide-card h2 {
     font-size: 16px;
   }
-  .pro-sections {
+  .advanced-sections {
     grid-template-columns: 1fr;
   }
   .model-grid {

@@ -19,7 +19,6 @@ type OpenAICompatibleProvider struct {
 	model      string
 	embedModel string
 	free       bool
-	proOnly    bool
 	httpClient *http.Client
 }
 
@@ -39,7 +38,6 @@ func NewOpenAICompatibleProvider(cfg ProviderConfig) *OpenAICompatibleProvider {
 		model:      cfg.Model,
 		embedModel: cfg.EmbedModel,
 		free:       isFree,
-		proOnly:    !isFree,
 		httpClient: &http.Client{Timeout: 120 * time.Second},
 	}
 }
@@ -51,7 +49,6 @@ func (p *OpenAICompatibleProvider) Info() ProviderInfo {
 		Name:        p.name,
 		Type:        "openai_compatible",
 		Free:        p.free,
-		ProOnly:     p.proOnly,
 		Description: fmt.Sprintf("OpenAI-compatible provider: %s", p.name),
 	}
 }

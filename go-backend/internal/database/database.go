@@ -49,7 +49,6 @@ func Migrate(db *gorm.DB) error {
 		&models.Project{},
 		&models.ProjectNote{},
 		&models.DailyReport{},
-		&models.License{},
 		&models.Backup{},
 		&models.Setting{},
 		&models.APIKey{},

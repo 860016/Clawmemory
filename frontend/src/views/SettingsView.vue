@@ -27,14 +27,14 @@
             <el-tag :type="aiConfig.provider_source === 'reasoning' ? 'success' : 'primary'" size="small">
               {{ aiConfig.provider_name || aiConfig.provider_id || $t('settings.aiNotConfigured') }}
             </el-tag>
-            <el-tag v-if="aiConfig.is_pro" type="warning" size="small" style="margin-left: 4px">Pro</el-tag>
+            <el-tag v-if="aiConfig.provider_source === 'reasoning' || aiConfig.provider_source === 'pro_config'" type="success" size="small" style="margin-left: 4px">{{ $t('settings.configured') }}</el-tag>
           </span>
         </div>
         <div class="setting-item" v-if="aiConfig">
           <span>{{ $t('settings.aiModel') }}</span>
           <span class="setting-desc">{{ aiConfig.model || '-' }}</span>
         </div>
-        <div class="setting-item" v-if="aiConfig && aiConfig.is_pro">
+        <div class="setting-item" v-if="aiConfig">
           <span>{{ $t('settings.aiCustomProvider') }}</span>
           <el-button size="small" @click="showAIConfigDialog = true">{{ $t('settings.aiConfigure') }}</el-button>
         </div>
@@ -578,7 +578,7 @@
             <el-option v-for="p in aiProviders" :key="p.ID" :label="p.Name" :value="p.ID">
               <span>{{ p.Name }}</span>
               <el-tag v-if="p.Free" type="success" size="small" style="margin-left: 8px">{{ $t('settings.aiFree') }}</el-tag>
-              <el-tag v-if="p.ProOnly" type="warning" size="small" style="margin-left: 4px">Pro</el-tag>
+              
             </el-option>
           </el-select>
         </el-form-item>
@@ -1422,11 +1422,11 @@ watch(showAgentsMdPreview, async (v) => {
 .card-title { font-size: 16px; font-weight: 600; color: var(--cm-text); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--cm-border); }
 .status-label { color: var(--cm-text-muted); font-size: 13px; }
 .status-value { font-size: 13px; color: var(--cm-text); }
-.status-value.pro { color: #10B981; font-weight: 600; }
+.status-value.advanced { color: #10B981; font-weight: 600; }
 .status-value.text-warning { color: #F59E0B; font-weight: 600; }
 .feature-tags { display: flex; flex-wrap: wrap; gap: 4px; max-width: 280px; justify-content: flex-end; }
 .ftag { padding: 1px 8px; background: rgba(16,185,129,0.12); color: #10B981; border-radius: 4px; font-size: 11px; }
-.pro-install-status { margin-top: 12px; padding: 12px; background: rgba(16,185,129,0.05); border-radius: 8px; }
+.advanced-install-status { margin-top: 12px; padding: 12px; background: rgba(16,185,129,0.05); border-radius: 8px; }
 .status-text { font-size: 13px; color: var(--cm-text); margin-bottom: 8px; }
 .section-desc { font-size: 13px; color: var(--cm-text-muted); margin: 0 0 12px; }
 .invitation-create-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -1504,7 +1504,7 @@ watch(showAgentsMdPreview, async (v) => {
   .price-amount {
     font-size: 18px;
   }
-  .pro-install-status {
+  .advanced-install-status {
     padding: 10px;
   }
   .status-text {

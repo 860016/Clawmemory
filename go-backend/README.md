@@ -47,20 +47,12 @@ go-backend/
 
 ### Windows
 ```powershell
-# 开源版
 .\scripts\build.ps1
-
-# Pro 版
-go build -tags pro -o clawmemory-pro.exe ./cmd/server
 ```
 
 ### Linux/macOS
 ```bash
-# 开源版
 ./scripts/build.sh
-
-# Pro 版
-go build -tags pro -o clawmemory-pro ./cmd/server
 ```
 
 ### 跨平台编译

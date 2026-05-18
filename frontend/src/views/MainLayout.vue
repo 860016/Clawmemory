@@ -46,7 +46,7 @@
         
         <!-- Tier Badge -->
         <div class="tier-badge-v2" :class="tierClass">
-          <el-icon v-if="tier === 'pro'"><Trophy /></el-icon>
+          <el-icon v-if="tier === 'advanced'"><Trophy /></el-icon>
           <span>{{ tierLabel }}</span>
         </div>
         
@@ -227,9 +227,9 @@ const showSearch = ref(false)
 const searchQuery = ref('')
 const searchInput = ref<HTMLInputElement>()
 
-const tier = ref('pro')
-const tierLabel = computed(() => t('tier.pro'))
-const tierClass = computed(() => 'tier-pro')
+const tier = ref('advanced')
+const tierLabel = computed(() => t('tier.advanced'))
+const tierClass = computed(() => 'tier-advanced')
 const storagePercent = ref(0)
 
 const handleResize = () => {
@@ -243,7 +243,7 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
   handleResize()
   statsApi.getOverview().then(({ data }) => {
-    const total = data.memory_count || 0
+    const total = data.memoryCount || 0
     const maxPro = 50000
     storagePercent.value = Math.min(Math.round((total / maxPro) * 100), 100)
   }).catch(() => {
@@ -274,7 +274,7 @@ const navItems = [
   { path: '/memories', label: 'nav.memories', icon: Collection },
   { path: '/knowledge', label: 'nav.knowledge', icon: Connection },
   { path: '/projects', label: 'nav.projects', icon: Document },
-  { path: '/pro', label: 'nav.pro', icon: Promotion },
+  { path: '/advanced', label: 'nav.advanced', icon: Promotion },
   { path: '/settings', label: 'nav.settings', icon: Setting },
 ]
 
@@ -316,14 +316,14 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
       { path: '/projects?status=completed', label: 'project.completed', icon: SuccessFilled },
     ]}
   ],
-  '/pro': [
+  '/advanced': [
     { items: [
-      { path: '/pro?section=decay', label: 'pro.decay', icon: TrendCharts },
-      { path: '/pro?section=conflicts', label: 'pro.conflicts', icon: Warning },
-      { path: '/pro?section=router', label: 'pro.smartRouter', icon: Cpu },
-      { path: '/pro?section=tokenStats', label: 'pro.tokenStats', icon: Coin },
-      { path: '/pro?section=extract', label: 'pro.aiExtract', icon: MagicStick },
-      { path: '/pro?section=graph', label: 'pro.autoGraph', icon: Connection },
+      { path: '/advanced?section=decay', label: 'advanced.decay', icon: TrendCharts },
+      { path: '/advanced?section=conflicts', label: 'advanced.conflicts', icon: Warning },
+      { path: '/advanced?section=router', label: 'advanced.smartRouter', icon: Cpu },
+      { path: '/advanced?section=tokenStats', label: 'advanced.tokenStats', icon: Coin },
+      { path: '/advanced?section=extract', label: 'advanced.aiExtract', icon: MagicStick },
+      { path: '/advanced?section=graph', label: 'advanced.autoGraph', icon: Connection },
     ]}
   ],
   '/settings': [
@@ -402,7 +402,7 @@ async function performSearch(q: string) {
     if (projRes.status === 'fulfilled' && projRes.value.data?.items?.length) {
       results.push({
         category: 'projects',
-        label: t('nav.projects'),
+        label: t('nav.advancedjects'),
         items: projRes.value.data.items.map((p: any) => ({
           id: p.id, title: p.name, description: (p.description || '').substring(0, 80), icon: Document, path: '/projects'
         }))
@@ -598,7 +598,7 @@ function handleUserCommand(command: string) {
   font-weight: 600;
 }
 
-.tier-badge-v2.tier-pro {
+.tier-badge-v2.tier-advanced {
   background: var(--cm-primary-gradient);
   color: white;
 }

@@ -88,11 +88,12 @@ func main() {
 	backupSvc := services.NewBackupService(db, filepath.Join(exeDir, "backups"))
 	_ = backupSvc
 
-	proProvider := services.InitProProvider(db, cfg)
+	toolbox := services.NewToolboxService(db)
+	_ = toolbox
 
 	autoCreateAPIKey(db)
 
-	log.Printf("✅ Pro features active (tier: %s)", proProvider.GetTier())
+	log.Printf("✅ All features active (open source)")
 
 	syncService := services.GetOpenClawSyncService(db)
 	go syncService.Start()

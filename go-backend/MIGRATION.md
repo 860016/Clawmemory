@@ -104,13 +104,13 @@ go build -o clawmemory.exe ./cmd/server
 go build -o clawmemory ./cmd/server
 ```
 
-### 5. 编译 Pro 版
+### 5. 编译
 ```bash
 # Windows
-go build -tags pro -o clawmemory-pro.exe ./cmd/server
+go build -o clawmemory.exe ./cmd/server
 
 # Linux/macOS
-go build -tags pro -o clawmemory-pro ./cmd/server
+go build -o clawmemory ./cmd/server
 ```
 
 ### 6. 跨平台编译

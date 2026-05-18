@@ -255,6 +255,16 @@ func (s *SkillLearningService) RecordSkillUsage(userID uint, skillID uint, succe
 		updates["fail_count"] = skill.FailCount + 1
 	}
 
+	newUsageCount := skill.UsageCount + 1
+	newFailCount := skill.FailCount
+	if !success {
+		newFailCount++
+	}
+
+	if newUsageCount >= 3 && newFailCount > 0 && float64(newFailCount)/float64(newUsageCount) > 0.33 {
+		updates["status"] = "needs_improvement"
+	}
+
 	return s.db.Model(&skill).Updates(updates).Error
 }
 
@@ -278,7 +288,7 @@ func (s *SkillLearningService) PatchSkill(userID uint, skillID uint, field, oldV
 	case "description":
 		skill.Description = newValue
 	case "status":
-		validStatuses := map[string]bool{"active": true, "inactive": true, "archived": true}
+		validStatuses := map[string]bool{"active": true, "inactive": true, "archived": true, "needs_improvement": true}
 		if !validStatuses[newValue] {
 			return fmt.Errorf("invalid status value: %s", newValue)
 		}

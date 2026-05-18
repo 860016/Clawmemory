@@ -3,7 +3,6 @@ module clawmemory
 go 1.23
 
 require (
-	github.com/860016/clawmemory-pro v0.0.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/glebarez/sqlite v1.11.0
 	github.com/golang-jwt/jwt/v5 v5.2.0
@@ -48,5 +47,3 @@ require (
 	modernc.org/memory v1.5.0 // indirect
 	modernc.org/sqlite v1.23.1 // indirect
 )
-
-replace github.com/860016/clawmemory-pro => ./prostub

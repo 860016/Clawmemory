@@ -19,8 +19,8 @@ export const knowledgeApi = {
   // 统计
   getStats: () => api.get('/stats'),
 
-  // AI 提取（Pro 功能）
-  aiExtract: (data: any) => api.post('/pro/ai/extract', data),
+  // AI 提取（高级功能）
+  aiExtract: (data: any) => api.post('/toolbox/ai/extract', data),
 
   // 消歧
   disambiguate: (name: string) =>
