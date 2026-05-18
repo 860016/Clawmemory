@@ -65,6 +65,7 @@ func Migrate(db *gorm.DB) error {
 		&models.ActionTrace{},
 		&models.Skill{},
 		&models.SkillSuggestion{},
+		&models.FileSyncIndex{},
 	)
 }
 

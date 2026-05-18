@@ -14,34 +14,30 @@ go-backend/
 │   ├── models/         # 数据模型（GORM）
 │   └── services/       # 业务逻辑层
 ├── pkg/                # 可复用包
-│   ├── license/        # 授权验证和加密
 │   └── utils/          # 工具函数
-├── pro/                # Pro 功能模块（编译时加密）
-│   ├── decay/          # 记忆衰减算法
-│   ├── conflict/       # 冲突检测与合并
-│   └── router/         # 智能模型路由
 ├── scripts/            # 构建脚本
 │   ├── build.ps1       # Windows 构建
 │   └── build.sh        # Linux/macOS 构建
 └── go.mod
 ```
 
-## 功能对比
+## 功能列表
 
-| 功能 | 开源版 | Pro 版 |
-|------|--------|--------|
-| 记忆管理 | ✓ | ✓ |
-| 知识图谱 | ✓ | ✓ |
-| Wiki | ✓ | ✓ |
-| 日报 | ✓ | ✓ |
-| 备份恢复 | ✓ | ✓ |
-| 全文搜索 | ✓ | ✓ |
-| 向量搜索 | ✓ | ✓ |
-| 记忆衰减算法 | 基础 | 高级 |
-| 冲突检测 | 基础 | 高级 |
-| 智能路由 | 基础 | 高级 |
-| 自动备份 | - | ✓ |
-| 多设备同步 | - | ✓ |
+所有功能完全开源（MIT License）：
+
+| 功能 | 说明 |
+|------|------|
+| 记忆管理 | 多层级记忆分类、衰减算法、强化机制 |
+| 知识图谱 | 实体提取、关系建立、图谱可视化 |
+| Wiki | Markdown 知识页面、版本历史 |
+| 日报 | 自动汇总、趋势分析 |
+| 备份恢复 | 自动备份、数据导入导出 |
+| 全文搜索 | SQLite FTS5 关键词搜索 |
+| 向量搜索 | ChromaDB 语义搜索 |
+| AI 增强 | 冲突扫描、Wiki 生成、记忆压缩、关系发现、智能路由、衰减评估 |
+| 自进化系统 | NudgeReflect 技能审查、自动创建和改进技能 |
+| OpenClaw 集成 | 实时文件监听、增量索引、显著性过滤 |
+| Dialectic Reasoning | 多轮推理引擎 |
 
 ## 编译
 
@@ -118,20 +114,21 @@ DATA_DIR=/path/to/data ./clawmemory
 - `POST /api/v1/backups` - 创建备份
 - `GET /api/v1/backups/:filename/download` - 下载备份
 
-### 授权
-- `GET /api/v1/license/info` - 授权信息
-- `POST /api/v1/license/activate` - 激活
-- `POST /api/v1/license/deactivate` - 停用
+### AI 增强
+- `GET /api/v1/ai/config` - 获取 AI 配置
+- `GET /api/v1/ai/providers` - 列出可用 AI 模型
+- `POST /api/v1/ai/test` - 测试 AI 连接
+- `POST /api/v1/ai/extract` - AI 实体提取
+- `GET /api/v1/ai/daily-report` - AI 日报生成
 
 ### 统计
 - `GET /api/v1/stats` - 统计数据
-- `GET /api/v1/stats/decay` - 衰减统计（Pro）
+- `GET /api/v1/stats/decay` - 衰减统计
 
 ## 与 Python 版本的区别
 
 1. **单文件可执行**：Go 编译为单个二进制文件，无需 Python 环境
-2. **内置 SQLite**：使用 mattn/go-sqlite3，无需额外安装
+2. **内置 SQLite**：使用纯 Go SQLite 驱动，无需 CGO
 3. **静态资源嵌入**：前端文件可嵌入二进制（使用 embed）
 4. **更好的加密**：Go 的 crypto 包提供更完善的加密支持
 5. **跨平台编译**：一次编写，到处编译
-6. **Pro 模块保护**：使用 build tags 控制 Pro 功能编译

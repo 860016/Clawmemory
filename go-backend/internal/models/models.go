@@ -387,3 +387,17 @@ type SkillSuggestion struct {
 	DismissedAt *time.Time `json:"dismissed_at"`
 	CreatedAt   time.Time  `json:"created_at"`
 }
+
+type FileSyncIndex struct {
+	ID        uint      `gorm:"primarykey" json:"id"`
+	FilePath  string    `gorm:"size:500;uniqueIndex" json:"file_path"`
+	FileHash  string    `gorm:"size:64;not null" json:"file_hash"`
+	FileSize  int64     `json:"file_size"`
+	ModTime   int64     `json:"mod_time"`
+	Source    string    `gorm:"size:50;index" json:"source"`
+	ChunkCount int      `gorm:"default:0" json:"chunk_count"`
+	Platform  string    `gorm:"size:30;index" json:"platform"`
+	SyncedAt  time.Time `json:"synced_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

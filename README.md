@@ -1,4 +1,4 @@
-# ClawMemory v2.22.0 — AI 记忆管理中枢
+# ClawMemory v2.28.0 — AI 记忆管理中枢
 
 **ClawMemory** 是一款为 AI 助手设计的**长期记忆管理系统**。它让 AI 能够"记住"过去的对话、知识和上下文，实现跨会话的智能记忆检索与关联。
 
@@ -292,7 +292,44 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 
 ## 📝 更新日志
 
-### v2.22.0 (2026-05-14)
+### v2.28.0 (2026-05-19)
+- 🧠 记忆扫描：文件哈希增量索引（SHA-256），避免重复扫描未修改文件
+- 🧠 记忆扫描：路径感知记忆分类，自动区分长期记忆/每日日志/会话记录/知识文档
+- 🧠 记忆扫描：多级标题分块（1-6级标题），结合滑动窗口算法处理长文本
+- 🧠 记忆扫描：新增JSONL格式会话记录解析支持
+- 🧠 记忆扫描：OpenClaw专用SQLite chunks表解析，过滤系统表
+- 🧠 记忆扫描：稳定块ID生成（路径哈希+行号+内容哈希），确保记忆更新可追踪
+- 🧠 记忆扫描：内容哈希去重机制，避免相同内容重复入库
+- 🧠 记忆扫描：显著性评分过滤，基于类别权重+偏好/决策/事实信号+信息密度
+- 🧠 记忆扫描：文件变更自动清理旧记忆块，确保记忆与源文件同步
+- 🧠 自进化：NudgeReflect技能审查闭环，自动创建和改进技能
+- 🧠 自进化：技能失败率检测和自动修补逻辑
+- 🧠 自进化：记忆容量限制与主动压缩策略
+- 🔓 开源：所有高级功能完全开源，移除Pro授权体系
+- 🔓 开源：取消"Pro"说法，统一改为"高级功能"
+- 🔌 插件：OpenClaw记忆插件重写，实现ingest直接写入+去重+防抖批量写入
+- 🔌 插件：修复afterTurn逻辑，确保会话ID变化时正确隔离记忆
+- 🔌 API：新增外部AI端点（nudge-reflect、process-conversation、skills/actions）
+- 🔌 API：新增ai:execute权限，支持外部AI功能调用
+- 🎨 前端：技能管理支持状态筛选、改进和重新激活
+- 🎨 前端：修复TokenStats字段映射错误
+- 🎨 前端：SkillsView全面i18n化
+- 🎨 前端：修复deactivateSkill状态不正确问题
+- 🌍 i18n：补充8条翻译key到en.ts和zh.ts
+- 🧹 清理：移除AI服务层isPro参数残留（19个方法）
+- 🧹 清理：移除PromptTemplate中ProOnly字段
+- 🧹 清理：删除旧版inferPlatform方法，统一使用inferPlatformFromPath
+
+### v2.27.0 (2026-05-17)
+- 🔓 开源：Pro功能全部免费开源，彻底废弃授权平台
+- 🔓 开源：移除ProProvider接口层、Handler层checkPro、LocalProProvider实现层
+- 🔓 开源：删除约1200行授权相关代码
+- 🏗️ 重构：创建ToolboxService整合所有Pro业务逻辑（21个核心方法）
+- 🏗️ 重构：/pro/*路由合并到主路由，统一API命名规范
+- 🏗️ 重构：AI服务层移除isPro参数，统一Provider加载逻辑
+- 🎨 前端：清理5个核心视图中的授权相关UI和逻辑
+- 🎨 前端：修复15处数据映射错误
+- 🌍 i18n：删除约50条授权相关翻译key，统一替换相关提示文案
 - 🔐 授权：Pro 授权系统接入远程授权服务器，支持设备指纹、RSA 签名验证、心跳上报
 - 🔐 授权：授权状态持久化到数据库，7 天离线宽限期
 - 🧠 P1-1：统一衰减算法，Pro 版 DecayApply 先尝试 AI 评估，不可用时 fallback 到 DecayService
@@ -429,129 +466,13 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 
 ## 📄 许可证
 
-ClawMemory 采用 **双许可证** 模式：
+ClawMemory 采用 **MIT License** 开源许可证，所有功能完全免费使用。
 
 | 组件 | 许可证 | 说明 |
 |------|--------|------|
-| OSS 核心 | MIT License | 自由使用、修改、分发 |
-| Pro 功能 | Commercial License | 需要购买授权密钥 |
+| 全部功能 | MIT License | 自由使用、修改、分发 |
 
-**OSS 核心功能**（MIT）包括：记忆管理、知识图谱基础版、Wiki、项目管理、日报、AI 基础提取（NVIDIA NIM 免费模型）、OpenClaw 集成、备份还原、API Key 管理等。
-
-**Pro 功能**（商业授权）包括：AI 高级功能（冲突扫描、Wiki 生成、记忆压缩、关系发现、智能路由、衰减评估）、Pro 衰减管理、Pro 知识图谱增强、Pro 备份调度、Pro 记忆压缩等。
-
-> 💡 Pro 功能的源代码不在本仓库中，仅以编译后的二进制形式分发。获取 Pro 授权请访问 [GitHub](https://github.com/860016/Clawmemory)。
-
----
-
-## ⭐ Pro 版本
-
-ClawMemory Pro 提供高级 AI 功能和增强管理能力，适合需要深度记忆分析和自动化的用户。
-
-### Pro 功能列表
-
-| 功能 | 说明 |
-|------|------|
-| **AI 冲突扫描** | 自动检测记忆矛盾，提示确认正确信息 |
-| **AI Wiki 生成** | 根据记忆自动生成结构化 Wiki 页面 |
-| **AI 记忆压缩** | 智能合并冗余记忆，释放存储空间 |
-| **AI 关系发现** | 自动发现记忆间的隐藏关联 |
-| **AI 智能路由** | 根据任务复杂度自动选择最优 AI 模型 |
-| **AI 衰减评估** | 智能评估记忆重要性，优化衰减策略 |
-| **Pro 衰减管理** | 高级衰减统计、批量应用、智能强化 |
-| **Pro 知识图谱增强** | 自动图谱构建、演化洞察、推理发现 |
-| **Pro 备份调度** | 定时自动备份，可配置间隔和策略 |
-| **Pro 记忆压缩** | 预览压缩效果、多级压缩、自动压缩配置 |
-
-### 获取 Pro 授权
-
-访问 [ClawMemory GitHub](https://github.com/860016/Clawmemory) 获取 Pro 授权。
-
-### 安装 Pro 版本
-
-Pro 版本以编译后的二进制文件分发，替换 OSS 版本的可执行文件即可：
-
-#### 第一步：下载 Pro 二进制
-
-从发布页面下载对应平台的 Pro 版本：
-
-| 平台 | 文件名 |
-|------|--------|
-| Windows x64 | `clawmemory-pro-windows-amd64.zip` |
-| Windows ARM | `clawmemory-pro-windows-arm64.zip` |
-| Linux x64 | `clawmemory-pro-linux-amd64.tar.gz` |
-| Linux ARM | `clawmemory-pro-linux-arm64.tar.gz` |
-| macOS x64 | `clawmemory-pro-darwin-amd64.tar.gz` |
-| macOS ARM | `clawmemory-pro-darwin-arm64.tar.gz` |
-
-#### 第二步：替换可执行文件
-
-**Windows**:
-```powershell
-# 停止当前服务
-stop.bat
-
-# 备份原文件
-copy go-backend\clawmemory.exe go-backend\clawmemory-oss-backup.exe
-
-# 解压并替换
-# 将下载的 clawmemory-pro.exe 重命名为 clawmemory.exe
-# 复制到 go-backend\ 目录下
-
-# 启动服务
-start.bat
-```
-
-**Linux / macOS**:
-```bash
-# 停止当前服务
-./stop.sh
-
-# 备份原文件
-cp go-backend/clawmemory go-backend/clawmemory-oss-backup
-
-# 解压并替换
-# 将下载的 clawmemory-pro 重命名为 clawmemory
-# 复制到 go-backend/ 目录下
-chmod +x go-backend/clawmemory
-
-# 启动服务
-./start.sh
-```
-
-#### 第三步：激活 Pro 授权
-
-1. 启动 ClawMemory 后，访问 `http://localhost:8765`
-2. 进入 **设置 → Pro 授权**
-3. 输入授权密钥，点击「激活」
-4. 激活成功后，Pro 功能自动解锁
-
-也可以通过 API 激活：
-```bash
-curl -X POST http://localhost:8765/api/v1/license/activate \
-  -H "Authorization: Bearer <your-jwt-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"license_key": "YOUR_LICENSE_KEY"}'
-```
-
-### Pro 授权状态
-
-| API | 说明 |
-|-----|------|
-| `GET /api/v1/license/info` | 查看授权状态 |
-| `POST /api/v1/license/activate` | 激活授权 |
-| `POST /api/v1/license/deactivate` | 停用授权 |
-
-### 常见问题
-
-**Q: Pro 授权过期后会怎样？**
-A: 授权过期后，Pro 功能将不可用，但 OSS 核心功能不受影响。所有数据保留，续费后 Pro 功能自动恢复。
-
-**Q: 可以在多台设备上使用同一个授权密钥吗？**
-A: 每个授权密钥仅限一台设备使用。如需多设备授权，请联系获取多设备许可证。
-
-**Q: 如何从 Pro 版本回退到 OSS 版本？**
-A: 将备份的 `clawmemory-oss-backup` 文件恢复为 `clawmemory` 即可。数据完全兼容，无需迁移。
+**包含功能**：记忆管理、知识图谱、Wiki、项目管理、日报、AI 增强（冲突扫描、Wiki 生成、记忆压缩、关系发现、智能路由、衰减评估）、OpenClaw 集成、备份还原、API Key 管理、自进化系统等。
 
 ---
 
