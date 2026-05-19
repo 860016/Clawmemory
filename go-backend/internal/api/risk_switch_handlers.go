@@ -25,8 +25,11 @@ func handleGetRiskSwitches(db *gorm.DB) gin.HandlerFunc {
 func handleSetRiskSwitches(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		var req map[string]bool
-		if err := c.ShouldBindJSON(&req); err != nil {
+
+		var outer struct {
+			Switches map[string]bool `json:"switches"`
+		}
+		if err := c.ShouldBindJSON(&outer); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 			return
 		}
@@ -38,7 +41,7 @@ func handleSetRiskSwitches(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		switches := make(map[services.RiskSwitch]bool)
-		for k, v := range req {
+		for k, v := range outer.Switches {
 			switches[services.RiskSwitch(k)] = v
 		}
 

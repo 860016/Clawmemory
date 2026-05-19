@@ -122,37 +122,37 @@
           <div class="risk-category-title">{{ $t('riskSwitch.categoryMemory') }}</div>
           <div class="setting-item">
             <span>{{ $t('riskSwitch.allowCrossAgentRead') }}</span>
-            <el-switch v-model="riskSwitches.allow_cross_agent_read" @change="saveRiskSwitches" />
+            <el-switch v-model="riskSwitches.risk_agent_memory_access" @change="saveRiskSwitches" />
           </div>
           <div class="setting-item">
             <span>{{ $t('riskSwitch.allowCrossAgentWrite') }}</span>
-            <el-switch v-model="riskSwitches.allow_cross_agent_write" @change="saveRiskSwitches" />
+            <el-switch v-model="riskSwitches.risk_cross_agent_write" @change="saveRiskSwitches" />
           </div>
           <div class="setting-item">
             <span>{{ $t('riskSwitch.allowMemoryVisibilityChange') }}</span>
-            <el-switch v-model="riskSwitches.allow_visibility_change" @change="saveRiskSwitches" />
+            <el-switch v-model="riskSwitches.risk_memory_visibility_change" @change="saveRiskSwitches" />
           </div>
         </div>
         <div class="risk-category">
           <div class="risk-category-title">{{ $t('riskSwitch.categorySharing') }}</div>
           <div class="setting-item">
             <span>{{ $t('riskSwitch.allowAutoSharing') }}</span>
-            <el-switch v-model="riskSwitches.allow_auto_sharing" @change="saveRiskSwitches" />
+            <el-switch v-model="riskSwitches.risk_share_auto_approve" @change="saveRiskSwitches" />
           </div>
           <div class="setting-item">
             <span>{{ $t('riskSwitch.allowManualSharing') }}</span>
-            <el-switch v-model="riskSwitches.allow_manual_sharing" @change="saveRiskSwitches" />
+            <el-switch v-model="riskSwitches.risk_auto_import_memories" @change="saveRiskSwitches" />
           </div>
           <div class="setting-item">
             <span>{{ $t('riskSwitch.allowBatchShare') }}</span>
-            <el-switch v-model="riskSwitches.allow_batch_share" @change="saveRiskSwitches" />
+            <el-switch v-model="riskSwitches.risk_bulk_delete" @change="saveRiskSwitches" />
           </div>
         </div>
         <div class="risk-category">
           <div class="risk-category-title">{{ $t('riskSwitch.categoryWriteback') }}</div>
           <div class="setting-item">
             <span>{{ $t('riskSwitch.allowWriteback') }}</span>
-            <el-switch v-model="riskSwitches.allow_writeback" @change="saveRiskSwitches" />
+            <el-switch v-model="riskSwitches.risk_decay_auto_apply" @change="saveRiskSwitches" />
           </div>
         </div>
       </div>
@@ -910,19 +910,26 @@ async function loadRecordSensitiveSetting() {
 }
 
 const riskSwitches = ref<Record<string, boolean>>({
-  allow_cross_agent_read: false,
-  allow_cross_agent_write: false,
-  allow_visibility_change: true,
-  allow_auto_sharing: false,
-  allow_manual_sharing: true,
-  allow_batch_share: false,
-  allow_writeback: false,
+  risk_cross_agent_write: false,
+  risk_memory_visibility_change: true,
+  risk_share_auto_approve: false,
+  risk_auto_import_memories: false,
+  risk_agent_memory_access: false,
+  risk_bulk_delete: false,
+  risk_decay_auto_apply: false,
+  risk_compress_auto_apply: false,
 })
 
 async function loadRiskSwitches() {
   try {
     const { data } = await riskSwitchApi.getSwitches()
-    if (data.switches) {
+    if (data.items && Array.isArray(data.items)) {
+      for (const item of data.items) {
+        const key = String(item.key)
+        const enabled = !!item.enabled
+        riskSwitches.value[key] = enabled
+      }
+    } else if (data.switches) {
       riskSwitches.value = { ...riskSwitches.value, ...data.switches }
     }
   } catch { /* use defaults */ }
