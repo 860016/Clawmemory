@@ -1851,19 +1851,116 @@ func handleWikiMarkInProgress(db *gorm.DB) gin.HandlerFunc {
 
 func handleWikiConfig(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"llm_available": false})
+		userID := middleware.GetUserID(c)
+		svc := services.NewSettingsService(db)
+		llmAvailable := false
+		if v, err := svc.GetByKey(userID, "ai_provider_id"); err == nil {
+			if s, ok := v.(string); ok && s != "" {
+				llmAvailable = true
+			}
+		}
+		c.JSON(http.StatusOK, gin.H{"llm_available": llmAvailable})
 	}
 }
 
-func handleWikiAIExtract(db *gorm.DB) gin.HandlerFunc {
+func handleWikiAIExtract(aiSvc *ai.AIService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "AI extraction not available in OSS version"})
+		userID := middleware.GetUserID(c)
+
+		var req struct {
+			Conversation string `json:"conversation"`
+			IsComplete   bool   `json:"is_complete"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "conversation is required"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
+		defer cancel()
+
+		result, err := aiSvc.ExtractFacts(ctx, userID, []map[string]string{
+			{"role": "user", "content": req.Conversation},
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		wikiSvc := services.NewWikiService(db)
+		facts, _ := result["facts"].([]map[string]interface{})
+		created := 0
+		for _, fact := range facts {
+			title, _ := fact["title"].(string)
+			content, _ := fact["content"].(string)
+			if title == "" || content == "" {
+				continue
+			}
+			pageData := map[string]interface{}{
+				"title":   title,
+				"content": content,
+				"status":  "in_progress",
+			}
+			if cat, ok := fact["category"].(string); ok {
+				pageData["category"] = cat
+			}
+			if _, err := wikiSvc.Create(userID, pageData); err == nil {
+				created++
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"extracted": len(facts),
+			"created":   created,
+			"mode":      "ai",
+		})
 	}
 }
 
-func handleWikiRefine(db *gorm.DB) gin.HandlerFunc {
+func handleWikiRefine(aiSvc *ai.AIService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "AI refinement not available in OSS version"})
+		userID := middleware.GetUserID(c)
+		idStr := c.Param("id")
+		id, err := strconv.ParseUint(idStr, 10, 64)
+		if err != nil || id == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid page id"})
+			return
+		}
+
+		wikiSvc := services.NewWikiService(db)
+		page, err := wikiSvc.Get(userID, uint(id))
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "page not found"})
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
+		defer cancel()
+
+		result, err := aiSvc.GenerateWiki(ctx, userID, page.Title)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		if content, ok := result["content"].(string); ok && content != "" {
+			updates := map[string]interface{}{"content": content}
+			if summary, ok := result["summary"].(string); ok && summary != "" {
+				updates["summary"] = summary
+			}
+			if _, err := wikiSvc.Update(userID, uint(id), updates); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save refined content"})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"message": "page refined",
+				"content": content,
+				"mode":    "ai",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "AI refinement produced no content"})
 	}
 }
 
@@ -1999,6 +2096,14 @@ func handleGetStats(db *gorm.DB) gin.HandlerFunc {
 		logDBErr("count users for dashboard", db.Table("users").Count(&userCount).Error)
 		passwordSet := userCount > 0
 
+		maxMemories := int64(50000)
+		settingsSvc := services.NewSettingsService(db)
+		if v, err := settingsSvc.GetByKey(userID, "max_memories"); err == nil {
+			if n, ok := v.(float64); ok && n > 0 {
+				maxMemories = int64(n)
+			}
+		}
+
 		c.JSON(http.StatusOK, gin.H{
 			"memoryCount":    memoryCount,
 			"entityCount":    entityCount,
@@ -2008,7 +2113,7 @@ func handleGetStats(db *gorm.DB) gin.HandlerFunc {
 			"recentMemories": recentMemoriesJson,
 			"license":        licenseInfo,
 			"passwordSet":    passwordSet,
-			"maxMemories":    50000,
+			"maxMemories":    maxMemories,
 		})
 	}
 }

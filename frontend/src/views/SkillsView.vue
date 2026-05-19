@@ -253,6 +253,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useIsMobile } from '../composables/useIsMobile'
+import { useAIConfig } from '../composables/useAIConfig'
 import { MagicStick, Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { skillsApi } from '../api/go-skills'
@@ -263,6 +264,7 @@ const { t } = useI18n()
 
 const activeTab = ref<'learned' | 'scanned'>('learned')
 const { isMobile } = useIsMobile()
+const { requireAIConfig } = useAIConfig(false)
 
 const scanning = ref(false)
 const scanned = ref(false)
@@ -351,6 +353,7 @@ async function detectPatterns() {
 }
 
 async function autoCreateSkill() {
+  if (!(await requireAIConfig(t('skills.autoCreate')))) return
   creating.value = true
   try {
     const { data } = await skillsApi.createSkill({ use_ai: true })
@@ -416,6 +419,7 @@ async function showLearnedDetail(skill: any) {
 }
 
 async function improveSkill(id: number) {
+  if (!(await requireAIConfig(t('skills.improve')))) return
   improving.value = true
   try {
     const { data } = await skillsApi.improveSkill(id)

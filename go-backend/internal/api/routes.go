@@ -89,8 +89,8 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.DELETE("/wiki/:id", handleDeleteWiki(db))
 		authorized.POST("/wiki/:id/mark-complete", handleWikiMarkComplete(db))
 		authorized.POST("/wiki/:id/mark-in-progress", handleWikiMarkInProgress(db))
-		authorized.POST("/wiki/ai/extract", handleWikiAIExtract(db))
-		authorized.POST("/wiki/:id/refine", handleWikiRefine(db))
+		authorized.POST("/wiki/ai/extract", handleWikiAIExtract(aiSvc, db))
+		authorized.POST("/wiki/:id/refine", handleWikiRefine(aiSvc, db))
 
 		authorized.GET("/projects", handleListProjects(db))
 		authorized.POST("/projects", handleCreateProject(db))
