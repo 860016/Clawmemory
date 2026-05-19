@@ -49,7 +49,7 @@ func NewMemoryService(db *gorm.DB) *MemoryService {
 
 func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*MemoryModel, error) {
 	if err := ValidateMemoryCreate(data); err != nil {
-		return nil, fmt.Errorf("validation failed: %w", err)
+		return nil, fmt.Errorf("validation failed: %s", err.Error())
 	}
 
 	layer := getString(data, "layer", "episodic")
@@ -223,7 +223,7 @@ func (s *MemoryService) Restore(userID, id uint) error {
 }
 
 func (s *MemoryService) SearchKeyword(userID uint, q string, limit int) ([]*MemoryModel, error) {
-	escaped := escapeLikeQuery(q)
+	escaped := EscapeLikeQuery(q)
 	var memories []models.Memory
 	err := s.db.Where("user_id = ? AND status != ? AND (key LIKE ? OR value LIKE ?)", userID, "trashed", "%"+escaped+"%", "%"+escaped+"%").
 		Limit(limit).
@@ -237,7 +237,7 @@ func (s *MemoryService) SearchKeyword(userID uint, q string, limit int) ([]*Memo
 }
 
 func (s *MemoryService) SearchKeywordWithPlatform(userID uint, q string, platform string, platformFilter string, limit int) ([]*MemoryModel, error) {
-	escaped := escapeLikeQuery(q)
+	escaped := EscapeLikeQuery(q)
 	var memories []models.Memory
 	query := s.db.Where("user_id = ? AND status != ? AND (key LIKE ? OR value LIKE ?)", userID, "trashed", "%"+escaped+"%", "%"+escaped+"%")
 
@@ -299,7 +299,7 @@ func ToMemoryModel(m *models.Memory) *MemoryModel {
 	}
 }
 
-func escapeLikeQuery(s string) string {
+func EscapeLikeQuery(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, `%`, `\%`)
 	s = strings.ReplaceAll(s, `_`, `\_`)

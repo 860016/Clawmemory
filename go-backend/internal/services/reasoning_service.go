@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -106,6 +107,60 @@ func (s *ReasoningService) SetConfig(userID uint, data map[string]interface{}) (
 	return &config, nil
 }
 
+func (s *ReasoningService) buildLLMConfig(userID uint, rc *models.ReasoningConfig) (*models.ReasoningConfig, error) {
+	settingsSvc := NewSettingsService(s.db)
+
+	providerID, _ := settingsSvc.GetByKey(userID, "ai_provider_id")
+	if pid, ok := providerID.(string); ok && pid != "" {
+		rc.Provider = pid
+	}
+
+	if v, _ := settingsSvc.GetByKey(userID, "ai_provider_type"); v != nil {
+		if s, ok := v.(string); ok && s != "" {
+			rc.Provider = s
+		}
+	}
+
+	if v, _ := settingsSvc.GetByKey(userID, "ai_api_key"); v != nil {
+		if s, ok := v.(string); ok && s != "" {
+			rc.APIKey = s
+		}
+	}
+
+	if v, _ := settingsSvc.GetByKey(userID, "ai_base_url"); v != nil {
+		if s, ok := v.(string); ok && s != "" {
+			rc.BaseURL = s
+		}
+	}
+
+	if v, _ := settingsSvc.GetByKey(userID, "ai_model"); v != nil {
+		if s, ok := v.(string); ok && s != "" {
+			rc.Model = s
+		}
+	}
+
+	if rc.Provider == "" {
+		return nil, fmt.Errorf("no AI provider configured. Please configure one in Settings > AI Config")
+	}
+	if rc.APIKey == "" && rc.Provider != "ollama" {
+		return nil, fmt.Errorf("API key is not configured for provider %s", rc.Provider)
+	}
+	if rc.Model == "" {
+		switch rc.Provider {
+		case "openai":
+			rc.Model = "gpt-4o-mini"
+		case "deepseek":
+			rc.Model = "deepseek-chat"
+		case "ollama":
+			rc.Model = "llama3"
+		default:
+			rc.Model = "gpt-4o-mini"
+		}
+	}
+
+	return rc, nil
+}
+
 func (s *ReasoningService) TestConnection(userID uint) error {
 	config, err := s.GetConfig(userID)
 	if err != nil {
@@ -117,11 +172,13 @@ func (s *ReasoningService) TestConnection(userID uint) error {
 	if !config.Enabled {
 		return fmt.Errorf("reasoning is not enabled")
 	}
-	if config.APIKey == "" {
-		return fmt.Errorf("API key is not configured")
+
+	llmConfig, err := s.buildLLMConfig(userID, config)
+	if err != nil {
+		return fmt.Errorf("failed to load AI provider: %w", err)
 	}
 
-	_, err = callLLM(*config, "Reply with OK", "minimal")
+	_, err = callLLM(*llmConfig, "Reply with OK", "minimal")
 	return err
 }
 
@@ -131,10 +188,15 @@ func (s *ReasoningService) Reason(userID uint, query string, depth int, level st
 		return "", fmt.Errorf("failed to get reasoning config: %w", err)
 	}
 	if config == nil {
-		return "", fmt.Errorf("no reasoning model configured. Please configure one in Settings > Reasoning")
+		return "", fmt.Errorf("no reasoning model configured. Please configure one in Settings > AI Config")
 	}
 	if !config.Enabled {
-		return "", fmt.Errorf("reasoning is not enabled. Please enable it in Settings > Reasoning")
+		return "", fmt.Errorf("reasoning is not enabled. Please enable it in Settings > AI Config")
+	}
+
+	llmConfig, err := s.buildLLMConfig(userID, config)
+	if err != nil {
+		return "", fmt.Errorf("failed to load AI provider: %w", err)
 	}
 
 	if depth < 1 {
@@ -164,7 +226,7 @@ func (s *ReasoningService) Reason(userID uint, query string, depth int, level st
 
 	fullQuery := pass0Prompt + "\n\nConversation context:\n" + truncate(query, 10000)
 
-	pass0Result, err := callLLM(*config, fullQuery, level)
+	pass0Result, err := callLLM(*llmConfig, fullQuery, level)
 	if err != nil {
 		return "", fmt.Errorf("pass 0 failed: %w", err)
 	}
@@ -172,7 +234,7 @@ func (s *ReasoningService) Reason(userID uint, query string, depth int, level st
 
 	if depth >= 2 && len(pass0Result.Content) > 300 {
 		auditQuery := auditPrompt + "\n\nPrevious assessment:\n" + pass0Result.Content
-		pass1Result, err := callLLM(*config, auditQuery, "low")
+		pass1Result, err := callLLM(*llmConfig, auditQuery, "low")
 		if err == nil {
 			results = append(results, pass1Result)
 		}
@@ -180,7 +242,7 @@ func (s *ReasoningService) Reason(userID uint, query string, depth int, level st
 
 	if depth >= 3 && len(results) >= 2 {
 		reconcileQuery := reconcilePrompt + "\n\nAssessment 1:\n" + results[0].Content + "\n\nAssessment 2:\n" + results[1].Content
-		pass2Result, err := callLLM(*config, reconcileQuery, "low")
+		pass2Result, err := callLLM(*llmConfig, reconcileQuery, "low")
 		if err == nil {
 			results = append(results, pass2Result)
 		}
@@ -195,8 +257,11 @@ func (s *ReasoningService) Reason(userID uint, query string, depth int, level st
 		"source":      "dialectic-" + config.Provider,
 		"memory_type": "knowledge",
 	})
+	if err != nil {
+		log.Printf("[Reasoning] failed to save reasoning result: %v", err)
+	}
 
-	return finalResult, err
+	return finalResult, nil
 }
 
 func callLLM(config models.ReasoningConfig, prompt string, level string) (ReasoningResult, error) {

@@ -160,7 +160,7 @@ func (s *ChromaDBService) SyncMemories(userID uint) (int, error) {
 	}
 
 	var memories []models.Memory
-	_ = s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error
+	logDBErr("load memories for chromadb sync", s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error)
 
 	if len(memories) == 0 {
 		return 0, nil

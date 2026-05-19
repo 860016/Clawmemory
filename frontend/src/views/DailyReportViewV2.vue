@@ -115,10 +115,10 @@
             <span class="month">{{ getMonth(selectedReport.report_date) }}</span>
           </div>
           <div class="detail-actions">
-            <button class="action-btn" @click="exportReport" title="Export">
+            <button class="action-btn" @click="exportReport" :title="$t('dailyReportV2.export')">
               <el-icon><Download /></el-icon>
             </button>
-            <button class="action-btn" @click="shareReport" title="Share">
+            <button class="action-btn" @click="shareReport" :title="$t('dailyReportV2.share')">
               <el-icon><Share /></el-icon>
             </button>
           </div>

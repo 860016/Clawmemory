@@ -98,9 +98,9 @@
         </el-form-item>
         <el-form-item :label="$t('sharing.ruleLayer')">
           <el-select v-model="ruleForm.layer" clearable style="width: 100%">
-            <el-option label="Knowledge" value="knowledge" />
-            <el-option label="Preference" value="preference" />
-            <el-option label="Short Term" value="short_term" />
+            <el-option :label="$t('memories.knowledge')" value="knowledge" />
+            <el-option :label="$t('memories.preference')" value="preference" />
+            <el-option :label="$t('memories.shortTerm')" value="short_term" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('sharing.ruleVisibility')">

@@ -18,7 +18,7 @@ import (
 const DefaultUsername = "admin"
 
 const (
-	MaxFailedAttempts = 3
+	MaxFailedAttempts = 5
 	LockoutDuration   = 15 * time.Minute
 	AccessTokenTTL    = 24 * time.Hour
 	RefreshTokenTTL   = 30 * 24 * time.Hour

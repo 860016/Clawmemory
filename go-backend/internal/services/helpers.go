@@ -1,6 +1,6 @@
 package services
 
-// Helper functions used across services
+import "log"
 
 func getString(data map[string]interface{}, key, defaultValue string) string {
 	if v, ok := data[key].(string); ok {
@@ -28,4 +28,10 @@ func getInt(data map[string]interface{}, key string, defaultValue int) int {
 		return int(v)
 	}
 	return defaultValue
+}
+
+func logDBErr(context string, err error) {
+	if err != nil {
+		log.Printf("[DB] %s: %v", context, err)
+	}
 }

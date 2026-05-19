@@ -71,10 +71,10 @@ func (s *SmartLoadService) SmartLoad(userID uint, query string, tokenBudget int,
 	var memories []models.Memory
 	dbQuery := s.db.Where("user_id = ? AND status = ?", userID, "active")
 	if query != "" {
-		escaped := escapeLike(query)
+		escaped := EscapeLikeQuery(query)
 		dbQuery = dbQuery.Where("key LIKE ? OR value LIKE ? OR tags LIKE ?", "%"+escaped+"%", "%"+escaped+"%", "%"+escaped+"%")
 	}
-	_ = dbQuery.Order("importance DESC, access_count DESC").Limit(500).Find(&memories).Error
+	logDBErr("smart load memories", dbQuery.Order("importance DESC, access_count DESC").Limit(500).Find(&memories).Error)
 
 	if len(memories) == 0 {
 		return &SmartLoadResult{

@@ -194,9 +194,9 @@
         </el-form-item>
         <el-form-item :label="$t('project.status')">
           <el-select v-model="form.status">
-            <el-option label="Active" value="active" />
-            <el-option label="Paused" value="paused" />
-            <el-option label="Completed" value="completed" />
+            <el-option :label="$t('project.active')" value="active" />
+            <el-option :label="$t('project.paused')" value="paused" />
+            <el-option :label="$t('project.completed')" value="completed" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('project.progress')">
@@ -225,11 +225,11 @@
         </el-form-item>
         <el-form-item :label="$t('project.noteType')">
           <el-select v-model="noteForm.note_type">
-            <el-option label="Note" value="note" />
-            <el-option label="Decision" value="decision" />
-            <el-option label="Question" value="question" />
-            <el-option label="Idea" value="idea" />
-            <el-option label="Issue" value="issue" />
+            <el-option :label="$t('project.noteTypeNote')" value="note" />
+            <el-option :label="$t('project.noteTypeDecision')" value="decision" />
+            <el-option :label="$t('project.noteTypeQuestion')" value="question" />
+            <el-option :label="$t('project.noteTypeIdea')" value="idea" />
+            <el-option :label="$t('project.noteTypeIssue')" value="issue" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('project.keyPoint')">

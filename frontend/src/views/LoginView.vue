@@ -181,10 +181,10 @@
           <div class="cli-hint">
             <p>{{ $t('login.cliResetHint') }}</p>
             <div class="cli-commands">
-              <div class="cli-platform">Windows:</div>
+              <div class="cli-platform">{{ $t('login.platformWindows') }}</div>
               <code>clawmemory.exe --reset-password NEW_PASSWORD</code>
               <code v-if="forgotUsername">clawmemory.exe --reset-password {{ forgotUsername }}:NEW_PASSWORD</code>
-              <div class="cli-platform">Linux/macOS:</div>
+              <div class="cli-platform">{{ $t('login.platformLinuxMac') }}</div>
               <code>./clawmemory --reset-password NEW_PASSWORD</code>
               <code v-if="forgotUsername">./clawmemory --reset-password {{ forgotUsername }}:NEW_PASSWORD</code>
             </div>
@@ -198,9 +198,9 @@
           <div class="cli-hint">
             <p>{{ $t('login.cliResetHintWithUser') }}</p>
             <div class="cli-commands">
-              <div class="cli-platform">Windows:</div>
+              <div class="cli-platform">{{ $t('login.platformWindows') }}</div>
               <code>clawmemory.exe --reset-password USERNAME:NEW_PASSWORD</code>
-              <div class="cli-platform">Linux/macOS:</div>
+              <div class="cli-platform">{{ $t('login.platformLinuxMac') }}</div>
               <code>./clawmemory --reset-password USERNAME:NEW_PASSWORD</code>
             </div>
           </div>

@@ -19,7 +19,7 @@ const router = createRouter({
         { path: 'projects', name: 'projects', component: () => import('../views/ProjectView.vue') },
         { path: 'reports', name: 'reports', component: () => import('../views/DailyReportViewV2.vue') },
         { path: 'docs', name: 'docs', component: () => import('../views/UserGuideView.vue') },
-        { path: 'advanced', name: 'advanced', component: () => import('../views/ProView.vue') },
+        { path: 'advanced', name: 'advanced', component: () => import('../views/AdvancedFeaturesView.vue') },
         { path: 'settings', name: 'settings', component: () => import('../views/SettingsView.vue') },
       ],
     },

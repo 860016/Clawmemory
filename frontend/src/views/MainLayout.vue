@@ -244,8 +244,8 @@ onMounted(() => {
   handleResize()
   statsApi.getOverview().then(({ data }) => {
     const total = data.memoryCount || 0
-    const maxPro = 50000
-    storagePercent.value = Math.min(Math.round((total / maxPro) * 100), 100)
+    const maxMemories = data.maxMemories || 50000
+    storagePercent.value = Math.min(Math.round((total / maxMemories) * 100), 100)
   }).catch(() => {
     storagePercent.value = 0
   })
@@ -331,8 +331,7 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
       { path: '/settings?section=ai', label: 'settings.aiConfig', icon: Cpu },
       { path: '/settings?section=security', label: 'settings.security', icon: Lock },
       { path: '/settings?section=risk-switches', label: 'settings.riskControl', icon: Warning },
-      { path: '/settings?section=reasoning', label: 'settings.reasoningConfig', icon: MagicStick },
-      { path: '/settings?section=openclaw', label: 'settings.openclaw', icon: Connection },
+      { path: '/settings?section=openclaw', label: 'settings.clientConnection', icon: Connection },
       { path: '/settings?section=data', label: 'settings.dataManagement', icon: Coin },
       { path: '/settings?section=decay', label: 'settings.memoryDecay', icon: Timer },
       { path: '/settings?section=system', label: 'settings.systemInfo', icon: Monitor },

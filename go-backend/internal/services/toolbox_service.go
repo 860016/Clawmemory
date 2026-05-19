@@ -50,10 +50,10 @@ func (s *ToolboxService) DecayStats(userID uint) (map[string]interface{}, error)
 		Archived int64
 		Trashed  int64
 	}
-	_ = s.db.Model(&models.Memory{}).Where("user_id = ?", userID).Count(&stats.Total).Error
-	_ = s.db.Model(&models.Memory{}).Where("user_id = ? AND status = ?", userID, "active").Count(&stats.Active).Error
-	_ = s.db.Model(&models.Memory{}).Where("user_id = ? AND status = ?", userID, "archived").Count(&stats.Archived).Error
-	_ = s.db.Model(&models.Memory{}).Where("user_id = ? AND status = ?", userID, "trashed").Count(&stats.Trashed).Error
+	logDBErr("count total memories", s.db.Model(&models.Memory{}).Where("user_id = ?", userID).Count(&stats.Total).Error)
+	logDBErr("count active memories", s.db.Model(&models.Memory{}).Where("user_id = ? AND status = ?", userID, "active").Count(&stats.Active).Error)
+	logDBErr("count archived memories", s.db.Model(&models.Memory{}).Where("user_id = ? AND status = ?", userID, "archived").Count(&stats.Archived).Error)
+	logDBErr("count trashed memories", s.db.Model(&models.Memory{}).Where("user_id = ? AND status = ?", userID, "trashed").Count(&stats.Trashed).Error)
 
 	var avgImportance float64
 	s.db.Model(&models.Memory{}).Where("user_id = ? AND status = ?", userID, "active").
@@ -70,7 +70,7 @@ func (s *ToolboxService) DecayStats(userID uint) (map[string]interface{}, error)
 
 func (s *ToolboxService) DecayApply(userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
-	_ = s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error
+	logDBErr("load memories for decay", s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error)
 
 	archived := 0
 	trashed := 0
@@ -79,10 +79,10 @@ func (s *ToolboxService) DecayApply(userID uint) (map[string]interface{}, error)
 	for _, m := range memories {
 		switch {
 		case m.Importance < 0.1 && time.Since(m.UpdatedAt) > 30*24*time.Hour:
-			_ = s.db.Model(&models.Memory{}).Where("id = ?", m.ID).Update("status", "trashed").Error
+			logDBErr("trash memory", s.db.Model(&models.Memory{}).Where("id = ?", m.ID).Update("status", "trashed").Error)
 			trashed++
 		case m.Importance < 0.3 && time.Since(m.UpdatedAt) > 14*24*time.Hour:
-			_ = s.db.Model(&models.Memory{}).Where("id = ?", m.ID).Update("status", "archived").Error
+			logDBErr("archive memory", s.db.Model(&models.Memory{}).Where("id = ?", m.ID).Update("status", "archived").Error)
 			archived++
 		default:
 			kept++
@@ -113,7 +113,7 @@ func (s *ToolboxService) PruneSuggest(userID uint) (map[string]interface{}, erro
 
 func (s *ToolboxService) ConflictScan(userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
-	_ = s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error
+	logDBErr("load memories for conflict scan", s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error)
 
 	keyMap := make(map[string][]models.Memory)
 	for _, m := range memories {
@@ -198,7 +198,7 @@ func (s *ToolboxService) ConflictScan(userID uint) (map[string]interface{}, erro
 
 func (s *ToolboxService) ConflictResolve(userID uint, conflictIndex int, strategy string) (map[string]interface{}, error) {
 	var memories []models.Memory
-	_ = s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error
+	logDBErr("load memories for conflict resolve", s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error)
 
 	keyMap := make(map[string][]models.Memory)
 	for _, m := range memories {
@@ -263,7 +263,7 @@ func (s *ToolboxService) ConflictResolve(userID uint, conflictIndex int, strateg
 
 func (s *ToolboxService) CompressPreview(userID uint, level string) (map[string]interface{}, error) {
 	var memories []models.Memory
-	_ = s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error
+	logDBErr("load memories for compress preview", s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error)
 
 	threshold := 0.3
 	switch level {
@@ -435,13 +435,13 @@ func (s *ToolboxService) TokenRoute(message string, contextLength int) (map[stri
 
 func (s *ToolboxService) TokenStats(userID uint) (map[string]interface{}, error) {
 	var totalMemories int64
-	_ = s.db.Model(&models.Memory{}).Where("user_id = ? AND status != ?", userID, "trashed").Count(&totalMemories).Error
+	logDBErr("count total memories for token stats", s.db.Model(&models.Memory{}).Where("user_id = ? AND status != ?", userID, "trashed").Count(&totalMemories).Error)
 
 	var totalEntities int64
-	_ = s.db.Model(&models.Entity{}).Where("user_id = ?", userID).Count(&totalEntities).Error
+	logDBErr("count entities for token stats", s.db.Model(&models.Entity{}).Where("user_id = ?", userID).Count(&totalEntities).Error)
 
 	var totalRelations int64
-	_ = s.db.Model(&models.Relation{}).Where("user_id = ?", userID).Count(&totalRelations).Error
+	logDBErr("count relations for token stats", s.db.Model(&models.Relation{}).Where("user_id = ?", userID).Count(&totalRelations).Error)
 
 	estimatedTokens := totalMemories*200 + totalEntities*50 + totalRelations*30
 
@@ -459,7 +459,7 @@ func (s *ToolboxService) TokenStats(userID uint) (map[string]interface{}, error)
 
 func (s *ToolboxService) EvolutionInsights(userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
-	_ = s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error
+	logDBErr("load memories for evolution insights", s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error)
 
 	layerCount := make(map[string]int)
 	sourceCount := make(map[string]int)
@@ -480,7 +480,7 @@ func (s *ToolboxService) EvolutionInsights(userID uint) (map[string]interface{},
 
 func (s *ToolboxService) EvolutionDiscover(userID uint) (map[string]interface{}, error) {
 	var relations []models.Relation
-	_ = s.db.Where("user_id = ?", userID).Limit(5000).Find(&relations).Error
+	logDBErr("load relations for evolution discover", s.db.Where("user_id = ?", userID).Limit(5000).Find(&relations).Error)
 
 	typeCount := make(map[string]int)
 	for _, r := range relations {
@@ -507,7 +507,7 @@ func (s *ToolboxService) EvolutionDiscover(userID uint) (map[string]interface{},
 
 func (s *ToolboxService) EvolutionInfer(userID uint) (map[string]interface{}, error) {
 	var entities []models.Entity
-	_ = s.db.Where("user_id = ?", userID).Limit(5000).Find(&entities).Error
+	logDBErr("load entities for evolution infer", s.db.Where("user_id = ?", userID).Limit(5000).Find(&entities).Error)
 
 	inferences := []map[string]interface{}{}
 	for _, e := range entities {
@@ -530,7 +530,7 @@ func (s *ToolboxService) EvolutionInfer(userID uint) (map[string]interface{}, er
 
 func (s *ToolboxService) EvolutionImportance(userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
-	_ = s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error
+	logDBErr("load memories for evolution importance", s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error)
 
 	importanceBuckets := map[string]int{
 		"critical": 0,
@@ -560,10 +560,10 @@ func (s *ToolboxService) EvolutionImportance(userID uint) (map[string]interface{
 
 func (s *ToolboxService) EvolutionPrefetch(userID uint, context string) (map[string]interface{}, error) {
 	var memories []models.Memory
-	escaped := escapeLike(context)
-	_ = s.db.Where("user_id = ? AND status != ?", userID, "trashed").
+	escaped := EscapeLikeQuery(context)
+	logDBErr("search memories by context", s.db.Where("user_id = ? AND status != ?", userID, "trashed").
 		Where("key LIKE ? OR value LIKE ?", "%"+escaped+"%", "%"+escaped+"%").
-		Limit(200).Find(&memories).Error
+		Limit(200).Find(&memories).Error)
 
 	results := make([]map[string]interface{}, 0, len(memories))
 	for _, m := range memories {
@@ -608,10 +608,10 @@ func (s *ToolboxService) ReinforceMemory(userID uint, memoryID uint) (map[string
 
 func (s *ToolboxService) AutoGraph(userID uint, overwrite bool) (map[string]interface{}, error) {
 	var memories []models.Memory
-	_ = s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error
+	logDBErr("load memories for auto graph", s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error)
 
 	var relations []models.Relation
-	_ = s.db.Where("user_id = ?", userID).Limit(5000).Find(&relations).Error
+	logDBErr("load relations for auto graph", s.db.Where("user_id = ?", userID).Limit(5000).Find(&relations).Error)
 
 	existingPairs := make(map[string]bool)
 	for _, r := range relations {
@@ -694,7 +694,7 @@ func (s *ToolboxService) AutoGraph(userID uint, overwrite bool) (map[string]inte
 	}
 
 	var entities []models.Entity
-	_ = s.db.Where("user_id = ?", userID).Limit(1000).Find(&entities).Error
+	logDBErr("load entities for shared tags", s.db.Where("user_id = ?", userID).Limit(1000).Find(&entities).Error)
 
 	entityMemories := make(map[uint][]uint)
 	for _, e := range entities {
@@ -736,7 +736,7 @@ func (s *ToolboxService) AutoGraph(userID uint, overwrite bool) (map[string]inte
 
 func (s *ToolboxService) AIExtract(userID uint) (map[string]interface{}, error) {
 	var memories []models.Memory
-	_ = s.db.Where("user_id = ? AND status != ?", userID, "trashed").Select("value").Limit(5000).Find(&memories).Error
+	logDBErr("load memories for ai extract", s.db.Where("user_id = ? AND status != ?", userID, "trashed").Select("value").Limit(5000).Find(&memories).Error)
 
 	extracted := 0
 	for _, m := range memories {
@@ -795,10 +795,10 @@ func (s *ToolboxService) SetBackupSchedule(userID uint, enabled bool, intervalHo
 
 func (s *ToolboxService) SmartLoad(userID uint, context string) (map[string]interface{}, error) {
 	var memories []models.Memory
-	escaped := escapeLike(context)
-	_ = s.db.Where("user_id = ? AND status != ?", userID, "trashed").
+	escaped := EscapeLikeQuery(context)
+	logDBErr("search memories for ai context", s.db.Where("user_id = ? AND status != ?", userID, "trashed").
 		Where("key LIKE ? OR value LIKE ?", "%"+escaped+"%", "%"+escaped+"%").
-		Limit(200).Find(&memories).Error
+		Limit(200).Find(&memories).Error)
 
 	sort.Slice(memories, func(i, j int) bool {
 		return memories[i].Importance > memories[j].Importance

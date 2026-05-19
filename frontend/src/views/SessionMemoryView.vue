@@ -14,8 +14,8 @@
         <template #prefix><el-icon><Search /></el-icon></template>
       </el-input>
       <el-select v-model="filterStatus" @change="loadSessions" clearable :placeholder="$t('sessionMemory.filterStatus')" style="width: 140px">
-        <el-option label="Active" value="active" />
-        <el-option label="Archived" value="archived" />
+        <el-option :label="$t('sessionMemory.statusActive')" value="active" />
+        <el-option :label="$t('sessionMemory.statusArchived')" value="archived" />
       </el-select>
     </div>
 
@@ -44,8 +44,8 @@
       <div v-if="detailSession" class="session-detail">
         <div class="detail-meta">
           <el-tag size="small" :type="detailSession.status === 'active' ? 'success' : 'info'">{{ detailSession.status }}</el-tag>
-          <span v-if="detailSession.session_id">Session: {{ detailSession.session_id }}</span>
-          <span v-if="detailSession.token_count">~{{ detailSession.token_count }} tokens</span>
+          <span v-if="detailSession.session_id">{{ $t('sessionMemory.sessionIdLabel') }}: {{ detailSession.session_id }}</span>
+          <span v-if="detailSession.token_count">~{{ detailSession.token_count }} {{ $t('sessionMemory.tokenCountLabel') }}</span>
         </div>
         <el-descriptions :column="1" border size="small">
           <el-descriptions-item :label="$t('sessionMemory.currentState')" v-if="detailSession.current_state">{{ detailSession.current_state }}</el-descriptions-item>

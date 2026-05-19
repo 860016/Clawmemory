@@ -152,7 +152,7 @@
           <h4>{{ $t('knowledge.metaInfo') }}</h4>
           <div class="meta-grid">
             <div class="meta-item">
-              <span class="meta-label">ID</span>
+              <span class="meta-label">{{ $t('knowledgeV2.id') }}</span>
               <span class="meta-value">{{ detailEntity.id }}</span>
             </div>
             <div class="meta-item">

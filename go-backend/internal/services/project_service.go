@@ -185,8 +185,9 @@ func (s *ProjectService) ExtractFromMemories(userID uint, projectID uint) (int, 
 	}
 
 	var memories []models.Memory
+	escapedName := EscapeLikeQuery(project.Name)
 	_ = s.db.Where("user_id = ? AND status != ?", userID, "trashed").
-		Where("key LIKE ? OR value LIKE ?", "%"+project.Name+"%", "%"+project.Name+"%").
+		Where("key LIKE ? OR value LIKE ?", "%"+escapedName+"%", "%"+escapedName+"%").
 		Order("importance DESC").Limit(50).Find(&memories).Error
 
 	extracted := 0
@@ -213,7 +214,7 @@ func (s *ProjectService) ExtractFromMemories(userID uint, projectID uint) (int, 
 
 func (s *ProjectService) GetContextForOpenClaw(userID uint, projectName string) (string, error) {
 	var project models.Project
-	if err := s.db.Where("user_id = ? AND name LIKE ?", userID, "%"+projectName+"%").First(&project).Error; err != nil {
+	if err := s.db.Where("user_id = ? AND name LIKE ?", userID, "%"+EscapeLikeQuery(projectName)+"%").First(&project).Error; err != nil {
 		return "", fmt.Errorf("project not found")
 	}
 
@@ -265,7 +266,7 @@ func (s *ProjectService) GetContextForOpenClaw(userID uint, projectName string) 
 }
 
 func (s *ProjectService) Search(userID uint, query string, limit int) ([]models.Project, error) {
-	escaped := escapeLikeQuery(query)
+	escaped := EscapeLikeQuery(query)
 	var projects []models.Project
 	err := s.db.Where("user_id = ? AND (name LIKE ? OR description LIKE ? OR category LIKE ?)",
 		userID, "%"+escaped+"%", "%"+escaped+"%", "%"+escaped+"%").

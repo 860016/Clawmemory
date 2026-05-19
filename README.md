@@ -1,4 +1,4 @@
-# ClawMemory v2.28.0 — AI 记忆管理中枢
+# ClawMemory v2.29.0 — AI 记忆管理中枢
 
 **ClawMemory** 是一款为 AI 助手设计的**长期记忆管理系统**。它让 AI 能够"记住"过去的对话、知识和上下文，实现跨会话的智能记忆检索与关联。
 
@@ -292,6 +292,15 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 
 ## 📝 更新日志
 
+### v2.29.0 (2026-05-19)
+- 🔑 安全：登录失败锁定阈值从 3 次调整为 5 次
+- 🏗️ 架构：统一双存储体系，AI 配置从 settings KV 加载，reasoning_config 不再重复存储 Provider/Model/APIKey
+- 🏗️ 架构：存储容量上限从硬编码改为后端动态返回（`/stats` 新增 `maxMemories` 字段）
+- 🐛 修复：`ValidateMemoryCreate` 返回 `*Validator` 指针导致所有记忆写入均返回 "validation failed" 的致命 Bug
+- 🐛 修复：`ValidateUsername`/`ValidatePassword` 同类指针判断问题，统一改为返回 `error` 接口
+- 📊 可观测性：44 处静默忽略的数据库错误（`_ = db.xxx.Error`）全部添加日志记录
+- 🔌 插件：OpenClaw 插件配置示例补充 `plugins.load.paths` 字段（Docker 环境必需）
+
 ### v2.28.0 (2026-05-19)
 - 🧠 记忆扫描：文件哈希增量索引（SHA-256），避免重复扫描未修改文件
 - 🧠 记忆扫描：路径感知记忆分类，自动区分长期记忆/每日日志/会话记录/知识文档
@@ -332,7 +341,7 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - 🌍 i18n：删除约50条授权相关翻译key，统一替换相关提示文案
 - 🔐 授权：Pro 授权系统接入远程授权服务器，支持设备指纹、RSA 签名验证、心跳上报
 - 🔐 授权：授权状态持久化到数据库，7 天离线宽限期
-- 🧠 P1-1：统一衰减算法，Pro 版 DecayApply 先尝试 AI 评估，不可用时 fallback 到 DecayService
+- 🧠 P1-1：统一衰减算法，DecayApply 先尝试 AI 评估，不可用时 fallback 到 DecayService
 - 🧠 P1-2：增强 TokenRoute 算法，增加句子数统计、专业术语检测、平均句长、4 档复杂度评分
 - 🔗 P2-1：增强 AutoGraph 语义分析，增加 Jaccard 相似度、标签关联、实体共享关联，关系类型扩展为 same_topic/shared_tags/shared_entity
 - 🔍 P2-2：增强冲突检测算法，增加 Jaccard 相似度检测、标签重叠检测、严重度分级（exact_duplicate/similar_content/potential_conflict）
@@ -371,8 +380,8 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - 🔧 改进：外部 API 支持 visibility 和 source_agent 字段
 - 🔧 改进：GetPlatform 默认值从 "openclaw" 改为 "clawmemory"
 - 🔧 改进：记忆回写服务新增 clawmemory 和 trae 目标
-- 🏗️ 架构：Pro 功能分离为独立仓库 ClawMemory-Pro（闭源），主仓库保持 MIT 开源
-- 🏗️ 架构：引入 ProProvider 接口，开源版使用 Stub 实现，Pro 版使用真实实现
+- 🏗️ 架构：高级功能整合到主仓库，统一 MIT 开源
+- 🏗️ 架构：移除 ProProvider 接口，统一使用 ToolboxService 实现
 
 ### v2.19.0 (2026-05-08)
 - 🔮 新增：Dialectic Reasoning 多轮推理引擎（用户自带 AI 模型，零额外费用）
@@ -674,67 +683,6 @@ cd ..
 ## 🤖 OpenClaw 集成说明
 
 ClawMemory 可以作为 OpenClaw 的主要记忆管理工具，通过 API 联动实现对话自动记忆。
-
----
-
-## ⬆️ 升级到 Pro
-
-ClawMemory Pro 提供额外的 AI 增强功能，包括智能对话、Wiki 生成、每日报告、知识提炼、代理加速、本地推理等。
-
-### 下载 Pro
-
-前往 [ClawMemory Releases](https://github.com/860016/Clawmemory/releases/tag/v2.18.0) 下载对应平台的 Pro 安装包：
-
-| 平台 | 文件名 |
-|------|--------|
-| Windows x64 | `clawmemory-pro-2.18.0-windows-amd64.zip` |
-| Windows ARM | `clawmemory-pro-2.18.0-windows-arm64.zip` |
-| Linux x64 | `clawmemory-pro-2.18.0-linux-amd64.tar.gz` |
-| Linux ARM | `clawmemory-pro-2.18.0-linux-arm64.tar.gz` |
-| macOS Intel | `clawmemory-pro-2.18.0-darwin-amd64.tar.gz` |
-| macOS Apple Silicon | `clawmemory-pro-2.18.0-darwin-arm64.tar.gz` |
-
-### 安装 Pro
-
-1. 先完成上方「一键安装」安装 ClawMemory
-2. 下载对应平台的 Pro 安装包并解压，得到 `clawmemory-pro`（Linux/macOS）或 `clawmemory-pro.exe`（Windows）可执行文件
-3. **将解压得到的可执行文件复制到 ClawMemory 安装目录的 `go-backend/` 下，替换原有的 `clawmemory`（或 `clawmemory.exe`）**
-
-**替换位置**：
-
-| 平台 | 替换文件路径 |
-|------|-------------|
-| **Windows** | `ClawMemory\go-backend\clawmemory.exe` |
-| **Linux/macOS** | `ClawMemory/go-backend/clawmemory` |
-
-**具体操作**：
-
-```bash
-# Windows (PowerShell)
-# 假设解压到了 Downloads 目录
-Copy-Item "$HOME\Downloads\clawmemory-pro.exe" ".\go-backend\clawmemory.exe" -Force
-
-# Linux / macOS
-# 假设解压到了 ~/Downloads 目录
-cp ~/Downloads/clawmemory-pro ./go-backend/clawmemory
-chmod +x ./go-backend/clawmemory
-```
-
-4. 重新启动 ClawMemory（`start.bat` 或 `./start.sh`）
-5. 打开浏览器访问 `http://localhost:8765` → **设置 → Pro 授权** → 输入授权码激活
-
-### Pro 专属功能
-
-- **AI 智能对话** - 基于记忆的智能 AI 对话
-- **AI Wiki 生成** - 自动生成知识库 Wiki
-- **AI 每日报告** - 自动生成每日总结报告
-- **AI 知识提炼** - 从对话中自动提炼知识点
-- **AI 记忆助手** - 智能化 AI 记忆管理
-- **AI 项目分析** - 深度分析项目记忆
-- **Pro 代理加速** - 支持 OpenAI/Anthropic 代理加速
-- **Pro 本地推理** - 支持 Ollama 本地模型推理
-- **Pro 高级加密** - 端到端加密存储
-- **Pro 数据同步** - 跨设备数据同步
 
 ---
 

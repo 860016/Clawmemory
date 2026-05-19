@@ -86,7 +86,7 @@ func (s *MemoryWritebackService) Writeback(userID uint, agentName string, projec
 	if agentName != "" {
 		query = query.Where("source_agent = ? OR visibility IN ?", agentName, []string{"shared", "public"})
 	}
-	_ = query.Find(&memories).Error
+	logDBErr("load memories for writeback", query.Find(&memories).Error)
 
 	if len(memories) == 0 {
 		return &WritebackResult{
@@ -158,7 +158,7 @@ func (s *MemoryWritebackService) PreviewWriteback(userID uint, agentName string)
 	if agentName != "" {
 		query = query.Where("source_agent = ? OR visibility IN ?", agentName, []string{"shared", "public"})
 	}
-	_ = query.Find(&memories).Error
+	logDBErr("load memories for writeback sync", query.Find(&memories).Error)
 	return memories, nil
 }
 

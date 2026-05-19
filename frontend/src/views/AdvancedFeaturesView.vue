@@ -3,7 +3,7 @@
     <div class="page-hero">
       <div class="hero-content">
         <h1>🚀 {{ $t('advanced.title') }}</h1>
-        <span class="advanced-badge">Advanced</span>
+        <span class="advanced-badge">{{ $t('nav.advancedVersion') }}</span>
       </div>
     </div>
 

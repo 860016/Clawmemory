@@ -153,16 +153,9 @@ type internalSearchResult struct {
 	UpdatedAt  string
 }
 
-func escapeLike(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `%`, `\%`)
-	s = strings.ReplaceAll(s, `_`, `\_`)
-	return s
-}
-
 func (s *SearchService) keywordSearch(userID uint, query string, limit int) []internalSearchResult {
 	var memories []models.Memory
-	escaped := escapeLike(query)
+	escaped := EscapeLikeQuery(query)
 	if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").
 		Where("key LIKE ? OR value LIKE ?", "%"+escaped+"%", "%"+escaped+"%").
 		Limit(limit).Find(&memories).Error; err != nil {
@@ -218,7 +211,7 @@ func (s *SearchService) keywordSearch(userID uint, query string, limit int) []in
 
 func (s *SearchService) semanticSearch(userID uint, query string, limit int) []internalSearchResult {
 	var memories []models.Memory
-	escaped := escapeLike(query)
+	escaped := EscapeLikeQuery(query)
 	if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").
 		Where("key LIKE ? OR value LIKE ?", "%"+escaped+"%", "%"+escaped+"%").
 		Limit(500).Find(&memories).Error; err != nil {
@@ -526,7 +519,7 @@ func (s *SearchService) graphTraversalSearch(userID uint, query string, limit in
 
 func (s *SearchService) SemanticSearch(userID uint, query string, limit int) ([]map[string]interface{}, error) {
 	var memories []models.Memory
-	escaped := escapeLike(query)
+	escaped := EscapeLikeQuery(query)
 	_ = s.db.Where("user_id = ? AND status != ?", userID, "trashed").
 		Where("key LIKE ? OR value LIKE ?", "%"+escaped+"%", "%"+escaped+"%").
 		Limit(500).Find(&memories).Error

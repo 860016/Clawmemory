@@ -313,7 +313,7 @@ func (s *SkillLearningService) GenerateAgentSuggestions(userID uint) ([]map[stri
 	suggestions := make([]map[string]interface{}, 0)
 
 	var existingSuggestions []models.SkillSuggestion
-	_ = s.db.Where("user_id = ? AND status = ?", userID, "pending").Find(&existingSuggestions).Error
+	logDBErr("load pending skill suggestions", s.db.Where("user_id = ? AND status = ?", userID, "pending").Find(&existingSuggestions).Error)
 	existingTypes := make(map[string]bool)
 	for _, es := range existingSuggestions {
 		key := es.AgentName + ":" + es.SuggestType
@@ -346,7 +346,7 @@ func (s *SkillLearningService) GenerateAgentSuggestions(userID uint) ([]map[stri
 	}
 
 	var traces []models.ActionTrace
-	_ = s.db.Where("user_id = ?", userID).Order("created_at DESC").Limit(100).Find(&traces).Error
+	logDBErr("load traces for skill learning", s.db.Where("user_id = ?", userID).Order("created_at DESC").Limit(100).Find(&traces).Error)
 	agentActionCount := make(map[string]int)
 	for _, t := range traces {
 		agentActionCount[t.AgentName]++
@@ -424,7 +424,7 @@ func (s *SkillLearningService) GetSkillStats(userID uint) map[string]interface{}
 	s.db.Model(&models.ActionTrace{}).Where("user_id = ?", userID).Count(&totalUsage)
 
 	var traces []models.ActionTrace
-	_ = s.db.Where("user_id = ?", userID).Order("created_at DESC").Limit(1).Find(&traces).Error
+	logDBErr("load latest trace", s.db.Where("user_id = ?", userID).Order("created_at DESC").Limit(1).Find(&traces).Error)
 	lastActivity := ""
 	if len(traces) > 0 {
 		lastActivity = traces[0].CreatedAt.Format("2006-01-02 15:04:05")

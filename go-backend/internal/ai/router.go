@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"clawmemory/internal/models"
 	"clawmemory/internal/services"
 
 	"gorm.io/gorm"
@@ -152,61 +151,12 @@ func (r *AIRouter) getProvider(userID uint) (Provider, error) {
 }
 
 func (r *AIRouter) loadProvider(userID uint) (Provider, error) {
-	provider, err := r.loadFromReasoningConfig(userID)
-	if err == nil && provider != nil {
-		return provider, nil
-	}
-
 	userProvider, err := r.loadUserProvider(userID)
 	if err != nil {
-		return nil, fmt.Errorf("no AI provider configured. Please configure an AI provider in Settings > Reasoning")
+		return nil, fmt.Errorf("no AI provider configured. Please configure an AI provider in Settings > AI Config")
 	}
 
 	return userProvider, nil
-}
-
-func (r *AIRouter) loadFromReasoningConfig(userID uint) (Provider, error) {
-	var config models.ReasoningConfig
-	if err := r.db.Where("user_id = ? AND enabled = ?", userID, true).First(&config).Error; err != nil {
-		return nil, err
-	}
-
-	if config.APIKey == "" && config.Provider != "ollama" {
-		return nil, fmt.Errorf("reasoning config has no API key")
-	}
-
-	baseURL := config.BaseURL
-	if baseURL == "" {
-		switch config.Provider {
-		case "openai":
-			baseURL = "https://api.openai.com/v1"
-		case "anthropic":
-			baseURL = "https://api.anthropic.com/v1"
-		case "openrouter":
-			baseURL = "https://openrouter.ai/api/v1"
-		case "ollama":
-			baseURL = "http://localhost:11434/v1"
-		case "deepseek":
-			baseURL = "https://api.deepseek.com/v1"
-		default:
-			baseURL = ""
-		}
-	}
-
-	model := config.Model
-	if model == "" {
-		model = defaultModel(config.Provider)
-	}
-
-	cfg := ProviderConfig{
-		ID:      config.Provider,
-		Type:    config.Provider,
-		APIKey:  config.APIKey,
-		BaseURL: baseURL,
-		Model:   model,
-	}
-
-	return NewOpenAICompatibleProvider(cfg), nil
 }
 
 func (r *AIRouter) loadUserProvider(userID uint) (Provider, error) {
@@ -274,19 +224,12 @@ func (r *AIRouter) GetCurrentUserConfig(userID uint) map[string]interface{} {
 		"available_providers": AllProviders,
 	}
 
-	reasoningProvider, reasoningModel := r.getReasoningConfigInfo(userID)
-	if reasoningProvider != "" {
-		result["provider_id"] = reasoningProvider
-		result["model"] = reasoningModel
-		result["provider_source"] = "reasoning"
-	}
-
 	settingsSvc := services.NewSettingsService(r.db)
 
 	if v, _ := settingsSvc.GetByKey(userID, "ai_provider_id"); v != nil {
 		if s, ok := v.(string); ok && s != "" {
 			result["provider_id"] = s
-			result["provider_source"] = "pro_config"
+			result["provider_source"] = "user_config"
 		}
 	}
 	if v, _ := settingsSvc.GetByKey(userID, "ai_model"); v != nil {
@@ -306,14 +249,6 @@ func (r *AIRouter) GetCurrentUserConfig(userID uint) map[string]interface{} {
 	}
 
 	return result
-}
-
-func (r *AIRouter) getReasoningConfigInfo(userID uint) (provider string, model string) {
-	var config models.ReasoningConfig
-	if err := r.db.Where("user_id = ? AND enabled = ?", userID, true).First(&config).Error; err != nil {
-		return "", ""
-	}
-	return config.Provider, config.Model
 }
 
 func (r *AIRouter) UpdateProConfig(userID uint, data map[string]interface{}) error {

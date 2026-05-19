@@ -6,11 +6,11 @@
     </el-select>
     <el-select v-model="memoryType" @change="emitChange" :placeholder="$t('memories.memoryType')" clearable style="width: 140px">
       <el-option :label="$t('memories.all')" value="" />
-      <el-option label="Knowledge" value="knowledge" />
-      <el-option label="Feedback" value="feedback" />
-      <el-option label="Project" value="project" />
-      <el-option label="Reference" value="reference" />
-      <el-option label="User" value="user" />
+      <el-option :label="$t('memories.knowledge')" value="knowledge" />
+      <el-option :label="$t('memories.feedback')" value="feedback" />
+      <el-option :label="$t('memories.project')" value="project" />
+      <el-option :label="$t('memories.reference')" value="reference" />
+      <el-option :label="$t('memories.user')" value="user" />
     </el-select>
     <el-select v-model="sourceAgent" @change="emitChange" :placeholder="$t('memories.sourceAgent')" clearable style="width: 140px">
       <el-option :label="$t('memories.all')" value="" />

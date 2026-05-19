@@ -25,7 +25,7 @@ func (s *RecommendService) RecommendForMemory(userID uint, memoryID uint, limit 
 	}
 
 	var memories []models.Memory
-	_ = s.db.Where("user_id = ? AND status != ? AND id != ?", userID, "trashed", memoryID).Limit(5000).Find(&memories).Error
+	logDBErr("load memories for recommendation", s.db.Where("user_id = ? AND status != ? AND id != ?", userID, "trashed", memoryID).Limit(5000).Find(&memories).Error)
 
 	targetTokens := tokenize(target.Key + " " + target.Value)
 	if len(targetTokens) == 0 {
@@ -104,7 +104,7 @@ func (s *RecommendService) RecommendForMemory(userID uint, memoryID uint, limit 
 
 func (s *RecommendService) RecommendByContext(userID uint, context string, limit int) (map[string]interface{}, error) {
 	var memories []models.Memory
-	_ = s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error
+	logDBErr("load memories for related search", s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error)
 
 	if len(memories) == 0 || context == "" {
 		return map[string]interface{}{"recommendations": []map[string]interface{}{}}, nil

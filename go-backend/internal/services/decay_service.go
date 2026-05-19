@@ -45,13 +45,16 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 	locked := 0
 
 	batchSize := 200
-	offset := 0
+	var lastID uint
 	totalProcessed := 0
 
 	for {
 		var memories []models.Memory
-		if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").
-			Order("importance ASC").Limit(batchSize).Offset(offset).Find(&memories).Error; err != nil {
+		query := s.db.Where("user_id = ? AND status != ?", userID, "trashed")
+		if lastID > 0 {
+			query = query.Where("id > ?", lastID)
+		}
+		if err := query.Order("id ASC").Limit(batchSize).Find(&memories).Error; err != nil {
 			return nil, fmt.Errorf("failed to load memories: %w", err)
 		}
 		if len(memories) == 0 {
@@ -60,6 +63,7 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 
 		for i := range memories {
 			m := &memories[i]
+			lastID = m.ID
 			daysSinceAccess := now.Sub(m.UpdatedAt).Hours() / 24
 			if m.LastAccessedAt != nil {
 				daysSinceAccess = now.Sub(*m.LastAccessedAt).Hours() / 24
@@ -128,11 +132,10 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 			}
 		}
 
+		totalProcessed += len(memories)
 		if len(memories) < batchSize {
 			break
 		}
-		totalProcessed += len(memories)
-		offset += batchSize
 	}
 
 	return map[string]interface{}{

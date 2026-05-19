@@ -8,9 +8,9 @@
       <div class="settings-grid">
       <!-- 语言设置 -->
       <div class="settings-card">
-        <div class="card-title">◇ {{ currentLocale === 'zh' ? 'Language' : '界面语言' }}</div>
+        <div class="card-title">◇ {{ $t('settings.language') }}</div>
         <div class="setting-item">
-          <span>{{ currentLocale === 'zh' ? 'Language' : '界面语言' }}</span>
+          <span>{{ $t('settings.language') }}</span>
           <el-select v-model="currentLocale" @change="changeLocale" style="width: 140px">
             <el-option v-if="currentLocale === 'zh'" :label="$t('settings.english')" value="en" />
             <el-option v-else :label="$t('settings.chinese')" value="zh" />
@@ -58,6 +58,53 @@
         <div class="ai-config-hint" v-if="aiConfig && !aiConfig.provider_id" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px; color: var(--cm-text-muted)">
           <div style="font-weight: 600; margin-bottom: 4px">{{ $t('settings.aiConfigHint') }}</div>
           <div>{{ $t('settings.aiConfigHintDesc') }}</div>
+        </div>
+
+        <el-divider v-if="reasoningConfig" style="margin: 16px 0 12px" />
+
+        <div v-if="reasoningConfig" class="reasoning-section">
+          <div class="card-title" style="font-size: 14px; margin-bottom: 8px">🔮 {{ $t('settings.reasoningConfig') }}</div>
+          <p class="setting-desc" style="margin-bottom: 8px">{{ $t('settings.reasoningDesc') }}</p>
+          <div class="setting-item">
+            <span>{{ $t('settings.reasoningEnabled') }}</span>
+            <el-switch v-model="reasoningEnabled" @change="updateReasoningEnabled" />
+          </div>
+          <template v-if="reasoningEnabled">
+            <div class="setting-item">
+              <span>{{ $t('settings.reasoningDepth') }}</span>
+              <el-slider v-model="reasoningForm.dialectic_depth" :min="1" :max="3" :step="1" :marks="{ 1: '1', 2: '2', 3: '3' }" style="width: 200px" />
+            </div>
+            <div class="setting-item">
+              <span>{{ $t('settings.reasoningLevel') }}</span>
+              <el-select v-model="reasoningForm.reasoning_level" style="width: 200px">
+                <el-option :label="$t('settings.levelMinimal')" value="minimal" />
+                <el-option :label="$t('settings.levelLow')" value="low" />
+                <el-option :label="$t('settings.levelMedium')" value="medium" />
+                <el-option :label="$t('settings.levelHigh')" value="high" />
+                <el-option :label="$t('settings.levelMax')" value="max" />
+              </el-select>
+            </div>
+            <div class="setting-item">
+              <span></span>
+              <div>
+                <el-button size="small" type="primary" @click="saveReasoningConfig" :loading="reasoningSaving">{{ $t('common.save') }}</el-button>
+                <el-button size="small" @click="testReasoningConnection" :loading="reasoningTesting">{{ $t('settings.reasoningTest') }}</el-button>
+              </div>
+            </div>
+            <div v-if="reasoningTestResult" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
+              <span :style="{ color: reasoningTestResult.success ? 'var(--cm-success)' : 'var(--cm-danger)' }">
+                {{ reasoningTestResult.success ? '✓ ' + $t('settings.reasoningTestSuccess') : '✗ ' + (reasoningTestResult.error || $t('settings.reasoningTestFailed')) }}
+              </span>
+            </div>
+            <div class="reasoning-hint" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px; color: var(--cm-text-muted)">
+              <div style="font-weight: 600; margin-bottom: 4px">{{ $t('settings.reasoningHint') }}</div>
+              <div>{{ $t('settings.reasoningHintDesc') }}</div>
+            </div>
+          </template>
+        </div>
+        <div v-if="!reasoningConfig" class="setting-item">
+          <span>{{ $t('settings.reasoningConfig') }}</span>
+          <el-button size="small" @click="loadReasoningConfig" :loading="reasoningLoading">{{ $t('common.retry') }}</el-button>
         </div>
       </div>
 
@@ -112,71 +159,6 @@
             <span>{{ $t('riskSwitch.allowWriteback') }}</span>
             <el-switch v-model="riskSwitches.allow_writeback" @change="saveRiskSwitches" />
           </div>
-        </div>
-      </div>
-
-      <!-- Dialectic Reasoning -->
-      <div class="settings-card" id="settings-reasoning">
-        <div class="card-title">🔮 {{ $t('settings.reasoningConfig') }}</div>
-        <p class="setting-desc" style="margin-bottom: 8px">{{ $t('settings.reasoningDesc') }}</p>
-        <div class="setting-item" v-if="reasoningConfig">
-          <span>{{ $t('settings.reasoningEnabled') }}</span>
-          <el-switch v-model="reasoningEnabled" @change="updateReasoningEnabled" />
-        </div>
-        <div class="setting-item" v-if="reasoningConfig">
-          <span>{{ $t('settings.reasoningProvider') }}</span>
-          <el-select v-model="reasoningForm.provider" style="width: 200px" @change="onReasoningProviderChange">
-            <el-option label="OpenAI" value="openai" />
-            <el-option label="Ollama" value="ollama" />
-            <el-option label="DeepSeek" value="deepseek" />
-            <el-option label="Custom" value="custom" />
-          </el-select>
-        </div>
-        <div class="setting-item" v-if="reasoningConfig">
-          <span>{{ $t('settings.reasoningModel') }}</span>
-          <el-input v-model="reasoningForm.model" style="width: 200px" :placeholder="$t('settings.reasoningModelPlaceholder')" />
-        </div>
-        <div class="setting-item" v-if="reasoningConfig">
-          <span>{{ $t('settings.reasoningApiKey') }}</span>
-          <el-input v-model="reasoningForm.api_key" type="password" show-password style="width: 200px" :placeholder="reasoningHasKey ? $t('settings.reasoningApiKeySet') : $t('settings.reasoningApiKeyPlaceholder')" />
-        </div>
-        <div class="setting-item" v-if="reasoningConfig && reasoningForm.provider === 'custom'">
-          <span>{{ $t('settings.reasoningBaseUrl') }}</span>
-          <el-input v-model="reasoningForm.base_url" style="width: 200px" placeholder="http://localhost:11434/v1" />
-        </div>
-        <div class="setting-item" v-if="reasoningConfig">
-          <span>{{ $t('settings.reasoningDepth') }}</span>
-          <el-slider v-model="reasoningForm.dialectic_depth" :min="1" :max="3" :step="1" :marks="{ 1: '1', 2: '2', 3: '3' }" style="width: 200px" />
-        </div>
-        <div class="setting-item" v-if="reasoningConfig">
-          <span>{{ $t('settings.reasoningLevel') }}</span>
-          <el-select v-model="reasoningForm.reasoning_level" style="width: 200px">
-            <el-option label="Minimal" value="minimal" />
-            <el-option label="Low" value="low" />
-            <el-option label="Medium" value="medium" />
-            <el-option label="High" value="high" />
-            <el-option label="Max" value="max" />
-          </el-select>
-        </div>
-        <div class="setting-item" v-if="reasoningConfig">
-          <span></span>
-          <div>
-            <el-button size="small" type="primary" @click="saveReasoningConfig" :loading="reasoningSaving">{{ $t('common.save') }}</el-button>
-            <el-button size="small" @click="testReasoningConnection" :loading="reasoningTesting">{{ $t('settings.reasoningTest') }}</el-button>
-          </div>
-        </div>
-        <div v-if="reasoningTestResult" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
-          <span :style="{ color: reasoningTestResult.success ? 'var(--cm-success)' : 'var(--cm-danger)' }">
-            {{ reasoningTestResult.success ? '✓ ' + $t('settings.reasoningTestSuccess') : '✗ ' + (reasoningTestResult.error || $t('settings.reasoningTestFailed')) }}
-          </span>
-        </div>
-        <div v-if="!reasoningConfig" class="setting-item">
-          <span>{{ $t('settings.reasoningProvider') }}</span>
-          <el-button size="small" @click="loadReasoningConfig" :loading="reasoningLoading">{{ $t('common.retry') }}</el-button>
-        </div>
-        <div class="reasoning-hint" v-if="reasoningConfig" style="margin-top: 8px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px; color: var(--cm-text-muted)">
-          <div style="font-weight: 600; margin-bottom: 4px">{{ $t('settings.reasoningHint') }}</div>
-          <div>{{ $t('settings.reasoningHintDesc') }}</div>
         </div>
       </div>
 
@@ -277,7 +259,7 @@
           </code>
           <div style="color: var(--cm-text-muted); margin-top: 8px; font-size: 11px">{{ $t('settings.pluginConfigHint') }}</div>
           <code style="display: block; padding: 8px; background: var(--cm-bg); border-radius: 4px; font-size: 11px; word-break: break-all; color: var(--cm-accent); margin-top: 4px">
-            { "plugins": { "slots": { "contextEngine": "clawmemory" }, "entries": { "clawmemory": { "enabled": true, "config": { "baseUrl": "http://localhost:8765", "apiKey": "cm_..." } } } } }
+            { "plugins": { "slots": { "contextEngine": "clawmemory" }, "entries": { "clawmemory": { "enabled": true, "config": { "baseUrl": "http://localhost:8765", "apiKey": "cm_..." } } }, "load": { "paths": ["/path/to/openclaw-plugin"] } } }
           </code>
           <el-alert type="info" :closable="false" style="margin-top: 8px; font-size: 11px">
             <template #title>{{ $t('settings.apiKeyHowToGet') }}</template>
@@ -638,8 +620,7 @@ const sections = [
   { id: 'ai', icon: '🧠', label: computed(() => t('settings.aiConfig')) },
   { id: 'security', icon: '🔒', label: computed(() => t('settings.security')) },
   { id: 'risk-switches', icon: '🛡️', label: computed(() => t('settings.riskControl')) },
-  { id: 'reasoning', icon: '🤔', label: computed(() => t('settings.reasoningConfig')) },
-  { id: 'openclaw', icon: '🌐', label: 'OpenClaw' },
+  { id: 'openclaw', icon: '🌐', label: computed(() => t('settings.clientConnection')) },
   { id: 'data', icon: '💾', label: computed(() => t('settings.dataManagement')) },
   { id: 'decay', icon: '⏳', label: computed(() => t('settings.memoryDecay')) },
   { id: 'system', icon: '🖥️', label: computed(() => t('settings.systemInfo')) },

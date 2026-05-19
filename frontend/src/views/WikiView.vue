@@ -7,12 +7,12 @@
           <span class="stat-badge completed">{{ stats.completed }} {{ $t('wiki.completed') }}</span>
           <span class="stat-badge in-progress">{{ stats.in_progress }} {{ $t('wiki.inProgress') }}</span>
           <span class="stat-badge draft">{{ stats.draft }} {{ $t('wiki.draft') }}</span>
-          <span class="stat-badge ai" v-if="stats.ai_generated">🤖 {{ stats.ai_generated }} AI</span>
+          <span class="stat-badge ai" v-if="stats.ai_generated">🤖 {{ stats.ai_generated }} {{ $t('wiki.aiGenerated') }}</span>
         </div>
       </div>
       <div class="header-actions">
         <el-button type="primary" @click="openExtractDialog" v-if="llmAvailable">
-          <el-icon><MagicStick /></el-icon> AI {{ $t('wiki.extractFromConversation') }}
+          <el-icon><MagicStick /></el-icon> {{ $t('wiki.aiExtract') }} {{ $t('wiki.extractFromConversation') }}
         </el-button>
         <el-button type="primary" @click="openNewPage">
           <el-icon><Plus /></el-icon> {{ $t('wiki.addPage') }}

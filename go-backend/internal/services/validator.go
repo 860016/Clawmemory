@@ -95,7 +95,7 @@ func (v *Validator) Regex(field, value, pattern, message string) *Validator {
 	return v
 }
 
-func ValidateMemoryCreate(data map[string]interface{}) *Validator {
+func ValidateMemoryCreate(data map[string]interface{}) error {
 	v := NewValidator()
 
 	key, _ := data["key"].(string)
@@ -120,22 +120,31 @@ func ValidateMemoryCreate(data map[string]interface{}) *Validator {
 		v.OneOf("visibility", visibility, []string{"private", "shared", "public"})
 	}
 
-	return v
+	if v.HasErrors() {
+		return v
+	}
+	return nil
 }
 
-func ValidateUsername(username string) *Validator {
+func ValidateUsername(username string) error {
 	v := NewValidator()
 	v.Required("username", username).
 		MinLength("username", username, 3).
 		MaxLength("username", username, 50).
 		Regex("username", username, `^[a-zA-Z0-9_-]+$`, "username can only contain letters, numbers, underscores, and hyphens")
-	return v
+	if v.HasErrors() {
+		return v
+	}
+	return nil
 }
 
-func ValidatePassword(password string) *Validator {
+func ValidatePassword(password string) error {
 	v := NewValidator()
 	v.Required("password", password).
 		MinLength("password", password, 6).
 		MaxLength("password", password, 128)
-	return v
+	if v.HasErrors() {
+		return v
+	}
+	return nil
 }

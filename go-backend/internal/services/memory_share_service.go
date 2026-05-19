@@ -155,7 +155,7 @@ func (s *MemoryShareService) GetOutboundShares(userID uint) ([]models.MemoryShar
 func (s *MemoryShareService) ProcessAutoShareRules(userID uint, memory *models.Memory) error {
 	if memory.Visibility == "public" {
 		var rules []models.ShareRule
-		_ = s.db.Where("user_id = ? AND enabled = ? AND auto_approve = ?", userID, true, true).Find(&rules).Error
+		logDBErr("load auto-approve share rules", s.db.Where("user_id = ? AND enabled = ? AND auto_approve = ?", userID, true, true).Find(&rules).Error)
 
 		for _, rule := range rules {
 			if rule.SourceAgent != "" && rule.SourceAgent != memory.SourceAgent {

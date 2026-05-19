@@ -30,6 +30,12 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+func logDBErr(context string, err error) {
+	if err != nil {
+		log.Printf("[DB] %s: %v", context, err)
+	}
+}
+
 func parseIDParam(c *gin.Context, name string) (int, bool) {
 	id, err := strconv.Atoi(c.Param(name))
 	if err != nil || id <= 0 {
@@ -234,8 +240,8 @@ func handleChangePassword(authService *services.AuthService) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password is required"})
 			return
 		}
-		if len(req.NewPassword) < 4 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password too short"})
+		if len(req.NewPassword) < 6 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "new_password must be at least 6 characters"})
 			return
 		}
 		if err := authService.ChangePassword(userID, req.OldPassword, req.NewPassword); err != nil {
@@ -601,7 +607,7 @@ func handleSessionMemoryUpsert(db *gorm.DB) gin.HandlerFunc {
 				updates["key_results"] = data.KeyResults
 			}
 			if len(updates) > 0 {
-				_ = db.Model(&session).Updates(updates).Error
+				logDBErr("update session", db.Model(&session).Updates(updates).Error)
 			}
 		}
 
@@ -626,12 +632,13 @@ func handleMemoryEvolution(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		var history []models.MemoryHistory
-		_ = db.Where("user_id = ? AND memory_id = ?", userID, memoryID).
-			Order("created_at ASC").Find(&history).Error
+		logDBErr("load memory history", db.Where("user_id = ? AND memory_id = ?", userID, memoryID).
+			Order("created_at ASC").Find(&history).Error)
 
 		var relatedEntities []models.Entity
-		_ = db.Where("user_id = ? AND (name LIKE ? OR description LIKE ?)",
-			userID, "%"+memory.Key+"%", "%"+memory.Key+"%").Limit(20).Find(&relatedEntities).Error
+		escapedKey := services.EscapeLikeQuery(memory.Key)
+		logDBErr("load related entities", db.Where("user_id = ? AND (name LIKE ? OR description LIKE ?)",
+			userID, "%"+escapedKey+"%", "%"+escapedKey+"%").Limit(20).Find(&relatedEntities).Error)
 
 		var relatedRelations []models.Relation
 		if len(relatedEntities) > 0 {
@@ -639,8 +646,8 @@ func handleMemoryEvolution(db *gorm.DB) gin.HandlerFunc {
 			for i, e := range relatedEntities {
 				entityIDs[i] = e.ID
 			}
-			_ = db.Where("user_id = ? AND (source_id IN ? OR target_id IN ?)",
-				userID, entityIDs, entityIDs).Limit(50).Find(&relatedRelations).Error
+			logDBErr("load related relations", db.Where("user_id = ? AND (source_id IN ? OR target_id IN ?)",
+				userID, entityIDs, entityIDs).Limit(50).Find(&relatedRelations).Error)
 		}
 
 		type evolutionStep struct {
@@ -1261,7 +1268,7 @@ func handleGetAgentsMD(db *gorm.DB) gin.HandlerFunc {
 		baseURL := scheme + "://" + host
 
 		var keys []models.APIKey
-		_ = db.Where("revoked_at IS NULL").Order("created_at DESC").Find(&keys).Error
+		logDBErr("load api keys", db.Where("revoked_at IS NULL").Order("created_at DESC").Find(&keys).Error)
 
 		hasKey := len(keys) > 0
 		apiKeyHint := "cm_your_api_key_here"
@@ -1439,7 +1446,7 @@ func enrichChromaResults(db *gorm.DB, userID uint, chromaResults []map[string]in
 	}
 
 	var memories []models.Memory
-	_ = db.Where("user_id = ? AND id IN ?", userID, memIDs).Find(&memories).Error
+	logDBErr("load memories by ids", db.Where("user_id = ? AND id IN ?", userID, memIDs).Find(&memories).Error)
 
 	memMap := make(map[uint]models.Memory)
 	for _, m := range memories {
@@ -1948,10 +1955,10 @@ func handleGetStats(db *gorm.DB) gin.HandlerFunc {
 			"tier":     "advanced",
 			"is_valid": true,
 		}
-		_ = db.Model(&struct{ ID uint }{}).Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Count(&memoryCount).Error
-		_ = db.Model(&struct{ ID uint }{}).Table("entities").Where("user_id = ?", userID).Count(&entityCount).Error
-		_ = db.Model(&struct{ ID uint }{}).Table("relations").Where("user_id = ?", userID).Count(&relationCount).Error
-		_ = db.Model(&struct{ ID uint }{}).Table("projects").Where("user_id = ?", userID).Count(&projectCount).Error
+		logDBErr("count memories for license", db.Model(&struct{ ID uint }{}).Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Count(&memoryCount).Error)
+		logDBErr("count entities for license", db.Model(&struct{ ID uint }{}).Table("entities").Where("user_id = ?", userID).Count(&entityCount).Error)
+		logDBErr("count relations for license", db.Model(&struct{ ID uint }{}).Table("relations").Where("user_id = ?", userID).Count(&relationCount).Error)
+		logDBErr("count projects for license", db.Model(&struct{ ID uint }{}).Table("projects").Where("user_id = ?", userID).Count(&projectCount).Error)
 
 		layerStats := make(map[string]int64)
 		rows, err := db.Raw("SELECT COALESCE(layer, 'knowledge') as layer, COUNT(*) as cnt FROM memories WHERE user_id = ? AND status != 'trashed' GROUP BY layer", userID).Rows()
@@ -1976,7 +1983,7 @@ func handleGetStats(db *gorm.DB) gin.HandlerFunc {
 			CreatedAt time.Time `json:"created_at"`
 		}
 		var recentMemories []RecentMemory
-		_ = db.Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Order("created_at desc").Limit(10).Find(&recentMemories).Error
+		logDBErr("load recent memories for dashboard", db.Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Order("created_at desc").Limit(10).Find(&recentMemories).Error)
 
 		recentMemoriesJson := make([]map[string]interface{}, 0)
 		for _, m := range recentMemories {
@@ -1989,7 +1996,7 @@ func handleGetStats(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		var userCount int64
-		_ = db.Table("users").Count(&userCount).Error
+		logDBErr("count users for dashboard", db.Table("users").Count(&userCount).Error)
 		passwordSet := userCount > 0
 
 		c.JSON(http.StatusOK, gin.H{
@@ -2001,6 +2008,7 @@ func handleGetStats(db *gorm.DB) gin.HandlerFunc {
 			"recentMemories": recentMemoriesJson,
 			"license":        licenseInfo,
 			"passwordSet":    passwordSet,
+			"maxMemories":    50000,
 		})
 	}
 }
@@ -2474,7 +2482,7 @@ func handleGetUsageStats(db *gorm.DB) gin.HandlerFunc {
 			Importance float64   `json:"importance"`
 			CreatedAt  time.Time `json:"created_at"`
 		}
-		_ = db.Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Order("created_at desc").Find(&memories).Error
+		logDBErr("load memories for export", db.Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Order("created_at desc").Find(&memories).Error)
 
 		now := time.Now()
 
@@ -2522,7 +2530,7 @@ func handleGetUsageStats(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		var entityCount int64
-		_ = db.Table("entities").Where("user_id = ?", userID).Count(&entityCount).Error
+		logDBErr("count entities for import", db.Table("entities").Where("user_id = ?", userID).Count(&entityCount).Error)
 
 		rows, err := db.Raw("SELECT entity_type, COUNT(*) as cnt FROM entities WHERE user_id = ? GROUP BY entity_type", userID).Rows()
 		if err == nil {
@@ -3617,7 +3625,7 @@ func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
 
 				if req.SkipExisting {
 					var count int64
-					_ = db.Table("memories").Where("user_id = ? AND key = ?", userID, p.Key).Count(&count).Error
+					logDBErr("count memories by key for import", db.Table("memories").Where("user_id = ? AND key = ?", userID, p.Key).Count(&count).Error)
 					if count > 0 {
 						skipped++
 						seenKeys[p.Key] = true
@@ -4096,7 +4104,7 @@ func tryCreateEntity(db *gorm.DB, userID uint, key, content string, entitiesCrea
 	}
 
 	var entityCount int64
-	_ = db.Table("entities").Where("user_id = ? AND name = ?", userID, name).Count(&entityCount).Error
+	logDBErr("count entities by name", db.Table("entities").Where("user_id = ? AND name = ?", userID, name).Count(&entityCount).Error)
 	if entityCount == 0 {
 		entity := models.Entity{
 			UserID:        userID,
@@ -4382,7 +4390,7 @@ func handleListTrash(db *gorm.DB) gin.HandlerFunc {
 		if limit < 1 || limit > 500 {
 			limit = 100
 		}
-		_ = db.Where("user_id = ? AND status = ?", userID, "trashed").Order("trashed_at DESC").Limit(limit).Find(&memories).Error
+		logDBErr("load trashed memories", db.Where("user_id = ? AND status = ?", userID, "trashed").Order("trashed_at DESC").Limit(limit).Find(&memories).Error)
 		items := make([]*services.MemoryModel, 0, len(memories))
 		for i := range memories {
 			items = append(items, services.ToMemoryModel(&memories[i]))
@@ -4426,27 +4434,27 @@ func handleExportData(db *gorm.DB) gin.HandlerFunc {
 		exportData["memories"] = memoryModels
 
 		var entities []models.Entity
-		_ = db.Where("user_id = ?", userID).Find(&entities).Error
+		logDBErr("load entities for export", db.Where("user_id = ?", userID).Find(&entities).Error)
 		exportData["entities"] = entities
 
 		var relations []models.Relation
-		_ = db.Where("user_id = ?", userID).Find(&relations).Error
+		logDBErr("load relations for export", db.Where("user_id = ?", userID).Find(&relations).Error)
 		exportData["relations"] = relations
 
 		var wikiPages []models.WikiPage
-		_ = db.Where("user_id = ?", userID).Find(&wikiPages).Error
+		logDBErr("load wiki pages for export", db.Where("user_id = ?", userID).Find(&wikiPages).Error)
 		exportData["wiki_pages"] = wikiPages
 
 		var projects []models.Project
-		_ = db.Where("user_id = ?", userID).Find(&projects).Error
+		logDBErr("load projects for export", db.Where("user_id = ?", userID).Find(&projects).Error)
 		exportData["projects"] = projects
 
 		var projectNotes []models.ProjectNote
-		_ = db.Where("user_id = ?", userID).Find(&projectNotes).Error
+		logDBErr("load project notes for export", db.Where("user_id = ?", userID).Find(&projectNotes).Error)
 		exportData["project_notes"] = projectNotes
 
 		var reports []models.DailyReport
-		_ = db.Where("user_id = ?", userID).Find(&reports).Error
+		logDBErr("load reports for export", db.Where("user_id = ?", userID).Find(&reports).Error)
 		exportData["daily_reports"] = reports
 
 		exportData["exported_at"] = time.Now().Format(time.RFC3339)
@@ -4966,7 +4974,7 @@ func auditLog(db *gorm.DB, c *gin.Context, action, target, detail string) {
 		Detail: detail,
 		IP:     c.ClientIP(),
 	}
-	_ = db.Create(&log).Error
+	logDBErr("create audit log", db.Create(&log).Error)
 }
 
 func getString(m map[string]interface{}, key, def string) string {
@@ -5188,7 +5196,7 @@ func handleListSessionMemories(db *gorm.DB) gin.HandlerFunc {
 		if limit < 1 || limit > 200 {
 			limit = 50
 		}
-		_ = query.Order("updated_at DESC").Limit(limit).Find(&sessions).Error
+		logDBErr("load sessions", query.Order("updated_at DESC").Limit(limit).Find(&sessions).Error)
 
 		c.JSON(http.StatusOK, gin.H{"items": sessions})
 	}

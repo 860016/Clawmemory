@@ -34,10 +34,10 @@
       </el-select>
       <el-radio-group v-model="currentLayer" @change="loadMemories" size="default">
         <el-radio-button label="">{{ $t('memories.all') }}</el-radio-button>
-        <el-radio-button label="core">Core</el-radio-button>
-        <el-radio-button label="context">Context</el-radio-button>
-        <el-radio-button label="episodic">Episodic</el-radio-button>
-        <el-radio-button label="semantic">Semantic</el-radio-button>
+        <el-radio-button label="core">{{ $t('memories.core') }}</el-radio-button>
+        <el-radio-button label="context">{{ $t('memories.context') }}</el-radio-button>
+        <el-radio-button label="episodic">{{ $t('memories.episodic') }}</el-radio-button>
+        <el-radio-button label="semantic">{{ $t('memories.semantic') }}</el-radio-button>
         <el-radio-button label="preference">{{ $t('memories.preference') }}</el-radio-button>
         <el-radio-button label="knowledge">{{ $t('memories.knowledge') }}</el-radio-button>
         <el-radio-button label="short_term">{{ $t('memories.shortTerm') }}</el-radio-button>
@@ -45,13 +45,13 @@
       </el-radio-group>
       <el-select v-model="currentMemoryType" @change="loadMemories" :placeholder="$t('memories.memoryType')" clearable style="width: 140px">
         <el-option :label="$t('memories.all')" value="" />
-        <el-option label="Knowledge" value="knowledge" />
-        <el-option label="Preference" value="preference" />
-        <el-option label="Instruction" value="instruction" />
-        <el-option label="Context" value="context" />
-        <el-option label="Fact" value="fact" />
-        <el-option label="Episodic" value="episodic" />
-        <el-option label="Conversation" value="conversation" />
+        <el-option :label="$t('memories.knowledge')" value="knowledge" />
+        <el-option :label="$t('memories.preference')" value="preference" />
+        <el-option :label="$t('memories.instruction')" value="instruction" />
+        <el-option :label="$t('memories.context')" value="context" />
+        <el-option :label="$t('memories.fact')" value="fact" />
+        <el-option :label="$t('memories.episodic')" value="episodic" />
+        <el-option :label="$t('memories.conversation')" value="conversation" />
       </el-select>
       <el-select v-model="currentSourceAgent" @change="loadMemories" :placeholder="$t('memories.sourceAgent')" clearable style="width: 140px">
         <el-option :label="$t('memories.all')" value="" />
@@ -160,26 +160,26 @@
       <el-form label-position="top">
         <el-form-item :label="$t('memories.layer')">
           <el-select v-model="form.layer" style="width: 100%">
-            <el-option label="Core (core)" value="core" />
-            <el-option label="Context (context)" value="context" />
-            <el-option label="Detail (detail)" value="detail" />
-            <el-option :label="$t('memories.preference') + ' (preference)'" value="preference" />
-            <el-option :label="$t('memories.knowledge') + ' (knowledge)'" value="knowledge" />
-            <el-option label="Episodic (episodic)" value="episodic" />
-            <el-option label="Semantic (semantic)" value="semantic" />
-            <el-option :label="$t('memories.shortTerm') + ' (short_term)'" value="short_term" />
-            <el-option :label="$t('memories.private') + ' (private)'" value="private" />
+            <el-option :label="$t('memories.layerCore')" value="core" />
+            <el-option :label="$t('memories.layerContext')" value="context" />
+            <el-option :label="$t('memories.layerDetail')" value="detail" />
+            <el-option :label="$t('memories.layerPreference')" value="preference" />
+            <el-option :label="$t('memories.layerKnowledge')" value="knowledge" />
+            <el-option :label="$t('memories.layerEpisodic')" value="episodic" />
+            <el-option :label="$t('memories.layerSemantic')" value="semantic" />
+            <el-option :label="$t('memories.layerShortTerm')" value="short_term" />
+            <el-option :label="$t('memories.layerPrivate')" value="private" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('memories.memoryType')">
           <el-select v-model="form.memory_type" style="width: 100%">
-            <el-option label="Knowledge" value="knowledge" />
-            <el-option label="Preference" value="preference" />
-            <el-option label="Instruction" value="instruction" />
-            <el-option label="Context" value="context" />
-            <el-option label="Fact" value="fact" />
-            <el-option label="Episodic" value="episodic" />
-            <el-option label="Conversation" value="conversation" />
+            <el-option :label="$t('memories.knowledge')" value="knowledge" />
+            <el-option :label="$t('memories.preference')" value="preference" />
+            <el-option :label="$t('memories.instruction')" value="instruction" />
+            <el-option :label="$t('memories.context')" value="context" />
+            <el-option :label="$t('memories.fact')" value="fact" />
+            <el-option :label="$t('memories.episodic')" value="episodic" />
+            <el-option :label="$t('memories.conversation')" value="conversation" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('memories.titleField')">
