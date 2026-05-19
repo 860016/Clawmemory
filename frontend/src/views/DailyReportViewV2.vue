@@ -255,6 +255,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { translateError } from '../i18n'
+import { useAIConfig } from '../composables/useAIConfig'
 import { aiApi } from '../api/go-ai'
 import { reportApi } from '../api/go-reports'
 import {
@@ -265,6 +266,7 @@ import {
 } from '@element-plus/icons-vue'
 
 const { t } = useI18n()
+const { requireAIConfig } = useAIConfig(false)
 
 const currentDate = ref(new Date())
 const selectedReport = ref<any>(null)
@@ -445,6 +447,7 @@ onMounted(() => {
 const aiGenerating = ref(false)
 
 async function generateAIReport() {
+  if (!(await requireAIConfig(t('dailyReport.aiGenerate')))) return
   aiGenerating.value = true
   try {
     const dateStr = currentDate.value.toISOString().split('T')[0]

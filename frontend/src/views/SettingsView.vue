@@ -24,10 +24,9 @@
         <div class="setting-item" v-if="aiConfig">
           <span>{{ $t('settings.aiProvider') }}</span>
           <span class="setting-desc">
-            <el-tag :type="aiConfig.provider_source === 'reasoning' ? 'success' : 'primary'" size="small">
+            <el-tag :type="aiConfig.provider_id ? 'success' : 'danger'" size="small">
               {{ aiConfig.provider_name || aiConfig.provider_id || $t('settings.aiNotConfigured') }}
             </el-tag>
-            <el-tag v-if="aiConfig.provider_source === 'reasoning' || aiConfig.provider_source === 'pro_config'" type="success" size="small" style="margin-left: 4px">{{ $t('settings.configured') }}</el-tag>
           </span>
         </div>
         <div class="setting-item" v-if="aiConfig">
@@ -60,9 +59,9 @@
           <div>{{ $t('settings.aiConfigHintDesc') }}</div>
         </div>
 
-        <el-divider v-if="reasoningConfig" style="margin: 16px 0 12px" />
+        <el-divider style="margin: 16px 0 12px" />
 
-        <div v-if="reasoningConfig" class="reasoning-section">
+        <div class="reasoning-section">
           <div class="card-title" style="font-size: 14px; margin-bottom: 8px">🔮 {{ $t('settings.reasoningConfig') }}</div>
           <p class="setting-desc" style="margin-bottom: 8px">{{ $t('settings.reasoningDesc') }}</p>
           <div class="setting-item">
@@ -101,10 +100,6 @@
               <div>{{ $t('settings.reasoningHintDesc') }}</div>
             </div>
           </template>
-        </div>
-        <div v-if="!reasoningConfig" class="setting-item">
-          <span>{{ $t('settings.reasoningConfig') }}</span>
-          <el-button size="small" @click="loadReasoningConfig" :loading="reasoningLoading">{{ $t('common.retry') }}</el-button>
         </div>
       </div>
 
@@ -708,13 +703,8 @@ const reasoningTestResult = ref<any>(null)
 const reasoningEnabled = ref(false)
 const reasoningHasKey = ref(false)
 const reasoningForm = ref<any>({
-  provider: 'openai',
-  model: '',
-  api_key: '',
-  base_url: '',
   dialectic_depth: 1,
   reasoning_level: 'medium',
-  max_tokens: 1000,
 })
 
 function formatDate(dateStr: string): string {
@@ -1236,13 +1226,8 @@ async function loadReasoningConfig() {
     reasoningEnabled.value = data.enabled || false
     reasoningHasKey.value = data.has_api_key || false
     reasoningForm.value = {
-      provider: data.provider || 'openai',
-      model: data.model || '',
-      api_key: '',
-      base_url: data.base_url || '',
       dialectic_depth: data.dialectic_depth || 1,
       reasoning_level: data.reasoning_level || 'medium',
-      max_tokens: data.max_tokens || 1000,
     }
   } catch {
     reasoningConfig.value = null
@@ -1261,25 +1246,12 @@ async function updateReasoningEnabled() {
   }
 }
 
-function onReasoningProviderChange() {
-  if (reasoningForm.value.provider === 'ollama') {
-    reasoningForm.value.base_url = 'http://localhost:11434/v1'
-    reasoningForm.value.model = reasoningForm.value.model || 'llama3'
-  } else if (reasoningForm.value.provider === 'deepseek') {
-    reasoningForm.value.base_url = 'https://api.deepseek.com/v1'
-    reasoningForm.value.model = reasoningForm.value.model || 'deepseek-chat'
-  } else if (reasoningForm.value.provider === 'openai') {
-    reasoningForm.value.base_url = ''
-    reasoningForm.value.model = reasoningForm.value.model || 'gpt-4o-mini'
-  }
-}
-
 async function saveReasoningConfig() {
   reasoningSaving.value = true
   try {
-    const payload: Record<string, any> = { ...reasoningForm.value }
-    if (!payload.api_key) {
-      delete payload.api_key
+    const payload: Record<string, any> = {
+      dialectic_depth: reasoningForm.value.dialectic_depth,
+      reasoning_level: reasoningForm.value.reasoning_level,
     }
     await reasoningApi.updateConfig(payload)
     ElMessage.success(t('common.success'))

@@ -260,6 +260,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useIsMobile } from '../composables/useIsMobile'
+import { useAIConfig } from '../composables/useAIConfig'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Connection, Edit, Delete, Loading, MagicStick } from '@element-plus/icons-vue'
 import { translateError } from '../i18n'
@@ -270,6 +271,7 @@ import { knowledgeApi } from '../api/go-knowledge'
 
 const { t } = useI18n()
 const { isMobile } = useIsMobile()
+const { requireAIConfig } = useAIConfig(false)
 
 const entities = ref<any[]>([])
 const relations = ref<any[]>([])
@@ -564,6 +566,7 @@ onMounted(loadData)
 const aiExtracting = ref(false)
 
 async function aiExtract() {
+  if (!(await requireAIConfig(t('knowledge.aiExtract')))) return
   try {
     await ElMessageBox.confirm(t('knowledge.aiExtractConfirm'), t('common.confirm'), { type: 'info' })
   } catch { return }

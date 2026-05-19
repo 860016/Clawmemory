@@ -328,6 +328,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useIsMobile } from '../composables/useIsMobile'
+import { useAIConfig } from '../composables/useAIConfig'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -357,6 +358,7 @@ const saving = ref(false)
 const loadingList = ref(true)
 const mobileActionsCollapsed = ref(window.innerWidth <= 768)
 const { isMobile } = useIsMobile()
+const { requireAIConfig } = useAIConfig(false)
 
 // OpenClaw import state
 const showImportDialog = ref(false)
@@ -442,6 +444,7 @@ async function handleSearch() {
   if (!searchQuery.value) { searchResults.value = []; smartLoadResult.value = null; return }
 
   if (searchMode.value === 'smart') {
+    if (!(await requireAIConfig(t('memories.smartSearch')))) return
     try {
       const { data } = await memoryApi.smartLoad({ q: searchQuery.value, token_budget: 2000, load_level: 'auto' })
       smartLoadResult.value = data
@@ -521,6 +524,7 @@ async function saveMemory() {
 const aiScanning = ref(false)
 
 async function aiConflictScan() {
+  if (!(await requireAIConfig(t('memories.aiConflictScan')))) return
   aiScanning.value = true
   try {
     const { data } = await aiApi.conflictScan()
