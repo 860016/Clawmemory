@@ -1,4 +1,4 @@
-# ClawMemory v2.29.0 — AI 记忆管理中枢
+# ClawMemory v2.30.0 — AI 记忆管理中枢
 
 **ClawMemory** 是一款为 AI 助手设计的**长期记忆管理系统**。它让 AI 能够"记住"过去的对话、知识和上下文，实现跨会话的智能记忆检索与关联。
 
@@ -14,6 +14,9 @@
 | **日报生成** | 自动汇总每日活动，生成结构化工作报告 |
 | **AI 增强** | 内置 NVIDIA NIM 免费模型，智能提取实体、生成摘要、分析记忆 |
 | **外部集成** | 提供 API 接口，支持 OpenClaw 等外部应用自动写入记忆 |
+| **MCP 一键配置** | 一键生成 MCP Server 配置，粘贴到 Cursor/Claude/Windsurf/Trae 即可使用 |
+| **记忆自动治理** | 自动执行摘要生成、质量修复、去重合并、衰减应用和垃圾清理 |
+| **质量评估** | 扫描记忆库质量问题，一键自动修复空值、过短、缺失标签等问题 |
 
 **典型用例**：
 - 🤖 AI 助手记住你的编程习惯、项目架构、技术偏好
@@ -63,6 +66,26 @@
 - **外部 API**：`/api/v1/external/memories` 供 OpenClaw 等写入记忆
 - **批量导入**：支持批量写入记忆（最多 100 条/次）
 - **OpenClaw 实时同步**：安装后自动监控 `~/.openclaw/` 目录，基于 fsnotify 实时监听文件变更，2秒防抖合并
+
+### 🔌 MCP 一键配置
+- **零配置接入**：设置页一键生成 MCP Server 配置 JSON，粘贴即用
+- **多 IDE 支持**：Cursor / Claude Desktop / Windsurf / Trae 四种 IDE 配置模板
+- **自动创建 API Key**：首次配置时自动创建 MCP 专用 API Key
+- **npm 一行安装**：`npx -y clawmemory-mcp`，无需全局安装
+- **6 个 MCP Tools**：memory_save / search / context / reason / conclude / push_conversation
+
+### 🏥 记忆自动治理
+- **编排层设计**：GovernanceService 整合 DecayService / HealthService / SmartLoadService / DedupService
+- **5 步治理流水线**：摘要生成 → 质量修复 → 去重合并 → 衰减应用 → 垃圾清理
+- **灵活配置**：每步可独立开关，支持每天/每周自动执行
+- **一键执行**：手动触发即时治理，实时查看治理结果统计
+- **定时任务**：后端 24 小时定时器，自动为所有启用用户执行治理
+
+### 🩺 质量评估
+- **问题扫描**：空值、过短、缺失标签、重复 Key 等多种质量问题检测
+- **严重度分级**：high / medium / low 三级严重度标记
+- **一键修复**：自动修复可修复的质量问题，显示修复/跳过/失败统计
+- **问题列表**：展示具体问题详情，标记哪些可自动修复
 
 ### 🔐 安全特性
 - JWT 认证 + API Key 双重认证机制
@@ -123,6 +146,10 @@ clawmemory/
 │   ├── internal/             # 内部包
 │   │   ├── api/              # HTTP API
 │   │   ├── services/         # 业务逻辑
+│   │   │   ├── governance_service.go  # 记忆治理编排层
+│   │   │   ├── decay_service.go       # 记忆衰减
+│   │   │   ├── health_service.go      # 质量评估与修复
+│   │   │   └── smart_load_service.go  # 智能加载与摘要
 │   │   ├── ai/               # AI 增强功能
 │   │   └── models/           # 数据模型
 │   ├── frontend_dist/        # 前端构建产物
@@ -288,9 +315,35 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - `POST /api/v1/openclaw-sync/toggle` - 开关自动同步
 - `GET /api/v1/openclaw/agents-md` - 获取 AGENTS.md 指令内容
 
+### MCP 配置
+- `GET /api/v1/mcp/config` - 获取 MCP Server 配置（自动检测 baseURL、自动创建 API Key、生成多 IDE 配置模板）
+
+### 记忆治理
+- `GET /api/v1/memories/governance/status` - 治理状态（上次结果、下次执行时间、配置）
+- `POST /api/v1/memories/governance/run` - 立即执行一次治理
+- `PUT /api/v1/memories/governance/config` - 更新治理配置（开关、频率、步骤）
+
+### 记忆质量
+- `GET /api/v1/memories/quality` - 质量评估（扫描问题、严重度分级、可修复标记）
+- `POST /api/v1/memories/auto-fix` - 自动修复质量问题
+
 ---
 
 ## 📝 更新日志
+
+### v2.30.0 (2026-05-30)
+- 🔌 新增：MCP 一键配置功能，设置页生成 Cursor/Claude Desktop/Windsurf/Trae 配置 JSON，粘贴即用
+- 🔌 新增：MCP 配置 API（`GET /api/v1/mcp/config`），自动检测 baseURL、自动创建 API Key
+- 🏥 新增：记忆自动治理系统（GovernanceService），编排 5 步治理流水线
+- 🏥 新增：治理 API（status/run/config），支持每步独立开关和每天/每周自动执行
+- 🏥 新增：后端 24 小时定时任务，自动为所有启用用户执行治理
+- 🩺 新增：质量评估功能，扫描空值/过短/缺失标签/重复Key等问题，严重度分级
+- 🩺 新增：一键自动修复质量问题，显示修复/跳过/失败统计
+- 🩺 新增：质量评估和自动修复 API（`GET /memories/quality`、`POST /memories/auto-fix`）
+- 📦 MCP Server：发布到 npm（`clawmemory-mcp@2.24.0`），支持 `npx -y clawmemory-mcp` 一行安装
+- 📦 MCP Server：新增完整 README，含对比表格、架构图、6 个工具详解
+- 🌍 i18n：新增 MCP 配置和记忆治理相关中英文翻译 33 条
+- 🐛 修复：i18n key 冲突（skippedCount/failedCount 在 settings 和 advanced 区域重复定义）
 
 ### v2.29.0 (2026-05-19)
 - 🔑 安全：登录失败锁定阈值从 3 次调整为 5 次

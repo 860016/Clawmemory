@@ -7,46 +7,50 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
 const (
-	AppVersion    = "2.29.0"
-	GitHubRepo    = "860016/Clawmemory"
+	AppVersion    = "2.30.0"
 	GitHubRepoURL = "https://github.com/860016/Clawmemory"
 )
 
 type Config struct {
-	DatabasePath     string
-	LicenseServerURL string
-	RSAPublicKeyPath string
-	JWTSecret        string
-	DataDir          string
-	SkillsDir        string
-	BackupsDir       string
+	DatabasePath string
+	JWTSecret    string
+	DataDir      string
+	SkillsDir    string
+	BackupsDir   string
 }
 
+var (
+	globalConfig *Config
+	configOnce   sync.Once
+)
+
 func Load() *Config {
-	dataDir := getDataDir()
-	skillsDir := getSkillsDir(dataDir)
-	backupsDir := getBackupsDir(dataDir)
+	configOnce.Do(func() {
+		dataDir := getDataDir()
+		skillsDir := getSkillsDir(dataDir)
+		backupsDir := getBackupsDir(dataDir)
 
-	jwtSecret := getEnv("SECRET_KEY", "clawmemory-default-secret-change-me")
-	if jwtSecret == "clawmemory-default-secret-change-me" {
-		jwtSecret = generateSecureSecret()
-		fmt.Printf("[CONFIG] WARNING: SECRET_KEY not set, auto-generated a secure secret.\n")
-		fmt.Printf("[CONFIG] To persist across restarts, set SECRET_KEY in your .env file.\n")
-	}
+		jwtSecret := getEnv("SECRET_KEY", "clawmemory-default-secret-change-me")
+		if jwtSecret == "clawmemory-default-secret-change-me" {
+			jwtSecret = generateSecureSecret()
+			fmt.Printf("[CONFIG] WARNING: SECRET_KEY not set, auto-generated a secure secret.\n")
+			fmt.Printf("[CONFIG] To persist across restarts, set SECRET_KEY in your .env file.\n")
+		}
 
-	return &Config{
-		DatabasePath:     filepath.Join(dataDir, "clawmemory.db"),
-		LicenseServerURL: getEnv("LICENSE_SERVER_URL", "https://auth.bestu.top"),
-		RSAPublicKeyPath: filepath.Join(dataDir, "keys", "public.pem"),
-		JWTSecret:        jwtSecret,
-		DataDir:          dataDir,
-		SkillsDir:        skillsDir,
-		BackupsDir:       backupsDir,
-	}
+		globalConfig = &Config{
+			DatabasePath: filepath.Join(dataDir, "clawmemory.db"),
+			JWTSecret:    jwtSecret,
+			DataDir:      dataDir,
+			SkillsDir:    skillsDir,
+			BackupsDir:   backupsDir,
+		}
+	})
+	return globalConfig
 }
 
 func generateSecureSecret() string {
