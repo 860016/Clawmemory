@@ -30,6 +30,18 @@
 
 **ClawMemory fixes this.**
 
+> ### 🔒 Your Memories Belong to You
+>
+> All data is stored **on your own machine** — SQLite local database, no cloud, no third party.
+>
+> - **100% Local**: Memories, preferences, conversation logs — all on your computer
+> - **Full Control**: Export, delete, backup anytime — you have absolute ownership
+> - **Privacy-Safe**: Sensitive content encrypted with AES-GCM — unreadable even if the database is copied
+> - **No Cloud Account Needed**: No vendor can view, analyze, or sell your memories
+>
+> ChatGPT Memory and Claude Memory store data in the cloud — **you rent, you don't own.**
+> ClawMemory stores data on your hard drive — **you own it, you control it.**
+
 ---
 
 ## ⚡ Understand ClawMemory in 30 Seconds
