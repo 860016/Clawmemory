@@ -49,6 +49,27 @@
 
 ---
 
+## 🏆 Why ClawMemory?
+
+| Feature | ClawMemory | ChatGPT Memory | Claude Memory | Mem0 | Zep |
+|---------|-----------|----------------|---------------|------|-----|
+| **Open Source** | ✅ MIT | ❌ Closed | ❌ Closed | ✅ | ✅ |
+| **Self-hosted, local data** | ✅ Fully local | ❌ Cloud | ❌ Cloud | ⚠️ Self-host needed | ⚠️ Self-host needed |
+| **Cross-tool sharing** | ✅ Cursor ↔ Claude ↔ Trae ↔ Windsurf | ❌ ChatGPT only | ❌ Claude only | ❌ | ❌ |
+| **MCP Protocol** | ✅ Native support | ❌ | ❌ | ❌ | ❌ |
+| **3-layer memory model** | ✅ Episodic / Semantic / Procedural | ❌ Flat | ❌ Flat | ❌ Flat | ⚠️ Simple |
+| **Auto governance** | ✅ 5-step pipeline | ❌ | ❌ | ⚠️ Basic | ⚠️ Basic |
+| **Memory decay** | ✅ Forgetting curve | ❌ | ❌ | ❌ | ⚠️ TTL only |
+| **Dialectic reasoning** | ✅ Your own AI model | ❌ | ❌ | ❌ | ❌ |
+| **Knowledge graph** | ✅ Entity + relation visualization | ❌ | ❌ | ❌ | ❌ |
+| **Quality assessment + fix** | ✅ One-click scan & repair | ❌ | ❌ | ❌ | ❌ |
+| **Built-in free AI** | ✅ NVIDIA NIM | ❌ | ❌ | ❌ | ❌ |
+| **One-line install** | ✅ `npx -y clawmemory-mcp` | N/A | N/A | ⚠️ Config needed | ⚠️ Config needed |
+
+> 💡 **TL;DR**: Other solutions are either closed-source, locked to one vendor, or feature-limited. ClawMemory is the only **open-source + self-hosted + cross-tool + MCP-native + full governance** all-in-one solution.
+
+---
+
 ## 🎯 Core Features
 
 ### 🧠 Three-Layer Memory System
