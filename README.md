@@ -1,139 +1,212 @@
-# ClawMemory v2.30.0 — AI 记忆管理中枢
+<div align="center">
 
-**ClawMemory** 是一款为 AI 助手设计的**长期记忆管理系统**。它让 AI 能够"记住"过去的对话、知识和上下文，实现跨会话的智能记忆检索与关联。
+# 🧠 ClawMemory
 
-## 🎯 ClawMemory 能做什么？
+### 给 AI 一个不会遗忘的大脑
 
-| 场景 | 功能 |
-|------|------|
-| **跨会话记忆** | AI 记住你之前说过的偏好、项目细节、重要事件，无需重复说明 |
-| **知识沉淀** | 将对话中的知识点自动提取、分类、建立关联，形成个人知识库 |
-| **智能检索** | 支持关键词搜索、语义搜索、向量搜索，快速找到相关记忆 |
-| **记忆衰减** | 模拟人类遗忘曲线，重要记忆自动强化，过时信息逐渐淡化 |
-| **冲突检测** | 自动发现记忆矛盾，提示用户确认正确信息 |
-| **日报生成** | 自动汇总每日活动，生成结构化工作报告 |
-| **AI 增强** | 内置 NVIDIA NIM 免费模型，智能提取实体、生成摘要、分析记忆 |
-| **外部集成** | 提供 API 接口，支持 OpenClaw 等外部应用自动写入记忆 |
-| **MCP 一键配置** | 一键生成 MCP Server 配置，粘贴到 Cursor/Claude/Windsurf/Trae 即可使用 |
-| **记忆自动治理** | 自动执行摘要生成、质量修复、去重合并、衰减应用和垃圾清理 |
-| **质量评估** | 扫描记忆库质量问题，一键自动修复空值、过短、缺失标签等问题 |
+**你的 AI 助手每次重启都失忆？ClawMemory 让它永远记住你。**
 
-**典型用例**：
-- 🤖 AI 助手记住你的编程习惯、项目架构、技术偏好
-- 📚 构建个人知识图谱，实体关系可视化
-- 📊 自动生成项目进度报告、学习总结
-- 🔗 与 OpenClaw 联动，对话自动转化为持久记忆
+[![Version](https://img.shields.io/badge/v2.30.0-blue.svg)](https://github.com/860016/Clawmemory)
+[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8.svg)](https://go.dev)
+[![Vue3](https://img.shields.io/badge/Vue-3.x-4FC08D.svg)](https://vuejs.org)
+[![MCP](https://img.shields.io/badge/MCP-Protocol-6366F1.svg)](https://modelcontextprotocol.io)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-**技术栈**: Go 后端（高性能、跨平台） + Vue3 前端 + SQLite + ChromaDB 向量引擎
+[English](./README_EN.md) · [快速开始](#-快速开始) · [功能展示](#-核心功能) · [MCP 接入](#-mcp-一键接入) · [API 文档](#-api-文档)
+
+</div>
 
 ---
 
-## ✨ 核心特性
+## 😤 你一定遇到过这些
 
-### 📝 记忆管理
-- 多层级记忆分类（情景记忆/语义记忆/程序记忆）
-- 记忆重要性评分与自动衰减算法
-- 记忆强化机制（手动强化 + 自动强化）
-- 全文搜索 + 语义搜索 + ChromaDB 向量搜索
+> 💬 *"我上周跟你说过用 pnpm，你怎么又用 npm 了？"*
+>
+> 💬 *"上次讨论的认证方案，你完全忘了？"*
+>
+> 💬 *"每次新对话都要重新解释项目架构，烦不烦？"*
 
-### 🕸️ 知识图谱
-- 实体自动提取与关系建立
-- 三种视图：网格视图 / 图谱视图 / 列表视图
-- 实体类型分类（人物/地点/事件/概念/项目）
-- 关系可视化与交互式编辑
+**AI 助手没有长期记忆，这是最大的痛点。** 每次重启、每次新对话，一切从零开始。
 
-### 📖 Wiki 知识库
-- Markdown 格式知识页面
-- 目录结构与标签分类
-- 与记忆实体双向关联
-- 版本历史与编辑记录
+**ClawMemory 就是来解决这个问题的。**
 
-### 📊 智能日报
-- 自动汇总每日记忆活动
-- 项目进度追踪
-- 关键事件提取
-- 趋势分析与统计图表
+---
 
-### 🧠 AI 增强功能
-- **内置 NVIDIA NIM 免费模型**：无需 API Key，开箱即用
-- **智能实体提取**：自动从记忆中提取人物、地点、事件、概念
-- **AI 摘要生成**：长文本自动生成精炼摘要
-- **智能记忆加载**：Token 预算控制，按重要性动态加载相关记忆
-- **记忆冲突检测**：发现矛盾记忆并提示确认
+## ⚡ 30 秒了解 ClawMemory
 
-### 🔌 外部集成
-- **API Key 认证**：安全的第三方应用接入
-- **外部 API**：`/api/v1/external/memories` 供 OpenClaw 等写入记忆
-- **批量导入**：支持批量写入记忆（最多 100 条/次）
-- **OpenClaw 实时同步**：安装后自动监控 `~/.openclaw/` 目录，基于 fsnotify 实时监听文件变更，2秒防抖合并
+```
+  你 → AI 助手 → ClawMemory → 永久记忆
+                    ↑                    ↓
+              下次对话自动加载 ← 智能检索相关记忆
+```
 
-### 🔌 MCP 一键配置
-- **零配置接入**：设置页一键生成 MCP Server 配置 JSON，粘贴即用
-- **多 IDE 支持**：Cursor / Claude Desktop / Windsurf / Trae 四种 IDE 配置模板
-- **自动创建 API Key**：首次配置时自动创建 MCP 专用 API Key
-- **npm 一行安装**：`npx -y clawmemory-mcp`，无需全局安装
-- **6 个 MCP Tools**：memory_save / search / context / reason / conclude / push_conversation
+| 你做的事 | ClawMemory 做的事 |
+|----------|-------------------|
+| 告诉 AI "我偏好 TypeScript" | 自动保存为语义记忆，标记为偏好 |
+| 下次打开 Cursor | AI 自动加载你的偏好，直接用 TypeScript |
+| 说 "上次怎么决定的？" | 搜索历史记忆，精确回忆 |
+| 一周没提某个项目 | 自动衰减不活跃记忆，保持记忆库清爽 |
+
+---
+
+## 🎯 核心功能
+
+### 🧠 三层记忆系统
+
+受认知科学启发，ClawMemory 用三层模型组织记忆：
+
+| 层级 | 存什么 | 举例 |
+|------|--------|------|
+| **情景记忆** Episodic | 事件和经历 | "今天修复了 auth 模块的 JWT bug" |
+| **语义记忆** Semantic | 事实和知识 | "项目使用 PostgreSQL 15" |
+| **程序记忆** Procedural | 方法和流程 | "部署流程：push main → CI 构建 → 自动部署" |
+
+### 🔍 三种检索方式
+
+| 方式 | 说明 | 何时用 |
+|------|------|--------|
+| **关键词搜索** | SQLite FTS5 全文检索 | 精确查找 |
+| **语义搜索** | AI 理解含义，匹配相关内容 | 模糊查找 |
+| **向量搜索** | ChromaDB 向量引擎，语义相似度 | 深度关联 |
+
+### 🔌 MCP 一键接入
+
+**一行命令，让任何 MCP 兼容的 AI 工具拥有记忆：**
+
+```bash
+npx -y clawmemory-mcp
+```
+
+支持 Cursor / Claude Desktop / Windsurf / Trae，设置页一键生成配置 JSON，粘贴即用。
 
 ### 🏥 记忆自动治理
-- **编排层设计**：GovernanceService 整合 DecayService / HealthService / SmartLoadService / DedupService
-- **5 步治理流水线**：摘要生成 → 质量修复 → 去重合并 → 衰减应用 → 垃圾清理
-- **灵活配置**：每步可独立开关，支持每天/每周自动执行
-- **一键执行**：手动触发即时治理，实时查看治理结果统计
-- **定时任务**：后端 24 小时定时器，自动为所有启用用户执行治理
+
+记忆库也需要"健康管理"——自动执行 5 步治理流水线：
+
+```
+摘要生成 → 质量修复 → 去重合并 → 衰减应用 → 垃圾清理
+```
+
+每步独立开关，支持每天/每周自动执行，也可以一键手动触发。
 
 ### 🩺 质量评估
-- **问题扫描**：空值、过短、缺失标签、重复 Key 等多种质量问题检测
-- **严重度分级**：high / medium / low 三级严重度标记
-- **一键修复**：自动修复可修复的质量问题，显示修复/跳过/失败统计
-- **问题列表**：展示具体问题详情，标记哪些可自动修复
 
-### 🔐 安全特性
-- JWT 认证 + API Key 双重认证机制
-- CORS 白名单限制（仅 localhost + 局域网）
-- 速率限制（防暴力破解）
-- 审计日志记录
-- 输入验证与长度限制
-- **敏感内容加密存储**：默认跳过含 API Key/密码/Token 的内容；开启后以 AES-GCM 加密存储，查看时解密
+一键扫描记忆库健康度：空值、过短、缺失标签、重复 Key……自动分级标记严重度，可修复的一键搞定。
 
-### 💾 数据管理
-- 本地 SQLite 数据库
-- 数据导出（JSON 格式）
-- 数据导入与恢复
-- 自动备份机制
+### 🕸️ 知识图谱
+
+自动从记忆中提取实体和关系，三种视图（网格/图谱/列表）可视化你的知识网络。
+
+### 📖 Wiki 知识库
+
+Markdown 格式知识页面，与记忆实体双向关联，版本历史可追溯。
+
+### 📊 智能日报
+
+自动汇总每日活动，项目进度追踪，趋势分析图表——你的 AI 工作日志。
+
+### 🧠 AI 增强
+
+- **内置 NVIDIA NIM 免费模型**——无需 API Key，开箱即用
+- 智能实体提取、AI 摘要生成、记忆冲突检测
+- **Dialectic Reasoning**——用你自己的 AI 模型做多轮推理，零额外费用
+
+### 🔐 安全
+
+- JWT + API Key 双重认证
+- CORS 白名单、速率限制、审计日志
+- 敏感内容 AES-GCM 加密存储
+- 数据完全本地，你拥有绝对控制权
 
 ---
 
 ## 🚀 快速开始
 
-### 环境要求
-
-| 组件 | 最低版本 | 说明 |
-|------|----------|------|
-| **Go** | 1.21+ | 后端必需 |
-
-**支持平台**: Windows / macOS / Linux (x86_64 + ARM64)
-
-> 💡 **提示**: 前端已预编译，无需安装 Node.js，直接运行安装脚本即可。
-
 ### 一键安装
 
-#### Linux / macOS
+```bash
+# Linux / macOS
+cd clawmemory && bash install.sh
+
+# Windows
+cd clawmemory && powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+启动：`bash start.sh` 或 `start.bat`
+
+访问：**http://localhost:8765**
+
+### Docker 部署
 
 ```bash
-cd clawmemory
-bash install.sh
+docker compose up -d
 ```
 
-#### Windows
+### 环境要求
 
-```powershell
-cd clawmemory
-powershell -ExecutionPolicy Bypass -File install.ps1
+| 组件 | 版本 | 说明 |
+|------|------|------|
+| Go | 1.21+ | 后端必需 |
+| 平台 | Windows / macOS / Linux | x86_64 + ARM64 |
+
+> 💡 前端已预编译，无需安装 Node.js
+
+---
+
+## 🔌 MCP 一键接入
+
+### 1. 启动 ClawMemory
+
+```bash
+./clawmemory
 ```
 
-安装完成后启动：`bash start.sh` 或 `start.bat`
+### 2. 获取 API Key
 
-访问：`http://localhost:8765`
+打开 Web UI → 设置 → API 密钥 → 创建
+
+### 3. 配置你的 AI 工具
+
+**Cursor** — 编辑 `~/.cursor/mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "clawmemory": {
+      "command": "npx",
+      "args": ["-y", "clawmemory-mcp"],
+      "env": {
+        "CLAWMEMORY_BASE_URL": "http://localhost:8765",
+        "CLAWMEMORY_API_KEY": "cm-your-key"
+      }
+    }
+  }
+}
+```
+
+**Claude Desktop** — 编辑 `~/AppData/Roaming/Claude/claude_desktop_config.json`
+
+**Windsurf** — 编辑 `~/.windsurf/mcp.json`
+
+**Trae** — 编辑 `~/.trae/mcp.json`
+
+> 配置格式完全相同，只需替换文件路径。
+
+### 4. 重启 AI 工具，开始使用
+
+> 💬 *"我总是用 pnpm"* → AI 自动保存
+> 💬 *"上次怎么决定的？"* → AI 搜索记忆回答
+
+### 6 个 MCP 工具
+
+| 工具 | 用途 |
+|------|------|
+| `memory_save` | 保存记忆 |
+| `memory_search` | 搜索记忆 |
+| `memory_context` | 获取上下文（注入 AI 提示词） |
+| `memory_reason` | 辩证推理（用你自己的 AI 模型） |
+| `memory_conclude` | 保存持久结论 |
+| `memory_push_conversation` | 保存完整对话 |
 
 ---
 
@@ -141,113 +214,49 @@ powershell -ExecutionPolicy Bypass -File install.ps1
 
 ```
 clawmemory/
-├── go-backend/               # Go 后端 (开源)
-│   ├── cmd/server/           # 主程序入口
-│   ├── internal/             # 内部包
-│   │   ├── api/              # HTTP API
-│   │   ├── services/         # 业务逻辑
+├── go-backend/                        # Go 后端
+│   ├── cmd/server/                    # 主程序入口
+│   ├── internal/
+│   │   ├── api/                       # HTTP API
+│   │   ├── services/
 │   │   │   ├── governance_service.go  # 记忆治理编排层
 │   │   │   ├── decay_service.go       # 记忆衰减
 │   │   │   ├── health_service.go      # 质量评估与修复
 │   │   │   └── smart_load_service.go  # 智能加载与摘要
-│   │   ├── ai/               # AI 增强功能
-│   │   └── models/           # 数据模型
-│   ├── frontend_dist/        # 前端构建产物
-│   └── go.mod
-├── frontend/                 # Vue3 前端源码
-│   ├── src/views/            # 页面组件
-│   │   ├── KnowledgeViewV2.vue
-│   │   ├── DailyReportViewV2.vue
-│   │   └── MainLayout.vue
-│   └── src/styles/           # 设计系统
-├── mcp-server/               # MCP Server (TypeScript)
-│   └── src/                  # 6 个 MCP Tools
-├── openclaw-plugin/          # OpenClaw Context Engine 插件
-├── hermes-plugin/            # Hermes Agent Memory Provider (Python)
-├── install.sh / install.ps1  # 一键安装脚本
-└── README.md
+│   │   ├── ai/                        # AI 增强功能
+│   │   └── models/                    # 数据模型
+│   └── frontend_dist/                 # 前端构建产物
+├── frontend/                          # Vue3 前端源码
+├── mcp-server/                        # MCP Server (TypeScript, npm)
+├── openclaw-plugin/                   # OpenClaw 插件
+├── hermes-plugin/                     # Hermes Agent Memory Provider
+└── install.sh / install.ps1           # 一键安装脚本
 ```
 
 ---
 
-## ⚙️ 环境变量
+## ⚙️ 配置
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `SECRET_KEY` | (自动生成) | JWT 密钥 + 敏感内容加密密钥（开启敏感内容记录时必须手动设置，否则敏感内容将被跳过） |
+| `SECRET_KEY` | 自动生成 | JWT 密钥 + 敏感内容加密密钥 |
 | `PORT` | `8765` | 监听端口 |
 | `DATA_DIR` | `./data` | 数据目录 |
 
 ---
 
-## 🐳 Docker 部署
-
-### 快速启动
-
-```bash
-docker compose up -d
-```
-
-访问：`http://localhost:8765`
-
-### 自定义配置
-
-编辑 `docker-compose.yml` 中的环境变量：
-
-```yaml
-environment:
-  - SECRET_KEY=your-random-secret-key   # 必须修改！
-  - PORT=8765
-```
-
-### 数据持久化
-
-Docker 部署使用命名卷持久化数据：
-
-| 卷 | 路径 | 说明 |
-|----|------|------|
-| `clawmemory-data` | `/app/data` | 数据库文件 |
-| `clawmemory-backups` | `/app/backups` | 自动备份 |
-| `clawmemory-logs` | `/app/logs` | 日志文件 |
-
-### 手动构建镜像
-
-```bash
-docker build -t clawmemory .
-docker run -d -p 8765:8765 -v clawmemory-data:/app/data clawmemory
-```
-
-### 重置密码
-
-```bash
-docker exec clawmemory ./clawmemory --reset-password NEW_PASSWORD
-```
-
----
-
 ## 🔨 构建
 
-### 前端构建
-
 ```bash
-cd frontend
-npm install
-npm run build
-# 构建产物自动复制到 go-backend/frontend_dist/
-```
+# 前端
+cd frontend && npm install && npm run build
 
-### Go 后端编译
+# 后端
+cd go-backend && go build -o clawmemory ./cmd/server
 
-```bash
-cd go-backend
-
-# 当前平台
-go build -o clawmemory ./cmd/server
-
-# 跨平台编译
+# 跨平台
 GOOS=linux GOARCH=amd64 go build -o clawmemory-linux ./cmd/server
 GOOS=darwin GOARCH=arm64 go build -o clawmemory-macos ./cmd/server
-GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 ```
 
 ---
@@ -283,612 +292,113 @@ GOOS=windows GOARCH=amd64 go build -o clawmemory.exe ./cmd/server
 - `POST /api/v1/ai/extract` - AI 实体提取
 - `GET /api/v1/ai/daily-report` - AI 日报生成
 
-### 授权
-- `GET /api/v1/license/info` - 授权信息
-- `POST /api/v1/license/activate` - 激活授权
-- `POST /api/v1/license/deactivate` - 停用授权
-
 ### API 密钥管理
 - `GET /api/v1/api-keys` - 列表
 - `POST /api/v1/api-keys` - 创建（返回完整密钥，仅一次）
 - `DELETE /api/v1/api-keys/:id` - 删除
 
-### 外部 API（供 OpenClaw 等外部应用调用，需 X-API-Key 请求头）
+### MCP 配置
+- `GET /api/v1/mcp/config` - 获取 MCP Server 配置（自动检测 baseURL、自动创建 API Key）
+
+### 记忆治理
+- `GET /api/v1/memories/governance/status` - 治理状态
+- `POST /api/v1/memories/governance/run` - 立即执行治理
+- `PUT /api/v1/memories/governance/config` - 更新治理配置
+
+### 记忆质量
+- `GET /api/v1/memories/quality` - 质量评估
+- `POST /api/v1/memories/auto-fix` - 自动修复质量问题
+
+### 外部 API（需 X-API-Key 请求头）
 - `POST /api/v1/external/memories` - 写入单条记忆
-- `POST /api/v1/external/memories/batch` - 批量写入记忆
-- `GET /api/v1/external/memories/search?q=keyword` - 搜索记忆
+- `POST /api/v1/external/memories/batch` - 批量写入
+- `GET /api/v1/external/memories/search?q=keyword` - 搜索
 - `GET /api/v1/external/memories/context?q=keyword` - 获取上下文
 - `POST /api/v1/external/conversations` - 推送对话
-- `POST /api/v1/external/conversations/batch` - 批量推送对话
+- `POST /api/v1/external/conversations/batch` - 批量推送
 - `POST /api/v1/external/sessions/track` - 跟踪会话
 - `POST /api/v1/external/reason` - Dialectic Reasoning 推理
 
-### 推理配置（需 JWT 认证）
+### 推理配置
 - `GET /api/v1/reasoning/config` - 获取推理配置
 - `PUT /api/v1/reasoning/config` - 更新推理配置
-- `POST /api/v1/reasoning/test` - 测试推理模型连接
+- `POST /api/v1/reasoning/test` - 测试推理模型
 - `POST /api/v1/reasoning/execute` - 执行推理
 
-### OpenClaw 自动同步
+### OpenClaw 同步
 - `GET /api/v1/openclaw-sync/status` - 同步状态
 - `POST /api/v1/openclaw-sync/force` - 手动触发同步
 - `POST /api/v1/openclaw-sync/toggle` - 开关自动同步
-- `GET /api/v1/openclaw/agents-md` - 获取 AGENTS.md 指令内容
-
-### MCP 配置
-- `GET /api/v1/mcp/config` - 获取 MCP Server 配置（自动检测 baseURL、自动创建 API Key、生成多 IDE 配置模板）
-
-### 记忆治理
-- `GET /api/v1/memories/governance/status` - 治理状态（上次结果、下次执行时间、配置）
-- `POST /api/v1/memories/governance/run` - 立即执行一次治理
-- `PUT /api/v1/memories/governance/config` - 更新治理配置（开关、频率、步骤）
-
-### 记忆质量
-- `GET /api/v1/memories/quality` - 质量评估（扫描问题、严重度分级、可修复标记）
-- `POST /api/v1/memories/auto-fix` - 自动修复质量问题
+- `GET /api/v1/openclaw/agents-md` - 获取 AGENTS.md
 
 ---
 
 ## 📝 更新日志
 
 ### v2.30.0 (2026-05-30)
-- 🔌 新增：MCP 一键配置功能，设置页生成 Cursor/Claude Desktop/Windsurf/Trae 配置 JSON，粘贴即用
-- 🔌 新增：MCP 配置 API（`GET /api/v1/mcp/config`），自动检测 baseURL、自动创建 API Key
-- 🏥 新增：记忆自动治理系统（GovernanceService），编排 5 步治理流水线
-- 🏥 新增：治理 API（status/run/config），支持每步独立开关和每天/每周自动执行
-- 🏥 新增：后端 24 小时定时任务，自动为所有启用用户执行治理
-- 🩺 新增：质量评估功能，扫描空值/过短/缺失标签/重复Key等问题，严重度分级
-- 🩺 新增：一键自动修复质量问题，显示修复/跳过/失败统计
-- 🩺 新增：质量评估和自动修复 API（`GET /memories/quality`、`POST /memories/auto-fix`）
-- 📦 MCP Server：发布到 npm（`clawmemory-mcp@2.24.0`），支持 `npx -y clawmemory-mcp` 一行安装
-- 📦 MCP Server：新增完整 README，含对比表格、架构图、6 个工具详解
-- 🌍 i18n：新增 MCP 配置和记忆治理相关中英文翻译 33 条
-- 🐛 修复：i18n key 冲突（skippedCount/failedCount 在 settings 和 advanced 区域重复定义）
+- 🔌 新增：MCP 一键配置，设置页生成 Cursor/Claude/Windsurf/Trae 配置 JSON
+- 🔌 新增：MCP 配置 API，自动检测 baseURL、自动创建 API Key
+- 🏥 新增：记忆自动治理系统，5 步治理流水线，每步独立开关
+- 🏥 新增：治理 API（status/run/config），支持每天/每周自动执行
+- 🩺 新增：质量评估 + 一键自动修复
+- 📦 MCP Server 发布 npm（`clawmemory-mcp@2.24.0`）
+- 🌍 新增中英文翻译 33 条
+
+<details>
+<summary>📜 历史版本</summary>
 
 ### v2.29.0 (2026-05-19)
-- 🔑 安全：登录失败锁定阈值从 3 次调整为 5 次
-- 🏗️ 架构：统一双存储体系，AI 配置从 settings KV 加载，reasoning_config 不再重复存储 Provider/Model/APIKey
-- 🏗️ 架构：存储容量上限从硬编码改为后端动态返回（`/stats` 新增 `maxMemories` 字段）
-- 🐛 修复：`ValidateMemoryCreate` 返回 `*Validator` 指针导致所有记忆写入均返回 "validation failed" 的致命 Bug
-- 🐛 修复：`ValidateUsername`/`ValidatePassword` 同类指针判断问题，统一改为返回 `error` 接口
-- 📊 可观测性：44 处静默忽略的数据库错误（`_ = db.xxx.Error`）全部添加日志记录
-- 🔌 插件：OpenClaw 插件配置示例补充 `plugins.load.paths` 字段（Docker 环境必需）
+- 🔑 登录锁定阈值 3→5 次
+- 🏗️ 统一双存储体系
+- 🐛 修复 Validator 指针导致所有记忆写入失败的致命 Bug
+- 📊 44 处静默 DB 错误添加日志
 
 ### v2.28.0 (2026-05-19)
-- 🧠 记忆扫描：文件哈希增量索引（SHA-256），避免重复扫描未修改文件
-- 🧠 记忆扫描：路径感知记忆分类，自动区分长期记忆/每日日志/会话记录/知识文档
-- 🧠 记忆扫描：多级标题分块（1-6级标题），结合滑动窗口算法处理长文本
-- 🧠 记忆扫描：新增JSONL格式会话记录解析支持
-- 🧠 记忆扫描：OpenClaw专用SQLite chunks表解析，过滤系统表
-- 🧠 记忆扫描：稳定块ID生成（路径哈希+行号+内容哈希），确保记忆更新可追踪
-- 🧠 记忆扫描：内容哈希去重机制，避免相同内容重复入库
-- 🧠 记忆扫描：显著性评分过滤，基于类别权重+偏好/决策/事实信号+信息密度
-- 🧠 记忆扫描：文件变更自动清理旧记忆块，确保记忆与源文件同步
-- 🧠 自进化：NudgeReflect技能审查闭环，自动创建和改进技能
-- 🧠 自进化：技能失败率检测和自动修补逻辑
-- 🧠 自进化：记忆容量限制与主动压缩策略
-- 🔓 开源：所有高级功能完全开源，移除Pro授权体系
-- 🔓 开源：取消"Pro"说法，统一改为"高级功能"
-- 🔌 插件：OpenClaw记忆插件重写，实现ingest直接写入+去重+防抖批量写入
-- 🔌 插件：修复afterTurn逻辑，确保会话ID变化时正确隔离记忆
-- 🔌 API：新增外部AI端点（nudge-reflect、process-conversation、skills/actions）
-- 🔌 API：新增ai:execute权限，支持外部AI功能调用
-- 🎨 前端：技能管理支持状态筛选、改进和重新激活
-- 🎨 前端：修复TokenStats字段映射错误
-- 🎨 前端：SkillsView全面i18n化
-- 🎨 前端：修复deactivateSkill状态不正确问题
-- 🌍 i18n：补充8条翻译key到en.ts和zh.ts
-- 🧹 清理：移除AI服务层isPro参数残留（19个方法）
-- 🧹 清理：移除PromptTemplate中ProOnly字段
-- 🧹 清理：删除旧版inferPlatform方法，统一使用inferPlatformFromPath
+- 🧠 记忆扫描全面升级：增量索引、路径感知分类、多级标题分块
+- 🧠 自进化：NudgeReflect 技能审查闭环
+- 🔓 所有高级功能完全开源
 
 ### v2.27.0 (2026-05-17)
-- 🔓 开源：Pro功能全部免费开源，彻底废弃授权平台
-- 🔓 开源：移除ProProvider接口层、Handler层checkPro、LocalProProvider实现层
-- 🔓 开源：删除约1200行授权相关代码
-- 🏗️ 重构：创建ToolboxService整合所有Pro业务逻辑（21个核心方法）
-- 🏗️ 重构：/pro/*路由合并到主路由，统一API命名规范
-- 🏗️ 重构：AI服务层移除isPro参数，统一Provider加载逻辑
-- 🎨 前端：清理5个核心视图中的授权相关UI和逻辑
-- 🎨 前端：修复15处数据映射错误
-- 🌍 i18n：删除约50条授权相关翻译key，统一替换相关提示文案
-- 🔐 授权：Pro 授权系统接入远程授权服务器，支持设备指纹、RSA 签名验证、心跳上报
-- 🔐 授权：授权状态持久化到数据库，7 天离线宽限期
-- 🧠 P1-1：统一衰减算法，DecayApply 先尝试 AI 评估，不可用时 fallback 到 DecayService
-- 🧠 P1-2：增强 TokenRoute 算法，增加句子数统计、专业术语检测、平均句长、4 档复杂度评分
-- 🔗 P2-1：增强 AutoGraph 语义分析，增加 Jaccard 相似度、标签关联、实体共享关联，关系类型扩展为 same_topic/shared_tags/shared_entity
-- 🔍 P2-2：增强冲突检测算法，增加 Jaccard 相似度检测、标签重叠检测、严重度分级（exact_duplicate/similar_content/potential_conflict）
-- 🔑 登录：首次设置密码支持自定义用户名（不再硬编码 admin）
-- 🔑 登录：前端首次设置页面增加用户名输入框
-- 🔑 登录：首次设置密码后引导创建 API Key，展示密钥并支持一键复制
-- 🔑 登录：`--reset-password` 在无用户时自动创建 admin 用户（不再报错）
-- 🎨 UI：记忆库子导航"导入 Agent 记忆"改为"导入记忆"
-- 🎨 UI：左侧子导航缩小，增加收缩功能（收缩后只显示图标）
-- 🎨 UI：设置页"界面语言"标签，中文系统显示英文、英文系统显示中文
-- 🐳 Docker：新增 Dockerfile 和 docker-compose.yml，支持一键 Docker 部署
-- 🔧 修复：前端 auth API 和 store 的 setPassword 缺少 username 参数
+- 🔓 Pro 功能全部免费开源，删除约 1200 行授权代码
+- 🏗️ ToolboxService 整合 21 个核心方法
+- 🐳 Docker 一键部署
 
 ### v2.21.0 (2026-05-14)
-- 🔒 安全：JWT Secret 未设置时自动生成安全密钥（32字节随机）
-- 🔒 安全：SQL LIKE 查询添加转义，防止通配符注入
-- 🔒 安全：CORS 配置收紧，移除通配符，使用白名单
-- 🔒 安全：API Key 权限分级，区分只读/读写/管理员权限
-- ⚡ 性能：语义搜索预过滤，先 SQLite FTS5 再向量搜索
-- ⚡ 性能：GraphRAG N² 复杂度优化，限制关系数量
-- ⚡ 性能：Embedding 缓存 LRU 实现，减少重复计算
-- 🛡️ 可靠性：AI 服务超时和重试机制（指数退避）
-- 🛡️ 可靠性：数据库连接池配置优化
-- 🛡️ 可靠性：NudgeReflect/SelfRefine 添加事务支持
-- 🐛 修复：Rate Limiter 内存泄漏，添加定期清理
-- 🐛 修复：路由重复注册，清理冗余路由
-- 🐛 修复：导出接口二次认证（GET 改 POST）
-- 🏗️ 架构：全局单例改为依赖注入（AppContainer）
-- 🏗️ 架构：前端全局错误拦截增强
-- 🧹 改进：52 处 bug 修复（并发安全、资源泄漏、错误处理等）
+- 🔒 安全加固：JWT 自动密钥、SQL 注入防护、CORS 白名单
+- ⚡ 性能优化：FTS5 预过滤、GraphRAG N² 优化、LRU 缓存
+- 🏗️ 全局单例改为依赖注入
 
 ### v2.20.0 (2026-05-11)
-- ⚡ 重构：OpenClaw 同步从 60 秒轮询改为 fsnotify 实时文件监听，2 秒防抖合并
-- ⚡ 新增：支持多 IDE 目录实时监控（OpenClaw/Trae CN/CodeBuddy CN）
-- ⚡ 新增：fsnotify 初始化失败时自动降级为轮询模式
-- 🔧 改进：外部 API 支持 visibility 和 source_agent 字段
-- 🔧 改进：GetPlatform 默认值从 "openclaw" 改为 "clawmemory"
-- 🔧 改进：记忆回写服务新增 clawmemory 和 trae 目标
-- 🏗️ 架构：高级功能整合到主仓库，统一 MIT 开源
-- 🏗️ 架构：移除 ProProvider 接口，统一使用 ToolboxService 实现
+- ⚡ OpenClaw 同步从轮询改为 fsnotify 实时监听
+- ⚡ 多 IDE 目录实时监控
 
 ### v2.19.0 (2026-05-08)
-- 🔮 新增：Dialectic Reasoning 多轮推理引擎（用户自带 AI 模型，零额外费用）
-- 🔮 新增：推理配置 UI（设置 → Dialectic Reasoning，支持 OpenAI/Ollama/DeepSeek/自定义）
-- 🔮 新增：推理 API 端点（`POST /api/v1/external/reason`、`POST /api/v1/reasoning/execute`）
-- 🔌 新增：MCP Server（支持 Trae/Claude Desktop/Cursor/Windsurf/Codex 等 MCP 兼容工具）
-- 🔌 新增：6 个 MCP Tools（memory_save/search/context/reason/conclude/push_conversation）
-- 🐍 新增：Hermes Agent Memory Provider Plugin（Python，支持 4 种会话策略）
-- 🏷️ 新增：Platform 多平台追踪（X-Platform Header，区分记忆来源）
-- 🧹 改进：OpenClaw 插件噪声过滤（自动跳过"ok"、"好的"等无意义内容）
-- 🧹 改进：OpenClaw 插件 afterTurn 推理触发（按间隔自动调用 Dialectic Reasoning）
-- 🧹 改进：MemoryService.Create 支持 Platform 字段
-- 🧹 改进：ToMemoryModel 映射 Platform 字段
+- 🔮 Dialectic Reasoning 多轮推理引擎
+- 🔌 MCP Server + 6 个 MCP Tools
+- 🐍 Hermes Agent Memory Provider Plugin
 
-### v2.18.0 (2026-05-04)
-- 🔗 新增：AGENTS.md 指令集成，安装时自动写入 OpenClaw AGENTS.md
-- 🔗 新增：AGENTS.md 内容生成 API（`GET /api/v1/openclaw/agents-md`）
-- 🔗 新增：前端设置页 AGENTS.md 复制/预览功能
-- 🧹 移除：旧版 hook 安装方式，改用 AGENTS.md 指令方式
-- 📦 新增：openclaw-hook 安装脚本（setup.sh / setup.ps1），自动处理 AGENTS.md 模板
-
-### v2.17.0 (2026-05-04)
-- 🧠 新增：AI 大模型集成系统，内置 NVIDIA NIM 免费模型
-- 🧠 新增：AI 实体提取、摘要生成、日报生成等智能功能
-- 🧠 新增：AI Provider 抽象层，支持 OpenAI/DeepSeek/自定义端点
-- 🧠 新增：Prompt 模板系统，8 种智能分析模板
-- 🔧 优化：AI 功能分级，免费用户可使用 NVIDIA NIM 免费模型
-
-### v2.16.0 (2026-05-04)
-- 🐛 修复：备份功能路径硬编码问题
-- 🐛 修复：前端单元测试 mock 路径错误
-- 🔧 优化：配置管理统一化
-
-### v2.15.0 (2026-05-03)
-- 🛡️ 新增：敏感内容记录开关（默认关闭），开启后敏感内容以 AES-GCM 加密存储
-- 🔐 新增：加密记忆解密 API（`POST /api/v1/memories/:id/decrypt`）
-- 🎛️ 新增：设置页面「记录敏感内容」开关 + 安全警告提示
-- 📋 新增：同步状态显示跳过数量（skipped_count）
-
-### v2.14.0 (2026-05-03)
-- 🔒 安全：OpenClaw 同步增加敏感信息过滤（API Key、密码、token 等）
-- 🔒 安全：跳过敏感文件（.env、credentials、secrets 等）
-- 🔒 安全：内容长度限制（最大 50000 字符）
-- 📊 新增：同步状态显示跳过数量（skipped_count）
-
-### v2.13.0 (2026-05-03)
-- 🔄 新增：OpenClaw 自动同步服务，安装后自动监控 `~/.openclaw/` 目录
-- 🔄 新增：后台定时扫描（每 60 秒），自动导入新对话和记忆
-- 🔄 新增：增量同步机制，避免重复导入
-- 📋 新增：同步状态 API（`/api/v1/openclaw-sync/status`）
-- 🎛️ 新增：手动触发同步和开关自动同步 API
-- 🚀 改进：启动时自动检测 OpenClaw 目录并开始同步
-
-### v2.12.0 (2026-05-03)
-- 🔑 新增：API Key 认证机制，支持外部应用安全调用 ClawMemory API
-- 🤖 新增：外部 API 端点（`/api/v1/external/memories`），供 OpenClaw 自动写入记忆
-- 📦 新增：批量写入记忆 API（`/api/v1/external/memories/batch`）
-- 🔍 新增：外部记忆搜索 API（`/api/v1/external/memories/search`）
-- 🎨 新增：设置页面 API 密钥管理界面（生成/复制/删除）
-- 🌍 新增：API Key 相关中英文翻译
-
-### v2.11.0 (2026-04-30)
-- 🐛 修复：SQLite 驱动注册冲突（modernc.org/sqlite 与 glebarez/go-sqlite 同名注册）
-- 🔐 新增：终端命令重置密码 `./clawmemory --reset-password NEW_PASSWORD`
-- 🔐 新增：`./clawmemory --version` 查看版本号
-- 📋 新增：设置页面显示版本号、检查更新、更新说明
-- 🔄 新增：GitHub Releases 版本更新检查 API
-- 🔒 改进：忘记密码 API 增加用户名验证
-- 📦 统一版本号管理（config.AppVersion）
-
-### v2.10.0 (2026-04-30)
-- 🔒 安全加固：Auth 中间件拆分，API Key 只能访问 /api/v1/external 端点
-- 🔒 安全加固：CORS 从 `*` 改为 Origin 白名单（localhost + 局域网）
-- 🔒 安全加固：添加速率限制（API Key 60次/分，JWT 120次/分，登录 10次/分）
-- 🔒 安全加固：API Key 数量上限（每用户最多 5 个）
-- 🔒 安全加固：批量写入上限（100条/次）+ 输入长度限制
-- 📋 新增：审计日志（API Key 创建/删除、外部记忆写入自动记录）
-
-### v2.0 (2026-04-29)
-- 🎨 全新现代化 UI (知识图谱/日报/主布局)
-- 🤖 AI 提取/摘要 (支持国内外 7+ 主流模型)
-- 📊 批量路由、趋势分析、报告生成
-- 🧠 智能记忆加载 (Token 预算控制)
-- 📌 记忆强化机制 (防止重要记忆衰减)
-- 🔍 ChromaDB 向量搜索支持
-- 🌍 完善国际化 (中文/英文)
-- 🚀 Go 高性能后端 (全平台编译)
-- 🔒 移除 Python 后端和 Docker，简化架构
+</details>
 
 ---
+
+## 🤝 参与贡献
+
+1. Fork 本仓库
+2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'Add amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 提交 Pull Request
 
 ## 📄 许可证
 
-ClawMemory 采用 **MIT License** 开源许可证，所有功能完全免费使用。
-
-| 组件 | 许可证 | 说明 |
-|------|--------|------|
-| 全部功能 | MIT License | 自由使用、修改、分发 |
-
-**包含功能**：记忆管理、知识图谱、Wiki、项目管理、日报、AI 增强（冲突扫描、Wiki 生成、记忆压缩、关系发现、智能路由、衰减评估）、OpenClaw 集成、备份还原、API Key 管理、自进化系统等。
+MIT License
 
 ---
 
-## 🤝 贡献
+<div align="center">
 
-欢迎提交 Issue 和 PR！
+**让 AI 不再失忆 🧠**
 
-GitHub: [https://github.com/860016/Clawmemory](https://github.com/860016/Clawmemory)
+[GitHub](https://github.com/860016/Clawmemory) · [npm](https://www.npmjs.com/package/clawmemory-mcp) · [问题反馈](https://github.com/860016/Clawmemory/issues)
 
----
-
-## 🤖 OpenClaw 自动安装
-
-ClawMemory 支持 **OpenClaw 自动安装**，只需一条命令即可完成完整安装：
-
-### 📦 安装命令
-
-#### Windows (PowerShell)
-```powershell
-# 克隆项目
-git clone https://github.com/860016/Clawmemory.git
-
-# 进入目录
-cd Clawmemory
-
-# 一键安装（自动检测依赖、构建前端、编译后端）
-powershell -ExecutionPolicy Bypass -File install.ps1
-
-# 启动服务
-start.bat
-```
-
-#### Linux / macOS (Bash)
-```bash
-# 克隆项目
-git clone https://github.com/860016/Clawmemory.git
-
-# 进入目录
-cd Clawmemory
-
-# 一键安装（自动检测依赖、构建前端、编译后端）
-bash install.sh
-
-# 启动服务
-./start.sh
-```
-
-### 🎯 安装流程（自动完成）
-
-安装脚本会自动执行以下 5 个步骤：
-
-```
-[1/5] 检查环境依赖...
-      ✓ Go 环境 (必需)
-      ✓ Git (可选，用于技能安装)
-
-[2/5] 检查前端文件...
-      ✓ 前端已预编译，跳过构建
-
-[3/5] 编译 Go 后端...
-      ✓ go build -o clawmemory.exe ./cmd/server
-
-[4/5] 配置环境...
-      ✓ 创建 .env 配置文件
-      ✓ 创建统一目录结构 (data/skills, data/backups)
-
-[5/5] 验证安装...
-      ✓ 检查所有关键文件
-      ✓ 安装完成!
-```
-
-### ⚡ 快速安装（单行命令）
-
-#### Windows
-```powershell
-git clone https://github.com/860016/Clawmemory.git; cd Clawmemory; powershell -ExecutionPolicy Bypass -File install.ps1; start.bat
-```
-
-#### Linux / macOS
-```bash
-git clone https://github.com/860016/Clawmemory.git && cd Clawmemory && bash install.sh && ./start.sh
-```
-
-### 🔧 安装参数
-
-| 参数 | 说明 | 示例 |
-|------|------|------|
-| `--port=PORT` | 自定义端口 | `--port=3000` |
-| `--install-path=PATH` | 自定义安装路径 | `--install-path=/opt/clawmemory` |
-| `--auto-start` | 安装后自动启动 | `--auto-start` |
-| `--upgrade` | 升级模式（保留配置） | `--upgrade` |
-
-#### Windows 示例
-```powershell
-# 自定义端口 + 自动启动
-powershell -ExecutionPolicy Bypass -File install.ps1 -Port 3000 -AutoStart
-
-# 自定义安装路径
-powershell -ExecutionPolicy Bypass -File install.ps1 -InstallPath "D:\Apps\ClawMemory"
-
-# 升级模式（保留配置和数据）
-powershell -ExecutionPolicy Bypass -File install.ps1 -Upgrade
-```
-
-#### Linux / macOS 示例
-```bash
-# 自定义端口 + 自动启动
-bash install.sh --port=3000 --auto-start
-
-# 自定义安装路径
-bash install.sh --install-path=/opt/clawmemory
-
-# 升级模式（保留配置和数据）
-bash install.sh --upgrade
-
-# 查看帮助
-bash install.sh --help
-```
-
-### 📁 安装后目录结构
-
-```
-ClawMemory/                      # 安装根目录
-├── go-backend/                  # 后端程序
-│   ├── clawmemory.exe          # 可执行文件
-│   ├── .env                    # 配置文件
-│   └── frontend_dist/          # 前端构建产物
-├── openclaw-plugin/             # OpenClaw Context Engine 插件
-│   ├── src/                    # 插件源码
-│   ├── package.json
-│   └── tsconfig.json
-├── data/                        # 📌 统一数据目录
-│   ├── clawmemory.db           # 数据库
-│   ├── skills/                 # 技能插件目录
-│   ├── backups/                # 备份文件目录
-│   ├── keys/                   # 密钥文件
-│   └── uploads/                # 上传文件
-├── start.bat / start.sh        # 启动脚本
-├── stop.bat / stop.sh          # 停止脚本
-├── install.ps1                 # Windows 安装脚本
-└── install.sh                  # Linux/macOS 安装脚本
-```
-
-### 🚀 启动与访问
-
-安装完成后：
-
-1. **启动服务**: 双击 `start.bat` (Windows) 或运行 `./start.sh` (Linux/macOS)
-2. **访问地址**: 打开浏览器访问 `http://localhost:8765`
-3. **首次设置**: 首次访问需设置管理员密码（初始密码 `admin123`，首次登录后必须修改）
-
-### 🔑 忘记密码？
-
-ClawMemory 支持通过命令行重置密码，无需原密码。
-
-> ⚠️ **重置前请先停止 ClawMemory 服务**（关闭终端窗口或执行 `stop.bat` / `./stop.sh`）
-
-**Windows**:
-```powershell
-# 打开 PowerShell，进入安装目录
-cd ClawMemory\go-backend
-
-# 执行重置（将"你的新密码"替换为实际密码）
-.\clawmemory.exe --reset-password 你的新密码
-
-# 重置成功后，重新启动服务
-cd ..
-start.bat
-```
-
-**Linux / macOS**:
-```bash
-# 打开终端，进入安装目录
-cd ClawMemory/go-backend
-
-# 执行重置（将"你的新密码"替换为实际密码）
-./clawmemory --reset-password 你的新密码
-
-# 重置成功后，重新启动服务
-cd ..
-./start.sh
-```
-
-> 💡 重置完成后，必须不带 `--reset-password` 参数重新启动服务才能正常使用。
->
-> 如果提示权限不足（Linux/macOS），请先执行 `chmod +x ./go-backend/clawmemory`
-
-### 💡 提示
-
-- ✅ **统一目录**: 所有数据、技能、备份统一存储在 `data/` 目录下
-- ✅ **自动检测**: 自动检测 Go/Git 环境
-- ✅ **完整验证**: 安装完成后自动验证所有关键文件
-- ✅ **跨平台**: 支持 Windows / Linux / macOS (x86_64 + ARM64)
-- ✅ **升级友好**: 使用 `--upgrade` 参数可保留配置和数据
-- ✅ **前端预编译**: 前端已预编译，无需安装 Node.js
-
----
-
-## 🤖 OpenClaw 集成说明
-
-ClawMemory 可以作为 OpenClaw 的主要记忆管理工具，通过 API 联动实现对话自动记忆。
-
----
-
-## 🤖 OpenClaw 集成说明
-
-### ⚠️ 安装目录要求
-
-**必须安装在持久化目录中，禁止安装在临时目录（如 `/tmp`）！**
-
-| 平台 | 推荐安装目录 | ❌ 禁止目录 |
-|------|-------------|------------|
-| **Windows** | `C:\Users\<用户名>\ClawMemory\` | `%TEMP%%`、`C:\Windows\Temp\` |
-| **Linux/macOS** | `~/clawmemory/` 或 `/opt/clawmemory/` | `/tmp/`、`/var/tmp/` |
-
-> 💡 **原因**: 临时目录会在系统重启或清理时被删除，导致数据丢失。ClawMemory 的数据库、配置、备份都存储在安装目录下。
-
-### 第一步：安装并启动 ClawMemory
-
-```bash
-# 1. 克隆到持久化目录
-git clone https://github.com/860016/Clawmemory.git ~/clawmemory
-cd ~/clawmemory
-
-# 2. 一键安装
-bash install.sh   # Linux/macOS
-# 或
-powershell -ExecutionPolicy Bypass -File install.ps1  # Windows
-
-# 3. 启动服务
-./start.sh   # Linux/macOS
-# 或
-start.bat    # Windows
-```
-
-### 第二步：注册管理员账号
-
-1. 打开浏览器访问 `http://localhost:8765`
-2. 首次访问需注册管理员账号
-3. 登录后即可使用 ClawMemory
-
-### 第三步：创建 API 密钥（用于 OpenClaw 自动记录）
-
-1. 登录 ClawMemory 网页 → 设置 → API 密钥
-2. 点击「创建密钥」，输入名称如 `OpenClaw 自动记录`
-3. **立即复制并保存密钥**（关闭后无法再次查看！）
-
-### 第四步：配置 OpenClaw 连接 ClawMemory
-
-**方式一：Context Engine 插件（推荐）**
-
-ClawMemory 提供了 OpenClaw Context Engine 插件，安装后自动实现：
-- ✅ 每轮对话自动写入 ClawMemory（ingestBatch）
-- ✅ 回复前自动检索相关记忆注入上下文（assemble）
-- ✅ 跨 session 关联记忆
-- ✅ 上下文压缩时同步到 ClawMemory（compact）
-
-```bash
-# 1. 安装插件（ClawMemory 安装目录下的 openclaw-plugin/）
-openclaw plugins install -l ./openclaw-plugin
-
-# 2. 在 openclaw.json 中配置
-# 将 contextEngine slot 指向 clawmemory，并填入 API Key
-```
-
-在 `openclaw.json` 中添加：
-```json5
-{
-  plugins: {
-    slots: {
-      contextEngine: "clawmemory"
-    },
-    entries: {
-      clawmemory: {
-        enabled: true,
-        config: {
-          baseUrl: "http://localhost:8765",
-          apiKey: "cm_你的API密钥"
-        }
-      }
-    }
-  }
-}
-```
-
-**方式二：手动 API 调用**
-
-如无法安装插件，也可直接通过 API 写入和搜索记忆：
-
-```bash
-# 写入单条记忆
-curl -X POST http://localhost:8765/api/v1/external/memories \
-  -H "X-API-Key: cm你的密钥" \
-  -H "Content-Type: application/json" \
-  -d '{"key":"用户偏好","value":"喜欢深色主题","source":"openclaw"}'
-
-# 批量写入
-curl -X POST http://localhost:8765/api/v1/external/memories/batch \
-  -H "X-API-Key: cm你的密钥" \
-  -H "Content-Type: application/json" \
-  -d '{"memories":[{"key":"topic1","value":"content1"},{"key":"topic2","value":"content2"}]}'
-
-# 搜索记忆
-curl "http://localhost:8765/api/v1/external/memories/search?q=关键词" \
-  -H "X-API-Key: cm你的密钥"
-```
-
-### 第五步：导入 OpenClaw 已有记忆
-
-如果你之前使用 OpenClaw 的本地记忆，可以在 ClawMemory 中一键导入。
-
-**扫描范围（仅此目录）**：
-
-| 平台 | 扫描目录 |
-|------|----------|
-| **Windows** | `C:\Users\<用户名>\.openclaw\workspace\` |
-| **Linux/macOS** | `~/.openclaw/workspace/` |
-
-> ⚠️ **注意**: 扫描功能**只扫描** `~/.openclaw/workspace/` 目录，不会扫描其他位置。
-
-该目录下的文件结构：
-
-```
-~/.openclaw/workspace/
-├── MEMORY.md          # 长期记忆（会被导入）
-└── memory/            # 日常记忆文件目录（会被导入）
-```
-
-**导入方式**：
-1. 登录 ClawMemory 网页
-2. 进入设置页面
-3. 点击「扫描 / 导入 OpenClaw 记忆」
-4. 系统会自动扫描 `~/.openclaw/workspace/` 目录下的 `MEMORY.md` 和 `memory/` 文件
-5. 确认扫描结果中的路径指向 `~/.openclaw/workspace/` 后完成导入
-
-> 💡 **提示**: 如果扫描结果为空或路径不对，请确认 `~/.openclaw/workspace/` 目录下存在 `MEMORY.md` 或 `memory/` 文件。
-
-### 局域网访问
-
-ClawMemory 默认监听 `0.0.0.0`，支持局域网访问：
-
-- 本机访问: `http://localhost:8765`
-- 局域网访问: `http://<你的IP>:8765`
-
-> 💡 **提示**: 如需修改端口，可在 `.env` 文件中设置 `PORT=端口号`
-
-### 数据目录说明
-
-| 目录 | 说明 |
-|------|------|
-| `~/.openclaw/` | OpenClaw 默认数据目录 |
-| `~/.openclaw/workspace/` | OpenClaw 记忆文件（MEMORY.md + memory/） |
-| `./data/` | ClawMemory 安装目录下的数据目录 |
-
-ClawMemory 会自动扫描以下目录中的技能：
-- `~/.openclaw/skills/` (OpenClaw 默认目录)
-- `./data/skills/` (ClawMemory 安装目录)
+</div>

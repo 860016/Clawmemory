@@ -9,7 +9,7 @@
 [![Model Context Protocol](https://img.shields.io/badge/MCP-Protocol-blue)](https://modelcontextprotocol.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[Install](#-install) · [Quick Start](#-quick-start) · [Tools](#-tools) · [Configuration](#-configuration) · [How It Works](#-how-it-works)
+[中文](./README_ZH.md) · [Install](#-install) · [Quick Start](#-quick-start) · [Tools](#-tools) · [How It Works](#-how-it-works)
 
 </div>
 
@@ -60,7 +60,6 @@ That's it. No global install needed — `npx` handles everything.
 ### 1. Start ClawMemory Server
 
 ```bash
-# Clone and run the backend
 git clone https://github.com/860016/Clawmemory.git
 cd Clawmemory/go-backend
 go run ./cmd/server
@@ -91,56 +90,13 @@ Open ClawMemory Web UI → Settings → API Keys → Create one.
 }
 ```
 
-**Claude Desktop** — edit `~/AppData/Roaming/Claude/claude_desktop_config.json` (Windows) or `~/.config/Claude/claude_desktop_config.json` (macOS/Linux):
+**Claude Desktop** — edit `~/AppData/Roaming/Claude/claude_desktop_config.json` (Windows) or `~/.config/Claude/claude_desktop_config.json` (macOS/Linux)
 
-```json
-{
-  "mcpServers": {
-    "clawmemory": {
-      "command": "npx",
-      "args": ["-y", "clawmemory-mcp"],
-      "env": {
-        "CLAWMEMORY_BASE_URL": "http://localhost:8765",
-        "CLAWMEMORY_API_KEY": "cm-your-api-key-here"
-      }
-    }
-  }
-}
-```
+**Windsurf** — edit `~/.windsurf/mcp.json`
 
-**Windsurf** — edit `~/.windsurf/mcp.json`:
+**Trae** — edit `~/.trae/mcp.json`
 
-```json
-{
-  "mcpServers": {
-    "clawmemory": {
-      "command": "npx",
-      "args": ["-y", "clawmemory-mcp"],
-      "env": {
-        "CLAWMEMORY_BASE_URL": "http://localhost:8765",
-        "CLAWMEMORY_API_KEY": "cm-your-api-key-here"
-      }
-    }
-  }
-}
-```
-
-**Trae** — edit `~/.trae/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "clawmemory": {
-      "command": "npx",
-      "args": ["-y", "clawmemory-mcp"],
-      "env": {
-        "CLAWMEMORY_BASE_URL": "http://localhost:8765",
-        "CLAWMEMORY_API_KEY": "cm-your-api-key-here"
-      }
-    }
-  }
-}
-```
+> Same config format — just change the file path.
 
 ### 4. Restart Your AI Tool
 
@@ -229,8 +185,6 @@ Summary: "Decided to use JWT with refresh tokens"
 | `CLAWMEMORY_PLATFORM` | No | `mcp` | Platform identifier for memory source tracking |
 
 ### Memory Layers
-
-ClawMemory uses a 3-layer memory model inspired by cognitive science:
 
 | Layer | Purpose | Example |
 |-------|---------|---------|
