@@ -1,11 +1,29 @@
 {
-  "name": "clawmemory-mcp-server",
-  "version": "2.23.0",
+  "name": "clawmemory-mcp",
+  "version": "2.24.0",
   "description": "ClawMemory MCP Server - AI memory management for Trae, Claude Desktop, Cursor, Windsurf",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
     "clawmemory-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "mcp",
+    "memory",
+    "ai",
+    "clawmemory",
+    "cursor",
+    "claude",
+    "trae",
+    "windsurf",
+    "model-context-protocol"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clawmemory/clawmemory-mcp.git"
   },
   "scripts": {
     "build": "tsc",
