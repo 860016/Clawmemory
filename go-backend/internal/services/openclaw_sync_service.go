@@ -6,7 +6,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -183,37 +185,50 @@ func (s *OpenClawSyncService) markKeySkipped(key string) {
 
 func (s *OpenClawSyncService) Start() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	if s.running {
+		s.mu.Unlock()
 		return
 	}
 
 	if s.mode == "local" && !s.detectLocalOpenClaw() {
 		s.lastError = "No supported IDE directory found (OpenClaw/Trae CN/CodeBuddy CN)"
+		s.mu.Unlock()
 		return
 	}
 
 	s.running = true
 	s.stopChan = make(chan struct{})
 	s.pendingEvents = make(map[string]bool)
+	s.mu.Unlock()
 
-	s.localSync()
+	go func() {
+		time.Sleep(5 * time.Second)
+		s.localSync()
+	}()
 
 	if s.mode == "local" {
 		watcher, err := fsnotify.NewWatcher()
 		if err != nil {
+			s.mu.Lock()
 			s.lastError = fmt.Sprintf("fsnotify init failed: %v, falling back to polling", err)
+			s.mu.Unlock()
 			go s.periodicRescan()
 			return
 		}
+		s.mu.Lock()
 		s.watcher = watcher
+		s.mu.Unlock()
 
-		s.addWatchDirs()
-
+		go s.addWatchDirsAsync()
 		go s.watchLoop()
 		go s.periodicRescan()
 	}
+}
+
+func (s *OpenClawSyncService) addWatchDirsAsync() {
+	time.Sleep(3 * time.Second)
+	s.addWatchDirs()
 }
 
 func (s *OpenClawSyncService) addWatchDirs() {
@@ -461,6 +476,7 @@ func (s *OpenClawSyncService) localSync() {
 	s.lastError = ""
 
 	previews := s.readLocalDatabases()
+	log.Printf("[sync] readLocalDatabases returned %d previews", len(previews))
 	if len(previews) == 0 {
 		return
 	}
@@ -484,26 +500,37 @@ func (s *OpenClawSyncService) localSync() {
 
 	newCount := 0
 	skipped := 0
+	skipByHash := 0
+	skipByKey := 0
+	skipByQuality := 0
+	skipBySignificant := 0
+	skipBySensitive := 0
+	skipByCreateFail := 0
+	skipByNoUser := 0
 	fileChunkCounts := make(map[string]int)
 
 	for _, p := range previews {
 		if s.isChunkHashSynced(p.ChunkHash) {
 			skipped++
+			skipByHash++
 			continue
 		}
 
 		if s.isKeySynced(p.Key) {
 			skipped++
+			skipByKey++
 			continue
 		}
 
 		if s.isLowQualityContent(p.Content) {
 			skipped++
+			skipByQuality++
 			continue
 		}
 
 		if !s.isSignificant(p) {
 			skipped++
+			skipBySignificant++
 			continue
 		}
 
@@ -512,6 +539,7 @@ func (s *OpenClawSyncService) localSync() {
 
 		if (isSensitive || isSensitiveFile) && !recordSensitive {
 			skipped++
+			skipBySensitive++
 			s.markKeySkipped(p.Key)
 			continue
 		}
@@ -522,8 +550,10 @@ func (s *OpenClawSyncService) localSync() {
 
 		userID := s.getDefaultUserID()
 		if userID == 0 {
+			log.Printf("[sync] No user found, skipping all remaining previews")
 			s.lastError = "no user found"
-			continue
+			skipByNoUser = len(previews) - newCount - skipped
+			break
 		}
 
 		value := p.Content
@@ -541,7 +571,7 @@ func (s *OpenClawSyncService) localSync() {
 		}
 
 		platform := s.inferPlatformFromPath(p.FilePath)
-		if p.Category != "" {
+		if p.Category != "" && !strings.Contains(p.Source, "-git-") {
 			_, _, catSource := s.categoryToLayerAndType(p.Category)
 			if catSource != "" {
 				source = catSource
@@ -562,6 +592,10 @@ func (s *OpenClawSyncService) localSync() {
 			"source_agent": p.AgentName,
 		})
 		if err != nil {
+			skipByCreateFail++
+			if skipByCreateFail <= 3 {
+				log.Printf("[sync] Create failed for key=%s: %v", p.Key, err)
+			}
 			continue
 		}
 
@@ -589,6 +623,8 @@ func (s *OpenClawSyncService) localSync() {
 
 	s.syncedCount += newCount
 	s.skippedCount += skipped
+	log.Printf("[sync] localSync complete: new=%d, skipped=%d (hash=%d key=%d quality=%d significant=%d sensitive=%d createFail=%d noUser=%d), total_synced=%d",
+		newCount, skipped, skipByHash, skipByKey, skipByQuality, skipBySignificant, skipBySensitive, skipByCreateFail, skipByNoUser, s.syncedCount)
 }
 
 func (s *OpenClawSyncService) isChunkHashSynced(hash string) bool {
@@ -786,6 +822,7 @@ type memoryPreview struct {
 
 func (s *OpenClawSyncService) readLocalDatabases() []memoryPreview {
 	searchDirs := s.getLocalSearchDirs()
+	log.Printf("[sync] Scanning %d directories", len(searchDirs))
 	var allPreviews []memoryPreview
 
 	for _, dir := range searchDirs {
@@ -793,7 +830,14 @@ func (s *OpenClawSyncService) readLocalDatabases() []memoryPreview {
 			continue
 		}
 		previews := s.extractFromDir(dir)
+		log.Printf("[sync] Dir %s: %d previews", dir, len(previews))
 		allPreviews = append(allPreviews, previews...)
+	}
+
+	memPreviews := s.extractMemoryConversations()
+	if len(memPreviews) > 0 {
+		log.Printf("[sync] Memory scan: %d previews", len(memPreviews))
+		allPreviews = append(allPreviews, memPreviews...)
 	}
 
 	return allPreviews
@@ -814,7 +858,19 @@ func (s *OpenClawSyncService) extractFromDir(dir string) []memoryPreview {
 	var previews []memoryPreview
 
 	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			gitPath := filepath.Join(path, ".git")
+			if _, err := os.Stat(gitPath); err == nil {
+				log.Printf("[sync] Found git repo: %s", path)
+				gitPreviews := s.extractGitRepoMemories(path)
+				log.Printf("[sync] Git repo %s returned %d previews", path, len(gitPreviews))
+				if len(gitPreviews) > 0 {
+					previews = append(previews, gitPreviews...)
+				}
+			}
 			return nil
 		}
 
@@ -1142,6 +1198,8 @@ func (s *OpenClawSyncService) inferAgentFromPath(path string) string {
 		"codebuddy": "codebuddy",
 		"cursor":    "cursor",
 		"claude":    "claude",
+		"qoder":     "qoder",
+		"codex":     "codex",
 		"windsurf":  "windsurf",
 		"cline":     "cline",
 		"continue":  "continue",
@@ -1165,6 +1223,8 @@ func (s *OpenClawSyncService) inferPlatformFromPath(path string) string {
 		"cursor":    {"cursor"},
 		"trae":      {"trae"},
 		"codebuddy": {"codebuddy"},
+		"qoder":     {"qoder"},
+		"codex":     {"codex"},
 		"windsurf":  {"windsurf", "codeium"},
 		"cline":     {"cline"},
 		"continue":  {"continue"},
@@ -1393,6 +1453,325 @@ func (s *OpenClawSyncService) extractMessagesFromJSON(messages []interface{}, pa
 		})
 	}
 	return previews
+}
+
+func (s *OpenClawSyncService) extractGitRepoMemories(repoPath string) []memoryPreview {
+	var previews []memoryPreview
+
+	lowerPath := strings.ToLower(repoPath)
+	if !strings.Contains(lowerPath, "snapshot") && !strings.Contains(lowerPath, "ai-agent") {
+		return nil
+	}
+
+	agentName := "unknown-git"
+	if strings.Contains(lowerPath, "trae") {
+		agentName = "trae"
+	} else if strings.Contains(lowerPath, "codebuddy") {
+		agentName = "codebuddy"
+	}
+
+	sessionID := filepath.Base(filepath.Dir(repoPath))
+	if sessionID == "" || sessionID == "." {
+		sessionID = filepath.Base(repoPath)
+	}
+
+	tagsOutput, err := s.runGitCommand(repoPath, "tag", "-l", "after-chat-turn-*")
+	if err != nil || tagsOutput == "" {
+		return nil
+	}
+	tags := strings.Split(strings.TrimSpace(tagsOutput), "\n")
+	if len(tags) == 0 {
+		return nil
+	}
+
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+
+		diffStat, err := s.runGitCommand(repoPath, "diff", "--stat", tag+"^", tag)
+		if err != nil || diffStat == "" {
+			continue
+		}
+
+		var changedFiles []string
+		var addLines, delLines int
+		lines := strings.Split(diffStat, "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			if strings.Contains(line, "files changed") || strings.Contains(line, "file changed") {
+				fmt.Sscanf(line, "%d files changed", &addLines)
+				fmt.Sscanf(line, "%d file changed", &addLines)
+				if strings.Contains(line, "insertion") {
+					fmt.Sscanf(line, "%d insertion", &addLines)
+				}
+				if strings.Contains(line, "deletion") {
+					fmt.Sscanf(line, "%d deletion", &delLines)
+				}
+				continue
+			}
+			parts := strings.Split(line, "|")
+			if len(parts) >= 1 {
+				fileName := strings.TrimSpace(parts[0])
+				if fileName != "" && !strings.HasSuffix(fileName, "version_file_first_graph.json") &&
+					!strings.HasSuffix(fileName, "version_file_latest_change.json") &&
+					!strings.HasSuffix(fileName, "version_file_extra_meta.json") {
+					changedFiles = append(changedFiles, fileName)
+				}
+			}
+			if strings.Contains(line, "insertion") {
+				fmt.Sscanf(line, "%d insertion", &addLines)
+			}
+			if strings.Contains(line, "deletion") {
+				fmt.Sscanf(line, "%d deletion", &delLines)
+			}
+		}
+
+		if len(changedFiles) == 0 {
+			continue
+		}
+
+		var contentParts []string
+
+		beforeTag := strings.Replace(tag, "after-chat-turn-", "before-chat-turn-", 1)
+		beforeMsg, _ := s.runGitCommand(repoPath, "log", "-1", "--format=%s", beforeTag)
+		beforeMsg = strings.TrimSpace(beforeMsg)
+
+		var userRequest string
+		if strings.HasPrefix(beforeMsg, "user-") {
+			userRequest = ""
+		} else if beforeMsg != "" && !strings.HasPrefix(beforeMsg, "before-chat-turn") {
+			userRequest = beforeMsg
+		}
+
+		afterMsg, _ := s.runGitCommand(repoPath, "log", "-1", "--format=%s", tag)
+		afterMsg = strings.TrimSpace(afterMsg)
+		var toolCallInfo string
+		if strings.HasPrefix(afterMsg, "toolcall-") {
+			toolCallInfo = "AI used tools to modify code"
+		}
+
+		if userRequest != "" {
+			contentParts = append(contentParts, "User asked: "+userRequest)
+		} else if toolCallInfo != "" {
+			contentParts = append(contentParts, toolCallInfo)
+		}
+
+		diffPatch, err := s.runGitCommand(repoPath, "diff", tag+"^", tag)
+		fileSummaries := s.summarizeDiffByFile(diffPatch, changedFiles)
+
+		if len(changedFiles) == 1 {
+			f := changedFiles[0]
+			summary := fileSummaries[f]
+			if summary != "" {
+				contentParts = append(contentParts, fmt.Sprintf("AI modified %s: %s", f, summary))
+			} else {
+				contentParts = append(contentParts, fmt.Sprintf("AI modified %s (+%d/-%d lines)", f, addLines, delLines))
+			}
+		} else {
+			contentParts = append(contentParts, fmt.Sprintf("AI modified %d files (+%d/-%d lines):", len(changedFiles), addLines, delLines))
+			for i, f := range changedFiles {
+				if i >= 8 {
+					contentParts = append(contentParts, fmt.Sprintf("  ... and %d more files", len(changedFiles)-8))
+					break
+				}
+				summary := fileSummaries[f]
+				if summary != "" {
+					contentParts = append(contentParts, fmt.Sprintf("  - %s: %s", f, summary))
+				} else {
+					contentParts = append(contentParts, "  - "+f)
+				}
+			}
+		}
+
+		if diffPatch != "" && err == nil {
+			textContent := s.extractTextFromDiff(diffPatch)
+			if textContent != "" && len(textContent) >= 20 {
+				if len(textContent) > 2000 {
+					textContent = textContent[:2000]
+				}
+				contentParts = append(contentParts, "\nCode changes:\n"+textContent)
+			}
+		}
+
+		content := strings.Join(contentParts, "\n")
+		if len(content) < 15 {
+			continue
+		}
+		if s.isLowQualityContent(content) {
+			continue
+		}
+		if len(content) > MaxMemoryContentLength {
+			content = content[:MaxMemoryContentLength]
+		}
+
+		chunkHash := sha256Hash(content)
+		key := agentName + "-git-assistant:" + chunkHash[:12]
+
+		previews = append(previews, memoryPreview{
+			Key:       key,
+			Content:   content,
+			Layer:     "semantic",
+			Source:    agentName + "-git-assistant",
+			FilePath:  repoPath,
+			AgentName: agentName,
+			ChunkHash: chunkHash,
+			Category:  categoryKnowledge,
+		})
+	}
+
+	return previews
+}
+
+func (s *OpenClawSyncService) runGitCommand(repoPath string, args ...string) (string, error) {
+	time.Sleep(50 * time.Millisecond)
+	cmd := exec.Command("git", args...)
+	cmd.Dir = repoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
+}
+
+func (s *OpenClawSyncService) summarizeDiffByFile(diff string, changedFiles []string) map[string]string {
+	summaries := make(map[string]string)
+	if diff == "" {
+		return summaries
+	}
+
+	type fileDiff struct {
+		addedFuncs    []string
+		modifiedFuncs []string
+		addedLines    int
+		removedLines  int
+	}
+	fileDiffs := make(map[string]*fileDiff)
+	for _, f := range changedFiles {
+		fileDiffs[f] = &fileDiff{}
+	}
+
+	var currentFile string
+	diffLines := strings.Split(diff, "\n")
+	for _, line := range diffLines {
+		if strings.HasPrefix(line, "diff --git") {
+			parts := strings.SplitN(line, " b/", 2)
+			if len(parts) >= 2 {
+				currentFile = parts[1]
+			}
+			continue
+		}
+		fd, ok := fileDiffs[currentFile]
+		if !ok {
+			continue
+		}
+		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+			fd.addedLines++
+			text := strings.TrimPrefix(line, "+")
+			text = strings.TrimSpace(text)
+			if fn := s.extractFuncName(text); fn != "" {
+				if strings.HasPrefix(text, "func ") || strings.HasPrefix(text, "function ") ||
+					strings.HasPrefix(text, "def ") || strings.HasPrefix(text, "class ") ||
+					strings.HasPrefix(text, "public ") || strings.HasPrefix(text, "private ") ||
+					strings.HasPrefix(text, "const ") || strings.HasPrefix(text, "async ") {
+					fd.addedFuncs = append(fd.addedFuncs, fn)
+				} else {
+					fd.modifiedFuncs = append(fd.modifiedFuncs, fn)
+				}
+			}
+		} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
+			fd.removedLines++
+		}
+	}
+
+	for f, fd := range fileDiffs {
+		var parts []string
+		if len(fd.addedFuncs) > 0 {
+			unique := uniqueStrings(fd.addedFuncs)
+			if len(unique) > 3 {
+				parts = append(parts, fmt.Sprintf("added %s", strings.Join(unique[:3], ", ")+fmt.Sprintf(" and %d more", len(unique)-3)))
+			} else {
+				parts = append(parts, fmt.Sprintf("added %s", strings.Join(unique, ", ")))
+			}
+		}
+		if len(fd.modifiedFuncs) > 0 {
+			unique := uniqueStrings(fd.modifiedFuncs)
+			if len(unique) > 3 {
+				parts = append(parts, fmt.Sprintf("modified %s", strings.Join(unique[:3], ", ")+fmt.Sprintf(" and %d more", len(unique)-3)))
+			} else {
+				parts = append(parts, fmt.Sprintf("modified %s", strings.Join(unique, ", ")))
+			}
+		}
+		if len(parts) == 0 {
+			if fd.addedLines > 0 && fd.removedLines > 0 {
+				parts = append(parts, fmt.Sprintf("changed %d lines", fd.addedLines+fd.removedLines))
+			} else if fd.addedLines > 0 {
+				parts = append(parts, fmt.Sprintf("added %d lines", fd.addedLines))
+			} else if fd.removedLines > 0 {
+				parts = append(parts, fmt.Sprintf("removed %d lines", fd.removedLines))
+			}
+		}
+		if len(parts) > 0 {
+			summaries[f] = strings.Join(parts, ", ")
+		}
+	}
+	return summaries
+}
+
+func (s *OpenClawSyncService) extractFuncName(line string) string {
+	line = strings.TrimSpace(line)
+	for _, prefix := range []string{"func ", "function ", "def ", "class ", "public ", "private ", "protected ", "static ", "async ", "const ", "let ", "var "} {
+		if strings.HasPrefix(line, prefix) {
+			rest := strings.TrimPrefix(line, prefix)
+			rest = strings.TrimSpace(rest)
+			if idx := strings.IndexAny(rest, "( {:=<"); idx > 0 {
+				name := rest[:idx]
+				if len(name) > 2 && len(name) < 60 {
+					return name
+				}
+			} else if len(rest) > 2 && len(rest) < 60 {
+				return rest
+			}
+		}
+	}
+	return ""
+}
+
+func uniqueStrings(input []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+	for _, v := range input {
+		if !seen[v] {
+			seen[v] = true
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
+func (s *OpenClawSyncService) extractTextFromDiff(diff string) string {
+	var lines []string
+	diffLines := strings.Split(diff, "\n")
+	for _, line := range diffLines {
+		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+			text := strings.TrimPrefix(line, "+")
+			text = strings.TrimSpace(text)
+			if text != "" && len(text) >= 5 && !strings.HasPrefix(text, "//") &&
+				!strings.HasPrefix(text, "/*") && !strings.HasPrefix(text, "*") &&
+				!strings.HasPrefix(text, "#") && !strings.HasPrefix(text, "{") &&
+				!strings.HasPrefix(text, "}") && !strings.HasPrefix(text, "<") {
+				lines = append(lines, text)
+			}
+		}
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (s *OpenClawSyncService) extractSqliteMemories(dbPath string) []memoryPreview {
@@ -1665,6 +2044,26 @@ func (s *OpenClawSyncService) extractVscdbMemories(dbPath string) []memoryPrevie
 		})
 	}
 
+	var chatStoreRows []KV
+	db.Raw("SELECT key, value FROM ItemTable WHERE key = 'ChatStore'").Scan(&chatStoreRows)
+	for _, row := range chatStoreRows {
+		if row.Value == "" || len(row.Value) < 100 {
+			continue
+		}
+		chatPreviews := s.extractChatStoreConversations(row.Value, dbPath, agentName)
+		previews = append(previews, chatPreviews...)
+	}
+
+	var chatSessionRows []KV
+	db.Raw("SELECT key, value FROM ItemTable WHERE key LIKE 'chat.sessions%' OR key LIKE 'chat.ChatSessionStore.sessions%'").Scan(&chatSessionRows)
+	for _, row := range chatSessionRows {
+		if row.Value == "" || len(row.Value) < 100 {
+			continue
+		}
+		chatPreviews := s.extractChatStoreConversations(row.Value, dbPath, agentName)
+		previews = append(previews, chatPreviews...)
+	}
+
 	return previews
 }
 
@@ -1709,6 +2108,124 @@ func (s *OpenClawSyncService) parseInputHistory(jsonStr string) []string {
 		}
 	}
 	return result
+}
+
+func (s *OpenClawSyncService) extractChatStoreConversations(jsonStr string, dbPath string, agentName string) []memoryPreview {
+	var previews []memoryPreview
+
+	var rawData map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &rawData); err != nil {
+		return nil
+	}
+
+	var sessions map[string]interface{}
+
+	if state, ok := rawData["state"].(map[string]interface{}); ok {
+		if s, ok := state["sessions"].(map[string]interface{}); ok {
+			sessions = s
+		}
+	}
+	if sessions == nil {
+		if s, ok := rawData["sessions"].(map[string]interface{}); ok {
+			sessions = s
+		}
+	}
+	if sessions == nil {
+		return nil
+	}
+
+	for sessionID, sessionData := range sessions {
+		sessionMap, ok := sessionData.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		title, _ := sessionMap["title"].(string)
+		_ = title
+
+		turnsRaw, ok := sessionMap["turns"].([]interface{})
+		if !ok {
+			continue
+		}
+
+		for _, turnRaw := range turnsRaw {
+			turn, ok := turnRaw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			role, _ := turn["role"].(string)
+			if role == "" {
+				continue
+			}
+
+			content := s.extractTurnContent(turn)
+			if content == "" || len(content) < 10 {
+				continue
+			}
+
+			if s.isLowQualityContent(content) {
+				continue
+			}
+
+			if len(content) > MaxMemoryContentLength {
+				content = content[:MaxMemoryContentLength]
+			}
+
+			chunkHash := sha256Hash(content)
+			key := agentName + "-chatstore-" + role + ":" + chunkHash[:12]
+
+			layer := "episodic"
+			source := agentName + "-chat-user"
+			category := categoryConversation
+			if role == "assistant" {
+				layer = "semantic"
+				source = agentName + "-chat-assistant"
+				category = categoryKnowledge
+			}
+
+			previews = append(previews, memoryPreview{
+				Key:       key,
+				Content:   content,
+				Layer:     layer,
+				Source:    source,
+				FilePath:  dbPath,
+				AgentName: agentName,
+				ChunkHash: chunkHash,
+				Category:  category,
+			})
+		}
+
+		_ = sessionID
+	}
+
+	return previews
+}
+
+func (s *OpenClawSyncService) extractTurnContent(turn map[string]interface{}) string {
+	if content, ok := turn["content"].(string); ok && content != "" {
+		return content
+	}
+	if text, ok := turn["text"].(string); ok && text != "" {
+		return text
+	}
+	if message, ok := turn["message"].(string); ok && message != "" {
+		return message
+	}
+	if parts, ok := turn["content"].([]interface{}); ok {
+		var texts []string
+		for _, part := range parts {
+			if p, ok := part.(map[string]interface{}); ok {
+				if t, ok := p["text"].(string); ok && t != "" {
+					texts = append(texts, t)
+				}
+			}
+		}
+		if len(texts) > 0 {
+			return strings.Join(texts, "\n")
+		}
+	}
+	return ""
 }
 
 func (s *OpenClawSyncService) isLowQualityContent(content string) bool {
@@ -1797,7 +2314,79 @@ func (s *OpenClawSyncService) isLowQualityContent(content string) bool {
 		}
 	}
 
+	if !s.isReadableContent(content) {
+		return true
+	}
+
 	return false
+}
+
+func (s *OpenClawSyncService) isReadableContent(content string) bool {
+	runes := []rune(content)
+	if len(runes) == 0 {
+		return false
+	}
+	printable := 0
+	cjkCount := 0
+	consecutiveCJK := 0
+	maxConsecutiveCJK := 0
+	for _, r := range runes {
+		if r >= 0x20 && r < 0x7F || r == '\n' || r == '\r' || r == '\t' {
+			printable++
+			consecutiveCJK = 0
+		} else if r >= 0x4E00 && r <= 0x9FFF {
+			printable++
+			cjkCount++
+			consecutiveCJK++
+			if consecutiveCJK > maxConsecutiveCJK {
+				maxConsecutiveCJK = consecutiveCJK
+			}
+		} else if r >= 0x3000 && r <= 0x303F || r >= 0xFF00 && r <= 0xFFEF {
+			printable++
+			consecutiveCJK = 0
+		} else {
+			consecutiveCJK = 0
+		}
+	}
+	ratio := float64(printable) / float64(len(runes))
+	if ratio < 0.7 {
+		return false
+	}
+	if maxConsecutiveCJK >= 3 || cjkCount >= 5 {
+		return true
+	}
+	v8HeapPatterns := []string{
+		"MemoryScanner", "ScanForPattern", "cleanPrintable",
+		"extractThought", "extractAIResponse", "regexp.MustCompile",
+		"inherit", "prototype", "undefined", "constructor",
+		"__proto__", "webpack", "chunkId", "moduleId",
+	}
+	for _, pat := range v8HeapPatterns {
+		if strings.Contains(content, pat) {
+			return false
+		}
+	}
+	jsFileCount := strings.Count(content, ".js")
+	if jsFileCount >= 3 {
+		return false
+	}
+	goFileCount := strings.Count(content, ".go")
+	if goFileCount >= 3 {
+		return false
+	}
+	tsCount := strings.Count(content, ".ts")
+	if tsCount >= 3 {
+		return false
+	}
+	spaceCount := strings.Count(content, "   ")
+	if spaceCount > len(runes)/20 {
+		return false
+	}
+	blankLines := strings.Count(content, "\n\n\n")
+	if blankLines >= 2 {
+		return false
+	}
+	return true
 }
 
 func (s *OpenClawSyncService) computeSignificance(p memoryPreview) float64 {
@@ -1958,4 +2547,103 @@ func sha256Hash(s string) string {
 func md5Hash(s string) string {
 	h := md5.Sum([]byte(s))
 	return hex.EncodeToString(h[:])
+}
+
+func (s *OpenClawSyncService) extractMemoryConversations() []memoryPreview {
+	scanner := NewMemoryScanner()
+	items := scanner.ExtractConversations()
+	if len(items) == 0 {
+		return nil
+	}
+
+	var previews []memoryPreview
+	for _, item := range items {
+		platform := item.Platform
+		if platform == "" {
+			platform = "trae"
+		}
+
+		switch item.Type {
+		case "ai_response":
+			content := item.Thought
+			if content == "" {
+				content = item.Content
+			}
+			if content == "" || len(content) < 50 {
+				continue
+			}
+			if s.isLowQualityContent(content) {
+				continue
+			}
+			if len(content) > MaxMemoryContentLength {
+				content = content[:MaxMemoryContentLength]
+			}
+			chunkHash := sha256Hash(content)
+			agentName := platform
+			if item.AgentID != "" {
+				agentName = platform + "-" + item.AgentID
+			}
+			key := agentName + "-mem-ai:" + chunkHash[:12]
+			previews = append(previews, memoryPreview{
+				Key:       key,
+				Content:   content,
+				Layer:     "semantic",
+				Source:    agentName + "-chat-assistant",
+				FilePath:  "memory://" + item.SessionID,
+				AgentName: agentName,
+				ChunkHash: chunkHash,
+				Category:  categoryKnowledge,
+			})
+
+		case "user_input":
+			if item.Content == "" || len(item.Content) < 10 {
+				continue
+			}
+			if s.isLowQualityContent(item.Content) {
+				continue
+			}
+			content := item.Content
+			if len(content) > MaxMemoryContentLength {
+				content = content[:MaxMemoryContentLength]
+			}
+			chunkHash := sha256Hash(content)
+			key := platform + "-mem-user:" + chunkHash[:12]
+			previews = append(previews, memoryPreview{
+				Key:       key,
+				Content:   content,
+				Layer:     "episodic",
+				Source:    platform + "-chat-user",
+				FilePath:  "memory://user-input",
+				AgentName: platform,
+				ChunkHash: chunkHash,
+				Category:  categoryConversation,
+			})
+
+		case "session":
+			if item.Name == "" {
+				continue
+			}
+			content := item.Name
+			if item.Status != "" {
+				content += " | Status: " + item.Status
+			}
+			if len(content) < 5 {
+				continue
+			}
+			chunkHash := sha256Hash(content + item.SessionID)
+			key := platform + "-mem-session:" + chunkHash[:12]
+			previews = append(previews, memoryPreview{
+				Key:       key,
+				Content:   content,
+				Layer:     "episodic",
+				Source:    platform + "-session",
+				FilePath:  "memory://session/" + item.SessionID,
+				AgentName: platform,
+				ChunkHash: chunkHash,
+				Category:  categorySessionLog,
+			})
+		}
+	}
+
+	return previews
 }

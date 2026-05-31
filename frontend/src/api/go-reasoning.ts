@@ -6,7 +6,7 @@ export const reasoningApi = {
   },
 
   updateConfig(data: Record<string, any>) {
-    return api.put('/reasoning/config', data)
+    return api.put('/reasoning/config', data, { _silent: true } as any)
   },
 
   testConnection() {

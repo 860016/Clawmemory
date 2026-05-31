@@ -48,7 +48,21 @@
         <el-button type="primary" @click="loadData">{{ $t('common.retry') }}</el-button>
       </div>
 
-      <div v-else-if="filteredEntities.length" class="content-views">
+      <div v-else-if="entities.length === 0" class="state-block empty">
+        <div class="empty-visual">
+          <div class="empty-circle">🕸️</div>
+        </div>
+        <h3>{{ $t('knowledge.emptyGraph') }}</h3>
+        <p>{{ $t('knowledge.emptyHint') }}</p>
+        <div class="empty-actions">
+          <el-button type="primary" @click="openCreateDialog">{{ $t('knowledge.addEntity') }}</el-button>
+          <el-button type="success" @click="aiExtract" :loading="aiExtracting" plain>
+            <el-icon><MagicStick /></el-icon> {{ $t('knowledge.aiExtract') }}
+          </el-button>
+        </div>
+      </div>
+
+      <div v-else class="content-views">
         <div v-if="viewMode === 'cards'" class="cards-grid">
         <div v-for="entity in filteredEntities" :key="entity.id" class="entity-card" @click="openDetail(entity)">
           <div class="card-top">
@@ -109,15 +123,6 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <div v-else class="state-block empty">
-        <div class="empty-visual">
-          <div class="empty-circle">🕸️</div>
-        </div>
-        <h3>{{ $t('knowledge.emptyGraph') }}</h3>
-        <p>{{ $t('knowledge.emptyHint') }}</p>
-        <el-button type="primary" @click="openCreateDialog">{{ $t('knowledge.addEntity') }}</el-button>
       </div>
     </div>
 
@@ -258,7 +263,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useIsMobile } from '../composables/useIsMobile'
 import { useAIConfig } from '../composables/useAIConfig'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -335,7 +340,7 @@ function getTypeLabel(type: string) {
 }
 
 function getColor(name: string) {
-  const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#0ea5e9', '#3b82f6']
+  const colors = ['#10b981', '#34d399', '#059669', '#0ea5e9', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#06b6d4']
   const idx = name?.charCodeAt(0) % colors.length || 0
   return colors[idx]
 }
@@ -358,12 +363,9 @@ async function loadData() {
   loading.value = true
   error.value = ''
   try {
-    const [entRes, relRes] = await Promise.all([
-      knowledgeApi.listEntities({ page: 1, size: 500 }),
-      knowledgeApi.listRelations(),
-    ])
-    entities.value = entRes.data.items || entRes.data || []
-    relations.value = relRes.data.items || relRes.data || []
+    const { data } = await knowledgeApi.getGraph()
+    entities.value = data.entities || []
+    relations.value = data.relations || []
   } catch (e: any) {
     const msg = translateError(e.response?.data?.error || e.response?.data?.detail, t('common.loadFailed'))
     error.value = msg
@@ -442,8 +444,8 @@ async function createRelation() {
 }
 
 const typeColors: Record<string, string> = {
-  person: '#6366f1',
-  organization: '#8b5cf6',
+  person: '#10b981',
+  organization: '#34d399',
   location: '#14b8a6',
   concept: '#f97316',
   technology: '#0ea5e9',
@@ -458,22 +460,21 @@ function renderGraph() {
     cyInstance = null
   }
 
-  const nodes = filteredEntities.value.map(e => ({
+  const allEntities = entities.value
+  const entityIdSet = new Set(allEntities.map(e => String(e.id)))
+
+  const nodes = allEntities.map(e => ({
     data: {
       id: String(e.id),
       label: e.name || '?',
       entityType: e.entity_type,
-      color: typeColors[e.entity_type] || '#6366f1',
+      color: typeColors[e.entity_type] || '#10b981',
       entity: e,
     },
   }))
 
   const edges = relations.value
-    .filter(r => {
-      const srcExists = nodes.some(n => n.data.id === String(r.source_id))
-      const tgtExists = nodes.some(n => n.data.id === String(r.target_id))
-      return srcExists && tgtExists
-    })
+    .filter(r => entityIdSet.has(String(r.source_id)) && entityIdSet.has(String(r.target_id)))
     .map(r => ({
       data: {
         id: `e-${r.id}`,
@@ -482,6 +483,8 @@ function renderGraph() {
         label: r.relation_type || '',
       },
     }))
+
+  if (nodes.length === 0) return
 
   cyInstance = cytoscape({
     container: graphContainer.value,
@@ -558,6 +561,13 @@ watch(viewMode, (mode) => {
 watch([entities, relations], () => {
   if (viewMode.value === 'graph') {
     nextTick(() => renderGraph())
+  }
+})
+
+onBeforeUnmount(() => {
+  if (cyInstance) {
+    cyInstance.destroy()
+    cyInstance = null
   }
 })
 
@@ -650,8 +660,8 @@ async function aiExtract() {
 }
 .search-box input:focus {
   outline: none;
-  border-color: var(--cm-primary, #6366f1);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  border-color: var(--cm-primary, #10b981);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
 .filter-bar {
@@ -676,12 +686,12 @@ async function aiExtract() {
   transition: all 0.2s;
 }
 .filter-chip:hover {
-  border-color: var(--cm-primary, #6366f1);
-  color: var(--cm-primary, #6366f1);
+  border-color: var(--cm-primary, #10b981);
+  color: var(--cm-primary, #10b981);
 }
 .filter-chip.active {
-  background: var(--cm-primary, #6366f1);
-  border-color: var(--cm-primary, #6366f1);
+  background: var(--cm-primary, #10b981);
+  border-color: var(--cm-primary, #10b981);
   color: #fff;
 }
 .chip-count {
@@ -725,7 +735,7 @@ async function aiExtract() {
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1));
+  background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(5,150,105,0.1));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -741,6 +751,11 @@ async function aiExtract() {
 .state-block.empty p {
   color: var(--cm-text-secondary, #666);
   margin-bottom: 16px;
+}
+.empty-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
 }
 
 .cards-grid {
@@ -759,8 +774,8 @@ async function aiExtract() {
   position: relative;
 }
 .entity-card:hover {
-  border-color: var(--cm-primary, #6366f1);
-  box-shadow: 0 8px 24px rgba(99,102,241,0.12);
+  border-color: var(--cm-primary, #10b981);
+  box-shadow: 0 8px 24px rgba(16,185,129,0.12);
   transform: translateY(-3px);
 }
 
@@ -804,7 +819,7 @@ async function aiExtract() {
   display: inline-block;
   margin-top: 3px;
 }
-.type-badge.concept { background: #eef2ff; color: #6366f1; }
+.type-badge.concept { background: #d1fae5; color: #059669; }
 .type-badge.person { background: #fef3c7; color: #d97706; }
 .type-badge.organization { background: #dbeafe; color: #2563eb; }
 .type-badge.technology { background: #d1fae5; color: #059669; }
@@ -852,8 +867,8 @@ async function aiExtract() {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: var(--cm-primary, #6366f1);
-  background: rgba(99,102,241,0.08);
+  color: var(--cm-primary, #10b981);
+  background: rgba(16,185,129,0.08);
   padding: 3px 8px;
   border-radius: 6px;
 }
@@ -928,7 +943,7 @@ async function aiExtract() {
   border: 1px solid var(--cm-border, #e5e5e5);
 }
 .rel-type {
-  color: var(--cm-primary, #6366f1);
+  color: var(--cm-primary, #10b981);
   font-weight: 500;
   font-size: 12px;
 }
@@ -985,8 +1000,8 @@ async function aiExtract() {
 }
 .field-input:focus {
   outline: none;
-  border-color: var(--cm-primary, #6366f1);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+  border-color: var(--cm-primary, #10b981);
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.1);
 }
 
 .view-switch {
@@ -1011,9 +1026,9 @@ async function aiExtract() {
   cursor: pointer;
   transition: all 0.2s;
 }
-.view-btn:hover { color: var(--cm-primary, #6366f1); }
+.view-btn:hover { color: var(--cm-primary, #10b981); }
 .view-btn.active {
-  background: var(--cm-primary, #6366f1);
+  background: var(--cm-primary, #10b981);
   color: #fff;
 }
 

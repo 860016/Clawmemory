@@ -292,6 +292,7 @@
               <div class="step-title">{{ $t('dashboard.onboardStep1Title') }}</div>
               <div class="step-desc">{{ $t('dashboard.onboardStep1Desc') }}</div>
             </div>
+            <el-icon class="step-arrow"><ArrowRight /></el-icon>
           </div>
           <div class="onboarding-step" @click="$router.push('/settings?section=security')">
             <div class="step-icon">2️⃣</div>
@@ -299,6 +300,7 @@
               <div class="step-title">{{ $t('dashboard.onboardStep2Title') }}</div>
               <div class="step-desc">{{ $t('dashboard.onboardStep2Desc') }}</div>
             </div>
+            <el-icon class="step-arrow"><ArrowRight /></el-icon>
           </div>
           <div class="onboarding-step" @click="$router.push('/memories')">
             <div class="step-icon">3️⃣</div>
@@ -306,7 +308,38 @@
               <div class="step-title">{{ $t('dashboard.onboardStep3Title') }}</div>
               <div class="step-desc">{{ $t('dashboard.onboardStep3Desc') }}</div>
             </div>
+            <el-icon class="step-arrow"><ArrowRight /></el-icon>
           </div>
+        </div>
+      </div>
+
+      <div v-if="pageLoading" class="dashboard-skeleton">
+        <div class="skeleton-stats-grid">
+          <div class="skeleton-stat-card" v-for="i in 4" :key="i">
+            <div class="cm-skeleton" style="width:44px;height:44px;border-radius:10px"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+              <div class="cm-skeleton cm-skeleton-title" style="width:40%"></div>
+              <div class="cm-skeleton cm-skeleton-text" style="width:60%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="skeleton-content-grid">
+          <div class="skeleton-card" v-for="i in 4" :key="i">
+            <div class="cm-skeleton cm-skeleton-title" style="width:50%"></div>
+            <div class="cm-skeleton cm-skeleton-text" style="width:80%"></div>
+            <div class="cm-skeleton cm-skeleton-text" style="width:60%"></div>
+          </div>
+        </div>
+      </div>
+
+      <template v-else>
+      <div v-if="!showOnboarding && stats.memoryCount === 0" class="cm-empty-state dashboard-empty">
+        <div class="cm-empty-icon">🧠</div>
+        <div class="cm-empty-title">{{ $t('dashboard.emptyTitle') || '开始记录你的第一条记忆' }}</div>
+        <div class="cm-empty-desc">{{ $t('dashboard.emptyDesc') || '记忆是智能助手的核心，添加你的第一条记忆来开始使用' }}</div>
+        <div class="cm-empty-action">
+          <el-button type="primary" @click="$router.push('/memories')">{{ $t('dashboard.goMemories') || '添加记忆' }}</el-button>
+          <el-button @click="$router.push('/settings')">{{ $t('dashboard.goSettings') }}</el-button>
         </div>
       </div>
 
@@ -413,21 +446,6 @@
             <div v-if="Object.keys(stats.layerStats).length === 0" class="empty-hint">{{ $t('common.noData') }}</div>
           </div>
         </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h3>🔑 {{ $t('dashboard.advancedStatus') }}</h3>
-          </div>
-          <div class="advanced-info">
-            <div class="advanced-tier">
-              <span class="tier-icon">◆</span>
-              <span>{{ $t('dashboard.advancedVersion') }}</span>
-            </div>
-            <div class="advanced-detail">
-              <el-button type="primary" size="small" style="margin-top: 8px" @click="$router.push('/advanced')">{{ $t('nav.advanced') }} →</el-button>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div class="card">
@@ -447,6 +465,7 @@
         </div>
         <div v-else class="empty-hint">{{ $t('common.noData') }}</div>
       </div>
+      </template>
     </div>
   </div>
 </template>
@@ -457,6 +476,7 @@ import { useIsMobile } from '../composables/useIsMobile'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Close, ArrowRight } from '@element-plus/icons-vue'
 import { translateError } from '../i18n'
 import { statsApi } from '../api/go-stats'
 import { chromadbApi } from '../api/go-chromadb'
@@ -474,6 +494,7 @@ const stats = ref<any>({
 })
 
 const showOnboarding = ref(!localStorage.getItem('cm_onboarded'))
+const pageLoading = ref(true)
 function dismissOnboarding() {
   showOnboarding.value = false
   localStorage.setItem('cm_onboarded', '1')
@@ -526,6 +547,7 @@ onMounted(async () => {
     const { data } = await statsApi.getOverview()
     stats.value = data
   } catch { stats.value = { memoryCount: 0, entityCount: 0, relationCount: 0, projectCount: 0, layerStats: {}, recentMemories: [], license: { tier: 'advanced', active: true }, passwordSet: true } }
+  pageLoading.value = false
   loadChromaDBStatus()
 })
 
@@ -677,7 +699,7 @@ const tokenBarPoints = computed(() => {
   const plotH = chartHeight - chartPadding.top - chartPadding.bottom
   const max = maxTokenCount.value
   const barW = Math.max(plotW / trend.length - 2, 2)
-  const colors = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#3b82f6']
+  const colors = ['#10b981', '#34d399', '#059669', '#0ea5e9', '#10b981']
   return trend.map((d: any, i: number) => ({
     x: chartPadding.left + (i / trend.length) * plotW + 1,
     y: chartPadding.top + plotH - (d.tokens / max) * plotH,
@@ -723,7 +745,7 @@ function importanceLabel(level: string) {
 
 function entityTypeColor(etype: string) {
   const colors: Record<string, string> = {
-    person: '#3b82f6', project: '#10b981', tool: '#8b5cf6', concept: '#f59e0b',
+    person: '#10b981', project: '#059669', tool: '#34d399', concept: '#f59e0b',
     event: '#ef4444', tech: '#06b6d4', organization: '#ec4899', other: '#6b7280',
   }
   return colors[etype] || '#6b7280'
@@ -787,6 +809,8 @@ function formatNumber(n: number) {
 .onboarding-steps { display: flex; flex-direction: column; gap: 10px; }
 .onboarding-step { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; background: var(--cm-bg); cursor: pointer; transition: all 0.2s; }
 .onboarding-step:hover { background: rgba(16,185,129,0.08); transform: translateX(4px); }
+.step-arrow { color: var(--cm-text-muted); flex-shrink: 0; transition: transform 0.2s; }
+.onboarding-step:hover .step-arrow { transform: translateX(4px); color: var(--cm-primary); }
 .step-icon { font-size: 24px; flex-shrink: 0; }
 .step-title { font-size: 14px; font-weight: 500; color: var(--cm-text); }
 .step-desc { font-size: 12px; color: var(--cm-text-muted); margin-top: 2px; }
@@ -906,9 +930,6 @@ function formatNumber(n: number) {
 .accessed-layer-badge.private { background: rgba(233,30,99,0.15); color: #e91e63; }
 .accessed-count { font-size: 13px; color: var(--cm-text-muted); white-space: nowrap; }
 
-.advanced-tier { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #10B981; }
-.advanced-detail { font-size: 13px; color: var(--cm-text-muted); line-height: 1.8; }
-
 .recent-memories { display: flex; flex-direction: column; gap: 8px; }
 .memory-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; background: var(--cm-bg); border: 1px solid var(--cm-border); }
 .memory-layer-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
@@ -938,7 +959,7 @@ function formatNumber(n: number) {
 .scope { font-size: 10px; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; }
 .scope.global { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
 .scope.workspace { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-.scope.agents { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
+.scope.agents { background: rgba(16, 185, 129, 0.1); color: #10b981; }
 .scope.workspace-agents { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
 .scope.workspace-legacy { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
 
@@ -1034,9 +1055,6 @@ function formatNumber(n: number) {
   .memory-time {
     font-size: 10px;
   }
-  .advanced-tier {
-    font-size: 16px;
-  }
   .period-selector .el-radio-group {
     display: flex;
     flex-wrap: wrap;
@@ -1047,47 +1065,45 @@ function formatNumber(n: number) {
   .onboarding-header h2 { font-size: 16px; }
 }
 
+.dashboard-empty { margin-bottom: 24px; }
+
+.dashboard-skeleton { margin-bottom: 24px; }
+.skeleton-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.skeleton-stat-card { display: flex; align-items: center; gap: 16px; padding: 20px; background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; }
+.skeleton-content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.skeleton-card { padding: 20px; background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+@media (max-width: 768px) {
+  .skeleton-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .skeleton-content-grid { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 480px) {
-  .dashboard {
-    padding: 12px;
-  }
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
-  .stat-card {
-    padding: 12px;
-    gap: 10px;
-  }
-  .stat-icon-wrap {
-    width: 32px;
-    height: 32px;
-    font-size: 16px;
-  }
-  .stat-value {
-    font-size: 20px;
-  }
-  .page-header h1 {
-    font-size: 18px;
-  }
-  .card {
-    padding: 12px;
-    border-radius: 10px;
-  }
-  .card-header h3 {
-    font-size: 14px;
-  }
-  .chart-container {
-    min-height: 180px;
-  }
-  .skill-card {
-    padding: 10px;
-  }
-  .skill-name {
-    font-size: 13px;
-  }
-  .skill-desc {
-    font-size: 11px;
-  }
+  .skeleton-stats-grid { gap: 8px; }
+  .skeleton-stat-card { padding: 12px; gap: 10px; }
+  .skeleton-content-grid { gap: 10px; }
+  .skeleton-card { padding: 12px; }
+  .dashboard { padding: 12px; }
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card { padding: 12px; gap: 10px; }
+  .stat-icon-wrap { width: 32px; height: 32px; font-size: 16px; border-radius: 8px; }
+  .stat-value { font-size: 18px; }
+  .stat-label { font-size: 10px; }
+  .card { padding: 12px; border-radius: 10px; }
+  .card-header h3 { font-size: 13px; }
+  .page-header h1 { font-size: 18px; }
+  .content-grid { gap: 10px; }
+  .chromadb-features { gap: 6px; }
+  .feature-item { padding: 6px 10px; }
+  .feature-text { font-size: 12px; }
+  .onboarding-step { padding: 8px; gap: 8px; }
+  .step-icon { font-size: 20px; }
+  .step-title { font-size: 13px; }
+  .step-desc { font-size: 11px; }
+  .period-selector .el-radio-button__inner { padding: 6px 10px; font-size: 12px; }
+  .chart-container { min-height: 180px; }
+  .skill-card { padding: 10px; }
+  .skill-name { font-size: 13px; }
+  .skill-desc { font-size: 11px; }
 }
 </style>

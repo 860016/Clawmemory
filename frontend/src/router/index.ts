@@ -20,6 +20,7 @@ const router = createRouter({
         { path: 'reports', name: 'reports', component: () => import('../views/DailyReportViewV2.vue') },
         { path: 'docs', name: 'docs', component: () => import('../views/UserGuideView.vue') },
         { path: 'advanced', name: 'advanced', component: () => import('../views/AdvancedFeaturesView.vue') },
+        { path: 'trash', name: 'trash', component: () => import('../views/TrashView.vue') },
         { path: 'settings', name: 'settings', component: () => import('../views/SettingsView.vue') },
       ],
     },

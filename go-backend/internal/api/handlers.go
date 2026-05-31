@@ -36,6 +36,14 @@ func logDBErr(context string, err error) {
 	}
 }
 
+func truncateStr(s string, maxLen int) string {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
+		return s
+	}
+	return string(runes[:maxLen]) + "..."
+}
+
 func parseIDParam(c *gin.Context, name string) (int, bool) {
 	id, err := strconv.Atoi(c.Param(name))
 	if err != nil || id <= 0 {
@@ -85,10 +93,15 @@ func handleSetPassword(authService *services.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{
+		resp := gin.H{
 			"access_token":  result.AccessToken,
 			"refresh_token": result.RefreshToken,
-		})
+		}
+		if result.APIKey != "" {
+			resp["api_key"] = result.APIKey
+		}
+
+		c.JSON(http.StatusOK, resp)
 	}
 }
 
@@ -164,18 +177,23 @@ func handleRegister(authService *services.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		user, err := authService.RegisterWithInvitation(req.Username, req.Password, req.InvitationCode)
+		result, err := authService.RegisterWithInvitation(req.Username, req.Password, req.InvitationCode)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		c.JSON(http.StatusCreated, gin.H{
-			"id":         user.ID,
-			"username":   user.Username,
-			"role":       user.Role,
-			"is_founder": user.IsFounder,
-		})
+		resp := gin.H{
+			"id":         result.User.ID,
+			"username":   result.User.Username,
+			"role":       result.User.Role,
+			"is_founder": result.User.IsFounder,
+		}
+		if result.APIKey != "" {
+			resp["api_key"] = result.APIKey
+		}
+
+		c.JSON(http.StatusCreated, resp)
 	}
 }
 
@@ -328,6 +346,7 @@ func handleListMemories(db *gorm.DB) gin.HandlerFunc {
 		status := c.Query("status")
 		memoryType := c.Query("memory_type")
 		sourceAgent := c.Query("source_agent")
+		source := c.Query("source")
 		visibility := c.Query("visibility")
 		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 		size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
@@ -338,7 +357,7 @@ func handleListMemories(db *gorm.DB) gin.HandlerFunc {
 			size = 20
 		}
 
-		memories, total, err := svc.List(userID, layer, page, size, status, memoryType, sourceAgent, visibility)
+		memories, total, err := svc.List(userID, layer, page, size, status, memoryType, sourceAgent, visibility, source)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -379,9 +398,19 @@ func handleCreateMemory(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		validationSvc := services.NewValidationService(db)
+		validation := validationSvc.ValidateDTO(memory.Key, memory.Value, memory.Layer, memory.Importance)
+		if validation.Status != "valid" {
+			logDBErr("update validation status on create", db.Model(&models.Memory{}).Where("id = ?", memory.ID).
+				Update("validation_status", validation.Status).Error)
+		}
+
 		response := gin.H{"memory": memory}
 		if secretResult.Found {
 			response["secret_warning"] = secretResult
+		}
+		if validation.Status != "valid" {
+			response["validation"] = validation
 		}
 		c.JSON(http.StatusCreated, response)
 	}
@@ -430,9 +459,17 @@ func handleUpdateMemory(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		validationSvc := services.NewValidationService(db)
+		validation := validationSvc.ValidateDTO(memory.Key, memory.Value, memory.Layer, memory.Importance)
+		logDBErr("update validation status on update", db.Model(&models.Memory{}).Where("id = ?", memory.ID).
+			Update("validation_status", validation.Status).Error)
+
 		response := gin.H{"memory": memory}
 		if secretResult != nil && secretResult.Found {
 			response["secret_warning"] = secretResult
+		}
+		if validation.Status != "valid" {
+			response["validation"] = validation
 		}
 		c.JSON(http.StatusOK, response)
 	}
@@ -470,22 +507,59 @@ func handleRestoreMemory(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func handleSearchKeyword(db *gorm.DB) gin.HandlerFunc {
+func handleSearchMemories(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		q := c.Query("q")
 		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 		if limit <= 0 || limit > 200 {
 			limit = 20
 		}
+		mode := c.DefaultQuery("mode", "keyword")
 		userID := middleware.GetUserID(c)
 
-		svc := services.NewMemoryService(db)
-		memories, err := svc.SearchKeyword(userID, q, limit)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+		switch mode {
+		case "semantic":
+			chromaSvc := services.NewChromaDBService(db)
+			if chromaSvc.IsAvailable() {
+				results, err := chromaSvc.Search(userID, q, limit)
+				if err == nil && len(results) > 0 {
+					enriched := enrichChromaResults(db, userID, results, limit)
+					c.JSON(http.StatusOK, gin.H{"items": enriched, "engine": "chromadb"})
+					return
+				}
+			}
+			svc := services.NewSearchService(db)
+			memories, err := svc.SemanticSearch(userID, q, limit)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"items": memories, "engine": "tfidf"})
+		case "graph-rag":
+			if q == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "query parameter q is required"})
+				return
+			}
+			svc := services.NewSearchService(db)
+			results, err := svc.GraphRAGSearch(userID, q, limit)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"items":  results,
+				"engine": "graph_rag",
+				"mode":   "keyword+semantic+graph",
+			})
+		default:
+			svc := services.NewMemoryService(db)
+			memories, err := svc.SearchKeyword(userID, q, limit)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"items": memories})
 		}
-		c.JSON(http.StatusOK, gin.H{"items": memories})
 	}
 }
 
@@ -512,106 +586,6 @@ func handleMemoryHistory(db *gorm.DB) gin.HandlerFunc {
 			"items": history,
 			"total": len(history),
 		})
-	}
-}
-
-func handleSessionMemories(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
-		sessionID := c.Query("session_id")
-		if sessionID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "session_id is required"})
-			return
-		}
-
-		var session models.SessionMemory
-		if err := db.Where("user_id = ? AND session_id = ?", userID, sessionID).First(&session).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
-			return
-		}
-
-		c.JSON(http.StatusOK, session)
-	}
-}
-
-func handleSessionMemoryUpsert(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
-
-		var data struct {
-			SessionID     string `json:"session_id" binding:"required"`
-			Title         string `json:"title"`
-			CurrentState  string `json:"current_state"`
-			TaskSpec      string `json:"task_spec"`
-			FilesAndFuncs string `json:"files_and_funcs"`
-			Workflow      string `json:"workflow"`
-			Errors        string `json:"errors"`
-			Docs          string `json:"docs"`
-			Learnings     string `json:"learnings"`
-			KeyResults    string `json:"key_results"`
-		}
-		if err := c.ShouldBindJSON(&data); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-
-		var session models.SessionMemory
-		result := db.Where("user_id = ? AND session_id = ?", userID, data.SessionID).First(&session)
-
-		if result.Error != nil {
-			session = models.SessionMemory{
-				UserID:        userID,
-				SessionID:     data.SessionID,
-				Title:         data.Title,
-				CurrentState:  data.CurrentState,
-				TaskSpec:      data.TaskSpec,
-				FilesAndFuncs: data.FilesAndFuncs,
-				Workflow:      data.Workflow,
-				Errors:        data.Errors,
-				Docs:          data.Docs,
-				Learnings:     data.Learnings,
-				KeyResults:    data.KeyResults,
-				Status:        "active",
-			}
-			if err := db.Create(&session).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-		} else {
-			updates := map[string]interface{}{}
-			if data.Title != "" {
-				updates["title"] = data.Title
-			}
-			if data.CurrentState != "" {
-				updates["current_state"] = data.CurrentState
-			}
-			if data.TaskSpec != "" {
-				updates["task_spec"] = data.TaskSpec
-			}
-			if data.FilesAndFuncs != "" {
-				updates["files_and_funcs"] = data.FilesAndFuncs
-			}
-			if data.Workflow != "" {
-				updates["workflow"] = data.Workflow
-			}
-			if data.Errors != "" {
-				updates["errors"] = data.Errors
-			}
-			if data.Docs != "" {
-				updates["docs"] = data.Docs
-			}
-			if data.Learnings != "" {
-				updates["learnings"] = data.Learnings
-			}
-			if data.KeyResults != "" {
-				updates["key_results"] = data.KeyResults
-			}
-			if len(updates) > 0 {
-				logDBErr("update session", db.Model(&session).Updates(updates).Error)
-			}
-		}
-
-		c.JSON(http.StatusOK, session)
 	}
 }
 
@@ -1371,64 +1345,6 @@ func handleDecryptMemory(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func handleSearchSemantic(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		q := c.Query("q")
-		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-		if limit <= 0 || limit > 200 {
-			limit = 20
-		}
-		userID := middleware.GetUserID(c)
-
-		chromaSvc := services.NewChromaDBService(db)
-		if chromaSvc.IsAvailable() {
-			results, err := chromaSvc.Search(userID, q, limit)
-			if err == nil && len(results) > 0 {
-				enriched := enrichChromaResults(db, userID, results, limit)
-				c.JSON(http.StatusOK, gin.H{"items": enriched, "engine": "chromadb"})
-				return
-			}
-		}
-
-		svc := services.NewSearchService(db)
-		memories, err := svc.SemanticSearch(userID, q, limit)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"items": memories, "engine": "tfidf"})
-	}
-}
-
-func handleSearchGraphRAG(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		q := c.Query("q")
-		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-		if limit <= 0 || limit > 200 {
-			limit = 20
-		}
-		userID := middleware.GetUserID(c)
-
-		if q == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "query parameter q is required"})
-			return
-		}
-
-		svc := services.NewSearchService(db)
-		results, err := svc.GraphRAGSearch(userID, q, limit)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"items":  results,
-			"engine": "graph_rag",
-			"mode":   "keyword+semantic+graph",
-		})
-	}
-}
-
 func enrichChromaResults(db *gorm.DB, userID uint, chromaResults []map[string]interface{}, limit int) []map[string]interface{} {
 	memIDs := make([]uint, 0, len(chromaResults))
 	for _, r := range chromaResults {
@@ -1889,12 +1805,21 @@ func handleWikiAIExtract(aiSvc *ai.AIService, db *gorm.DB) gin.HandlerFunc {
 
 		wikiSvc := services.NewWikiService(db)
 		facts, _ := result["facts"].([]map[string]interface{})
+		prefs, _ := result["preferences"].([]map[string]interface{})
 		created := 0
 		for _, fact := range facts {
-			title, _ := fact["title"].(string)
 			content, _ := fact["content"].(string)
-			if title == "" || content == "" {
+			if content == "" {
 				continue
+			}
+			title, _ := fact["title"].(string)
+			if title == "" {
+				cat, _ := fact["category"].(string)
+				if cat != "" {
+					title = cat + ": " + truncateStr(content, 40)
+				} else {
+					title = truncateStr(content, 60)
+				}
 			}
 			pageData := map[string]interface{}{
 				"title":   title,
@@ -1903,6 +1828,23 @@ func handleWikiAIExtract(aiSvc *ai.AIService, db *gorm.DB) gin.HandlerFunc {
 			}
 			if cat, ok := fact["category"].(string); ok {
 				pageData["category"] = cat
+			}
+			if _, err := wikiSvc.Create(userID, pageData); err == nil {
+				created++
+			}
+		}
+		for _, pref := range prefs {
+			topic, _ := pref["topic"].(string)
+			value, _ := pref["value"].(string)
+			if topic == "" || value == "" {
+				continue
+			}
+			title := "Preference: " + topic
+			pageData := map[string]interface{}{
+				"title":    title,
+				"content":  topic + " → " + value,
+				"status":   "in_progress",
+				"category": "preferences",
 			}
 			if _, err := wikiSvc.Create(userID, pageData); err == nil {
 				created++
@@ -1948,6 +1890,21 @@ func handleWikiRefine(aiSvc *ai.AIService, db *gorm.DB) gin.HandlerFunc {
 			if summary, ok := result["summary"].(string); ok && summary != "" {
 				updates["summary"] = summary
 			}
+			if category, ok := result["category"].(string); ok && category != "" {
+				updates["category"] = category
+			}
+			if tags, ok := result["tags"].([]interface{}); ok && len(tags) > 0 {
+				tagStrs := make([]string, 0, len(tags))
+				for _, t := range tags {
+					if s, ok := t.(string); ok {
+						tagStrs = append(tagStrs, s)
+					}
+				}
+				if len(tagStrs) > 0 {
+					updates["tags"] = strings.Join(tagStrs, ",")
+				}
+			}
+			updates["ai_generated"] = true
 			if _, err := wikiSvc.Update(userID, uint(id), updates); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save refined content"})
 				return
@@ -2047,15 +2004,10 @@ func handleGetStats(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 		var memoryCount, entityCount, relationCount, projectCount int64
-		licenseInfo := map[string]interface{}{
-			"active":   true,
-			"tier":     "advanced",
-			"is_valid": true,
-		}
-		logDBErr("count memories for license", db.Model(&struct{ ID uint }{}).Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Count(&memoryCount).Error)
-		logDBErr("count entities for license", db.Model(&struct{ ID uint }{}).Table("entities").Where("user_id = ?", userID).Count(&entityCount).Error)
-		logDBErr("count relations for license", db.Model(&struct{ ID uint }{}).Table("relations").Where("user_id = ?", userID).Count(&relationCount).Error)
-		logDBErr("count projects for license", db.Model(&struct{ ID uint }{}).Table("projects").Where("user_id = ?", userID).Count(&projectCount).Error)
+		logDBErr("count memories for stats", db.Model(&struct{ ID uint }{}).Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Count(&memoryCount).Error)
+		logDBErr("count entities for stats", db.Model(&struct{ ID uint }{}).Table("entities").Where("user_id = ?", userID).Count(&entityCount).Error)
+		logDBErr("count relations for stats", db.Model(&struct{ ID uint }{}).Table("relations").Where("user_id = ?", userID).Count(&relationCount).Error)
+		logDBErr("count projects for stats", db.Model(&struct{ ID uint }{}).Table("projects").Where("user_id = ?", userID).Count(&projectCount).Error)
 
 		layerStats := make(map[string]int64)
 		rows, err := db.Raw("SELECT COALESCE(layer, 'knowledge') as layer, COUNT(*) as cnt FROM memories WHERE user_id = ? AND status != 'trashed' GROUP BY layer", userID).Rows()
@@ -2111,7 +2063,6 @@ func handleGetStats(db *gorm.DB) gin.HandlerFunc {
 			"projectCount":   projectCount,
 			"layerStats":     layerStats,
 			"recentMemories": recentMemoriesJson,
-			"license":        licenseInfo,
 			"passwordSet":    passwordSet,
 			"maxMemories":    maxMemories,
 		})
@@ -2145,90 +2096,6 @@ func handleUpdateSettings(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "settings updated"})
-	}
-}
-
-func handleToolboxDecayStats(toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
-		result, err := toolbox.DecayStats(userID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, result)
-	}
-}
-
-func handleToolboxDecayApply(aiSvc *ai.AIService, toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
-
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
-		defer cancel()
-
-		result, err := aiSvc.DecayEvaluate(ctx, userID)
-		if err != nil {
-			result, err = toolbox.DecayApply(userID)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-			result["mode"] = "local_fallback"
-		} else {
-			evaluations, _ := result["evaluations"].([]map[string]interface{})
-			archived := 0
-			trashed := 0
-			kept := 0
-			for _, ev := range evaluations {
-				action, _ := ev["action"].(string)
-				switch action {
-				case "archive":
-					archived++
-				case "delete":
-					trashed++
-				default:
-					kept++
-				}
-			}
-			result["processed"] = len(evaluations)
-			result["archived"] = archived
-			result["trashed"] = trashed
-			result["adjusted"] = kept
-			result["algorithm"] = "ai_decay_v1"
-		}
-
-		c.JSON(http.StatusOK, result)
-	}
-}
-
-func handleToolboxReinforce(toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
-		idStr := c.Param("id")
-		id, err := strconv.ParseUint(idStr, 10, 64)
-		if err != nil || id == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid memory id"})
-			return
-		}
-		result, err := toolbox.ReinforceMemory(userID, uint(id))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, result)
-	}
-}
-
-func handleToolboxPruneSuggest(toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
-		result, err := toolbox.PruneSuggest(userID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, result)
 	}
 }
 
@@ -2327,7 +2194,7 @@ func handleToolboxAIExtract(aiSvc *ai.AIService, toolbox *services.ToolboxServic
 
 		result, err := aiSvc.AIExtract(ctx, userID)
 		if err != nil {
-			result, err = toolbox.AIExtract(userID)
+			result, err = toolbox.ExtractEntities(userID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
@@ -2339,14 +2206,15 @@ func handleToolboxAIExtract(aiSvc *ai.AIService, toolbox *services.ToolboxServic
 	}
 }
 
-func handleToolboxAutoGraph(toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
+func handleToolboxAutoGraph(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 		var req struct {
 			Overwrite bool `json:"overwrite"`
 		}
 		c.ShouldBindJSON(&req)
-		result, err := toolbox.AutoGraph(userID, req.Overwrite)
+		evolutionSvc := services.NewEvolutionService(db)
+		result, err := evolutionSvc.AutoGraph(userID, req.Overwrite)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -2355,39 +2223,7 @@ func handleToolboxAutoGraph(toolbox *services.ToolboxService, db *gorm.DB) gin.H
 	}
 }
 
-func handleToolboxBackupSchedule(toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
-		result, err := toolbox.BackupSchedule(userID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, result)
-	}
-}
-
-func handleToolboxSetBackupSchedule(toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req struct {
-			Enabled       bool `json:"enabled"`
-			IntervalHours int  `json:"interval_hours"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		userID := middleware.GetUserID(c)
-		result, err := toolbox.SetBackupSchedule(userID, req.Enabled, req.IntervalHours)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, result)
-	}
-}
-
-func handleToolboxCompressPreview(toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
+func handleToolboxCompressPreview(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			Level string `json:"level"`
@@ -2397,7 +2233,8 @@ func handleToolboxCompressPreview(toolbox *services.ToolboxService, db *gorm.DB)
 			req.Level = "light"
 		}
 		userID := middleware.GetUserID(c)
-		result, err := toolbox.CompressPreview(userID, req.Level)
+		svc := services.NewDecayService(db)
+		result, err := svc.CompressPreview(userID, req.Level)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -2406,7 +2243,7 @@ func handleToolboxCompressPreview(toolbox *services.ToolboxService, db *gorm.DB)
 	}
 }
 
-func handleToolboxCompressApply(aiSvc *ai.AIService, toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
+func handleToolboxCompressApply(aiSvc *ai.AIService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			Level   string                 `json:"level"`
@@ -2421,7 +2258,8 @@ func handleToolboxCompressApply(aiSvc *ai.AIService, toolbox *services.ToolboxSe
 		}
 		userID := middleware.GetUserID(c)
 
-		preview, previewErr := toolbox.CompressPreview(userID, req.Level)
+		svc := services.NewDecayService(db)
+		preview, previewErr := svc.CompressPreview(userID, req.Level)
 		if previewErr == nil {
 			if previewItems, ok := preview["preview"].([]map[string]interface{}); ok && len(previewItems) > 0 {
 				memoryIDs := make([]uint, 0, len(previewItems))
@@ -2453,7 +2291,7 @@ func handleToolboxCompressApply(aiSvc *ai.AIService, toolbox *services.ToolboxSe
 			}
 		}
 
-		result, err := toolbox.CompressApply(userID, req.Level)
+		result, err := svc.CompressApply(userID, req.Level)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -2463,19 +2301,28 @@ func handleToolboxCompressApply(aiSvc *ai.AIService, toolbox *services.ToolboxSe
 	}
 }
 
-func handleToolboxCompressConfig(toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
+func handleToolboxCompressConfig(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		result, err := toolbox.CompressConfig(userID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+		svc := services.NewSettingsService(db)
+		cfg := map[string]interface{}{
+			"auto_compress":      false,
+			"threshold":          1000,
+			"level":              "light",
+			"preserve_important": true,
 		}
-		c.JSON(http.StatusOK, result)
+		if v, err := svc.GetByKey(userID, "compress_config"); err == nil && v != nil {
+			if m, ok := v.(map[string]interface{}); ok {
+				for k, val := range m {
+					cfg[k] = val
+				}
+			}
+		}
+		c.JSON(http.StatusOK, map[string]interface{}{"config": cfg})
 	}
 }
 
-func handleToolboxSetCompressConfig(toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
+func handleToolboxSetCompressConfig(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req map[string]interface{}
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -2483,7 +2330,17 @@ func handleToolboxSetCompressConfig(toolbox *services.ToolboxService, db *gorm.D
 			return
 		}
 		userID := middleware.GetUserID(c)
-		result, err := toolbox.SetCompressConfig(userID, req)
+		svc := services.NewSettingsService(db)
+		_ = svc.SetByKey(userID, "compress_config", req)
+		c.JSON(http.StatusOK, map[string]interface{}{"updated": true, "config": req})
+	}
+}
+
+func handleEvolutionInsights(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewEvolutionService(db)
+		result, err := svc.Insights(userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -2492,79 +2349,51 @@ func handleToolboxSetCompressConfig(toolbox *services.ToolboxService, db *gorm.D
 	}
 }
 
-func handleToolboxEvolutionInsights(toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
+func handleEvolutionRun(aiSvc *ai.AIService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		result, err := toolbox.EvolutionInsights(userID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		var req struct {
+			Action  string `json:"action"`
+			Context string `json:"context"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 			return
 		}
-		c.JSON(http.StatusOK, result)
-	}
-}
 
-func handleToolboxEvolutionDiscover(aiSvc *ai.AIService, toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
+		svc := services.NewEvolutionService(db)
 
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
-		defer cancel()
-
-		result, err := aiSvc.DiscoverRelations(ctx, userID)
-		if err != nil {
-			result, err = toolbox.EvolutionDiscover(userID)
+		switch req.Action {
+		case "discover":
+			ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
+			defer cancel()
+			result, err := aiSvc.DiscoverRelations(ctx, userID)
+			if err != nil {
+				result, err = svc.Discover(userID)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+				result["mode"] = "local_fallback"
+			}
+			c.JSON(http.StatusOK, result)
+		case "infer":
+			result, err := svc.HighConfidenceEntities(userID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
-			result["mode"] = "local_fallback"
+			c.JSON(http.StatusOK, result)
+		case "importance":
+			result, err := svc.ImportanceBuckets(userID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, result)
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid action, must be one of: discover, infer, importance"})
 		}
-
-		c.JSON(http.StatusOK, result)
-	}
-}
-
-func handleToolboxEvolutionInfer(toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
-		result, err := toolbox.EvolutionInfer(userID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, result)
-	}
-}
-
-func handleToolboxEvolutionImportance(toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
-		result, err := toolbox.EvolutionImportance(userID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, result)
-	}
-}
-
-func handleToolboxEvolutionPrefetch(toolbox *services.ToolboxService, db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req struct {
-			Context string `json:"context" binding:"required"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "context is required"})
-			return
-		}
-		userID := middleware.GetUserID(c)
-		result, err := toolbox.EvolutionPrefetch(userID, req.Context)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, result)
 	}
 }
 
@@ -3044,6 +2873,135 @@ func handleGenerateSummaries(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"generated": count, "message": fmt.Sprintf("Generated summaries for %d memories", count)})
+	}
+}
+
+func handleMCPConfig(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+
+		apiKeySvc := services.NewAPIKeyService(db)
+		keys, err := apiKeySvc.List(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		var rawKey string
+		if len(keys) == 0 {
+			_, rk, err := apiKeySvc.Create(userID, "mcp-server")
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create API key: " + err.Error()})
+				return
+			}
+			rawKey = rk
+		}
+
+		scheme := "http"
+		if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+			scheme = "https"
+		}
+		host := c.GetHeader("X-Forwarded-Host")
+		if host == "" {
+			host = c.Request.Host
+		}
+		baseURL := fmt.Sprintf("%s://%s", scheme, host)
+
+		if rawKey == "" {
+			for _, k := range keys {
+				if k.Name == "mcp-server" {
+					rawKey = k.KeyPrefix + "••••••••"
+					break
+				}
+			}
+			if rawKey == "" && len(keys) > 0 {
+				rawKey = keys[0].KeyPrefix + "••••••••"
+			}
+		}
+
+		mcpServerConfig := map[string]interface{}{
+			"command": "npx",
+			"args":    []string{"-y", "clawmemory-mcp"},
+			"env": map[string]string{
+				"CLAWMEMORY_BASE_URL": baseURL,
+				"CLAWMEMORY_API_KEY":  rawKey,
+			},
+		}
+
+		cursorConfig := map[string]interface{}{
+			"mcpServers": map[string]interface{}{
+				"clawmemory": mcpServerConfig,
+			},
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"base_url":    baseURL,
+			"api_key":     rawKey,
+			"has_new_key": len(keys) == 0,
+			"configs": map[string]interface{}{
+				"cursor": map[string]interface{}{
+					"label":      "Cursor",
+					"configPath": "~/.cursor/mcp.json",
+					"config":     cursorConfig,
+				},
+				"claude_desktop": map[string]interface{}{
+					"label":      "Claude Desktop",
+					"configPath": "~/AppData/Roaming/Claude/claude_desktop_config.json",
+					"config":     cursorConfig,
+				},
+				"windsurf": map[string]interface{}{
+					"label":      "Windsurf",
+					"configPath": "~/.windsurf/mcp.json",
+					"config":     cursorConfig,
+				},
+				"trae": map[string]interface{}{
+					"label":      "Trae",
+					"configPath": "~/.trae/mcp.json",
+					"config":     cursorConfig,
+				},
+			},
+		})
+	}
+}
+
+func handleGovernanceStatus(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewGovernanceService(db)
+		status := svc.GetStatus(userID)
+		c.JSON(http.StatusOK, status)
+	}
+}
+
+func handleGovernanceRun(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewGovernanceService(db)
+		result, err := svc.RunFullGovernance(userID)
+		if err != nil {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func handleGovernanceConfig(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+
+		var config services.GovernanceConfig
+		if err := c.ShouldBindJSON(&config); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		svc := services.NewGovernanceService(db)
+		if err := svc.UpdateConfig(userID, config); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "governance config updated"})
 	}
 }
 
@@ -4428,15 +4386,51 @@ func handleDecayStats(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func handleDecayApply(db *gorm.DB) gin.HandlerFunc {
+func handleDecayApply(aiSvc *ai.AIService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		svc := services.NewDecayService(db)
 		userID := middleware.GetUserID(c)
-		result, err := svc.ApplyDecay(userID)
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
+		defer cancel()
+
+		result, err := aiSvc.DecayEvaluate(ctx, userID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+			svc := services.NewDecayService(db)
+			result, err = svc.ApplyDecay(userID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			result["mode"] = "local_fallback"
+		} else {
+			evaluations, _ := result["evaluations"].([]map[string]interface{})
+			archived := 0
+			trashed := 0
+			kept := 0
+			for _, ev := range evaluations {
+				action, _ := ev["action"].(string)
+				memID, _ := ev["id"].(float64)
+				switch action {
+				case "archive":
+					db.Model(&models.Memory{}).Where("id = ? AND user_id = ?", uint(memID), userID).Update("status", "archived")
+					archived++
+				case "delete":
+					db.Model(&models.Memory{}).Where("id = ? AND user_id = ?", uint(memID), userID).Update("status", "trashed")
+					trashed++
+				default:
+					if newImp, ok := ev["new_importance"].(float64); ok {
+						db.Model(&models.Memory{}).Where("id = ? AND user_id = ?", uint(memID), userID).Update("importance", newImp)
+					}
+					kept++
+				}
+			}
+			result["processed"] = len(evaluations)
+			result["archived"] = archived
+			result["trashed"] = trashed
+			result["adjusted"] = kept
+			result["algorithm"] = "ai_decay_v1"
 		}
+
 		c.JSON(http.StatusOK, result)
 	}
 }
@@ -4567,59 +4561,6 @@ func handleExportData(db *gorm.DB) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, exportData)
 	}
-}
-
-func handleCheckUpdate(c *gin.Context) {
-	type GitHubRelease struct {
-		TagName string `json:"tag_name"`
-		HTMLURL string `json:"html_url"`
-		Body    string `json:"body"`
-	}
-
-	resp, err := http.Get("https://api.github.com/repos/" + config.GitHubRepo + "/releases/latest")
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"current_version": config.AppVersion,
-			"latest_version":  config.AppVersion,
-			"has_update":      false,
-			"error":           "failed to check update",
-		})
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		c.JSON(http.StatusOK, gin.H{
-			"current_version": config.AppVersion,
-			"latest_version":  config.AppVersion,
-			"has_update":      false,
-			"error":           "github api error",
-		})
-		return
-	}
-
-	var release GitHubRelease
-	if json.NewDecoder(resp.Body).Decode(&release) != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"current_version": config.AppVersion,
-			"latest_version":  config.AppVersion,
-			"has_update":      false,
-			"error":           "failed to parse release",
-		})
-		return
-	}
-
-	latestVer := strings.TrimPrefix(release.TagName, "v")
-	hasUpdate := latestVer != "" && latestVer != config.AppVersion && compareVersions(latestVer, config.AppVersion)
-
-	c.JSON(http.StatusOK, gin.H{
-		"current_version": config.AppVersion,
-		"latest_version":  latestVer,
-		"has_update":      hasUpdate,
-		"download_url":    release.HTMLURL,
-		"release_notes":   release.Body,
-		"github_repo":     config.GitHubRepoURL,
-	})
 }
 
 func handleImportData(db *gorm.DB) gin.HandlerFunc {
@@ -4781,39 +4722,6 @@ func handleMemoryAutoFix(db *gorm.DB) gin.HandlerFunc {
 
 		svc := services.NewHealthService(db)
 		result, err := svc.AutoFix(userID, data.IssueTypes)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, result)
-	}
-}
-
-func handleMemoryRecommend(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		userID := middleware.GetUserID(c)
-		memoryIDStr := c.Query("memory_id")
-		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-		if limit < 1 || limit > 50 {
-			limit = 10
-		}
-
-		svc := services.NewRecommendService(db)
-		var result map[string]interface{}
-		var err error
-
-		if memoryIDStr != "" {
-			memoryID, convErr := strconv.Atoi(memoryIDStr)
-			if convErr != nil || memoryID <= 0 {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid memory_id"})
-				return
-			}
-			result, err = svc.RecommendForMemory(userID, uint(memoryID), limit)
-		} else {
-			context := c.Query("context")
-			result, err = svc.RecommendByContext(userID, context, limit)
-		}
-
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -5103,34 +5011,6 @@ func getBool(m map[string]interface{}, key string, def bool) bool {
 	return def
 }
 
-func compareVersions(v1, v2 string) bool {
-	parseVer := func(v string) [3]int {
-		var major, minor, patch int
-		parts := strings.SplitN(v, ".", 3)
-		if len(parts) >= 1 {
-			major, _ = strconv.Atoi(parts[0])
-		}
-		if len(parts) >= 2 {
-			minor, _ = strconv.Atoi(parts[1])
-		}
-		if len(parts) >= 3 {
-			patch, _ = strconv.Atoi(parts[2])
-		}
-		return [3]int{major, minor, patch}
-	}
-	a := parseVer(v1)
-	b := parseVer(v2)
-	for i := 0; i < 3; i++ {
-		if a[i] > b[i] {
-			return true
-		}
-		if a[i] < b[i] {
-			return false
-		}
-	}
-	return false
-}
-
 func handleExtractMemories(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
@@ -5209,16 +5089,98 @@ func handleVerifyMemory(db *gorm.DB) gin.HandlerFunc {
 
 		now := time.Now()
 		memory.VerifiedAt = &now
-		memory.ReinforceCount++
+		memory.VerifyCount++
 		if err := db.Save(&memory).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"id":          memory.ID,
-			"verified_at": memory.VerifiedAt.Format("2006-01-02 15:04:05"),
-			"message":     "memory verified successfully",
+			"id":           memory.ID,
+			"verified_at":  memory.VerifiedAt.Format("2006-01-02 15:04:05"),
+			"verify_count": memory.VerifyCount,
+			"message":      "memory verified successfully",
+		})
+	}
+}
+
+func handleBatchValidate(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewValidationService(db)
+		result, err := svc.BatchValidate(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func handleListTemplates(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewTemplateService(db)
+		templates, err := svc.ListTemplates(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"items": templates})
+	}
+}
+
+func handleCreateTemplate(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		var req services.MemoryTemplate
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		svc := services.NewTemplateService(db)
+		if err := svc.CreateTemplate(userID, req); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"created": true})
+	}
+}
+
+func handleDeleteTemplate(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		name := c.Param("name")
+		svc := services.NewTemplateService(db)
+		if err := svc.DeleteTemplate(userID, name); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"deleted": true})
+	}
+}
+
+func handleApplyTemplate(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		name := c.Param("name")
+		var req struct {
+			Values map[string]string `json:"values"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		svc := services.NewTemplateService(db)
+		key, value, layer, err := svc.ApplyTemplate(userID, name, req.Values)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"key":   key,
+			"value": value,
+			"layer": layer,
 		})
 	}
 }
@@ -5275,6 +5237,13 @@ func handleCreateSessionMemory(db *gorm.DB) gin.HandlerFunc {
 			session.CompressedFrom = v
 		}
 
+		ttlHours := 24
+		if v, ok := data["ttl_hours"].(float64); ok && v > 0 {
+			ttlHours = int(v)
+		}
+		expiresAt := time.Now().Add(time.Duration(ttlHours) * time.Hour)
+		session.ExpiresAt = &expiresAt
+
 		if err := db.Create(&session).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -5296,6 +5265,10 @@ func handleListSessionMemories(db *gorm.DB) gin.HandlerFunc {
 		}
 		if status != "" {
 			query = query.Where("status = ?", status)
+		}
+		showExpired := c.Query("show_expired") == "true"
+		if !showExpired {
+			query = query.Where("expires_at IS NULL OR expires_at > ?", time.Now())
 		}
 		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 		if limit < 1 || limit > 200 {

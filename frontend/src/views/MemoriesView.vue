@@ -27,7 +27,7 @@
       <el-input v-model="searchQuery" :placeholder="$t('memories.searchPlaceholder')" clearable @keyup.enter="handleSearch" @clear="searchResults = []; smartLoadResult = null" class="search-input">
         <template #prefix><el-icon><Search /></el-icon></template>
       </el-input>
-      <el-select v-model="searchMode" style="width: 130px" @change="searchResults = []; smartLoadResult = null">
+      <el-select v-model="searchMode" style="width: 130px" @change="searchResults = []; smartLoadResult = null; searchEngine = ''">
         <el-option :label="$t('memories.searchKeyword')" value="keyword" />
         <el-option :label="$t('memories.searchSemantic')" value="semantic" />
         <el-option :label="$t('memories.searchSmart')" value="smart" />
@@ -57,6 +57,16 @@
         <el-option :label="$t('memories.all')" value="" />
         <el-option v-for="a in connectedAgents" :key="a.name" :label="a.display_name || a.name" :value="a.name" />
       </el-select>
+      <el-select v-model="currentSource" @change="loadMemories" placeholder="Source" clearable style="width: 160px">
+        <el-option label="All" value="" />
+        <el-option label="trae-chat" value="trae-chat" />
+        <el-option label="trae-git-assistant" value="trae-git-assistant" />
+        <el-option label="openclaw-markdown" value="openclaw-markdown" />
+        <el-option label="openclaw-knowledge" value="openclaw-knowledge" />
+        <el-option label="openclaw-session-archive" value="openclaw-session-archive" />
+        <el-option label="openclaw" value="openclaw" />
+        <el-option label="manual" value="manual" />
+      </el-select>
       <el-select v-model="currentVisibility" @change="loadMemories" :placeholder="$t('memories.visibility')" clearable style="width: 130px">
         <el-option :label="$t('memories.all')" value="" />
         <el-option :label="$t('memories.visibilityPrivate')" value="private" />
@@ -76,7 +86,10 @@
     </div>
 
     <div v-if="searchResults.length" class="search-results">
-      <div class="section-title">{{ $t('memories.searchResults') }} ({{ searchResults.length }})</div>
+      <div class="section-title">
+        {{ $t('memories.searchResults') }} ({{ searchResults.length }})
+        <el-tag v-if="searchEngine" size="small" type="info" style="margin-left: 8px">{{ searchEngineLabel }}</el-tag>
+      </div>
       <div class="memory-card" v-for="m in searchResults" :key="'s'+m.id" :class="{ 'smart-summary': m.load_level === 'summary', 'smart-full': m.load_level === 'full' }">
         <div class="card-top">
           <span class="layer-tag" :class="m.layer">{{ layerLabels[m.layer] || m.layer }}</span>
@@ -113,7 +126,19 @@
         </div>
       </div>
       <template v-else>
-        <el-empty v-if="memories.length === 0" :description="$t('common.noData')" />
+        <div v-if="memories.length === 0" class="cm-empty-state">
+          <div class="cm-empty-icon">🧠</div>
+          <div class="cm-empty-title">{{ $t('memories.emptyTitle') || '还没有记忆数据' }}</div>
+          <div class="cm-empty-desc">{{ $t('memories.emptyDesc') || '添加你的第一条记忆，或从对话中提取记忆' }}</div>
+          <div class="cm-empty-action">
+            <el-button type="primary" @click="openAddDialog">
+              <el-icon><Plus /></el-icon> {{ $t('memories.addMemory') }}
+            </el-button>
+            <el-button @click="showExtractDialog = true">
+              <el-icon><MagicStick /></el-icon> {{ $t('memories.extractMemory') }}
+            </el-button>
+          </div>
+        </div>
         <div v-for="m in memories" :key="m.id" class="memory-card">
         <div class="card-top">
           <span class="layer-tag" :class="m.layer">{{ layerLabels[m.layer] || m.layer }}</span>
@@ -123,7 +148,8 @@
           <el-tag v-if="m.source_agent" size="small" type="info" class="source-agent-tag">{{ m.source_agent }}</el-tag>
           <el-tag v-if="m.visibility && m.visibility !== 'private'" size="small" :type="m.visibility === 'public' ? 'success' : 'warning'" class="visibility-tag">{{ visibilityLabels[m.visibility] || m.visibility }}</el-tag>
           <el-tag v-if="m.reinforce_count > 0" size="small" type="success" class="reinforce-badge">📌 {{ m.reinforce_count }}</el-tag>
-          <span v-if="m.verified_at" class="verified-badge" :title="$t('memories.verifiedAt', { date: m.verified_at })">✅</span>
+          <el-tag v-if="m.verify_count > 0" size="small" type="primary" class="verify-badge">✅ {{ m.verify_count }}</el-tag>
+          <span v-if="m.verified_at && !m.verify_count" class="verified-badge" :title="$t('memories.verifiedAt', { date: m.verified_at })">✅</span>
         </div>
         <div class="card-key">{{ m.key }}</div>
         <div class="card-value" v-if="m.is_encrypted">
@@ -326,7 +352,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useIsMobile } from '../composables/useIsMobile'
 import { useAIConfig } from '../composables/useAIConfig'
 import { useI18n } from 'vue-i18n'
@@ -344,10 +370,20 @@ const memories = ref<any[]>([])
 const searchResults = ref<any[]>([])
 const searchQuery = ref('')
 const searchMode = ref('keyword')
+const searchEngine = ref('')
+const searchEngineLabel = computed(() => {
+  const map: Record<string, string> = {
+    chromadb: t('memories.engineChromaDB'),
+    tfidf: t('memories.engineTFIDF'),
+    keyword: t('memories.engineKeyword'),
+  }
+  return map[searchEngine.value] || searchEngine.value
+})
 const smartLoadResult = ref<any>(null)
 const currentLayer = ref('')
 const currentMemoryType = ref('')
 const currentSourceAgent = ref('')
+const currentSource = ref('')
 const currentVisibility = ref('')
 const currentPage = ref(1)
 const pageSize = 20
@@ -432,6 +468,7 @@ async function loadMemories() {
     if (currentLayer.value) params.layer = currentLayer.value
     if (currentMemoryType.value) params.memory_type = currentMemoryType.value
     if (currentSourceAgent.value) params.source_agent = currentSourceAgent.value
+    if (currentSource.value) params.source = currentSource.value
     if (currentVisibility.value) params.visibility = currentVisibility.value
     const { data } = await memoryApi.list(params)
     memories.value = data.items || []
@@ -441,13 +478,14 @@ async function loadMemories() {
 }
 
 async function handleSearch() {
-  if (!searchQuery.value) { searchResults.value = []; smartLoadResult.value = null; return }
+  if (!searchQuery.value) { searchResults.value = []; smartLoadResult.value = null; searchEngine.value = ''; return }
 
   if (searchMode.value === 'smart') {
     if (!(await requireAIConfig(t('memories.smartSearch')))) return
     try {
       const { data } = await memoryApi.smartLoad({ q: searchQuery.value, token_budget: 2000, load_level: 'auto' })
       smartLoadResult.value = data
+      searchEngine.value = data.engine || 'smart_v1'
       searchResults.value = (data.memories || []).map((m: any) => ({
         ...m,
         importance: m.importance || 0.5,
@@ -456,6 +494,7 @@ async function handleSearch() {
       }))
     } catch {
       smartLoadResult.value = null
+      searchEngine.value = 'keyword'
       const q = searchQuery.value.toLowerCase()
       searchResults.value = memories.value.filter(m =>
         m.key?.toLowerCase().includes(q) || m.value?.toLowerCase().includes(q)
@@ -464,18 +503,19 @@ async function handleSearch() {
     return
   }
 
-  const searchFn = searchMode.value === 'semantic' ? memoryApi.searchSemantic : memoryApi.searchKeyword
   try {
-    const { data } = await searchFn(searchQuery.value, 20)
+    const { data } = await memoryApi.search(searchQuery.value, searchMode.value, 20)
     const results = data.items || data || []
+    searchEngine.value = data.engine || (searchMode.value === 'semantic' ? 'tfidf' : 'keyword')
     searchResults.value = results.map((m: any) => ({
       ...m,
       importance: m.importance || 0.5,
       tags: m.tags || [],
-      updated_at: m.updated_at || new Date().toISOString(),
+      updated_at: m.updated_at || m.created_at || new Date().toISOString(),
     }))
     smartLoadResult.value = null
   } catch {
+    searchEngine.value = 'keyword'
     const q = searchQuery.value.toLowerCase()
     searchResults.value = memories.value.filter(m =>
       m.key?.toLowerCase().includes(q) || m.value?.toLowerCase().includes(q)
@@ -739,7 +779,7 @@ async function doSaveMemory(payload: any) {
 .card-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
 .tag { padding: 1px 8px; background: var(--cm-border); border-radius: 4px; font-size: 11px; color: var(--cm-text-muted); }
 .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--cm-border); }
-.type-tag { background: rgba(139,92,246,0.15); color: #8b5cf6; border: none; }
+.type-tag { background: rgba(16,185,129,0.15); color: #10b981; border: none; }
 .source-agent-tag { background: rgba(6,182,212,0.12); color: #06b6d4; border: none; }
 .visibility-tag { border: none; }
 .visibility-warning { margin-top: 0; }

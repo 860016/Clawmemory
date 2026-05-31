@@ -20,10 +20,11 @@ func NewDecayService(db *gorm.DB) *DecayService {
 }
 
 type DecayStatsResult struct {
-	Total    int64 `json:"total"`
-	Active   int64 `json:"active"`
-	Archived int64 `json:"archived"`
-	Trashed  int64 `json:"trashed"`
+	Total           int64                    `json:"total"`
+	Active          int64                    `json:"active"`
+	Archived        int64                    `json:"archived"`
+	Trashed         int64                    `json:"trashed"`
+	PruneCandidates []map[string]interface{} `json:"prune_candidates"`
 }
 
 func (s *DecayService) GetStats(userID uint) (*DecayStatsResult, error) {
@@ -32,6 +33,22 @@ func (s *DecayService) GetStats(userID uint) (*DecayStatsResult, error) {
 	s.db.Model(&models.Memory{}).Where("user_id = ? AND status = ?", userID, "active").Count(&stats.Active)
 	s.db.Model(&models.Memory{}).Where("user_id = ? AND status = ?", userID, "archived").Count(&stats.Archived)
 	s.db.Model(&models.Memory{}).Where("user_id = ? AND status = ?", userID, "trashed").Count(&stats.Trashed)
+
+	var memories []models.Memory
+	s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories)
+	stats.PruneCandidates = []map[string]interface{}{}
+	for _, m := range memories {
+		if m.Importance < 0.2 {
+			stats.PruneCandidates = append(stats.PruneCandidates, map[string]interface{}{
+				"id":         m.ID,
+				"key":        m.Key,
+				"layer":      m.Layer,
+				"importance": m.Importance,
+				"reason":     "low_importance",
+			})
+		}
+	}
+
 	return &stats, nil
 }
 
@@ -236,25 +253,76 @@ func (s *DecayService) AutoCleanupTrash(userID uint) (int64, error) {
 	return result.RowsAffected, nil
 }
 
-func (s *DecayService) GetPruneSuggestions(userID uint) ([]map[string]interface{}, error) {
+func (s *DecayService) CompressPreview(userID uint, level string) (map[string]interface{}, error) {
 	var memories []models.Memory
-	if err := s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories).Error; err != nil {
-		return nil, err
+	logDBErr("load memories for compress preview", s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error)
+
+	threshold := 0.3
+	switch level {
+	case "light":
+		threshold = 0.2
+	case "medium":
+		threshold = 0.35
+	case "heavy", "deep":
+		threshold = 0.5
+	default:
+		threshold = 0.2
 	}
-	suggestions := []map[string]interface{}{}
+
+	preview := []map[string]interface{}{}
 	for _, m := range memories {
-		if m.Importance < 0.2 {
-			suggestions = append(suggestions, map[string]interface{}{
-				"id":                 m.ID,
-				"key":                m.Key,
-				"layer":              m.Layer,
-				"importance":         m.Importance,
-				"decayed_importance": m.Importance * 0.7,
-				"reason":             "low_importance",
+		if m.Importance < threshold {
+			preview = append(preview, map[string]interface{}{
+				"memory_id":  m.ID,
+				"key":        m.Key,
+				"value_len":  len(m.Value),
+				"importance": m.Importance,
+				"action":     "archive",
 			})
 		}
 	}
-	return suggestions, nil
+
+	return map[string]interface{}{
+		"mode":      "local",
+		"level":     level,
+		"threshold": threshold,
+		"preview":   preview,
+		"total":     len(preview),
+	}, nil
+}
+
+func (s *DecayService) CompressApply(userID uint, level string) (map[string]interface{}, error) {
+	preview, err := s.CompressPreview(userID, level)
+	if err != nil {
+		return nil, err
+	}
+
+	previewItems, _ := preview["preview"].([]map[string]interface{})
+	archived := 0
+	for _, item := range previewItems {
+		if id, ok := item["memory_id"]; ok {
+			var memoryID uint
+			switch v := id.(type) {
+			case uint:
+				memoryID = v
+			case float64:
+				memoryID = uint(v)
+			case int:
+				memoryID = uint(v)
+			}
+			if err := s.db.Model(&models.Memory{}).Where("id = ? AND user_id = ?", memoryID, userID).
+				Update("status", "archived").Error; err == nil {
+				archived++
+			}
+		}
+	}
+
+	return map[string]interface{}{
+		"mode":     "local",
+		"level":    level,
+		"archived": archived,
+		"total":    len(previewItems),
+	}, nil
 }
 
 func init() {

@@ -28,15 +28,23 @@
       </el-radio-group>
     </div>
 
-    <div v-if="loading" class="loading-state">
-      <el-icon class="spin-icon" :size="32"><Loading /></el-icon>
-      <span>{{ $t('common.loading') }}</span>
+    <div v-if="loading" class="skeleton-grid">
+      <div class="skeleton-card" v-for="i in 3" :key="i">
+        <div class="cm-skeleton cm-skeleton-title"></div>
+        <div class="cm-skeleton cm-skeleton-text" style="width:90%"></div>
+        <div class="cm-skeleton cm-skeleton-text" style="width:60%"></div>
+      </div>
     </div>
 
-    <div v-else-if="projects.length === 0" class="empty-state">
-      <div class="empty-icon">📋</div>
-      <p>{{ $t('project.empty') }}</p>
-      <el-button type="primary" @click="openCreateDialog">{{ $t('project.createFirst') }}</el-button>
+    <div v-else-if="projects.length === 0" class="cm-empty-state">
+      <div class="cm-empty-icon">📋</div>
+      <div class="cm-empty-title">{{ $t('project.empty') }}</div>
+      <div class="cm-empty-desc">创建你的第一个项目，开始追踪工作进度</div>
+      <div class="cm-empty-action">
+        <el-button type="primary" @click="openCreateDialog">
+          <el-icon><Plus /></el-icon> {{ $t('project.createFirst') }}
+        </el-button>
+      </div>
     </div>
 
     <div v-else class="projects-grid">
@@ -569,6 +577,22 @@ onMounted(loadProjects)
   color: var(--el-text-color-secondary);
 }
 
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.skeleton-card {
+  background: var(--cm-bg-secondary, var(--el-bg-color));
+  border: 1px solid var(--cm-border, var(--el-border-color-lighter));
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .empty-icon {
   font-size: 48px;
   margin-bottom: 16px;
@@ -590,8 +614,8 @@ onMounted(loadProjects)
 }
 
 .project-card {
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
+  background: var(--cm-bg-secondary, var(--el-bg-color));
+  border: 1px solid var(--cm-border, var(--el-border-color-lighter));
   border-radius: 12px;
   padding: 20px;
   cursor: pointer;
@@ -600,13 +624,13 @@ onMounted(loadProjects)
 }
 
 .project-card:hover {
-  border-color: var(--el-color-primary);
+  border-color: var(--cm-primary, var(--el-color-primary));
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transform: translateY(-2px);
 }
 
 .project-card.pinned {
-  border-left: 3px solid var(--el-color-warning);
+  border-left: 3px solid var(--cm-warning, var(--el-color-warning));
 }
 
 .card-header {
@@ -848,15 +872,43 @@ onMounted(loadProjects)
 }
 
 @media (max-width: 768px) {
-  .project-page { padding: 16px; }
+  .projects-page { padding: 16px; }
+  .page-header { flex-direction: column; gap: 12px; }
   .page-header h1 { font-size: 20px; }
-  .header-actions { width: 100%; flex-wrap: wrap; }
-  .header-actions .el-button { flex: 1; min-width: 0; }
-  .project-grid { grid-template-columns: 1fr; }
+  .header-left { width: 100%; }
+  .header-actions { width: 100%; }
+  .header-actions .el-button { flex: 1; }
+  .toolbar { flex-direction: column; gap: 10px; align-items: stretch; }
+  .search-input { max-width: 100%; }
+  .toolbar .el-radio-group { width: 100%; display: flex; }
+  .toolbar .el-radio-group .el-radio-button { flex: 1; }
+  .projects-grid { grid-template-columns: 1fr; }
   .project-card { padding: 14px; }
+  .card-title { font-size: 15px; }
+  .card-desc { font-size: 12px; }
+  .card-meta { gap: 10px; font-size: 11px; }
+  .card-actions { opacity: 1; }
   .detail-header { flex-direction: column; align-items: flex-start; gap: 10px; }
-  .detail-stats { flex-wrap: wrap; }
+  .detail-meta { flex-wrap: wrap; gap: 8px; }
+  .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .section-actions { width: 100%; }
+  .section-actions .el-button { flex: 1; }
   .notes-list { gap: 8px; }
-  .note-card { padding: 10px; }
+  .note-item { padding: 10px; }
+}
+
+@media (max-width: 480px) {
+  .projects-page { padding: 12px; }
+  .page-header h1 { font-size: 18px; }
+  .header-stats { gap: 6px; }
+  .stat-badge { font-size: 11px; padding: 2px 6px; }
+  .project-card { padding: 10px; }
+  .card-title { font-size: 14px; }
+  .card-desc { font-size: 11px; }
+  .card-meta { flex-direction: column; gap: 4px; }
+  .card-tags { gap: 2px; }
+  .card-actions { gap: 2px; }
+  .note-content { font-size: 13px; }
+  .note-header { flex-wrap: wrap; gap: 4px; }
 }
 </style>

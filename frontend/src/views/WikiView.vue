@@ -103,10 +103,18 @@
               </div>
             </div>
           </div>
-          <div v-if="!pages.length" class="empty-state">
-            <div class="empty-icon">◇</div>
-            <p>{{ $t('common.noData') }}</p>
-            <el-button type="primary" @click="openNewPage">{{ $t('wiki.addPage') }}</el-button>
+          <div v-if="!pages.length" class="cm-empty-state">
+            <div class="cm-empty-icon">📖</div>
+            <div class="cm-empty-title">{{ $t('wiki.emptyTitle') || '还没有知识页面' }}</div>
+            <div class="cm-empty-desc">{{ $t('wiki.emptyDesc') || '创建知识页面来组织和管理你的知识库' }}</div>
+            <div class="cm-empty-action">
+              <el-button type="primary" @click="openNewPage">
+                <el-icon><Plus /></el-icon> {{ $t('wiki.addPage') }}
+              </el-button>
+              <el-button @click="openExtractDialog" v-if="llmAvailable">
+                <el-icon><MagicStick /></el-icon> {{ $t('wiki.aiExtract') }}
+              </el-button>
+            </div>
           </div>
         </div>
 
@@ -500,7 +508,7 @@ function formatTime(t: string) {
 .stat-badge.completed { background: rgba(16, 185, 129, 0.15); color: #10B981; }
 .stat-badge.in-progress { background: rgba(245, 158, 11, 0.15); color: #F59E0B; }
 .stat-badge.draft { background: rgba(107, 114, 128, 0.15); color: #6B7280; }
-.stat-badge.ai { background: rgba(139, 92, 246, 0.15); color: #8B5CF6; }
+.stat-badge.ai { background: rgba(16, 185, 129, 0.15); color: #10b981; }
 .header-actions { display: flex; gap: 8px; }
 
 /* Layout */
@@ -538,7 +546,7 @@ function formatTime(t: string) {
 .status-badge.in_progress { background: rgba(245, 158, 11, 0.15); color: #F59E0B; }
 .status-badge.draft { background: rgba(107, 114, 128, 0.15); color: #6B7280; }
 .pin-badge { font-size: 11px; color: #10B981; font-weight: 600; }
-.ai-badge { padding: 2px 6px; border-radius: 8px; font-size: 10px; background: rgba(139, 92, 246, 0.15); color: #8B5CF6; }
+.ai-badge { padding: 2px 6px; border-radius: 8px; font-size: 10px; background: rgba(16, 185, 129, 0.15); color: #10b981; }
 .card-title { font-size: 16px; font-weight: 600; color: var(--cm-text); margin-bottom: 6px; }
 .card-summary, .card-preview { font-size: 12px; color: var(--cm-text-muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; }
 .card-summary { color: var(--cm-text-secondary); font-style: italic; }
@@ -559,8 +567,8 @@ function formatTime(t: string) {
 .view-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
 
 /* AI Summary */
-.ai-summary { background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
-.ai-summary-header { font-size: 13px; font-weight: 600; color: #8B5CF6; margin-bottom: 8px; }
+.ai-summary { background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+.ai-summary-header { font-size: 13px; font-weight: 600; color: #10b981; margin-bottom: 8px; }
 .ai-summary-content { font-size: 14px; color: var(--cm-text-secondary); line-height: 1.6; }
 
 /* Key Sections */
@@ -592,10 +600,6 @@ function formatTime(t: string) {
 .markdown-body :deep(th) { background: var(--cm-bg); color: var(--cm-text); font-weight: 600; }
 .markdown-body :deep(hr) { border: none; border-top: 1px solid var(--cm-border); margin: 20px 0; }
 .markdown-body :deep(img) { max-width: 100%; border-radius: 8px; }
-
-/* Empty State */
-.empty-state { grid-column: 1/-1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; color: var(--cm-text-placeholder); }
-.empty-icon { font-size: 48px; margin-bottom: 12px; color: #10B981; }
 
 /* Editor */
 .editor-row { display: flex; gap: 16px; flex-wrap: wrap; }

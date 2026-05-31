@@ -19,7 +19,16 @@
       </el-select>
     </div>
 
-    <div class="session-list">
+    <div v-if="loading" class="skeleton-grid">
+      <div class="skeleton-card" v-for="i in 3" :key="i">
+        <div class="cm-skeleton cm-skeleton-text" style="width:30%"></div>
+        <div class="cm-skeleton cm-skeleton-title" style="width:60%"></div>
+        <div class="cm-skeleton cm-skeleton-text" style="width:90%"></div>
+        <div class="cm-skeleton cm-skeleton-text" style="width:40%"></div>
+      </div>
+    </div>
+
+    <div v-else class="session-list">
       <div class="session-card" v-for="s in sessions" :key="s.id" @click="openDetail(s)">
         <div class="card-top">
           <span class="session-id-tag" v-if="s.session_id">{{ s.session_id }}</span>
@@ -38,7 +47,16 @@
       </div>
     </div>
 
-    <el-empty v-if="!sessions.length" :description="$t('sessionMemory.empty')" />
+    <div v-if="!sessions.length" class="cm-empty-state">
+      <div class="cm-empty-icon">📋</div>
+      <div class="cm-empty-title">{{ $t('sessionMemory.empty') }}</div>
+      <div class="cm-empty-desc">创建一个会话记忆来记录工作状态和上下文信息</div>
+      <div class="cm-empty-action">
+        <el-button type="primary" @click="openAddDialog">
+          <el-icon><Plus /></el-icon> {{ $t('sessionMemory.add') }}
+        </el-button>
+      </div>
+    </div>
 
     <el-dialog v-model="showDetailDialog" :title="detailSession?.title || $t('sessionMemory.untitled')" width="800px" :fullscreen="isMobile" class="custom-dialog">
       <div v-if="detailSession" class="session-detail">
@@ -121,6 +139,7 @@ import { translateError } from '../i18n'
 const { t } = useI18n()
 const sessions = ref<any[]>([])
 const { isMobile } = useIsMobile()
+const loading = ref(true)
 const filterSessionId = ref('')
 const filterStatus = ref('')
 const showDetailDialog = ref(false)
@@ -146,6 +165,7 @@ async function loadSessions() {
     const { data } = await sessionMemoryApi.list(params)
     sessions.value = data.items || []
   } catch { sessions.value = [] }
+  finally { loading.value = false }
 }
 
 function openDetail(s: any) {
@@ -227,7 +247,7 @@ function formatTime(ts: string) {
 .session-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s ease; }
 .session-card:hover { border-color: rgba(16,185,129,0.3); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
 .card-top { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-.session-id-tag { padding: 2px 8px; background: rgba(139,92,246,0.15); color: #8b5cf6; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.session-id-tag { padding: 2px 8px; background: rgba(16,185,129,0.15); color: #10b981; border-radius: 4px; font-size: 11px; font-weight: 600; }
 .token-count { font-size: 11px; color: var(--cm-text-muted); }
 .card-title { font-size: 15px; font-weight: 600; color: var(--cm-text); margin-bottom: 6px; }
 .card-preview { font-size: 13px; color: var(--cm-text-muted); line-height: 1.5; }
@@ -236,6 +256,9 @@ function formatTime(ts: string) {
 .card-actions { display: flex; gap: 4px; }
 .detail-meta { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; font-size: 13px; color: var(--cm-text-muted); }
 
+.skeleton-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+.skeleton-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+
 @media (max-width: 768px) {
   .session-memory-page { padding: 16px; }
   .page-header h1 { font-size: 20px; }
@@ -243,8 +266,22 @@ function formatTime(ts: string) {
   .session-card { padding: 14px; }
   .card-title { font-size: 14px; }
   .card-preview { font-size: 12px; }
-  .toolbar { gap: 10px; }
+  .toolbar { gap: 10px; flex-direction: column; align-items: stretch; }
+  .toolbar .el-input { width: 100% !important; }
+  .toolbar .el-select { width: 100% !important; }
   .header-actions { width: 100%; }
   .header-actions .el-button { flex: 1; }
+}
+
+@media (max-width: 480px) {
+  .session-memory-page { padding: 12px; }
+  .page-header h1 { font-size: 18px; }
+  .session-card { padding: 10px; }
+  .card-top { flex-wrap: wrap; gap: 4px; }
+  .card-title { font-size: 13px; }
+  .card-preview { font-size: 11px; }
+  .card-footer { flex-direction: column; gap: 6px; align-items: flex-start; }
+  .card-actions { width: 100%; justify-content: flex-end; }
+  .detail-meta { flex-wrap: wrap; gap: 6px; font-size: 12px; }
 }
 </style>

@@ -147,6 +147,58 @@ func (s *DedupService) Merge(userID uint, sourceID, targetID uint) (map[string]i
 	}, nil
 }
 
+func (s *DedupService) AutoMergeSimilar(userID uint, threshold float64) (int, error) {
+	var memories []models.Memory
+	if err := s.db.Where("user_id = ? AND status = ?", userID, "active").
+		Order("importance DESC").Limit(1000).Find(&memories).Error; err != nil {
+		return 0, err
+	}
+
+	if len(memories) < 2 {
+		return 0, nil
+	}
+
+	merged := 0
+	processed := make(map[uint]bool)
+
+	for i := 0; i < len(memories); i++ {
+		if processed[memories[i].ID] {
+			continue
+		}
+		for j := i + 1; j < len(memories); j++ {
+			if processed[memories[j].ID] {
+				continue
+			}
+
+			similarity := computeSimilarity(memories[i].Key, memories[i].Value, memories[j].Key, memories[j].Value)
+			if similarity >= threshold {
+				target := &memories[i]
+				source := &memories[j]
+
+				bestImportance := target.Importance
+				if source.Importance > bestImportance {
+					bestImportance = source.Importance
+				}
+				bestValue := target.Value
+				if len(source.Value) > len(target.Value) {
+					bestValue = source.Value
+				}
+
+				s.db.Model(target).Updates(map[string]interface{}{
+					"importance": bestImportance,
+					"value":      bestValue,
+				})
+				s.db.Model(source).Update("status", "trashed")
+
+				processed[source.ID] = true
+				merged++
+			}
+		}
+	}
+
+	return merged, nil
+}
+
 func computeSimilarity(key1, value1, key2, value2 string) float64 {
 	keySim := jaccardSimilarity(key1, key2)
 	valueSim := jaccardSimilarity(value1, value2)

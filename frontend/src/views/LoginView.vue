@@ -270,8 +270,8 @@ onMounted(async () => {
     }
   } catch (e) {
     console.error('Failed to check init status:', e)
-    passwordSet.value = false
-    loginMode.value = 'setup'
+    passwordSet.value = true
+    loginMode.value = 'login'
   }
 })
 
@@ -366,8 +366,13 @@ async function handleSetPassword() {
       if (data.refresh_token) {
         localStorage.setItem('refresh_token', data.refresh_token)
       }
+      if (data.api_key) {
+        autoApiKey.value = data.api_key
+      }
       passwordSet.value = true
-      await fetchAutoApiKey()
+      if (!autoApiKey.value) {
+        await fetchAutoApiKey()
+      }
       loginMode.value = 'setup-complete'
     } else {
       ElMessage.error(t('common.failed'))
@@ -375,19 +380,9 @@ async function handleSetPassword() {
   } catch (e: any) {
     const detail = e.response?.data?.error || e.response?.data?.detail || ''
     if (detail === 'password already set') {
-      try {
-        const loginPayload: any = { password: password.value }
-        if (setupUsername.value) {
-          loginPayload.username = setupUsername.value
-        }
-        const { data: loginData } = await authApi.login(loginPayload)
-        localStorage.setItem('token', loginData.access_token)
-        passwordSet.value = true
-        router.push('/')
-        return
-      } catch (loginErr: any) {
-        ElMessage.error(translateError(loginErr.response?.data?.error || loginErr.response?.data?.detail, t('login.wrongPassword')))
-      }
+      passwordSet.value = true
+      loginMode.value = 'login'
+      ElMessage.warning(t('login.passwordAlreadySet'))
     } else {
       ElMessage.error(translateError(detail, t('common.failed')))
     }

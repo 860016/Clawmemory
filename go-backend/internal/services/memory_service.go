@@ -123,16 +123,22 @@ func (s *MemoryService) List(userID uint, layer string, page, size int, status s
 		query = query.Where("memory_type = ?", memoryType[0])
 	}
 
-	var sourceAgent, visibility string
+	var sourceAgent, visibility, source string
 	if len(memoryType) > 1 && memoryType[1] != "" {
 		sourceAgent = memoryType[1]
 	}
 	if len(memoryType) > 2 && memoryType[2] != "" {
 		visibility = memoryType[2]
 	}
+	if len(memoryType) > 3 && memoryType[3] != "" {
+		source = memoryType[3]
+	}
 
 	if sourceAgent != "" {
 		query = query.Where("source_agent = ?", sourceAgent)
+	}
+	if source != "" {
+		query = query.Where("source = ?", source)
 	}
 	if visibility != "" {
 		query = query.Where("visibility = ?", visibility)

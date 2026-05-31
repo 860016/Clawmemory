@@ -230,6 +230,9 @@ func (r *AIRouter) GetCurrentUserConfig(userID uint) map[string]interface{} {
 		if s, ok := v.(string); ok && s != "" {
 			result["provider_id"] = s
 			result["provider_source"] = "user_config"
+			if info := GetProviderInfo(s); info != nil {
+				result["provider_name"] = info.Name
+			}
 		}
 	}
 	if v, _ := settingsSvc.GetByKey(userID, "ai_model"); v != nil {
@@ -254,7 +257,7 @@ func (r *AIRouter) GetCurrentUserConfig(userID uint) map[string]interface{} {
 func (r *AIRouter) UpdateProConfig(userID uint, data map[string]interface{}) error {
 	settingsSvc := services.NewSettingsService(r.db)
 
-	if providerID, ok := data["provider_id"].(string); ok {
+	if providerID, ok := data["provider_id"].(string); ok && providerID != "" {
 		info := GetProviderInfo(providerID)
 		if info == nil {
 			return fmt.Errorf("unknown provider: %s", providerID)

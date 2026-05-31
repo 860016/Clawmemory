@@ -77,7 +77,7 @@ func (s *MemoryWritebackService) GetWritebackTargets() []WritebackTarget {
 
 func (s *MemoryWritebackService) Writeback(userID uint, agentName string, projectPath string) (*WritebackResult, error) {
 	riskSvc := GetRiskSwitchService()
-	if riskSvc != nil && riskSvc.IsDisabled(RiskCrossAgentWrite) {
+	if riskSvc != nil && riskSvc.IsDisabled(RiskCrossAgentAccess) {
 		return nil, fmt.Errorf("cross-agent write is disabled by risk switch")
 	}
 

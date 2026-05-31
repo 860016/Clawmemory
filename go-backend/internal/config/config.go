@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	AppVersion    = "2.30.0"
+	AppVersion    = "2.31.0"
 	GitHubRepoURL = "https://github.com/860016/Clawmemory"
 )
 
@@ -37,7 +37,7 @@ func Load() *Config {
 
 		jwtSecret := getEnv("SECRET_KEY", "clawmemory-default-secret-change-me")
 		if jwtSecret == "clawmemory-default-secret-change-me" {
-			jwtSecret = generateSecureSecret()
+			jwtSecret = GenerateSecureSecret()
 			fmt.Printf("[CONFIG] WARNING: SECRET_KEY not set, auto-generated a secure secret.\n")
 			fmt.Printf("[CONFIG] To persist across restarts, set SECRET_KEY in your .env file.\n")
 		}
@@ -53,7 +53,7 @@ func Load() *Config {
 	return globalConfig
 }
 
-func generateSecureSecret() string {
+func GenerateSecureSecret() string {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		fmt.Printf("[CONFIG] WARNING: failed to generate secure secret: %v, using fallback\n", err)
@@ -72,8 +72,18 @@ func getDataDir() string {
 		return "/app/data"
 	}
 
+	cwd, _ := os.Getwd()
+	if _, err := os.Stat(filepath.Join(cwd, "data")); err == nil {
+		return filepath.Join(cwd, "data")
+	}
+
 	exe, _ := os.Executable()
-	return filepath.Join(filepath.Dir(exe), "data")
+	exeDir := filepath.Dir(exe)
+	if _, err := os.Stat(filepath.Join(exeDir, "data")); err == nil {
+		return filepath.Join(exeDir, "data")
+	}
+
+	return filepath.Join(cwd, "data")
 }
 
 func getEnv(key, defaultValue string) string {

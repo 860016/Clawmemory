@@ -6,6 +6,8 @@
 
     <div class="settings-layout">
       <div class="settings-grid">
+
+      <div class="settings-row">
       <!-- 语言设置 -->
       <div class="settings-card">
         <div class="card-title">◇ {{ $t('settings.language') }}</div>
@@ -18,6 +20,139 @@
         </div>
       </div>
 
+      <!-- 安全设置 -->
+      <div class="settings-card" :class="{ 'section-highlight': activeSection === 'security' }" id="settings-security">
+        <div class="card-title">◇ {{ $t('settings.security') }}</div>
+        <div class="setting-item">
+          <span>{{ $t('settings.password') }}</span>
+          <el-button size="small" @click="showPasswordDialog = true">
+            {{ passwordSet ? $t('settings.changePassword') : $t('settings.setPassword') }}
+          </el-button>
+        </div>
+      </div>
+      </div>
+
+      <div class="settings-row">
+      <!-- 记忆自动治理 -->
+      <div class="settings-card" :class="{ 'section-highlight': activeSection === 'governance' }" id="settings-governance">
+        <div class="card-title">🏥 {{ $t('settings.governance') }}</div>
+        <p class="setting-desc">{{ $t('settings.governanceDesc') }}</p>
+
+        <div class="setting-item">
+          <span>{{ $t('settings.governanceAuto') }}</span>
+          <el-switch v-model="governanceConfig.enabled" @change="updateGovernanceConfig" />
+        </div>
+
+        <div v-if="governanceConfig.enabled" class="setting-item">
+          <span>{{ $t('settings.governanceInterval') }}</span>
+          <el-radio-group v-model="governanceConfig.interval" size="small" @change="updateGovernanceConfig">
+            <el-radio-button value="daily">{{ $t('settings.governanceDaily') }}</el-radio-button>
+            <el-radio-button value="weekly">{{ $t('settings.governanceWeekly') }}</el-radio-button>
+          </el-radio-group>
+        </div>
+
+        <div style="margin: 8px 0; padding: 8px 0; border-top: 1px solid var(--cm-border)">
+          <div style="font-size: 12px; color: var(--cm-text-muted); margin-bottom: 6px">{{ $t('settings.governanceSteps') }}</div>
+          <div class="governance-toggles">
+            <label class="governance-toggle"><el-switch v-model="governanceConfig.auto_summary" size="small" @change="updateGovernanceConfig" /> {{ $t('settings.governanceSummary') }}</label>
+            <label class="governance-toggle"><el-switch v-model="governanceConfig.auto_fix" size="small" @change="updateGovernanceConfig" /> {{ $t('settings.governanceFix') }}</label>
+            <label class="governance-toggle"><el-switch v-model="governanceConfig.auto_merge_similar" size="small" @change="updateGovernanceConfig" /> {{ $t('settings.governanceMerge') }}</label>
+            <label class="governance-toggle"><el-switch v-model="governanceConfig.auto_decay" size="small" @change="updateGovernanceConfig" /> {{ $t('settings.governanceDecay') }}</label>
+            <div v-if="governanceConfig.auto_decay" class="decay-stage-info" style="margin: 6px 0 0 24px; padding: 6px 0; border-top: 1px dashed var(--cm-border)">
+              <div class="stage-item">
+                <span class="stage-label">{{ $t('settings.stage15d') }}</span>
+                <span class="stage-desc">{{ $t('settings.stage15dDesc') }}</span>
+              </div>
+              <div class="stage-item">
+                <span class="stage-label">{{ $t('settings.stage30d') }}</span>
+                <span class="stage-desc">{{ $t('settings.stage30dDesc') }}</span>
+              </div>
+              <div class="stage-item">
+                <span class="stage-label">{{ $t('settings.stage60d') }}</span>
+                <span class="stage-desc">{{ $t('settings.stage60dDesc') }}</span>
+              </div>
+              <div class="stage-item">
+                <span class="stage-label">{{ $t('settings.stageTrash') }}</span>
+                <span class="stage-desc">{{ $t('settings.stageTrashDesc') }}</span>
+              </div>
+            </div>
+            <label class="governance-toggle"><el-switch v-model="governanceConfig.auto_cleanup" size="small" @change="updateGovernanceConfig" /> {{ $t('settings.governanceCleanup') }}</label>
+          </div>
+        </div>
+
+        <div v-if="governanceResult" class="governance-result">
+          <div class="stats-row">
+            <span class="stats-label">{{ $t('settings.governanceSummary') }}</span>
+            <span class="stats-value success">{{ governanceResult.summary_generated }}</span>
+          </div>
+          <div class="stats-row">
+            <span class="stats-label">{{ $t('settings.governanceFix') }}</span>
+            <span class="stats-value success">{{ governanceResult.auto_fixed }}</span>
+          </div>
+          <div class="stats-row">
+            <span class="stats-label">{{ $t('settings.governanceMerge') }}</span>
+            <span class="stats-value">{{ governanceResult.merged_groups }}</span>
+          </div>
+          <div class="stats-row">
+            <span class="stats-label">{{ $t('settings.governanceDecay') }}</span>
+            <span class="stats-value">{{ governanceResult.decay_applied }}</span>
+          </div>
+          <div class="stats-row">
+            <span class="stats-label">{{ $t('settings.governanceCleanup') }}</span>
+            <span class="stats-value danger">{{ governanceResult.trash_cleaned }}</span>
+          </div>
+          <div class="stats-row">
+            <span class="stats-label">{{ $t('settings.governanceDuration') }}</span>
+            <span class="stats-value">{{ governanceResult.duration_ms }}ms</span>
+          </div>
+        </div>
+
+        <div class="decay-actions">
+          <el-button size="small" type="primary" @click="runGovernance" :loading="governanceRunning">{{ $t('settings.governanceRunNow') }}</el-button>
+          <el-button size="small" @click="viewTrash">{{ $t('settings.viewTrash') }}</el-button>
+        </div>
+      </div>
+
+      <!-- API 密钥 -->
+      <div class="settings-card">
+        <div class="card-title">🔑 {{ $t('settings.apiKeys') }}</div>
+        <p class="setting-desc" style="margin-bottom: 8px">{{ $t('settings.apiKeysDesc') }}</p>
+        <el-alert type="info" :closable="false" style="margin-bottom: 12px; font-size: 12px">
+          <template #title>{{ $t('settings.apiKeySecurityNote') }}</template>
+        </el-alert>
+        <div class="api-key-list" v-if="apiKeys.length > 0">
+          <div class="api-key-item" v-for="key in apiKeys" :key="key.id">
+            <div class="api-key-info">
+              <span class="api-key-name">{{ key.name }}</span>
+              <span class="api-key-prefix">{{ key.key_prefix }}••••••••</span>
+              <span class="api-key-perms">{{ formatPermissions(key.permissions) }}</span>
+              <span class="api-key-time">{{ key.last_used_at ? t('settings.apiKeyLastUsed') + ': ' + key.last_used_at.substring(0, 10) : t('settings.apiKeyNeverUsed') }}</span>
+            </div>
+            <el-button type="danger" plain size="small" @click="deleteApiKey(key.id)">{{ t('settings.apiKeyDelete') }}</el-button>
+          </div>
+        </div>
+        <div v-else class="setting-item">
+          <span class="setting-desc">{{ $t('settings.apiKeyNoKeys') }}</span>
+        </div>
+        <div class="setting-item" style="margin-top: 12px">
+          <span class="setting-desc">{{ t('settings.apiKeyRemaining') }}: {{ 5 - apiKeys.length }}/5</span>
+          <el-button type="primary" size="small" @click="openApiKeyDialog" :disabled="apiKeys.length >= 5">{{ $t('settings.createApiKey') }}</el-button>
+        </div>
+        <div class="api-usage-hint" style="margin-top: 12px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
+          <div style="font-weight: 600; margin-bottom: 6px">{{ $t('settings.apiKeyUsage') }}</div>
+          <div style="color: var(--cm-text-muted); margin-bottom: 6px">{{ $t('settings.apiKeyUsageDesc') }}</div>
+          <code style="display: block; padding: 8px; background: var(--cm-bg); border-radius: 4px; font-size: 11px; word-break: break-all; color: var(--cm-accent)">
+            curl -X POST http://localhost:8765/api/v1/external/memories \<br>
+            &nbsp;&nbsp;-H "X-API-Key: YOUR_KEY" \<br>
+            &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+            &nbsp;&nbsp;-d '{"key":"topic","value":"content"}'
+          </code>
+        </div>
+      </div>
+
+      </div>
+
+      <div class="settings-row">
       <!-- AI 配置 -->
       <div class="settings-card" id="settings-ai">
         <div class="card-title">🧠 {{ $t('settings.aiConfig') }}</div>
@@ -103,110 +238,39 @@
         </div>
       </div>
 
-      <!-- 安全设置 -->
-      <div class="settings-card" :class="{ 'section-highlight': activeSection === 'security' }" id="settings-security">
-        <div class="card-title">◇ {{ $t('settings.security') }}</div>
-        <div class="setting-item">
-          <span>{{ $t('settings.password') }}</span>
-          <el-button size="small" @click="showPasswordDialog = true">
-            {{ passwordSet ? $t('settings.changePassword') : $t('settings.setPassword') }}
-          </el-button>
-        </div>
-      </div>
-
       <!-- 风险开关 -->
       <div class="settings-card" id="settings-risk-switches">
         <div class="card-title">⚠️ {{ $t('riskSwitch.title') }}</div>
         <p class="setting-desc" style="margin-bottom: 12px">{{ $t('riskSwitch.desc') }}</p>
         <div class="risk-category">
-          <div class="risk-category-title">{{ $t('riskSwitch.categoryMemory') }}</div>
+          <div class="risk-category-title">{{ $t('riskSwitch.categoryAccess') }}</div>
           <div class="setting-item">
-            <span>{{ $t('riskSwitch.allowCrossAgentRead') }}</span>
-            <el-switch v-model="riskSwitches.risk_agent_memory_access" @change="saveRiskSwitches" />
-          </div>
-          <div class="setting-item">
-            <span>{{ $t('riskSwitch.allowCrossAgentWrite') }}</span>
-            <el-switch v-model="riskSwitches.risk_cross_agent_write" @change="saveRiskSwitches" />
-          </div>
-          <div class="setting-item">
-            <span>{{ $t('riskSwitch.allowMemoryVisibilityChange') }}</span>
-            <el-switch v-model="riskSwitches.risk_memory_visibility_change" @change="saveRiskSwitches" />
+            <span>{{ $t('riskSwitch.allowCrossAgentAccess') }}</span>
+            <el-switch v-model="riskSwitches.risk_cross_agent_access" @change="saveRiskSwitches" />
           </div>
         </div>
         <div class="risk-category">
-          <div class="risk-category-title">{{ $t('riskSwitch.categorySharing') }}</div>
+          <div class="risk-category-title">{{ $t('riskSwitch.categoryImport') }}</div>
           <div class="setting-item">
-            <span>{{ $t('riskSwitch.allowAutoSharing') }}</span>
-            <el-switch v-model="riskSwitches.risk_share_auto_approve" @change="saveRiskSwitches" />
-          </div>
-          <div class="setting-item">
-            <span>{{ $t('riskSwitch.allowManualSharing') }}</span>
+            <span>{{ $t('riskSwitch.allowAutoImport') }}</span>
             <el-switch v-model="riskSwitches.risk_auto_import_memories" @change="saveRiskSwitches" />
           </div>
-          <div class="setting-item">
-            <span>{{ $t('riskSwitch.allowBatchShare') }}</span>
-            <el-switch v-model="riskSwitches.risk_bulk_delete" @change="saveRiskSwitches" />
-          </div>
         </div>
         <div class="risk-category">
-          <div class="risk-category-title">{{ $t('riskSwitch.categoryWriteback') }}</div>
+          <div class="risk-category-title">{{ $t('riskSwitch.categoryDestructive') }}</div>
           <div class="setting-item">
-            <span>{{ $t('riskSwitch.allowWriteback') }}</span>
-            <el-switch v-model="riskSwitches.risk_decay_auto_apply" @change="saveRiskSwitches" />
+            <span>{{ $t('riskSwitch.allowBulkDelete') }}</span>
+            <el-switch v-model="riskSwitches.risk_bulk_delete" @change="saveRiskSwitches" />
+          </div>
+          <div class="setting-item">
+            <span>{{ $t('riskSwitch.allowAutoDestructive') }}</span>
+            <el-switch v-model="riskSwitches.risk_auto_destructive" @change="saveRiskSwitches" />
           </div>
         </div>
       </div>
-
-      <!-- API 密钥 -->
-      <div class="settings-card">
-        <div class="card-title">🔑 {{ $t('settings.apiKeys') }}</div>
-        <p class="setting-desc" style="margin-bottom: 8px">{{ $t('settings.apiKeysDesc') }}</p>
-        <el-alert type="info" :closable="false" style="margin-bottom: 12px; font-size: 12px">
-          <template #title>{{ $t('settings.apiKeySecurityNote') }}</template>
-        </el-alert>
-        <div class="api-key-list" v-if="apiKeys.length > 0">
-          <div class="api-key-item" v-for="key in apiKeys" :key="key.id">
-            <div class="api-key-info">
-              <span class="api-key-name">{{ key.name }}</span>
-              <span class="api-key-prefix">{{ key.key_prefix }}••••••••</span>
-              <span class="api-key-perms">{{ formatPermissions(key.permissions) }}</span>
-              <span class="api-key-time">{{ key.last_used_at ? t('settings.apiKeyLastUsed') + ': ' + key.last_used_at.substring(0, 10) : t('settings.apiKeyNeverUsed') }}</span>
-            </div>
-            <el-button type="danger" plain size="small" @click="deleteApiKey(key.id)">{{ t('settings.apiKeyDelete') }}</el-button>
-          </div>
-        </div>
-        <div v-else class="setting-item">
-          <span class="setting-desc">{{ $t('settings.apiKeyNoKeys') }}</span>
-        </div>
-        <div class="setting-item" style="margin-top: 12px">
-          <span class="setting-desc">{{ t('settings.apiKeyRemaining') }}: {{ 5 - apiKeys.length }}/5</span>
-          <el-button type="primary" size="small" @click="openApiKeyDialog" :disabled="apiKeys.length >= 5">{{ $t('settings.createApiKey') }}</el-button>
-        </div>
-        <div class="api-usage-hint" style="margin-top: 12px; padding: 10px; background: var(--cm-bg-secondary); border-radius: 6px; font-size: 12px">
-          <div style="font-weight: 600; margin-bottom: 6px">{{ $t('settings.apiKeyUsage') }}</div>
-          <div style="color: var(--cm-text-muted); margin-bottom: 6px">{{ $t('settings.apiKeyUsageDesc') }}</div>
-          <code style="display: block; padding: 8px; background: var(--cm-bg); border-radius: 4px; font-size: 11px; word-break: break-all; color: var(--cm-accent)">
-            curl -X POST http://localhost:8765/api/v1/external/memories \<br>
-            &nbsp;&nbsp;-H "X-API-Key: YOUR_KEY" \<br>
-            &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
-            &nbsp;&nbsp;-d '{"key":"topic","value":"content"}'
-          </code>
-        </div>
       </div>
 
-      <!-- 敏感内容设置 -->
-      <div class="settings-card">
-        <div class="card-title">🛡️ {{ $t('settings.recordSensitive') }}</div>
-        <p class="setting-desc" style="margin-bottom: 8px">{{ $t('settings.recordSensitiveDesc') }}</p>
-        <div class="setting-item">
-          <span>{{ $t('settings.recordSensitive') }}</span>
-          <el-switch v-model="recordSensitive" @change="updateRecordSensitive" />
-        </div>
-        <el-alert v-if="recordSensitive" type="warning" :closable="false" style="margin-top: 8px; font-size: 12px">
-          <template #title>{{ $t('settings.recordSensitiveWarning') }}</template>
-        </el-alert>
-      </div>
-
+      <div class="settings-row">
       <!-- 客户端连接配置 -->
       <div class="settings-card" id="settings-openclaw">
         <div class="card-title">🔗 {{ $t('settings.clientConnection') }}</div>
@@ -290,58 +354,9 @@
           </el-upload>
         </div>
       </div>
-
-      <!-- 记忆衰减设置 -->
-      <div class="settings-card" :class="{ 'section-highlight': activeSection === 'decay' }" id="settings-decay">
-        <div class="card-title">🧠 {{ $t('settings.memoryDecay') }}</div>
-        <div class="decay-info" v-if="decayInfo">
-          <div class="decay-stage-info">
-            <div class="stage-item">
-              <span class="stage-label">{{ $t('settings.stage15d') }}</span>
-              <span class="stage-desc">{{ $t('settings.stage15dDesc') }}</span>
-            </div>
-            <div class="stage-item">
-              <span class="stage-label">{{ $t('settings.stage30d') }}</span>
-              <span class="stage-desc">{{ $t('settings.stage30dDesc') }}</span>
-            </div>
-            <div class="stage-item">
-              <span class="stage-label">{{ $t('settings.stage60d') }}</span>
-              <span class="stage-desc">{{ $t('settings.stage60dDesc') }}</span>
-            </div>
-            <div class="stage-item">
-              <span class="stage-label">{{ $t('settings.stageTrash') }}</span>
-              <span class="stage-desc">{{ $t('settings.stageTrashDesc') }}</span>
-            </div>
-          </div>
-        </div>
-        <div class="setting-item">
-          <span>{{ $t('settings.autoDecay') }}</span>
-          <el-switch v-model="decayEnabled" @change="updateDecaySettings" :loading="decayLoading" />
-        </div>
-        <div class="decay-stats" v-if="decayStats">
-          <div class="stats-row">
-            <span class="stats-label">{{ $t('settings.totalMemories') }}</span>
-            <span class="stats-value">{{ decayStats.total }}</span>
-          </div>
-          <div class="stats-row">
-            <span class="stats-label">{{ $t('settings.activeMemories') }}</span>
-            <span class="stats-value">{{ decayStats.active }}</span>
-          </div>
-          <div class="stats-row">
-            <span class="stats-label">{{ $t('settings.archivedMemories') }}</span>
-            <span class="stats-value warning">{{ decayStats.archived }}</span>
-          </div>
-          <div class="stats-row">
-            <span class="stats-label">{{ $t('settings.trashedMemories') }}</span>
-            <span class="stats-value danger">{{ decayStats.trashed }}</span>
-          </div>
-        </div>
-        <div class="decay-actions" v-if="decayStats && decayStats.trashed > 0">
-          <el-button size="small" type="warning" @click="viewTrash">{{ $t('settings.viewTrash') }}</el-button>
-          <el-button size="small" type="danger" @click="emptyTrash">{{ $t('settings.emptyTrash') }}</el-button>
-        </div>
       </div>
 
+      <div class="settings-row">
       <!-- 记忆健康度 -->
       <div class="settings-card">
         <div class="card-title">💊 {{ $t('settings.memoryHealth') }}</div>
@@ -389,6 +404,21 @@
           <el-button size="small" type="primary" @click="scanDedup" :loading="dedupLoading">{{ $t('settings.scan') }}</el-button>
         </div>
       </div>
+      </div>
+
+      <div class="settings-row">
+      <!-- 敏感内容设置 -->
+      <div class="settings-card">
+        <div class="card-title">🛡️ {{ $t('settings.recordSensitive') }}</div>
+        <p class="setting-desc" style="margin-bottom: 8px">{{ $t('settings.recordSensitiveDesc') }}</p>
+        <div class="setting-item">
+          <span>{{ $t('settings.recordSensitive') }}</span>
+          <el-switch v-model="recordSensitive" @change="updateRecordSensitive" />
+        </div>
+        <el-alert v-if="recordSensitive" type="warning" :closable="false" style="margin-top: 8px; font-size: 12px">
+          <template #title>{{ $t('settings.recordSensitiveWarning') }}</template>
+        </el-alert>
+      </div>
 
       <!-- 系统信息 -->
       <div class="settings-card" :class="{ 'section-highlight': activeSection === 'system' }" id="settings-system">
@@ -397,37 +427,17 @@
           <span>{{ $t('settings.version') }}</span>
           <span class="setting-desc">
             v{{ appVersion }}
-            <el-tag v-if="updateInfo.has_update" type="success" size="small" style="margin-left: 8px">
-              🆕 v{{ updateInfo.latest_version }}
-            </el-tag>
-            <el-tag v-else-if="updateInfo.checked" type="info" size="small" style="margin-left: 8px">
-              ✓ {{ $t('settings.upToDate') }}
-            </el-tag>
           </span>
-        </div>
-        <div class="setting-item" v-if="updateInfo.has_update">
-          <span>{{ $t('settings.newVersion') }}</span>
-          <span class="setting-desc">
-            v{{ updateInfo.latest_version }}
-            <a :href="updateInfo.download_url" target="_blank" class="update-link">{{ $t('settings.downloadUpdate') }}</a>
-          </span>
-        </div>
-        <div class="setting-item" v-if="updateInfo.release_notes">
-          <span>{{ $t('settings.releaseNotes') }}</span>
-          <span class="setting-desc release-notes">{{ updateInfo.release_notes }}</span>
         </div>
         <div class="setting-item">
           <span>{{ $t('settings.coreEngine') }}</span>
           <span class="setting-desc">{{ coreEngine }}</span>
         </div>
         <div class="setting-item">
-          <span>{{ $t('settings.checkUpdate') }}</span>
-          <el-button size="small" @click="checkForUpdate" :loading="updateChecking">{{ $t('settings.checkNow') }}</el-button>
-        </div>
-        <div class="setting-item">
           <span>{{ $t('settings.resetPasswordTip') }}</span>
           <span class="setting-desc code-hint">{{ cliResetCommand }}</span>
         </div>
+      </div>
       </div>
 
       <!-- 邀请码管理 (仅创始账号可见) -->
@@ -552,17 +562,17 @@
       <el-form label-position="top">
         <el-form-item :label="$t('settings.aiProvider')">
           <el-select v-model="aiForm.provider_id" @change="onAIProviderChange" style="width: 100%">
-            <el-option v-for="p in aiProviders" :key="p.ID" :label="p.Name" :value="p.ID">
-              <span>{{ p.Name }}</span>
-              <el-tag v-if="p.Free" type="success" size="small" style="margin-left: 8px">{{ $t('settings.aiFree') }}</el-tag>
-              
+            <el-option v-for="p in aiProviders" :key="p.id" :label="p.name" :value="p.id">
+              <span>{{ p.name }}</span>
+              <el-tag v-if="p.free" type="success" size="small" style="margin-left: 8px">{{ $t('settings.aiFree') }}</el-tag>
             </el-option>
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('settings.aiModel')">
-          <el-select v-model="aiForm.model" style="width: 100%">
+          <el-select v-if="currentProviderModels.length > 0" v-model="aiForm.model" style="width: 100%" filterable allow-create>
             <el-option v-for="m in currentProviderModels" :key="m" :label="m" :value="m" />
           </el-select>
+          <el-input v-else v-model="aiForm.model" :placeholder="$t('settings.aiModelPlaceholder') || 'Enter model name'" />
         </el-form-item>
         <el-form-item :label="$t('settings.aiApiKey')">
           <el-input v-model="aiForm.api_key" type="password" show-password :placeholder="$t('settings.aiApiKeyPlaceholder')" />
@@ -596,6 +606,7 @@ import { useIsMobile } from '../composables/useIsMobile'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Loading } from '@element-plus/icons-vue'
 import { setLocale, getLocale, translateError } from '../i18n'
 import { aiApi } from '../api/go-ai'
 import { reasoningApi } from '../api/go-reasoning'
@@ -630,8 +641,7 @@ const settingPassword = ref(false)
 const coreEngine = ref('python')
 const currentLocale = ref(getLocale())
 const appVersion = ref('2.14.0')
-const updateInfo = ref<any>({ checked: false, has_update: false, latest_version: '', download_url: '', release_notes: '' })
-const updateChecking = ref(false)
+
 const cliResetCommand = ref(navigator.platform.toLowerCase().includes('win') ? 'clawmemory.exe --reset-password NEW_PASSWORD' : './clawmemory --reset-password NEW_PASSWORD')
 
 const apiKeys = ref<any[]>([])
@@ -641,10 +651,7 @@ const newApiKeyRaw = ref('')
 const newApiKeyPerm = ref('full')
 const creatingApiKey = ref(false)
 
-const decayEnabled = ref(false)
-const decayLoading = ref(false)
-const decayStats = ref<any>(null)
-const decayInfo = ref<any>(null)
+const governanceRunning = ref(false)
 const recordSensitive = ref(false)
 
 const healthScore = ref<any>(null)
@@ -658,6 +665,19 @@ const healthGrade = computed(() => {
 })
 
 const dedupResult = ref<any>(null)
+
+
+const governanceConfig = ref<any>({
+  enabled: false,
+  interval: 'daily',
+  auto_merge_similar: false,
+  merge_threshold: 0.9,
+  auto_decay: true,
+  auto_cleanup: true,
+  auto_summary: true,
+  auto_fix: true,
+})
+const governanceResult = ref<any>(null)
 
 const isFounder = computed(() => authStore.isFounder)
 const invitations = ref<any[]>([])
@@ -687,8 +707,8 @@ const aiForm = ref<any>({
 })
 
 const currentProviderModels = computed(() => {
-  const p = aiProviders.value.find((x: any) => x.ID === aiForm.value.provider_id)
-  return p?.Models || []
+  const p = aiProviders.value.find((x: any) => x.id === aiForm.value.provider_id)
+  return p?.models || []
 })
 
 const showAgentsMdPreview = ref(false)
@@ -717,7 +737,7 @@ function formatDate(dateStr: string): string {
 }
 
 onMounted(async () => {
-  await Promise.all([loadInitStatus(), loadInstallStatus(), loadDecaySettings(), loadDecayStats(), loadApiKeys(), loadRecordSensitiveSetting(), loadConnectedAgents(), loadAgentSyncStatus(), loadRiskSwitches(), loadAIConfig(), loadAIUsage(), loadReasoningConfig()])
+  await Promise.all([loadInitStatus(), loadInstallStatus(), loadApiKeys(), loadRecordSensitiveSetting(), loadConnectedAgents(), loadAgentSyncStatus(), loadRiskSwitches(), loadAIConfig(), loadAIUsage(), loadReasoningConfig(), loadGovernanceStatus()])
   if (authStore.isFounder) {
     loadInvitations()
     loadUsers()
@@ -910,14 +930,10 @@ async function loadRecordSensitiveSetting() {
 }
 
 const riskSwitches = ref<Record<string, boolean>>({
-  risk_cross_agent_write: false,
-  risk_memory_visibility_change: true,
-  risk_share_auto_approve: false,
+  risk_cross_agent_access: false,
   risk_auto_import_memories: false,
-  risk_agent_memory_access: false,
   risk_bulk_delete: false,
-  risk_decay_auto_apply: false,
-  risk_compress_auto_apply: false,
+  risk_auto_destructive: false,
 })
 
 async function loadRiskSwitches() {
@@ -1057,24 +1073,6 @@ async function loadInstallStatus() {
   try { const { data } = await settingsApi.getInstallStatus(); coreEngine.value = data.checks?.security_engine || 'python'; if (data.version) appVersion.value = data.version } catch { coreEngine.value = 'go' }
 }
 
-async function checkForUpdate() {
-  updateChecking.value = true
-  try {
-    const { data } = await settingsApi.checkUpdate()
-    updateInfo.value = {
-      checked: true,
-      has_update: data.has_update || false,
-      latest_version: data.latest_version || '',
-      download_url: data.download_url || '',
-      release_notes: data.release_notes || '',
-    }
-  } catch {
-    updateInfo.value.checked = true
-  } finally {
-    updateChecking.value = false
-  }
-}
-
 async function exportData() {
   exporting.value = true
   try {
@@ -1120,48 +1118,8 @@ async function handleSetPassword() {
   finally { settingPassword.value = false }
 }
 
-async function loadDecaySettings() {
-  try {
-    const { data } = await memoryApi.getDecaySettings()
-    decayEnabled.value = data.enabled
-    decayInfo.value = data
-  } catch { decayEnabled.value = false }
-}
-
-async function loadDecayStats() {
-  try {
-    const { data } = await memoryApi.getDecayStats()
-    decayStats.value = data.stats || data
-  } catch { decayStats.value = null }
-}
-
-async function updateDecaySettings() {
-  decayLoading.value = true
-  try {
-    await memoryApi.updateDecaySettings({ enabled: decayEnabled.value })
-    ElMessage.success(decayEnabled.value ? t('settings.decayEnabled') : t('settings.decayDisabled'))
-  } catch {
-    ElMessage.error(t('common.failed'))
-  } finally {
-    decayLoading.value = false
-  }
-}
-
 async function viewTrash() {
-  window.location.href = '/memories?status=trashed'
-}
-
-async function emptyTrash() {
-  try {
-    await ElMessageBox.confirm(t('settings.emptyTrashConfirm'), t('settings.confirm'), { type: 'warning' })
-    await memoryApi.emptyTrash()
-    ElMessage.success(t('settings.trashEmptied'))
-    await loadDecayStats()
-  } catch (e: any) {
-    if (e !== 'cancel' && e?.message !== 'cancel') {
-      ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
-    }
-  }
+  window.location.href = '/trash'
 }
 
 async function checkHealth() {
@@ -1173,6 +1131,43 @@ async function checkHealth() {
     ElMessage.error(t('common.failed'))
   } finally {
     healthLoading.value = false
+  }
+}
+
+async function loadGovernanceStatus() {
+  try {
+    const { data } = await memoryApi.getGovernanceStatus()
+    if (data?.config) {
+      governanceConfig.value = { ...governanceConfig.value, ...data.config }
+    }
+    if (data?.last_result) {
+      governanceResult.value = data.last_result
+    }
+  } catch {
+    // governance not available yet
+  }
+}
+
+async function updateGovernanceConfig() {
+  try {
+    await memoryApi.updateGovernanceConfig(governanceConfig.value)
+    ElMessage.success(t('common.success'))
+    await loadGovernanceStatus()
+  } catch {
+    ElMessage.error(t('common.failed'))
+  }
+}
+
+async function runGovernance() {
+  governanceRunning.value = true
+  try {
+    const { data } = await memoryApi.runGovernance()
+    governanceResult.value = data
+    ElMessage.success(t('settings.governanceDone'))
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.error || t('common.failed'))
+  } finally {
+    governanceRunning.value = false
   }
 }
 
@@ -1291,15 +1286,23 @@ async function loadAIProviders() {
 }
 
 function onAIProviderChange() {
-  const p = aiProviders.value.find((x: any) => x.ID === aiForm.value.provider_id)
-  if (p && p.Models && p.Models.length > 0) {
-    aiForm.value.model = p.Models[0]
+  const p = aiProviders.value.find((x: any) => x.id === aiForm.value.provider_id)
+  if (p && p.models && p.models.length > 0) {
+    aiForm.value.model = p.models[0]
   } else {
     aiForm.value.model = ''
   }
 }
 
 async function saveAIConfig() {
+  if (!aiForm.value.provider_id) {
+    ElMessage.warning(t('settings.aiProviderRequired') || 'Please select a provider')
+    return
+  }
+  if (!aiForm.value.model) {
+    ElMessage.warning(t('settings.aiModelRequired') || 'Please enter a model name')
+    return
+  }
   aiSaving.value = true
   try {
     const payload: Record<string, any> = {
@@ -1376,7 +1379,11 @@ watch(showAgentsMdPreview, async (v) => {
 .settings-layout { display: flex; gap: 20px; }
 .page-header { margin-bottom: 24px; }
 .page-header h1 { font-size: 24px; font-weight: 700; color: var(--cm-text); margin: 0; }
-.settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 16px; }
+.settings-grid { display: flex; flex-direction: column; gap: 16px; }
+.settings-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 920px) {
+  .settings-row { grid-template-columns: 1fr; }
+}
 .settings-card { background: var(--cm-bg-secondary); border: 1px solid var(--cm-border); border-radius: 12px; padding: 20px; transition: border-color 0.3s, box-shadow 0.3s; }
 .settings-card.section-highlight { border-color: #10B981; box-shadow: 0 0 0 2px rgba(16,185,129,0.2); }
 .card-title { font-size: 16px; font-weight: 600; color: var(--cm-text); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--cm-border); }
@@ -1404,7 +1411,7 @@ watch(showAgentsMdPreview, async (v) => {
 .user-time { font-size: 12px; color: var(--cm-text-muted); }
 .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--cm-border); font-size: 14px; color: var(--cm-text); }
 .setting-desc { color: var(--cm-text-muted); font-size: 13px; }
-.update-link { color: var(--cm-primary, #6366f1); text-decoration: none; margin-left: 8px; font-weight: 500; }
+.update-link { color: var(--cm-primary, #10b981); text-decoration: none; margin-left: 8px; font-weight: 500; }
 .update-link:hover { text-decoration: underline; }
 .release-notes { max-width: 400px; white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.5; }
 .code-hint { font-family: monospace; background: var(--cm-bg, #f5f5f5); padding: 4px 8px; border-radius: 4px; font-size: 12px; color: var(--cm-text); user-select: all; }
@@ -1416,9 +1423,6 @@ watch(showAgentsMdPreview, async (v) => {
 .backup-meta { font-size: 11px; color: var(--cm-text-muted); }
 .backup-actions { display: flex; gap: 4px; }
 @media (max-width: 768px) {
-  .settings-grid {
-    grid-template-columns: 1fr;
-  }
   .settings-page {
     padding: 16px;
   }
@@ -1432,6 +1436,9 @@ watch(showAgentsMdPreview, async (v) => {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+  }
+  .settings-row {
+    grid-template-columns: 1fr;
   }
 }
   .decay-stage-info {
@@ -1492,6 +1499,9 @@ watch(showAgentsMdPreview, async (v) => {
 .stats-value.warning { color: #ffc107; }
 .stats-value.danger { color: #e91e63; }
 .decay-actions { margin-top: 12px; display: flex; gap: 8px; }
+.governance-toggles { display: flex; flex-direction: column; gap: 6px; }
+.governance-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.governance-result { margin-top: 8px; }
 .health-display { text-align: center; }
 .health-score { font-size: 48px; font-weight: 700; margin: 8px 0; }
 .health-score.grade-a { color: #10B981; }

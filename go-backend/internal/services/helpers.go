@@ -1,6 +1,9 @@
 package services
 
-import "log"
+import (
+	"log"
+	"strings"
+)
 
 func getString(data map[string]interface{}, key, defaultValue string) string {
 	if v, ok := data[key].(string); ok {
@@ -34,4 +37,29 @@ func logDBErr(context string, err error) {
 	if err != nil {
 		log.Printf("[DB] %s: %v", context, err)
 	}
+}
+
+func truncateStr(s string, maxLen int) string {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
+		return s
+	}
+	return string(runes[:maxLen]) + "..."
+}
+
+func tokenSimilarity(a, b []string) float64 {
+	if len(a) == 0 || len(b) == 0 {
+		return 0
+	}
+	setB := make(map[string]struct{}, len(b))
+	for _, t := range b {
+		setB[strings.ToLower(t)] = struct{}{}
+	}
+	matches := 0
+	for _, t := range a {
+		if _, ok := setB[strings.ToLower(t)]; ok {
+			matches++
+		}
+	}
+	return float64(matches) / float64(len(a))
 }

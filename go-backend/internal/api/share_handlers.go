@@ -179,11 +179,16 @@ func handleListShareRules(db *gorm.DB) gin.HandlerFunc {
 func handleUpdateShareRule(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
+		id, ok := parseIDParam(c, "id")
+		if !ok {
+			return
+		}
 		var rule models.ShareRule
 		if err := c.ShouldBindJSON(&rule); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		rule.ID = uint(id)
 		rule.UserID = userID
 
 		svc := services.NewMemoryShareService(db)

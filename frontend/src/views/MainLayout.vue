@@ -44,12 +44,6 @@
           <el-icon v-else><Moon /></el-icon>
         </button>
         
-        <!-- Tier Badge -->
-        <div class="tier-badge-v2" :class="tierClass">
-          <el-icon v-if="tier === 'advanced'"><Trophy /></el-icon>
-          <span>{{ tierLabel }}</span>
-        </div>
-        
         <!-- User Menu -->
         <el-dropdown trigger="click" @command="handleUserCommand">
           <button class="user-avatar">
@@ -204,7 +198,7 @@ import { useThemeStore } from '../stores/theme'
 import { useAuthStore } from '../stores/auth'
 import {
   HomeFilled, Collection, Connection, Setting, Document, Promotion,
-  Menu, User, Search, Sunny, Moon, Trophy, SwitchButton,
+  Menu, User, Search, Sunny, Moon, SwitchButton,
   DataAnalysis, MagicStick, Upload, Grid, Share,
   TrendCharts, Warning, Cpu, FolderOpened, Lock, Coin, Monitor,
   DocumentChecked, Star, Timer, Compass, CircleCheck, SuccessFilled, Memo,
@@ -227,9 +221,6 @@ const showSearch = ref(false)
 const searchQuery = ref('')
 const searchInput = ref<HTMLInputElement>()
 
-const tier = ref('advanced')
-const tierLabel = computed(() => t('tier.advanced'))
-const tierClass = computed(() => 'tier-advanced')
 const storagePercent = ref(0)
 
 const handleResize = () => {
@@ -279,7 +270,9 @@ const navItems = [
 ]
 
 function isNavActive(path: string) {
-  if (path === '/') return route.path === '/' || route.path === '/reports' || route.path === '/docs'
+  if (path === '/') return route.path === '/' || route.path === '/reports' || route.path === '/docs' || route.path === '/skills'
+  if (path === '/knowledge') return route.path.startsWith('/knowledge') || route.path === '/wiki'
+  if (path === '/memories') return route.path.startsWith('/memories') || route.path === '/sharing' || route.path === '/session-memories'
   return route.path.startsWith(path)
 }
 
@@ -308,7 +301,12 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
       { path: '/session-memories', label: 'sessionMemory.title', icon: Memo },
     ]}
   ],
-  '/knowledge': [],
+  '/knowledge': [
+    { items: [
+      { path: '/knowledge', label: 'nav.knowledge', icon: Connection },
+      { path: '/wiki', label: 'nav.wiki', icon: Document },
+    ]}
+  ],
   '/projects': [
     { items: [
       { path: '/projects', label: 'project.allProjects', icon: Document },
@@ -333,7 +331,6 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
       { path: '/settings?section=risk-switches', label: 'settings.riskControl', icon: Warning },
       { path: '/settings?section=openclaw', label: 'settings.clientConnection', icon: Connection },
       { path: '/settings?section=data', label: 'settings.dataManagement', icon: Coin },
-      { path: '/settings?section=decay', label: 'settings.memoryDecay', icon: Timer },
       { path: '/settings?section=system', label: 'settings.systemInfo', icon: Monitor },
       { path: '/settings?section=invitations', label: 'settings.invitationManage', icon: Share, adminOnly: true },
       { path: '/settings?section=users', label: 'settings.userManage', icon: User, adminOnly: true },
@@ -343,8 +340,14 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
 
 const currentSubNav = computed(() => {
   const path = '/' + (route.path.split('/')[1] || '')
-  if (path === '/reports' || path === '/docs') {
+  if (path === '/reports' || path === '/docs' || path === '/skills') {
     return subNavMap['/'] || []
+  }
+  if (path === '/wiki') {
+    return subNavMap['/knowledge'] || []
+  }
+  if (path === '/sharing' || path === '/session-memories') {
+    return subNavMap['/memories'] || []
   }
   return subNavMap[path] || []
 })
@@ -375,7 +378,7 @@ async function performSearch(q: string) {
   searchLoading.value = true
   try {
     const [memRes, wikiRes, projRes] = await Promise.allSettled([
-      memoryApi.searchKeyword(q, 5),
+      memoryApi.search(q, 'keyword', 5),
       wikiApi.search(q, 5),
       projectApi.search(q, 5),
     ])
@@ -585,21 +588,6 @@ function handleUserCommand(command: string) {
 
 .theme-btn:hover {
   color: var(--cm-primary);
-}
-
-.tier-badge-v2 {
-  display: flex;
-  align-items: center;
-  gap: var(--cm-space-1);
-  padding: var(--cm-space-1) var(--cm-space-3);
-  border-radius: var(--cm-radius-full);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.tier-badge-v2.tier-advanced {
-  background: var(--cm-primary-gradient);
-  color: white;
 }
 
 .user-avatar {
@@ -1010,13 +998,6 @@ function handleUserCommand(command: string) {
     padding: 0;
   }
 
-  .tier-badge-v2 span {
-    display: none;
-  }
-  
-  .tier-badge-v2 {
-    padding: var(--cm-space-1);
-  }
 }
 
 @media (max-width: 480px) {

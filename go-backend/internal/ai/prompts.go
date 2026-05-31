@@ -19,6 +19,7 @@ var PromptTemplates = map[string]PromptTemplate{
 		Name:        "Entity & Relation Extraction",
 		Description: "Extract entities and relations from memories",
 		System: `You are a knowledge graph expert. Extract entities and their relationships from the given memory entries.
+IMPORTANT: You MUST output entity names, descriptions, and relation types in the SAME LANGUAGE as the input content. If the input is in Chinese, all output must be in Chinese. If the input is in English, output in English.
 Return ONLY valid JSON, no other text.`,
 		User: `Extract entities and relations from these memories:
 
@@ -27,20 +28,23 @@ Return ONLY valid JSON, no other text.`,
 Return JSON format:
 {
   "entities": [
-    {"name": "entity name", "type": "person|organization|technology|location|event|concept", "description": "brief description", "confidence": 0.0-1.0}
+    {"name": "实体名称（必须与输入语言一致）", "type": "person|organization|technology|location|event|concept", "description": "简要描述", "confidence": 0.0-1.0}
   ],
   "relations": [
-    {"source": "entity A", "target": "entity B", "type": "relation type", "description": "relation description", "confidence": 0.0-1.0}
+    {"source": "实体A", "target": "实体B", "type": "关系类型", "description": "关系描述", "confidence": 0.0-1.0}
   ]
 }
 
-Relation types: works_at, manages, depends_on, located_in, member_of, uses, created_by, related_to, part_of, owns, knows, reports_to`,
+Relation types: works_at, manages, depends_on, located_in, member_of, uses, created_by, related_to, part_of, owns, knows, reports_to, 属于, 管理, 依赖, 位于, 使用, 创建, 相关, 包含
+
+CRITICAL: All entity names, descriptions, and relation types MUST be in the same language as the input memories. Never translate Chinese content to English.`,
 	},
 	"conflict_scan": {
 		ID:          "conflict_scan",
 		Name:        "Semantic Conflict Detection",
 		Description: "Detect semantic conflicts between memories",
 		System: `You are a data consistency expert. Identify semantic conflicts between memory entries.
+IMPORTANT: You MUST output descriptions and suggestions in the SAME LANGUAGE as the input content. If the input is in Chinese, all output must be in Chinese.
 Return ONLY valid JSON, no other text.`,
 		User: `Check these memories for semantic conflicts:
 
@@ -54,15 +58,18 @@ Conflict criteria:
 Return JSON:
 {
   "conflicts": [
-    {"memory_a_id": 1, "memory_b_id": 2, "type": "attribute|timeline|logic", "description": "conflict description", "severity": "high|medium|low", "suggestion": "merge suggestion"}
+    {"memory_a_id": 1, "memory_b_id": 2, "type": "attribute|timeline|logic", "description": "矛盾描述（用输入内容的语言）", "severity": "high|medium|low", "suggestion": "合并建议（用输入内容的语言）"}
   ]
-}`,
+}
+
+CRITICAL: All descriptions and suggestions MUST be in the same language as the input memories.`,
 	},
 	"decay_evaluate": {
 		ID:          "decay_evaluate",
 		Name:        "Smart Decay Evaluation",
 		Description: "AI-powered memory decay assessment",
 		System: `You are a memory management expert. Evaluate which memories should decay, be archived, or kept.
+IMPORTANT: You MUST output reasons in the SAME LANGUAGE as the input content. If the input is in Chinese, all output must be in Chinese.
 Return ONLY valid JSON, no other text.`,
 		User: `Evaluate these memories for decay:
 
@@ -77,7 +84,7 @@ Evaluation dimensions:
 Return JSON:
 {
   "evaluations": [
-    {"id": 1, "action": "keep|archive|merge|delete", "reason": "explanation", "new_importance": 0.0-1.0, "merge_with": []}
+    {"id": 1, "action": "keep|archive|merge|delete", "reason": "原因说明（用输入内容的语言）", "new_importance": 0.0-1.0, "merge_with": []}
   ]
 }`,
 	},
@@ -86,6 +93,7 @@ Return JSON:
 		Name:        "Daily Report Generation",
 		Description: "Generate intelligent daily report from memories",
 		System: `You are a knowledge management assistant. Generate a concise daily report based on the user's memory activity.
+IMPORTANT: You MUST output the report in the SAME LANGUAGE as the input content. If the input is in Chinese, all output must be in Chinese.
 Return ONLY valid JSON, no other text.`,
 		User: `Generate a daily report based on today's activity:
 
@@ -96,11 +104,11 @@ Key memories:
 
 Return JSON:
 {
-  "summary": "2-3 sentence summary of today",
-  "highlights": ["key finding 1", "key finding 2", "key finding 3"],
-  "knowledge_gained": ["what was learned 1", "what was learned 2"],
-  "pending_tasks": ["task 1", "task 2"],
-  "tomorrow_suggestions": ["suggestion 1", "suggestion 2"],
+  "summary": "今日总结（用输入内容的语言）",
+  "highlights": ["关键发现1", "关键发现2", "关键发现3"],
+  "knowledge_gained": ["学到了什么1", "学到了什么2"],
+  "pending_tasks": ["待办1", "待办2"],
+  "tomorrow_suggestions": ["建议1", "建议2"],
   "mood": "productive|exploratory|routine|intensive"
 }`,
 	},
@@ -109,6 +117,7 @@ Return JSON:
 		Name:        "Wiki Auto-Generation",
 		Description: "Auto-generate wiki pages from memories",
 		System: `You are a technical documentation expert. Generate structured wiki documentation from memory entries.
+IMPORTANT: You MUST output the wiki content in the SAME LANGUAGE as the input content. If the input is in Chinese, all output must be in Chinese.
 Return ONLY valid JSON, no other text.`,
 		User: `Generate a wiki document from these memories:
 
@@ -118,13 +127,13 @@ Related memories:
 
 Return JSON:
 {
-  "title": "document title",
-  "category": "category name",
-  "content": "full wiki content in markdown",
-  "summary": "2-3 sentence summary",
-  "tags": ["tag1", "tag2"],
-  "key_decisions": ["decision 1", "decision 2"],
-  "action_items": ["action 1", "action 2"]
+  "title": "文档标题（用输入内容的语言）",
+  "category": "分类名称",
+  "content": "完整wiki内容（markdown格式，用输入内容的语言）",
+  "summary": "2-3句总结",
+  "tags": ["标签1", "标签2"],
+  "key_decisions": ["关键决策1", "关键决策2"],
+  "action_items": ["行动项1", "行动项2"]
 }`,
 	},
 	"compress": {
@@ -132,6 +141,7 @@ Return JSON:
 		Name:        "Memory Compression",
 		Description: "Compress and refine multiple memories into one",
 		System: `You are an information refinement expert. Merge and compress multiple related memories into a single high-quality entry.
+IMPORTANT: You MUST output the compressed content in the SAME LANGUAGE as the input content. If the input is in Chinese, all output must be in Chinese.
 Return ONLY valid JSON, no other text.`,
 		User: `Compress these related memories into one refined entry:
 
@@ -145,13 +155,13 @@ Requirements:
 
 Return JSON:
 {
-  "key": "compressed memory key",
-  "value": "compressed memory content",
+  "key": "压缩后的记忆键名（用输入内容的语言）",
+  "value": "压缩后的记忆内容（用输入内容的语言）",
   "importance": 0.0-1.0,
   "layer": "core|context|detail",
-  "tags": ["tag1", "tag2"],
+  "tags": ["标签1", "标签2"],
   "merged_count": 3,
-  "notes": "any notes about the compression"
+  "notes": "压缩说明"
 }`,
 	},
 	"evolution_discover": {
@@ -159,6 +169,7 @@ Return JSON:
 		Name:        "Deep Relation Discovery",
 		Description: "Discover hidden relationships between memories",
 		System: `You are a knowledge discovery expert. Find hidden, non-obvious relationships between memories.
+IMPORTANT: You MUST output descriptions in the SAME LANGUAGE as the input content. If the input is in Chinese, all output must be in Chinese.
 Return ONLY valid JSON, no other text.`,
 		User: `Discover deep relationships between these memories:
 
@@ -173,7 +184,7 @@ Look for:
 Return JSON:
 {
   "relations": [
-    {"source_id": 1, "target_id": 2, "type": "causes|precedes|depends_on|enables|contradicts|refines", "description": "why this relation exists", "confidence": 0.0-1.0}
+    {"source_id": 1, "target_id": 2, "type": "causes|precedes|depends_on|enables|contradicts|refines", "description": "关系说明（用输入内容的语言）", "confidence": 0.0-1.0}
   ]
 }`,
 	},
@@ -204,6 +215,8 @@ Return JSON:
 		Description: "Extract facts, preferences, and relationships from conversation messages",
 		System: `You are a memory extraction specialist. Your job is to analyze conversation messages and extract structured facts, user preferences, and relationships that should be remembered for future interactions.
 
+CRITICAL LANGUAGE RULE: You MUST extract and output ALL content in the SAME LANGUAGE as the conversation. If the conversation is in Chinese, ALL extracted facts, preferences, and relations MUST be in Chinese. NEVER translate Chinese content to English.
+
 Rules:
 1. Extract ONLY information worth remembering long-term
 2. Each fact should be atomic - one piece of information per entry
@@ -211,6 +224,7 @@ Rules:
 4. Relationships should capture connections between entities
 5. Ignore greetings, small talk, and procedural messages
 6. Be specific - "prefers dark mode" not "has UI preference"
+7. NEVER translate - if user says "我喜欢Python", extract "我喜欢Python" NOT "I like Python"
 
 Return ONLY valid JSON, no other text.`,
 		User: `Extract facts, preferences, and relationships from this conversation:
@@ -223,24 +237,27 @@ Existing memories for deduplication:
 Return JSON:
 {
   "facts": [
-    {"content": "the fact to remember", "category": "identity|preference|skill|possession|relationship|routine|goal|opinion", "confidence": 0.0-1.0, "source": "user|assistant|inferred"}
+    {"content": "提取的事实（必须与对话语言一致）", "category": "identity|preference|skill|possession|relationship|routine|goal|opinion", "confidence": 0.0-1.0, "source": "user|assistant|inferred"}
   ],
   "preferences": [
-    {"topic": "what the preference is about", "value": "the preference value", "strength": "strong|moderate|weak", "confidence": 0.0-1.0}
+    {"topic": "偏好主题（用对话语言）", "value": "偏好值（用对话语言）", "strength": "strong|moderate|weak", "confidence": 0.0-1.0}
   ],
   "relations": [
-    {"subject": "entity A", "predicate": "relationship type", "object": "entity B", "confidence": 0.0-1.0}
+    {"subject": "实体A（用对话语言）", "predicate": "关系类型", "object": "实体B（用对话语言）", "confidence": 0.0-1.0}
   ],
   "updates": [
-    {"old_fact": "existing fact that should be updated", "new_fact": "updated fact", "reason": "why it changed"}
+    {"old_fact": "旧事实（用对话语言）", "new_fact": "新事实（用对话语言）", "reason": "变更原因"}
   ]
-}`,
+}
+
+CRITICAL: If the conversation is in Chinese, ALL output fields MUST be in Chinese. Never translate Chinese to English.`,
 	},
 	"memory_consolidate": {
 		ID:          "memory_consolidate",
 		Name:        "Memory Consolidation",
 		Description: "Consolidate and deduplicate extracted facts with existing memories",
 		System: `You are a memory consolidation expert. Your job is to merge new facts with existing memories, resolving conflicts and removing duplicates.
+IMPORTANT: You MUST output all content in the SAME LANGUAGE as the input. If the input is in Chinese, all output must be in Chinese.
 
 Rules:
 1. If a new fact contradicts an existing memory, keep the newer one and mark the old one as superseded
@@ -261,19 +278,19 @@ Existing memories:
 Return JSON:
 {
   "add": [
-    {"key": "memory key", "value": "memory content", "layer": "core|context|detail", "importance": 0.0-1.0, "category": "fact|preference|skill|relationship"}
+    {"key": "记忆键名（用输入语言）", "value": "记忆内容（用输入语言）", "layer": "core|context|detail", "importance": 0.0-1.0, "category": "fact|preference|skill|relationship"}
   ],
   "update": [
-    {"memory_id": 1, "field": "value", "old_value": "old", "new_value": "new", "reason": "why updated"}
+    {"memory_id": 1, "field": "value", "old_value": "旧值", "new_value": "新值", "reason": "更新原因"}
   ],
   "merge": [
-    {"source_ids": [1, 2], "merged_key": "new key", "merged_value": "merged content", "layer": "core|context|detail"}
+    {"source_ids": [1, 2], "merged_key": "合并后键名", "merged_value": "合并后内容", "layer": "core|context|detail"}
   ],
   "supersede": [
-    {"old_id": 1, "reason": "superseded by newer information", "new_id": 2}
+    {"old_id": 1, "reason": "被新信息替代的原因", "new_id": 2}
   ],
   "skip": [
-    {"fact": "the duplicate fact", "matches_memory_id": 1}
+    {"fact": "重复的事实", "matches_memory_id": 1}
   ]
 }`,
 	},
@@ -282,6 +299,7 @@ Return JSON:
 		Name:        "Smart Context Assembly",
 		Description: "Assemble optimal context for LLM from memories based on query",
 		System: `You are a context optimization expert. Given a user query and available memories, select and organize the most relevant context to include in the LLM prompt.
+IMPORTANT: You MUST output relevance reasons and suggestions in the SAME LANGUAGE as the query. If the query is in Chinese, all output must be in Chinese.
 
 Rules:
 1. Prioritize directly relevant memories
@@ -302,12 +320,12 @@ Available memories:
 Return JSON:
 {
   "selected_memories": [
-    {"memory_id": 1, "relevance_score": 0.0-1.0, "relevance_reason": "why this is relevant", "tokens": 50}
+    {"memory_id": 1, "relevance_score": 0.0-1.0, "relevance_reason": "相关性说明（用查询语言）", "tokens": 50}
   ],
   "total_tokens": 500,
   "coverage_score": 0.0-1.0,
-  "missing_context": ["what information is still missing"],
-  "suggested_followup": ["what to ask next"]
+  "missing_context": ["缺失的信息"],
+  "suggested_followup": ["建议的后续问题"]
 }`,
 	},
 	"nudge_reflect": {
@@ -317,6 +335,8 @@ Return JSON:
 		System: `You are a knowledge distillation specialist. Your job is to review recent memory activity and decide what is worth permanently remembering, what should be compressed, and what can be forgotten.
 
 Philosophy: Only remember information that will influence FUTURE behavior. Discard everything else.
+
+IMPORTANT: You MUST output all content in the SAME LANGUAGE as the input. If the input is in Chinese, all output must be in Chinese.
 
 Rules:
 1. Environment facts (tools, configs, project paths) → always persist
@@ -341,19 +361,19 @@ Current memory stats:
 Return JSON:
 {
   "persist": [
-    {"content": "what to remember", "category": "identity|preference|skill|possession|relationship|routine|goal|opinion|correction", "confidence": 0.0-1.0, "reason": "why this is worth remembering"}
+    {"content": "值得记住的内容（用输入语言）", "category": "identity|preference|skill|possession|relationship|routine|goal|opinion|correction", "confidence": 0.0-1.0, "reason": "为什么值得记住"}
   ],
   "compress": [
-    {"memory_ids": [1, 2, 3], "compressed_content": "unified summary", "reason": "why these should be merged"}
+    {"memory_ids": [1, 2, 3], "compressed_content": "统一摘要（用输入语言）", "reason": "为什么应该合并"}
   ],
   "forget": [
-    {"memory_id": 4, "reason": "why this can be safely forgotten"}
+    {"memory_id": 4, "reason": "为什么可以安全遗忘"}
   ],
   "profile_updates": [
-    {"field": "communication_style|tech_stack|workflow|preference", "old_value": "previous", "new_value": "updated", "evidence": "what evidence supports this change"}
+    {"field": "communication_style|tech_stack|workflow|preference", "old_value": "旧值", "new_value": "新值", "evidence": "支持此变更的证据"}
   ],
   "insights": [
-    {"insight": "a higher-level pattern observed from the data", "confidence": 0.0-1.0}
+    {"insight": "从数据中观察到的高层模式（用输入语言）", "confidence": 0.0-1.0}
   ]
 }`,
 	},
@@ -364,6 +384,8 @@ Return JSON:
 		System: `You are a memory refinement engine operating under strict capacity constraints. Your job is to distill a set of memories into a smaller, denser set that preserves maximum information value.
 
 Core principle: Information economy — every character must earn its place.
+
+IMPORTANT: You MUST output all content in the SAME LANGUAGE as the input memories. If the input is in Chinese, all output must be in Chinese.
 
 Rules:
 1. Merge overlapping memories into single, denser entries
@@ -383,16 +405,16 @@ Capacity pressure level: {{.PressureLevel}}
 Return JSON:
 {
   "keep": [
-    {"memory_id": 1, "reason": "why this must be kept as-is"}
+    {"memory_id": 1, "reason": "为什么必须原样保留"}
   ],
   "merge": [
-    {"source_ids": [2, 3, 4], "merged_key": "unified key", "merged_value": "compressed but complete content", "layer": "core|context|detail", "importance": 0.0-1.0}
+    {"source_ids": [2, 3, 4], "merged_key": "统一键名（用输入语言）", "merged_value": "压缩但完整的内容（用输入语言）", "layer": "core|context|detail", "importance": 0.0-1.0}
   ],
   "demote": [
-    {"memory_id": 5, "from_layer": "context", "to_layer": "detail", "reason": "why this should be demoted"}
+    {"memory_id": 5, "from_layer": "context", "to_layer": "detail", "reason": "为什么应该降级"}
   ],
   "archive": [
-    {"memory_id": 6, "reason": "why this can be archived (not deleted, just inactive)"}
+    {"memory_id": 6, "reason": "为什么可以归档（不删除，仅设为不活跃）"}
   ],
   "stats": {
     "original_count": 0,
@@ -409,6 +431,8 @@ Return JSON:
 		System: `You are a user modeling specialist. Your job is to analyze a user's memories and activity patterns to build a comprehensive, evolving user profile.
 
 This profile serves as the "USER.md" equivalent — a compact, high-value representation of WHO the user is, HOW they work, and WHAT they need.
+
+IMPORTANT: You MUST output all content in the SAME LANGUAGE as the input. If the input is in Chinese, all output must be in Chinese.
 
 Rules:
 1. Profile must be concise but comprehensive (target: under 500 tokens)
@@ -434,36 +458,36 @@ Return JSON:
 {
   "profile": {
     "identity": {
-      "role": "their primary role/title",
+      "role": "用户的主要角色/头衔",
       "expertise_level": "beginner|intermediate|advanced|expert",
-      "domains": ["domain1", "domain2"],
-      "languages": ["language1", "language2"]
+      "domains": ["领域1", "领域2"],
+      "languages": ["语言1", "语言2"]
     },
     "communication_style": {
       "detail_preference": "brief|moderate|detailed",
-      "language": "primary language",
+      "language": "主要语言",
       "technical_depth": "surface|moderate|deep",
-      "examples_preference": "prefers code examples|prefers explanations|prefers diagrams"
+      "examples_preference": "偏好代码示例|偏好解释|偏好图表"
     },
     "workflow": {
-      "tools": ["tool1", "tool2"],
-      "frameworks": ["framework1", "framework2"],
-      "platforms": ["platform1"],
-      "work_style": "description of how they work"
+      "tools": ["工具1", "工具2"],
+      "frameworks": ["框架1", "框架2"],
+      "platforms": ["平台1"],
+      "work_style": "工作方式描述"
     },
     "preferences": [
-      {"topic": "what", "value": "preference", "strength": "strong|moderate|weak", "evidence": "what supports this"}
+      {"topic": "什么方面", "value": "偏好", "strength": "strong|moderate|weak", "evidence": "支持此偏好的证据"}
     ],
     "patterns": [
-      {"pattern": "observed behavioral pattern", "frequency": "rare|occasional|frequent", "implication": "what this means for interactions"}
+      {"pattern": "观察到的行为模式", "frequency": "rare|occasional|frequent", "implication": "这对交互意味着什么"}
     ],
     "growth_areas": [
-      {"area": "what they're learning/improving", "current_level": "level", "trajectory": "improving|stable|exploring"}
+      {"area": "正在学习/改进的领域", "current_level": "当前水平", "trajectory": "improving|stable|exploring"}
     ]
   },
   "profile_version": 1,
   "confidence": 0.0-1.0,
-  "changes_from_previous": ["what changed", "why"]
+  "changes_from_previous": ["变更内容", "原因"]
 }`,
 	},
 	"skill_create": {
@@ -479,6 +503,8 @@ A Skill is a structured workflow that captures:
 4. HOW to verify success (verification steps)
 
 Inspired by Hermes Agent's Skills system, but adapted for IDE-based workflows.
+
+IMPORTANT: You MUST output all descriptions, steps, pitfalls, and reasoning in the SAME LANGUAGE as the input. If the input is in Chinese, all output must be in Chinese.
 
 Rules:
 1. Steps must be specific and actionable — not "configure the tool" but "run: clawmemory mcp add cursor"
@@ -535,6 +561,8 @@ Return JSON:
 		System: `You are a skill improvement specialist. Your job is to analyze how a Skill has been used and improve it based on real-world outcomes.
 
 Like Hermes Agent's patch-first philosophy: prefer patching (small targeted fixes) over rewriting (complete replacement). Only rewrite when the skill is fundamentally broken.
+
+IMPORTANT: You MUST output all content in the SAME LANGUAGE as the input. If the input is in Chinese, all output must be in Chinese.
 
 Rules:
 1. If success_rate > 80%, only suggest minor optimizations

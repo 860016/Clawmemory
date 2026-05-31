@@ -18,7 +18,7 @@ export const sharingApi = {
 
 export const riskSwitchApi = {
   getSwitches: () => api.get('/risk-switches'),
-  setSwitches: (switches: Record<string, boolean>) => api.put('/risk-switches', { switches }),
+  setSwitches: (switches: Record<string, boolean>) => api.put('/risk-switches', { switches }, { _silent: true } as any),
 }
 
 export const writebackApi = {

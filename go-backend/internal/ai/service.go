@@ -135,6 +135,22 @@ func (s *AIService) AIExtract(ctx context.Context, userID uint) (map[string]inte
 			"confidence":  e.Confidence,
 			"method":      "ai",
 		}
+
+		var existCount int64
+		s.db.Model(&models.Entity{}).Where("user_id = ? AND name = ?", userID, e.Name).Count(&existCount)
+		if existCount == 0 {
+			entity := models.Entity{
+				Name:          e.Name,
+				EntityType:    e.Type,
+				Description:   e.Description,
+				Confidence:    e.Confidence,
+				UserID:        userID,
+				ExtractMethod: "ai_extract",
+			}
+			if err := s.db.Create(&entity).Error; err != nil {
+				log.Printf("[AIExtract] failed to save entity %s: %v", e.Name, err)
+			}
+		}
 	}
 
 	relations := make([]map[string]interface{}, len(result.Relations))
@@ -147,12 +163,55 @@ func (s *AIService) AIExtract(ctx context.Context, userID uint) (map[string]inte
 			"confidence":  r.Confidence,
 			"method":      "ai",
 		}
+
+		var sourceEntity models.Entity
+		if err := s.db.Where("user_id = ? AND name = ?", userID, r.Source).First(&sourceEntity).Error; err != nil {
+			sourceEntity = models.Entity{
+				Name:          r.Source,
+				EntityType:    "unknown",
+				Confidence:    0.5,
+				UserID:        userID,
+				ExtractMethod: "ai_extract",
+			}
+			s.db.Create(&sourceEntity)
+		}
+
+		var targetEntity models.Entity
+		if err := s.db.Where("user_id = ? AND name = ?", userID, r.Target).First(&targetEntity).Error; err != nil {
+			targetEntity = models.Entity{
+				Name:          r.Target,
+				EntityType:    "unknown",
+				Confidence:    0.5,
+				UserID:        userID,
+				ExtractMethod: "ai_extract",
+			}
+			s.db.Create(&targetEntity)
+		}
+
+		if sourceEntity.ID > 0 && targetEntity.ID > 0 {
+			var existCount int64
+			s.db.Model(&models.Relation{}).Where("user_id = ? AND source_id = ? AND target_id = ? AND relation_type = ?",
+				userID, sourceEntity.ID, targetEntity.ID, r.Type).Count(&existCount)
+			if existCount == 0 {
+				rel := models.Relation{
+					SourceID:     sourceEntity.ID,
+					TargetID:     targetEntity.ID,
+					RelationType: r.Type,
+					Weight:       r.Confidence,
+					UserID:       userID,
+				}
+				if err := s.db.Create(&rel).Error; err != nil {
+					log.Printf("[AIExtract] failed to save relation %s->%s: %v", r.Source, r.Target, err)
+				}
+			}
+		}
 	}
 
 	return map[string]interface{}{
 		"entities":  entities,
 		"relations": relations,
 		"total":     len(entities) + len(relations),
+		"extracted": len(entities),
 		"mode":      "ai",
 	}, nil
 }

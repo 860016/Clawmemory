@@ -24,7 +24,7 @@ func handleRegisterWithInvitation(authService *services.AuthService) gin.Handler
 			return
 		}
 
-		user, err := authService.RegisterWithInvitation(req.Username, req.Password, req.InvitationCode)
+		result, err := authService.RegisterWithInvitation(req.Username, req.Password, req.InvitationCode)
 		if err != nil {
 			status := http.StatusBadRequest
 			if err.Error() == "username already exists" {
@@ -34,12 +34,17 @@ func handleRegisterWithInvitation(authService *services.AuthService) gin.Handler
 			return
 		}
 
-		c.JSON(http.StatusCreated, gin.H{
-			"id":       user.ID,
-			"username": user.Username,
-			"role":     user.Role,
+		resp := gin.H{
+			"id":       result.User.ID,
+			"username": result.User.Username,
+			"role":     result.User.Role,
 			"message":  "registration successful",
-		})
+		}
+		if result.APIKey != "" {
+			resp["api_key"] = result.APIKey
+		}
+
+		c.JSON(http.StatusCreated, resp)
 	}
 }
 

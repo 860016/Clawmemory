@@ -426,17 +426,14 @@ func (s *HealthService) AutoFix(userID uint, issueTypes []string) (map[string]in
 				Order("importance DESC, updated_at DESC").Find(&duplicates).Error
 
 			if len(duplicates) > 1 {
-				merged := duplicates[0]
+				dedupSvc := NewDedupService(s.db)
 				for _, d := range duplicates[1:] {
-					if len(d.Value) > len(merged.Value) {
-						merged.Value = d.Value
+					_, mergeErr := dedupSvc.Merge(userID, d.ID, duplicates[0].ID)
+					if mergeErr != nil {
+						failed++
+						continue
 					}
-					if d.Importance > merged.Importance {
-						merged.Importance = d.Importance
-					}
-					s.db.Delete(&d)
 				}
-				s.db.Save(&merged)
 				fixed++
 			} else {
 				skipped++

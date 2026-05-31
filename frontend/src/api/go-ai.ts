@@ -6,7 +6,7 @@ export const aiApi = {
   },
 
   updateConfig(data: Record<string, any>) {
-    return api.put('/ai/config', data)
+    return api.put('/ai/config', data, { _silent: true } as any)
   },
 
   testConnection() {
@@ -71,7 +71,7 @@ export const aiApi = {
   },
 
   consolidate(newFacts: any[]) {
-    return api.post('/ai/consolidate', { new_facts: newFacts }, { timeout: 120000 })
+    return api.post('/ai/consolidate', { facts: newFacts }, { timeout: 120000 })
   },
 
   processConversation(messages: Array<{ role: string; content: string }>) {

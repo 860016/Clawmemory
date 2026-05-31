@@ -117,5 +117,25 @@ func runPreMigrations(db *gorm.DB) error {
 		}
 	}
 
+	if db.Migrator().HasTable(&models.Setting{}) && db.Migrator().HasTable(&models.User{}) {
+		var orphanCount int64
+		db.Model(&models.Setting{}).
+			Where("user_id NOT IN (?)", db.Model(&models.User{}).Select("id")).
+			Count(&orphanCount)
+		if orphanCount > 0 {
+			var firstUser models.User
+			if err := db.Order("id ASC").First(&firstUser).Error; err == nil {
+				result := db.Model(&models.Setting{}).
+					Where("user_id NOT IN (?)", db.Model(&models.User{}).Select("id")).
+					Update("user_id", firstUser.ID)
+				if result.Error != nil {
+					fmt.Printf("[DB] orphan settings fix error: %v\n", result.Error)
+				} else {
+					fmt.Printf("[DB] fixed %d orphan settings to user_id=%d\n", result.RowsAffected, firstUser.ID)
+				}
+			}
+		}
+	}
+
 	return nil
 }

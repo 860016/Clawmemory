@@ -8,48 +8,50 @@ import (
 
 // User 用户
 type User struct {
-	ID               uint       `gorm:"primarykey" json:"id"`
-	Username         string     `gorm:"uniqueIndex;not null" json:"username"`
-	Password         string     `gorm:"not null" json:"-"`
-	Email            string     `json:"email"`
-	Role             string     `gorm:"size:20;default:user" json:"role"`
-	IsFounder        bool       `gorm:"default:false" json:"is_founder"`
-	TokenVersion     int        `gorm:"default:1" json:"token_version"`
-	InvitationCode   string     `gorm:"size:50" json:"-"`
-	FailedAttempts   int        `gorm:"default:0" json:"-"`
-	LockedUntil      *time.Time `json:"-"`
-	RefreshToken     string     `gorm:"size:500" json:"-"`
-	RefreshTokenExp  *time.Time `json:"-"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	ID              uint       `gorm:"primarykey" json:"id"`
+	Username        string     `gorm:"uniqueIndex;not null" json:"username"`
+	Password        string     `gorm:"not null" json:"-"`
+	Email           string     `json:"email"`
+	Role            string     `gorm:"size:20;default:user" json:"role"`
+	IsFounder       bool       `gorm:"default:false" json:"is_founder"`
+	TokenVersion    int        `gorm:"default:1" json:"token_version"`
+	InvitationCode  string     `gorm:"size:50" json:"-"`
+	FailedAttempts  int        `gorm:"default:0" json:"-"`
+	LockedUntil     *time.Time `json:"-"`
+	RefreshToken    string     `gorm:"size:500" json:"-"`
+	RefreshTokenExp *time.Time `json:"-"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 // Memory 记忆
 type Memory struct {
-	ID             uint       `gorm:"primarykey" json:"id"`
-	UserID         uint       `gorm:"index;not null;default:1" json:"user_id"`
-	Layer          string     `gorm:"size:20;not null" json:"layer"`
-	Key            string     `gorm:"size:200;not null" json:"key"`
-	Value          string     `gorm:"type:text;not null" json:"value"`
-	Importance     float64    `gorm:"default:0.5" json:"importance"`
-	AccessCount    int        `gorm:"default:0" json:"access_count"`
-	LastAccessedAt *time.Time `json:"last_accessed_at"`
-	IsEncrypted    bool       `gorm:"default:false" json:"is_encrypted"`
-	Tags           string     `gorm:"type:text" json:"tags"`
-	Summary        string     `gorm:"size:500" json:"summary"`
-	Source         string     `gorm:"size:50;default:manual" json:"source"`
-	Platform       string     `gorm:"size:30;default:clawmemory;index" json:"platform"`
-	Status         string     `gorm:"size:20;default:active;index" json:"status"`
-	TrashedAt      *time.Time `json:"trashed_at"`
-	DecayStage     int        `gorm:"default:0" json:"decay_stage"`
-	ReinforceCount int        `gorm:"default:0" json:"reinforce_count"`
-	MemoryType     string     `gorm:"size:20;default:knowledge" json:"memory_type"`
-	VerifiedAt     *time.Time `json:"verified_at"`
-	SourceAgent    string     `gorm:"size:50;index" json:"source_agent"`
-	Visibility     string     `gorm:"size:20;default:private;index" json:"visibility"`
-	OriginChain    string     `gorm:"size:200" json:"origin_chain"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID               uint       `gorm:"primarykey" json:"id"`
+	UserID           uint       `gorm:"index;not null;default:1" json:"user_id"`
+	Layer            string     `gorm:"size:20;not null" json:"layer"`
+	Key              string     `gorm:"size:200;not null" json:"key"`
+	Value            string     `gorm:"type:text;not null" json:"value"`
+	Importance       float64    `gorm:"default:0.5" json:"importance"`
+	AccessCount      int        `gorm:"default:0" json:"access_count"`
+	LastAccessedAt   *time.Time `json:"last_accessed_at"`
+	IsEncrypted      bool       `gorm:"default:false" json:"is_encrypted"`
+	Tags             string     `gorm:"type:text" json:"tags"`
+	Summary          string     `gorm:"size:500" json:"summary"`
+	Source           string     `gorm:"size:50;default:manual" json:"source"`
+	Platform         string     `gorm:"size:30;default:clawmemory;index" json:"platform"`
+	Status           string     `gorm:"size:20;default:active;index" json:"status"`
+	TrashedAt        *time.Time `json:"trashed_at"`
+	DecayStage       int        `gorm:"default:0" json:"decay_stage"`
+	ReinforceCount   int        `gorm:"default:0" json:"reinforce_count"`
+	VerifyCount      int        `gorm:"default:0" json:"verify_count"`
+	MemoryType       string     `gorm:"size:20;default:knowledge" json:"memory_type"`
+	VerifiedAt       *time.Time `json:"verified_at"`
+	ValidationStatus string     `gorm:"size:20;default:pending" json:"validation_status"`
+	SourceAgent      string     `gorm:"size:50;index" json:"source_agent"`
+	Visibility       string     `gorm:"size:20;default:private;index" json:"visibility"`
+	OriginChain      string     `gorm:"size:200" json:"origin_chain"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
 // Entity 知识实体
@@ -205,24 +207,25 @@ type AuditLog struct {
 }
 
 type SessionMemory struct {
-	ID             uint      `gorm:"primarykey" json:"id"`
-	UserID         uint      `gorm:"index;not null;default:1" json:"user_id"`
-	SessionID      string    `gorm:"size:100;index" json:"session_id"`
-	Title          string    `gorm:"size:200" json:"title"`
-	CurrentState   string    `gorm:"type:text" json:"current_state"`
-	TaskSpec       string    `gorm:"type:text" json:"task_spec"`
-	FilesAndFuncs  string    `gorm:"type:text" json:"files_and_funcs"`
-	Workflow       string    `gorm:"type:text" json:"workflow"`
-	Errors         string    `gorm:"type:text" json:"errors"`
-	Docs           string    `gorm:"type:text" json:"docs"`
-	Learnings      string    `gorm:"type:text" json:"learnings"`
-	KeyResults     string    `gorm:"type:text" json:"key_results"`
-	Worklog        string    `gorm:"type:text" json:"worklog"`
-	TokenCount     int       `gorm:"default:0" json:"token_count"`
-	CompressedFrom string    `gorm:"size:100" json:"compressed_from"`
-	Status         string    `gorm:"size:20;default:active" json:"status"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             uint       `gorm:"primarykey" json:"id"`
+	UserID         uint       `gorm:"index;not null;default:1" json:"user_id"`
+	SessionID      string     `gorm:"size:100;index" json:"session_id"`
+	Title          string     `gorm:"size:200" json:"title"`
+	CurrentState   string     `gorm:"type:text" json:"current_state"`
+	TaskSpec       string     `gorm:"type:text" json:"task_spec"`
+	FilesAndFuncs  string     `gorm:"type:text" json:"files_and_funcs"`
+	Workflow       string     `gorm:"type:text" json:"workflow"`
+	Errors         string     `gorm:"type:text" json:"errors"`
+	Docs           string     `gorm:"type:text" json:"docs"`
+	Learnings      string     `gorm:"type:text" json:"learnings"`
+	KeyResults     string     `gorm:"type:text" json:"key_results"`
+	Worklog        string     `gorm:"type:text" json:"worklog"`
+	TokenCount     int        `gorm:"default:0" json:"token_count"`
+	CompressedFrom string     `gorm:"size:100" json:"compressed_from"`
+	Status         string     `gorm:"size:20;default:active" json:"status"`
+	ExpiresAt      *time.Time `gorm:"index" json:"expires_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 type ReasoningConfig struct {
@@ -389,15 +392,15 @@ type SkillSuggestion struct {
 }
 
 type FileSyncIndex struct {
-	ID        uint      `gorm:"primarykey" json:"id"`
-	FilePath  string    `gorm:"size:500;uniqueIndex" json:"file_path"`
-	FileHash  string    `gorm:"size:64;not null" json:"file_hash"`
-	FileSize  int64     `json:"file_size"`
-	ModTime   int64     `json:"mod_time"`
-	Source    string    `gorm:"size:50;index" json:"source"`
-	ChunkCount int      `gorm:"default:0" json:"chunk_count"`
-	Platform  string    `gorm:"size:30;index" json:"platform"`
-	SyncedAt  time.Time `json:"synced_at"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         uint      `gorm:"primarykey" json:"id"`
+	FilePath   string    `gorm:"size:500;uniqueIndex" json:"file_path"`
+	FileHash   string    `gorm:"size:64;not null" json:"file_hash"`
+	FileSize   int64     `json:"file_size"`
+	ModTime    int64     `json:"mod_time"`
+	Source     string    `gorm:"size:50;index" json:"source"`
+	ChunkCount int       `gorm:"default:0" json:"chunk_count"`
+	Platform   string    `gorm:"size:30;index" json:"platform"`
+	SyncedAt   time.Time `json:"synced_at"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }

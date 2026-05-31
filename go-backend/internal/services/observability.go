@@ -335,7 +335,7 @@ func (h *HealthChecker) Check() HealthStatus {
 		}
 	}
 
-	status.Checks["license"] = CheckResult{
+	status.Checks["edition"] = CheckResult{
 		Status: "healthy",
 		Detail: "open source (all features enabled)",
 	}

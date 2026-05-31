@@ -12,14 +12,10 @@ import (
 type RiskSwitch string
 
 const (
-	RiskShareAutoApprove       RiskSwitch = "risk_share_auto_approve"
-	RiskCrossAgentWrite        RiskSwitch = "risk_cross_agent_write"
-	RiskMemoryVisibilityChange RiskSwitch = "risk_memory_visibility_change"
-	RiskAutoImportMemories     RiskSwitch = "risk_auto_import_memories"
-	RiskAgentMemoryAccess      RiskSwitch = "risk_agent_memory_access"
-	RiskBulkDelete             RiskSwitch = "risk_bulk_delete"
-	RiskDecayAutoApply         RiskSwitch = "risk_decay_auto_apply"
-	RiskCompressAutoApply      RiskSwitch = "risk_compress_auto_apply"
+	RiskCrossAgentAccess   RiskSwitch = "risk_cross_agent_access"
+	RiskAutoImportMemories RiskSwitch = "risk_auto_import_memories"
+	RiskBulkDelete         RiskSwitch = "risk_bulk_delete"
+	RiskAutoDestructive    RiskSwitch = "risk_auto_destructive"
 )
 
 type RiskSwitchConfig struct {
@@ -32,24 +28,10 @@ type RiskSwitchConfig struct {
 
 var RiskSwitchDefinitions = []RiskSwitchConfig{
 	{
-		Key:          RiskShareAutoApprove,
-		Label:        "自动审批记忆共享",
-		Description:  "允许自动审批来自其他 Agent 的记忆共享请求，无需人工确认",
-		Category:     "sharing",
-		DefaultValue: false,
-	},
-	{
-		Key:          RiskCrossAgentWrite,
-		Label:        "跨 Agent 写入记忆",
-		Description:  "允许一个 Agent 向另一个 Agent 的私有记忆写入数据",
-		Category:     "sharing",
-		DefaultValue: false,
-	},
-	{
-		Key:          RiskMemoryVisibilityChange,
-		Label:        "记忆可见性变更",
-		Description:  "允许将私有记忆变更为共享或公开可见性",
-		Category:     "visibility",
+		Key:          RiskCrossAgentAccess,
+		Label:        "跨 Agent 访问控制",
+		Description:  "允许跨 Agent 读取、写入、共享记忆，以及变更记忆可见性",
+		Category:     "access",
 		DefaultValue: false,
 	},
 	{
@@ -60,13 +42,6 @@ var RiskSwitchDefinitions = []RiskSwitchConfig{
 		DefaultValue: false,
 	},
 	{
-		Key:          RiskAgentMemoryAccess,
-		Label:        "Agent 跨用户访问记忆",
-		Description:  "允许 Agent 通过 API Key 访问其他用户的共享记忆",
-		Category:     "access",
-		DefaultValue: false,
-	},
-	{
 		Key:          RiskBulkDelete,
 		Label:        "批量删除记忆",
 		Description:  "允许一次删除多条记忆，包括批量清空回收站",
@@ -74,16 +49,9 @@ var RiskSwitchDefinitions = []RiskSwitchConfig{
 		DefaultValue: false,
 	},
 	{
-		Key:          RiskDecayAutoApply,
-		Label:        "自动衰减应用",
-		Description:  "允许系统自动应用记忆衰减策略，可能自动归档或删除低重要性记忆",
-		Category:     "destructive",
-		DefaultValue: false,
-	},
-	{
-		Key:          RiskCompressAutoApply,
-		Label:        "自动压缩应用",
-		Description:  "允许系统自动压缩长记忆内容，可能导致信息损失",
+		Key:          RiskAutoDestructive,
+		Label:        "自动破坏性操作",
+		Description:  "允许系统自动执行衰减归档、压缩等可能丢失信息的操作",
 		Category:     "destructive",
 		DefaultValue: false,
 	},
@@ -123,7 +91,49 @@ func (s *RiskSwitchService) loadDefaults() {
 	s.cacheValid = true
 }
 
+func (s *RiskSwitchService) loadUserCache(userID uint) map[RiskSwitch]bool {
+	result := make(map[RiskSwitch]bool)
+	for _, def := range RiskSwitchDefinitions {
+		result[def.Key] = def.DefaultValue
+	}
+
+	settingsSvc := NewSettingsService(s.db)
+	if v, err := settingsSvc.GetByKey(userID, "risk_switches"); err == nil && v != nil {
+		if m, ok := v.(map[string]interface{}); ok {
+			for k, val := range m {
+				if b, ok := val.(bool); ok {
+					result[RiskSwitch(k)] = b
+				}
+			}
+		}
+	}
+	return result
+}
+
+func (s *RiskSwitchService) loadUserCacheRaw(userID uint) map[string]interface{} {
+	existing := make(map[string]interface{})
+
+	settingsSvc := NewSettingsService(s.db)
+	if v, err := settingsSvc.GetByKey(userID, "risk_switches"); err == nil && v != nil {
+		if m, ok := v.(map[string]interface{}); ok {
+			for k, val := range m {
+				existing[k] = val
+			}
+		}
+	}
+	return existing
+}
+
 func (s *RiskSwitchService) IsEnabled(switchKey RiskSwitch) bool {
+	return s.IsEnabledForUser(switchKey, 0)
+}
+
+func (s *RiskSwitchService) IsEnabledForUser(switchKey RiskSwitch, userID uint) bool {
+	if userID > 0 {
+		userCache := s.loadUserCache(userID)
+		return userCache[switchKey]
+	}
+
 	s.mu.RLock()
 	cacheValid := s.cacheValid
 	val, ok := s.cache[switchKey]
@@ -156,12 +166,17 @@ func (s *RiskSwitchService) GetAll(userID uint) map[RiskSwitch]bool {
 }
 
 func (s *RiskSwitchService) GetAllWithMeta(userID uint) []map[string]interface{} {
+	userCache := s.loadUserCache(userID)
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	result := make([]map[string]interface{}, 0, len(RiskSwitchDefinitions))
 	for _, def := range RiskSwitchDefinitions {
-		enabled := s.cache[def.Key]
+		enabled := def.DefaultValue
+		if v, ok := userCache[def.Key]; ok {
+			enabled = v
+		}
 		result = append(result, map[string]interface{}{
 			"key":           string(def.Key),
 			"label":         def.Label,
@@ -175,32 +190,23 @@ func (s *RiskSwitchService) GetAllWithMeta(userID uint) []map[string]interface{}
 }
 
 func (s *RiskSwitchService) Set(switchKey RiskSwitch, enabled bool, userID uint) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.cache[switchKey] = enabled
-
 	settingsSvc := NewSettingsService(s.db)
-	riskSettings := map[string]interface{}{
-		string(switchKey): enabled,
-	}
-	return settingsSvc.SetByKey(userID, "risk_switches", riskSettings)
+
+	existing := s.loadUserCacheRaw(userID)
+	existing[string(switchKey)] = enabled
+
+	return settingsSvc.SetByKey(userID, "risk_switches", existing)
 }
 
 func (s *RiskSwitchService) BatchSet(switches map[RiskSwitch]bool, userID uint) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for k, v := range switches {
-		s.cache[k] = v
-	}
-
 	settingsSvc := NewSettingsService(s.db)
-	data := make(map[string]interface{})
+
+	existing := s.loadUserCacheRaw(userID)
 	for k, v := range switches {
-		data[string(k)] = v
+		existing[string(k)] = v
 	}
-	return settingsSvc.SetByKey(userID, "risk_switches", data)
+
+	return settingsSvc.SetByKey(userID, "risk_switches", existing)
 }
 
 func (s *RiskSwitchService) refresh() {

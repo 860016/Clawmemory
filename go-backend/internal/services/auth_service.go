@@ -27,8 +27,14 @@ const (
 type LoginResult struct {
 	AccessToken     string     `json:"access_token"`
 	RefreshToken    string     `json:"refresh_token"`
+	APIKey          string     `json:"api_key,omitempty"`
 	RequiresCaptcha bool       `json:"requires_captcha"`
 	LockedUntil     *time.Time `json:"locked_until,omitempty"`
+}
+
+type RegisterResult struct {
+	User   *models.User `json:"user"`
+	APIKey string       `json:"api_key,omitempty"`
 }
 
 type AuthService struct {
@@ -101,10 +107,21 @@ func (s *AuthService) SetPasswordWithUsername(username, password string) (*Login
 		return nil, err
 	}
 
-	return &LoginResult{
+	result := &LoginResult{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-	}, nil
+	}
+
+	apiKeySvc := NewAPIKeyService(s.db)
+	_, rawKey, err := apiKeySvc.Create(user.ID, "mcp-server")
+	if err != nil {
+		log.Printf("SetPassword: failed to auto-create API key: %v", err)
+	} else {
+		result.APIKey = rawKey
+		log.Printf("SetPassword: auto-created API key for user %d", user.ID)
+	}
+
+	return result, nil
 }
 
 func (s *AuthService) LoginWithPassword(password string) (*LoginResult, error) {
@@ -120,11 +137,11 @@ func (s *AuthService) LoginWithPassword(password string) (*LoginResult, error) {
 	return s.completeLogin(&user)
 }
 
-func (s *AuthService) Register(username, password string) (*models.User, error) {
+func (s *AuthService) Register(username, password string) (*RegisterResult, error) {
 	return s.RegisterWithInvitation(username, password, "")
 }
 
-func (s *AuthService) RegisterWithInvitation(username, password, invitationCode string) (*models.User, error) {
+func (s *AuthService) RegisterWithInvitation(username, password, invitationCode string) (*RegisterResult, error) {
 	if len(username) < 2 || len(username) > 50 {
 		return nil, errors.New("username must be between 2 and 50 characters")
 	}
@@ -177,7 +194,18 @@ func (s *AuthService) RegisterWithInvitation(username, password, invitationCode 
 		invSvc.UseCode(invitationCode, user.ID)
 	}
 
-	return user, nil
+	result := &RegisterResult{User: user}
+
+	apiKeySvc := NewAPIKeyService(s.db)
+	_, rawKey, err := apiKeySvc.Create(user.ID, "mcp-server")
+	if err != nil {
+		log.Printf("Register: failed to auto-create API key: %v", err)
+	} else {
+		result.APIKey = rawKey
+		log.Printf("Register: auto-created API key for user %d", user.ID)
+	}
+
+	return result, nil
 }
 
 func (s *AuthService) GetUserByID(userID uint) (*models.User, error) {

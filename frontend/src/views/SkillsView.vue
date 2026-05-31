@@ -95,10 +95,14 @@
         </div>
       </div>
 
-      <div v-if="!learnedSkills.length && !patterns.length && !pendingSuggestions.length && !detecting" class="empty-state">
-        <el-icon :size="48" color="var(--cm-text-muted)"><MagicStick /></el-icon>
-        <p>{{ $t('skills.noLearnedSkills') }}</p>
-        <p class="hint">{{ $t('skills.learnedHint') }}</p>
+      <div v-if="!learnedSkills.length && !patterns.length && !pendingSuggestions.length && !detecting" class="cm-empty-state">
+        <div class="cm-empty-icon">✨</div>
+        <div class="cm-empty-title">{{ $t('skills.noLearnedSkills') }}</div>
+        <div class="cm-empty-desc">{{ $t('skills.learnedHint') }}</div>
+        <div class="cm-empty-action">
+          <el-button type="primary" @click="detectPatterns">{{ $t('skills.detectPatterns') }}</el-button>
+          <el-button @click="generateSuggestions">{{ $t('skills.suggestions') }}</el-button>
+        </div>
       </div>
     </div>
 
@@ -150,8 +154,10 @@
           </div>
         </div>
 
-        <div v-if="!globalSkills.length && !workspaceSkills.length" class="empty-state">
-          <p>{{ $t('skills.noSkills') }}</p>
+        <div v-if="!globalSkills.length && !workspaceSkills.length" class="cm-empty-state">
+          <div class="cm-empty-icon">📁</div>
+          <div class="cm-empty-title">{{ $t('skills.noSkills') }}</div>
+          <div class="cm-empty-desc">点击上方按钮扫描项目中的技能文件</div>
         </div>
 
         <div class="total-bar" v-if="globalSkills.length || workspaceSkills.length">
@@ -705,7 +711,33 @@ async function reactivateSkill(id: number) {
 }
 
 @media (max-width: 768px) {
+  .skills-page { padding: 16px; }
   .skill-grid, .pattern-grid, .suggestion-grid { grid-template-columns: 1fr; }
   .page-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+  .header-actions { width: 100%; }
+  .header-actions .el-button-group { width: 100%; display: flex; }
+  .header-actions .el-button-group .el-button { flex: 1; }
+  .learned-actions, .scanned-actions { gap: 6px; }
+  .learned-actions .el-button, .scanned-actions .el-button { font-size: 13px; }
+  .learned-actions .el-select { width: 100% !important; margin-left: 0 !important; margin-top: 4px; }
+  .skill-card, .pattern-card, .suggestion-card { padding: 12px; }
+  .skill-icon, .pattern-icon, .sug-icon { font-size: 20px; }
+  .skill-name, .sug-title { font-size: 13px; }
+  .skill-desc, .pattern-seq, .sug-desc { font-size: 11px; }
+  .sug-actions { flex-direction: column; width: 100%; }
+  .sug-actions .el-button { width: 100%; }
+  .detail-body pre { font-size: 12px; padding: 8px; max-height: 300px; }
+}
+
+@media (max-width: 480px) {
+  .skills-page { padding: 12px; }
+  .page-header h2 { font-size: 18px; }
+  .learned-actions, .scanned-actions { flex-direction: column; }
+  .learned-actions .el-button, .scanned-actions .el-button { width: 100%; }
+  .skill-card, .pattern-card, .suggestion-card { padding: 10px; gap: 8px; }
+  .skill-meta { align-items: flex-end; }
+  .badge { font-size: 10px; padding: 1px 6px; }
+  .step-item { font-size: 12px; }
+  .step-num { width: 18px; height: 18px; font-size: 10px; }
 }
 </style>

@@ -33,7 +33,6 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		public.POST("/auth/register-with-invitation", middleware.LoginRateLimit(), handleRegisterWithInvitation(authService))
 		public.POST("/auth/forgot-password", middleware.LoginRateLimit(), handleForgotPassword(authService))
 		public.GET("/install-status", handleInstallStatus(db))
-		public.GET("/check-update", handleCheckUpdate)
 		public.GET("/health", handleHealthCheck(db))
 	}
 
@@ -59,14 +58,9 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.DELETE("/memories/:id", handleDeleteMemory(db))
 		authorized.POST("/memories/:id/restore", handleRestoreMemory(db))
 		authorized.POST("/memories/:id/decrypt", handleDecryptMemory(db))
-		authorized.GET("/memories/search/keyword", handleSearchKeyword(db))
-		authorized.GET("/memories/search/semantic", handleSearchSemantic(db))
-		authorized.GET("/memories/search/graph-rag", handleSearchGraphRAG(db))
+		authorized.GET("/memories/search", handleSearchMemories(db))
 		authorized.GET("/memories/:id/history", handleMemoryHistory(db))
 		authorized.GET("/memories/:id/evolution", handleMemoryEvolution(db))
-		authorized.GET("/sessions/memories", handleSessionMemories(db))
-		authorized.PUT("/sessions/memories", handleSessionMemoryUpsert(db))
-
 		authorized.GET("/knowledge/entities", handleListEntities(db))
 		authorized.POST("/knowledge/entities", handleCreateEntity(db))
 		authorized.GET("/knowledge/entities/:id", handleGetEntity(db))
@@ -132,7 +126,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.DELETE("/api-keys/:id", handleDeleteAPIKey(db))
 
 		authorized.GET("/memories/decay/stats", handleDecayStats(db))
-		authorized.POST("/memories/decay/apply", handleDecayApply(db))
+		authorized.POST("/memories/decay/apply", handleDecayApply(aiSvc, db))
 		authorized.PUT("/memories/decay/settings", handleDecaySettingsUpdate(db))
 		authorized.GET("/memories/decay/settings", handleDecaySettingsGet(db))
 		authorized.DELETE("/memories/trash", handleEmptyTrash(db))
@@ -148,7 +142,11 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.GET("/memories/quality", handleMemoryQuality(db))
 		authorized.POST("/memories/auto-fix", handleMemoryAutoFix(db))
 
-		authorized.GET("/memories/recommend", handleMemoryRecommend(db))
+		authorized.GET("/mcp/config", handleMCPConfig(db))
+
+		authorized.GET("/memories/governance/status", handleGovernanceStatus(db))
+		authorized.POST("/memories/governance/run", handleGovernanceRun(db))
+		authorized.PUT("/memories/governance/config", handleGovernanceConfig(db))
 
 		authorized.GET("/memories/smart-load", handleSmartLoad(db))
 		authorized.POST("/memories/:id/reinforce", handleReinforceMemory(db))
@@ -157,6 +155,12 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.POST("/memories/extract-and-save", handleExtractAndSave(db))
 		authorized.POST("/memories/:id/verify", handleVerifyMemory(db))
 		authorized.POST("/memories/scan-secrets", handleScanSecrets(db))
+		authorized.POST("/memories/validate", handleBatchValidate(db))
+
+		authorized.GET("/memories/templates", handleListTemplates(db))
+		authorized.POST("/memories/templates", handleCreateTemplate(db))
+		authorized.DELETE("/memories/templates/:name", handleDeleteTemplate(db))
+		authorized.POST("/memories/templates/:name/apply", handleApplyTemplate(db))
 
 		authorized.GET("/session-memories", handleListSessionMemories(db))
 		authorized.POST("/session-memories", handleCreateSessionMemory(db))
@@ -207,27 +211,20 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 
 		toolbox := services.NewToolboxService(db)
 
-		authorized.GET("/toolbox/decay/stats", handleToolboxDecayStats(toolbox, db))
-		authorized.POST("/toolbox/decay/apply", handleToolboxDecayApply(aiSvc, toolbox, db))
-		authorized.POST("/toolbox/reinforce/:id", handleToolboxReinforce(toolbox, db))
-		authorized.GET("/toolbox/prune-suggest", handleToolboxPruneSuggest(toolbox, db))
 		authorized.GET("/toolbox/conflicts/scan", handleToolboxConflictScan(aiSvc, toolbox, db))
 		authorized.POST("/toolbox/conflicts/resolve/:index", handleToolboxConflictResolve(toolbox, db))
 		authorized.GET("/toolbox/token/route", handleToolboxTokenRoute(aiSvc, toolbox, db))
 		authorized.GET("/toolbox/token/stats", handleToolboxTokenStats(toolbox, db))
 		authorized.POST("/toolbox/ai/extract", handleToolboxAIExtract(aiSvc, toolbox, db))
-		authorized.POST("/toolbox/auto-graph", handleToolboxAutoGraph(toolbox, db))
-		authorized.GET("/toolbox/backup/schedule", handleToolboxBackupSchedule(toolbox, db))
-		authorized.POST("/toolbox/backup/schedule", handleToolboxSetBackupSchedule(toolbox, db))
-		authorized.POST("/toolbox/compress/preview", handleToolboxCompressPreview(toolbox, db))
-		authorized.POST("/toolbox/compress/apply", handleToolboxCompressApply(aiSvc, toolbox, db))
-		authorized.GET("/toolbox/compress/config", handleToolboxCompressConfig(toolbox, db))
-		authorized.PUT("/toolbox/compress/config", handleToolboxSetCompressConfig(toolbox, db))
-		authorized.GET("/toolbox/evolution/insights", handleToolboxEvolutionInsights(toolbox, db))
-		authorized.POST("/toolbox/evolution/discover", handleToolboxEvolutionDiscover(aiSvc, toolbox, db))
-		authorized.POST("/toolbox/evolution/infer", handleToolboxEvolutionInfer(toolbox, db))
-		authorized.POST("/toolbox/evolution/importance", handleToolboxEvolutionImportance(toolbox, db))
-		authorized.POST("/toolbox/evolution/prefetch", handleToolboxEvolutionPrefetch(toolbox, db))
+		authorized.POST("/toolbox/auto-graph", handleToolboxAutoGraph(db))
+
+		authorized.POST("/toolbox/compress/preview", handleToolboxCompressPreview(db))
+		authorized.POST("/toolbox/compress/apply", handleToolboxCompressApply(aiSvc, db))
+		authorized.GET("/toolbox/compress/config", handleToolboxCompressConfig(db))
+		authorized.PUT("/toolbox/compress/config", handleToolboxSetCompressConfig(db))
+
+		authorized.GET("/memories/evolution/insights", handleEvolutionInsights(db))
+		authorized.POST("/memories/evolution/run", handleEvolutionRun(aiSvc, db))
 
 		aiGroup := authorized.Group("/ai")
 		{

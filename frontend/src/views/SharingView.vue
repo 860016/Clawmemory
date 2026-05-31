@@ -9,8 +9,10 @@
         <div v-if="pendingLoading" style="text-align: center; padding: 40px">
           <el-icon class="is-loading" :size="24"><Loading /></el-icon>
         </div>
-        <div v-else-if="pendingShares.length === 0" class="empty-state">
-          <el-empty :description="$t('sharing.noPendingShares')" />
+        <div v-else-if="pendingShares.length === 0" class="cm-empty-state">
+          <div class="cm-empty-icon">🤝</div>
+          <div class="cm-empty-title">{{ $t('sharing.noPendingShares') }}</div>
+          <div class="cm-empty-desc">暂无待处理的共享请求</div>
         </div>
         <div v-else class="share-list">
           <div v-for="share in pendingShares" :key="share.id" class="share-card">
@@ -36,8 +38,10 @@
         <div v-if="outboundLoading" style="text-align: center; padding: 40px">
           <el-icon class="is-loading" :size="24"><Loading /></el-icon>
         </div>
-        <div v-else-if="outboundShares.length === 0" class="empty-state">
-          <el-empty :description="$t('sharing.noOutboundShares')" />
+        <div v-else-if="outboundShares.length === 0" class="cm-empty-state">
+          <div class="cm-empty-icon">📤</div>
+          <div class="cm-empty-title">{{ $t('sharing.noOutboundShares') }}</div>
+          <div class="cm-empty-desc">暂无发出的共享记录</div>
         </div>
         <div v-else class="share-list">
           <div v-for="share in outboundShares" :key="share.id" class="share-card">
@@ -67,8 +71,13 @@
         <div v-if="rulesLoading" style="text-align: center; padding: 40px">
           <el-icon class="is-loading" :size="24"><Loading /></el-icon>
         </div>
-        <div v-else-if="shareRules.length === 0" class="empty-state">
-          <el-empty :description="t('sharing.noAutoRules')" />
+        <div v-else-if="shareRules.length === 0" class="cm-empty-state">
+          <div class="cm-empty-icon">📜</div>
+          <div class="cm-empty-title">{{ $t('sharing.noAutoRules') }}</div>
+          <div class="cm-empty-desc">创建自动共享规则来管理记忆分享</div>
+          <div class="cm-empty-action">
+            <el-button type="primary" size="small" @click="showRuleDialog = true">{{ $t('sharing.createRule') }}</el-button>
+          </div>
         </div>
         <div v-else class="rule-list">
           <div v-for="rule in shareRules" :key="rule.id" class="rule-card">
@@ -310,10 +319,24 @@ onMounted(() => {
   .sharing-view { padding: 16px; }
   .page-header h2 { font-size: 18px; }
   .share-card { padding: 12px; }
+  .share-header { flex-wrap: wrap; gap: 4px; font-size: 12px; }
+  .share-preview { padding: 6px; }
+  .memory-key { font-size: 12px; }
+  .memory-value { font-size: 11px; }
   .rule-card { flex-direction: column; align-items: flex-start; gap: 8px; }
   .rule-actions { width: 100%; }
   .rule-actions .el-button { flex: 1; }
   .share-actions { flex-wrap: wrap; }
   .share-actions .el-button { flex: 1; min-width: 0; }
+}
+
+@media (max-width: 480px) {
+  .sharing-view { padding: 12px; }
+  .page-header h2 { font-size: 16px; }
+  .share-card { padding: 10px; }
+  .share-header { font-size: 11px; }
+  .rule-info { flex-wrap: wrap; font-size: 12px; }
+  .rule-actions .el-button { font-size: 12px; }
+  .share-actions .el-button { font-size: 12px; }
 }
 </style>

@@ -8,10 +8,8 @@ export const memoryApi = {
   update: (id: number, data: any) => api.put(`/memories/${id}`, data),
   delete: (id: number) => api.delete(`/memories/${id}`),
   restore: (id: number) => api.post(`/memories/${id}/restore`),
-  searchKeyword: (q: string, limit?: number) =>
-    api.get('/memories/search/keyword', { params: { q, limit } }),
-  searchSemantic: (q: string, limit?: number) =>
-    api.get('/memories/search/semantic', { params: { q, limit } }),
+  search: (q: string, mode?: string, limit?: number) =>
+    api.get('/memories/search', { params: { q, mode: mode || 'keyword', limit } }),
 
   smartLoad: (params: { q?: string; token_budget?: number; load_level?: string }) =>
     api.get('/memories/smart-load', { params }),
@@ -22,13 +20,28 @@ export const memoryApi = {
   extractAndSave: (content: string, autoSave: boolean = false) =>
     api.post('/memories/extract-and-save', { content, auto_save: autoSave }),
   scanSecrets: (content: string) => api.post('/memories/scan-secrets', { content }),
+  batchValidate: () => api.post('/memories/validate'),
+
+  listTemplates: () => api.get('/memories/templates'),
+  createTemplate: (data: any) => api.post('/memories/templates', data),
+  deleteTemplate: (name: string) => api.delete(`/memories/templates/${name}`),
+  applyTemplate: (name: string, values: Record<string, string>) =>
+    api.post(`/memories/templates/${name}/apply`, { values }),
 
   getDecaySettings: () => api.get('/memories/decay/settings'),
   getDecayStats: () => api.get('/memories/decay/stats'),
-  updateDecaySettings: (data: { enabled: boolean }) => api.put('/memories/decay/settings', data),
+  applyDecay: () => api.post('/memories/decay/apply'),
+  updateDecaySettings: (data: { enabled: boolean }) => api.put('/memories/decay/settings', data, { _silent: true } as any),
   getHealth: () => api.get('/memories/health'),
+  assessQuality: () => api.get('/memories/quality'),
+  autoFix: (issueTypes?: string[]) => api.post('/memories/auto-fix', { issue_types: issueTypes }),
   scanDedup: () => api.get('/memories/dedup/scan'),
   emptyTrash: () => api.delete('/memories/trash'),
+  listTrash: (limit = 100) => api.get('/memories/trash', { params: { limit } }),
+
+  getGovernanceStatus: () => api.get('/memories/governance/status'),
+  runGovernance: () => api.post('/memories/governance/run'),
+  updateGovernanceConfig: (config: any) => api.put('/memories/governance/config', config, { _silent: true } as any),
 
   scanAgentMemories: () => api.get('/agent-memories/scan'),
   scanAgent: (agentName: string) => api.get(`/agent-memories/scan/${agentName}`),

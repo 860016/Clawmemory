@@ -44,12 +44,25 @@ func main() {
 		filepath.Join(exeDir, ".env"),
 		".env",
 	}
+	envLoaded := false
 	for _, p := range envPaths {
 		if _, err := os.Stat(p); err == nil {
 			_ = godotenv.Load(p)
 			log.Printf("Loaded .env from %s", p)
+			envLoaded = true
 			break
 		}
+	}
+	if !envLoaded {
+		secret := os.Getenv("SECRET_KEY")
+		if secret == "" {
+			secret = config.GenerateSecureSecret()
+		}
+		envContent := fmt.Sprintf("SECRET_KEY=%s\n", secret)
+		if err := os.WriteFile(".env", []byte(envContent), 0600); err == nil {
+			log.Printf("Generated .env with SECRET_KEY (first run)")
+		}
+		os.Setenv("SECRET_KEY", secret)
 	}
 
 	cfg := config.Load()
@@ -113,6 +126,29 @@ func main() {
 		}
 	}()
 	log.Printf("Skill auto-cleanup service started (daily)")
+
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			govSvc := services.NewGovernanceService(db)
+			govSvc.RunAutoGovernanceForAllUsers()
+		}
+	}()
+	log.Printf("Memory governance service started (daily)")
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			result := db.Where("expires_at IS NOT NULL AND expires_at < ?", time.Now()).
+				Delete(&models.SessionMemory{})
+			if result.RowsAffected > 0 {
+				log.Printf("Cleaned up %d expired session memories", result.RowsAffected)
+			}
+		}
+	}()
+	log.Printf("Session memory expiry cleanup started (hourly)")
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()

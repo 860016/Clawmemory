@@ -139,7 +139,7 @@
           <!-- Highlights Section -->
           <section class="content-section" v-if="selectedReport.highlights?.length">
             <div class="section-header">
-              <div class="section-icon gradient-bg purple">
+              <div class="section-icon gradient-bg green">
                 <el-icon><Star /></el-icon>
               </div>
               <h2>{{ $t('dailyReport.highlights') }}</h2>
@@ -326,7 +326,7 @@ const statsData = computed(() => {
       icon: 'Connection',
       value: s.new_entities || 0,
       label: t('dailyReport.newEntities'),
-      color: 'purple',
+      color: 'green',
       trend: 5,
     },
     {
@@ -507,8 +507,8 @@ async function generateAIReport() {
   background: var(--cm-primary-gradient);
 }
 
-.gradient-bg.purple {
-  background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+.gradient-bg.green {
+  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
 }
 
 .gradient-bg.green {
@@ -616,7 +616,6 @@ async function generateAIReport() {
 }
 
 .stat-icon.blue { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
-.stat-icon.purple { background: linear-gradient(135deg, #8b5cf6, #a78bfa); }
 .stat-icon.green { background: linear-gradient(135deg, #10b981, #34d399); }
 .stat-icon.orange { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
 

@@ -7,11 +7,12 @@ keys/*.pem
 # Frontend
 **/node_modules/
 frontend/dist/
-# go-backend/frontend_dist is the production build — DO track it
+go-backend/frontend_dist/
 
 # IDE
 .vscode/
 .idea/
+.trae/
 
 # Commercial (private)
 license-platform-v2/
@@ -24,6 +25,7 @@ Thumbs.db
 # Temp files
 *.log
 *.tmp
+*.exe~
 InstallationLog.txt
 
 # Go backend build artifacts
@@ -31,6 +33,24 @@ go-backend/*.exe
 go-backend/clawmemory
 go-backend/clawmemory-pro
 go-backend/releases/
+
+# Scan/debug/diag artifacts
+scan_raw_output.txt
+scan_results.json
+memory_scan_results.json
+raw_input_history.txt
+raw_session_data.txt
+sessions_from_memory.json
+trigger_sync.py
+user_inputs_from_memory.json
+ai_conversation_memory.json
+ai_response_context.json
+ai_response_full.json
+ai_responses_from_memory.json
+chat_memory_results.json
+chat_session_data.json
+check_memories.py
+conversations_from_memory.json
 
 # Temp docs
 梳理方案.md

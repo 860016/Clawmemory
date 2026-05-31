@@ -33,7 +33,7 @@ func (s *MemoryShareService) ShareMemory(memoryID, fromUserID uint, toAgent stri
 
 	if shareType == "auto" {
 		riskSvc := GetRiskSwitchService()
-		if riskSvc != nil && riskSvc.IsDisabled(RiskShareAutoApprove) {
+		if riskSvc != nil && riskSvc.IsDisabled(RiskCrossAgentAccess) {
 			shareType = "manual"
 		}
 	}

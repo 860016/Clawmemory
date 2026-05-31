@@ -116,6 +116,26 @@ func GetSupportedClients() []ClientInfo {
 	})
 
 	clients = append(clients, ClientInfo{
+		Name:        "qoder",
+		DisplayName: "Qoder",
+		DataDirs: buildDirs(
+			dirIf(appData, filepath.Join(appData, "Qoder", "User", "workspaceStorage")),
+			dirIf(localAppData, filepath.Join(localAppData, "Qoder")),
+		),
+		SkillsDirs: []string{},
+	})
+
+	clients = append(clients, ClientInfo{
+		Name:        "codex",
+		DisplayName: "OpenAI Codex",
+		DataDirs: buildDirs(
+			filepath.Join(homeDir, ".codex"),
+			dirIf(appData, filepath.Join(appData, "codex")),
+		),
+		SkillsDirs: []string{},
+	})
+
+	clients = append(clients, ClientInfo{
 		Name:        "windsurf",
 		DisplayName: "Windsurf",
 		DataDirs: buildDirs(

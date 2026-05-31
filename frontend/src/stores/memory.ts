@@ -37,15 +37,8 @@ export const useMemoryStore = defineStore('memory', () => {
     await fetchMemories(currentLayer.value || undefined, 1, currentSourceAgent.value || undefined, currentVisibility.value || undefined)
   }
 
-  async function searchKeyword(q: string) {
-    const resp = await memoryApi.searchKeyword(q)
-    const items = Array.isArray(resp.data) ? resp.data : (resp.data.items || [])
-    memories.value = items
-    total.value = items.length
-  }
-
-  async function searchSemantic(q: string) {
-    const resp = await memoryApi.searchSemantic(q)
+  async function search(q: string, mode?: string) {
+    const resp = await memoryApi.search(q, mode)
     const items = Array.isArray(resp.data) ? resp.data : (resp.data.items || [])
     memories.value = items
     total.value = items.length
@@ -53,6 +46,6 @@ export const useMemoryStore = defineStore('memory', () => {
 
   return {
     memories, total, currentLayer, currentSourceAgent, currentVisibility, searchQuery,
-    fetchMemories, createMemory, updateMemory, deleteMemory, searchKeyword, searchSemantic,
+    fetchMemories, createMemory, updateMemory, deleteMemory, search,
   }
 })
