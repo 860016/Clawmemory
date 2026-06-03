@@ -30,28 +30,23 @@
       <el-select v-model="searchMode" style="width: 130px" @change="searchResults = []; smartLoadResult = null; searchEngine = ''">
         <el-option :label="$t('memories.searchKeyword')" value="keyword" />
         <el-option :label="$t('memories.searchSemantic')" value="semantic" />
+        <el-option :label="$t('memories.searchGraphRAG')" value="graph-rag" />
         <el-option :label="$t('memories.searchSmart')" value="smart" />
       </el-select>
       <el-radio-group v-model="currentLayer" @change="loadMemories" size="default">
         <el-radio-button label="">{{ $t('memories.all') }}</el-radio-button>
         <el-radio-button label="core">{{ $t('memories.core') }}</el-radio-button>
         <el-radio-button label="context">{{ $t('memories.context') }}</el-radio-button>
-        <el-radio-button label="episodic">{{ $t('memories.episodic') }}</el-radio-button>
-        <el-radio-button label="semantic">{{ $t('memories.semantic') }}</el-radio-button>
-        <el-radio-button label="preference">{{ $t('memories.preference') }}</el-radio-button>
-        <el-radio-button label="knowledge">{{ $t('memories.knowledge') }}</el-radio-button>
-        <el-radio-button label="short_term">{{ $t('memories.shortTerm') }}</el-radio-button>
-        <el-radio-button label="private">{{ $t('memories.private') }}</el-radio-button>
+        <el-radio-button label="detail">{{ $t('memories.detail') }}</el-radio-button>
       </el-radio-group>
       <el-select v-model="currentMemoryType" @change="loadMemories" :placeholder="$t('memories.memoryType')" clearable style="width: 140px">
         <el-option :label="$t('memories.all')" value="" />
-        <el-option :label="$t('memories.knowledge')" value="knowledge" />
         <el-option :label="$t('memories.preference')" value="preference" />
-        <el-option :label="$t('memories.instruction')" value="instruction" />
-        <el-option :label="$t('memories.context')" value="context" />
+        <el-option :label="$t('memories.knowledge')" value="knowledge" />
+        <el-option :label="$t('memories.feedback')" value="feedback" />
+        <el-option :label="$t('memories.project')" value="project" />
+        <el-option :label="$t('memories.reference')" value="reference" />
         <el-option :label="$t('memories.fact')" value="fact" />
-        <el-option :label="$t('memories.episodic')" value="episodic" />
-        <el-option :label="$t('memories.conversation')" value="conversation" />
       </el-select>
       <el-select v-model="currentSourceAgent" @change="loadMemories" :placeholder="$t('memories.sourceAgent')" clearable style="width: 140px">
         <el-option :label="$t('memories.all')" value="" />
@@ -98,6 +93,12 @@
             {{ m.load_level }}
           </el-tag>
           <span v-if="m.score" class="score-badge">{{ m.score.toFixed(2) }}</span>
+          <el-tooltip v-if="m.score_detail" placement="top" :show-after="300">
+            <template #content>
+              <div v-for="(val, key) in m.score_detail" :key="key">{{ key }}: {{ (val * 100).toFixed(1) }}%</div>
+            </template>
+            <el-tag size="small" type="info" class="score-detail-tag">📊</el-tag>
+          </el-tooltip>
         </div>
         <div class="card-key">{{ m.key }}</div>
         <div class="card-value" v-if="m.is_encrypted">
@@ -128,8 +129,8 @@
       <template v-else>
         <div v-if="memories.length === 0" class="cm-empty-state">
           <div class="cm-empty-icon">🧠</div>
-          <div class="cm-empty-title">{{ $t('memories.emptyTitle') || '还没有记忆数据' }}</div>
-          <div class="cm-empty-desc">{{ $t('memories.emptyDesc') || '添加你的第一条记忆，或从对话中提取记忆' }}</div>
+          <div class="cm-empty-title">{{ $t('memories.emptyTitle') }}</div>
+          <div class="cm-empty-desc">{{ $t('memories.emptyDesc') }}</div>
           <div class="cm-empty-action">
             <el-button type="primary" @click="openAddDialog">
               <el-icon><Plus /></el-icon> {{ $t('memories.addMemory') }}
@@ -189,23 +190,16 @@
             <el-option :label="$t('memories.layerCore')" value="core" />
             <el-option :label="$t('memories.layerContext')" value="context" />
             <el-option :label="$t('memories.layerDetail')" value="detail" />
-            <el-option :label="$t('memories.layerPreference')" value="preference" />
-            <el-option :label="$t('memories.layerKnowledge')" value="knowledge" />
-            <el-option :label="$t('memories.layerEpisodic')" value="episodic" />
-            <el-option :label="$t('memories.layerSemantic')" value="semantic" />
-            <el-option :label="$t('memories.layerShortTerm')" value="short_term" />
-            <el-option :label="$t('memories.layerPrivate')" value="private" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('memories.memoryType')">
           <el-select v-model="form.memory_type" style="width: 100%">
-            <el-option :label="$t('memories.knowledge')" value="knowledge" />
             <el-option :label="$t('memories.preference')" value="preference" />
-            <el-option :label="$t('memories.instruction')" value="instruction" />
-            <el-option :label="$t('memories.context')" value="context" />
+            <el-option :label="$t('memories.knowledge')" value="knowledge" />
+            <el-option :label="$t('memories.feedback')" value="feedback" />
+            <el-option :label="$t('memories.project')" value="project" />
+            <el-option :label="$t('memories.reference')" value="reference" />
             <el-option :label="$t('memories.fact')" value="fact" />
-            <el-option :label="$t('memories.episodic')" value="episodic" />
-            <el-option :label="$t('memories.conversation')" value="conversation" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('memories.titleField')">
@@ -348,6 +342,7 @@
         <el-button type="warning" @click="forceSaveWithSecret">{{ $t('memories.saveAnyway') }}</el-button>
       </template>
     </el-dialog>
+
   </div>
 </template>
 
@@ -361,7 +356,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Upload, Loading, MagicStick, Warning } from '@element-plus/icons-vue'
 import { translateError } from '../i18n'
 import { memoryApi } from '../api/go-memories'
-import { agentApi } from '../api/go-agents'
 import { aiApi } from '../api/go-ai'
 
 const { t } = useI18n()
@@ -369,13 +363,14 @@ const route = useRoute()
 const memories = ref<any[]>([])
 const searchResults = ref<any[]>([])
 const searchQuery = ref('')
-const searchMode = ref('keyword')
+const searchMode = ref<'keyword' | 'semantic' | 'graphrag' | 'graph-rag' | 'smart'>('keyword')
 const searchEngine = ref('')
 const searchEngineLabel = computed(() => {
   const map: Record<string, string> = {
     chromadb: t('memories.engineChromaDB'),
     tfidf: t('memories.engineTFIDF'),
     keyword: t('memories.engineKeyword'),
+    graph_rag: t('memories.engineGraphRAG'),
   }
   return map[searchEngine.value] || searchEngine.value
 })
@@ -404,18 +399,12 @@ const scanError = ref('')
 const previewData = ref<any>(null)
 const importing = ref(false)
 
-const form = ref({ layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '', memory_type: 'knowledge', visibility: 'private', source_agent: '' })
+const form = ref({ layer: 'context', key: '', value: '', importance: 50, tagsStr: '', memory_type: 'knowledge', visibility: 'private', source_agent: '' })
 
 const layerLabels: Record<string, string> = {
   core: 'Core',
   context: 'Context',
   detail: 'Detail',
-  episodic: 'Episodic',
-  semantic: 'Semantic',
-  preference: t('memories.preference'),
-  knowledge: t('memories.knowledge'),
-  short_term: t('memories.shortTerm'),
-  private: t('memories.private'),
 }
 
 const visibilityLabels: Record<string, string> = {
@@ -428,7 +417,7 @@ const connectedAgents = ref<any[]>([])
 
 async function loadConnectedAgents() {
   try {
-    const { data } = await agentApi.getConnected()
+    const { data } = await memoryApi.getConnectedAgents()
     connectedAgents.value = data.agents || []
   } catch { connectedAgents.value = [] }
 }
@@ -457,7 +446,7 @@ watch(() => route.query.import, (val) => {
 
 function openAddDialog() {
   editingMemory.value = null
-  form.value = { layer: 'knowledge', key: '', value: '', importance: 50, tagsStr: '', memory_type: 'knowledge', visibility: 'private', source_agent: '' }
+  form.value = { layer: 'context', key: '', value: '', importance: 50, tagsStr: '', memory_type: 'knowledge', visibility: 'private', source_agent: '' }
   showAddDialog.value = true
 }
 
@@ -504,9 +493,9 @@ async function handleSearch() {
   }
 
   try {
-    const { data } = await memoryApi.search(searchQuery.value, searchMode.value, 20)
+    const { data } = await memoryApi.search({ q: searchQuery.value, mode: searchMode.value, limit: 20 })
     const results = data.items || data || []
-    searchEngine.value = data.engine || (searchMode.value === 'semantic' ? 'tfidf' : 'keyword')
+    searchEngine.value = data.engine || (searchMode.value === 'semantic' ? 'tfidf' : searchMode.value === 'graph-rag' ? 'graph_rag' : 'keyword')
     searchResults.value = results.map((m: any) => ({
       ...m,
       importance: m.importance || 0.5,
@@ -628,7 +617,7 @@ async function handleScan() {
   scanning.value = true
   scanError.value = ''
   try {
-    const { data } = await agentApi.scanMemories()
+    const { data } = await memoryApi.scanAgentMemories()
     scanResult.value = data
   } catch (e: any) {
     scanError.value = translateError(e.response?.data?.error || e.response?.data?.detail, t('memories.scanFailed'))
@@ -640,7 +629,7 @@ async function handleScan() {
 async function handlePreview(agentName: string) {
   previewData.value = null
   try {
-    const { data } = await agentApi.scanAgentMemories(agentName)
+    const { data } = await memoryApi.scanAgent(agentName)
     previewData.value = data
   } catch {
     ElMessage.error(t('memories.previewFailed'))
@@ -658,10 +647,10 @@ async function handleImport(agentName: string) {
 
   importing.value = true
   try {
-    const { data } = await agentApi.importMemories({
+    const { data } = await memoryApi.importAgentMemories({
       agent_name: agentName,
       skip_existing: true,
-      layer: 'knowledge',
+      layer: 'context',
     })
     const { imported, skipped, errors } = data
     ElMessage.success(t('memories.importDone', { imported, skipped, errors }))
@@ -766,10 +755,9 @@ async function doSaveMemory(payload: any) {
 .memory-card:hover::before { opacity: 1; }
 .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .layer-tag { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
-.layer-tag.preference { background: rgba(16,185,129,0.15); color: #10B981; }
-.layer-tag.knowledge { background: rgba(6,182,212,0.15); color: #06b6d4; }
-.layer-tag.short_term { background: rgba(255,193,7,0.15); color: #ffc107; }
-.layer-tag.private { background: rgba(233,30,99,0.15); color: #e91e63; }
+.layer-tag.core { background: rgba(233,30,99,0.15); color: #e91e63; }
+.layer-tag.context { background: rgba(6,182,212,0.15); color: #06b6d4; }
+.layer-tag.detail { background: rgba(255,193,7,0.15); color: #ffc107; }
 .importance { font-size: 11px; font-weight: 600; }
 .importance.high { color: #e91e63; }
 .importance.medium { color: #ffc107; }

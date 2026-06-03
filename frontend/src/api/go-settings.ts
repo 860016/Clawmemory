@@ -1,8 +1,9 @@
 import api from './go-client'
+import type { AppSettings } from './types'
 
 export const settingsApi = {
   get: () => api.get('/settings'),
-  update: (data: Record<string, any>) => api.put('/settings', data, { _silent: true } as any),
+  update: (data: AppSettings) => api.put('/settings', data, { _silent: true } as any),
 
   getApiKeys: () => api.get('/api-keys'),
   createApiKey: (data: { name: string; expires_in_days?: number }) => api.post('/api-keys', data, { _silent: true } as any),
@@ -18,5 +19,5 @@ export const settingsApi = {
   getInstallStatus: () => api.get('/install-status'),
 
   exportData: (password: string) => api.post('/data/export', { password }, { _silent: true } as any),
-  importData: (data: any) => api.post('/data/import', data, { _silent: true } as any),
+  importData: (data: Record<string, unknown>) => api.post('/data/import', data, { _silent: true } as any),
 }

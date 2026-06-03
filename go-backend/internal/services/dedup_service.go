@@ -52,50 +52,56 @@ func (s *DedupService) Scan(userID uint) (map[string]interface{}, error) {
 	groups := []DuplicateGroup{}
 	processed := make(map[uint]bool)
 
-	for i := 0; i < len(memories); i++ {
-		if processed[memories[i].ID] {
-			continue
-		}
+	buckets := s.bucketByPrefix(memories)
 
-		similarMemories := []DuplicateMemory{}
-		for j := i + 1; j < len(memories); j++ {
-			if processed[memories[j].ID] {
+	for _, bucket := range buckets {
+		for i := 0; i < len(bucket); i++ {
+			mi := bucket[i]
+			if processed[mi.ID] {
 				continue
 			}
 
-			similarity := computeSimilarity(memories[i].Key, memories[i].Value, memories[j].Key, memories[j].Value)
-			if similarity > 0.6 {
-				if len(similarMemories) == 0 {
-					similarMemories = append(similarMemories, DuplicateMemory{
-						ID:         memories[i].ID,
-						Key:        memories[i].Key,
-						Value:      truncateString(memories[i].Value, 100),
-						Layer:      memories[i].Layer,
-						Importance: memories[i].Importance,
-						Source:     memories[i].Source,
-						CreatedAt:  memories[i].CreatedAt.Format("2006-01-02 15:04:05"),
-					})
+			similarMemories := []DuplicateMemory{}
+			for j := i + 1; j < len(bucket); j++ {
+				mj := bucket[j]
+				if processed[mj.ID] {
+					continue
 				}
-				similarMemories = append(similarMemories, DuplicateMemory{
-					ID:         memories[j].ID,
-					Key:        memories[j].Key,
-					Value:      truncateString(memories[j].Value, 100),
-					Layer:      memories[j].Layer,
-					Importance: memories[j].Importance,
-					Source:     memories[j].Source,
-					CreatedAt:  memories[j].CreatedAt.Format("2006-01-02 15:04:05"),
-				})
-				processed[memories[j].ID] = true
-			}
-		}
 
-		if len(similarMemories) > 1 {
-			processed[memories[i].ID] = true
-			groups = append(groups, DuplicateGroup{
-				Key:        memories[i].Key,
-				Similarity: computeSimilarity(memories[i].Key, memories[i].Value, similarMemories[0].Key, similarMemories[0].Value),
-				Memories:   similarMemories,
-			})
+				similarity := computeSimilarity(mi.Key, mi.Value, mj.Key, mj.Value)
+				if similarity > 0.6 {
+					if len(similarMemories) == 0 {
+						similarMemories = append(similarMemories, DuplicateMemory{
+							ID:         mi.ID,
+							Key:        mi.Key,
+							Value:      truncateString(mi.Value, 100),
+							Layer:      mi.Layer,
+							Importance: mi.Importance,
+							Source:     mi.Source,
+							CreatedAt:  mi.CreatedAt.Format("2006-01-02 15:04:05"),
+						})
+					}
+					similarMemories = append(similarMemories, DuplicateMemory{
+						ID:         mj.ID,
+						Key:        mj.Key,
+						Value:      truncateString(mj.Value, 100),
+						Layer:      mj.Layer,
+						Importance: mj.Importance,
+						Source:     mj.Source,
+						CreatedAt:  mj.CreatedAt.Format("2006-01-02 15:04:05"),
+					})
+					processed[mj.ID] = true
+				}
+			}
+
+			if len(similarMemories) > 1 {
+				processed[mi.ID] = true
+				groups = append(groups, DuplicateGroup{
+					Key:        mi.Key,
+					Similarity: computeSimilarity(mi.Key, mi.Value, similarMemories[0].Key, similarMemories[0].Value),
+					Memories:   similarMemories,
+				})
+			}
 		}
 	}
 
@@ -161,37 +167,41 @@ func (s *DedupService) AutoMergeSimilar(userID uint, threshold float64) (int, er
 	merged := 0
 	processed := make(map[uint]bool)
 
-	for i := 0; i < len(memories); i++ {
-		if processed[memories[i].ID] {
-			continue
-		}
-		for j := i + 1; j < len(memories); j++ {
-			if processed[memories[j].ID] {
+	buckets := s.bucketByPrefix(memories)
+
+	for _, bucket := range buckets {
+		for i := 0; i < len(bucket); i++ {
+			if processed[bucket[i].ID] {
 				continue
 			}
-
-			similarity := computeSimilarity(memories[i].Key, memories[i].Value, memories[j].Key, memories[j].Value)
-			if similarity >= threshold {
-				target := &memories[i]
-				source := &memories[j]
-
-				bestImportance := target.Importance
-				if source.Importance > bestImportance {
-					bestImportance = source.Importance
-				}
-				bestValue := target.Value
-				if len(source.Value) > len(target.Value) {
-					bestValue = source.Value
+			for j := i + 1; j < len(bucket); j++ {
+				if processed[bucket[j].ID] {
+					continue
 				}
 
-				s.db.Model(target).Updates(map[string]interface{}{
-					"importance": bestImportance,
-					"value":      bestValue,
-				})
-				s.db.Model(source).Update("status", "trashed")
+				similarity := computeSimilarity(bucket[i].Key, bucket[i].Value, bucket[j].Key, bucket[j].Value)
+				if similarity >= threshold {
+					target := &bucket[i]
+					source := &bucket[j]
 
-				processed[source.ID] = true
-				merged++
+					bestImportance := target.Importance
+					if source.Importance > bestImportance {
+						bestImportance = source.Importance
+					}
+					bestValue := target.Value
+					if len(source.Value) > len(target.Value) {
+						bestValue = source.Value
+					}
+
+					s.db.Model(target).Updates(map[string]interface{}{
+						"importance": bestImportance,
+						"value":      bestValue,
+					})
+					s.db.Model(source).Update("status", "trashed")
+
+					processed[source.ID] = true
+					merged++
+				}
 			}
 		}
 	}
@@ -238,6 +248,45 @@ func jaccardSimilarity(a, b string) float64 {
 	}
 
 	return float64(intersection) / float64(union)
+}
+
+func (s *DedupService) bucketByPrefix(memories []models.Memory) [][]models.Memory {
+	buckets := make(map[string][]models.Memory)
+	for _, m := range memories {
+		prefix := keyPrefix(m.Key)
+		buckets[prefix] = append(buckets[prefix], m)
+	}
+
+	// 也把没有匹配到其他桶的记忆放入一个跨桶组，防止漏检
+	// 小桶（<=10个）合并到一起做交叉比较
+	var smallBucket []models.Memory
+	var result [][]models.Memory
+	for _, bucket := range buckets {
+		if len(bucket) <= 10 {
+			smallBucket = append(smallBucket, bucket...)
+		} else {
+			result = append(result, bucket)
+		}
+	}
+	if len(smallBucket) > 0 {
+		result = append(result, smallBucket)
+	}
+
+	return result
+}
+
+func keyPrefix(key string) string {
+	// 取 key 的第一个单词或前缀作为桶标识
+	parts := strings.SplitN(strings.ToLower(strings.TrimSpace(key)), " ", 2)
+	if len(parts) == 0 || parts[0] == "" {
+		return "_empty"
+	}
+	// 取前4个字符作为前缀，避免桶太碎
+	p := parts[0]
+	if len(p) > 4 {
+		p = p[:4]
+	}
+	return p
 }
 
 func truncateString(s string, maxLen int) string {

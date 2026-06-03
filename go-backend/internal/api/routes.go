@@ -15,10 +15,13 @@ import (
 func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 	cfg := config.Load()
 
+	container := services.NewAppContainer(db)
+
 	authService := services.NewAuthService(db, cfg.JWTSecret)
 	aiRouter := ai.NewAIRouter(db)
 	aiSvc := ai.NewAIService(aiRouter, db)
 	embedAdapter := &aiEmbeddingAdapter{router: aiRouter}
+	chatAdapter := &aiChatAdapter{router: aiRouter}
 	services.InitEmbeddingService(db, embedAdapter)
 	services.SetEmbeddingAIRouter(embedAdapter)
 
@@ -99,6 +102,8 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.PUT("/projects/notes/:noteId", handleUpdateProjectNote(db))
 		authorized.DELETE("/projects/notes/:noteId", handleDeleteProjectNote(db))
 		authorized.POST("/projects/:id/extract-memories", handleProjectExtractMemories(db))
+		authorized.POST("/projects/discover", handleProjectDiscoverFromMemories(db))
+		authorized.POST("/projects/:id/generate-wiki", handleProjectGenerateWiki(db))
 
 		authorized.GET("/reports", handleListReports(db))
 		authorized.POST("/reports", handleCreateReport(db))
@@ -198,10 +203,10 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.PUT("/share-rules/:id", handleUpdateShareRule(db))
 		authorized.DELETE("/share-rules/:id", handleDeleteShareRule(db))
 
-		authorized.GET("/reasoning/config", handleGetReasoningConfig(db))
-		authorized.PUT("/reasoning/config", handleSetReasoningConfig(db))
-		authorized.POST("/reasoning/test", handleTestReasoningConnection(db))
-		authorized.POST("/reasoning/execute", handleReason(db))
+		authorized.GET("/reasoning/config", handleGetReasoningConfig(db, chatAdapter))
+		authorized.PUT("/reasoning/config", handleSetReasoningConfig(db, chatAdapter))
+		authorized.POST("/reasoning/test", handleTestReasoningConnection(db, chatAdapter))
+		authorized.POST("/reasoning/execute", handleReason(db, chatAdapter))
 
 		authorized.GET("/backups", handleListBackups)
 		authorized.POST("/backups", handleCreateBackup)
@@ -209,7 +214,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		authorized.POST("/backups/:filename/restore", handleRestoreBackup(db))
 		authorized.DELETE("/backups/:filename", handleDeleteBackup(db))
 
-		toolbox := services.NewToolboxService(db)
+		toolbox := container.ToolboxService()
 
 		authorized.GET("/toolbox/conflicts/scan", handleToolboxConflictScan(aiSvc, toolbox, db))
 		authorized.POST("/toolbox/conflicts/resolve/:index", handleToolboxConflictResolve(toolbox, db))
@@ -225,6 +230,10 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 
 		authorized.GET("/memories/evolution/insights", handleEvolutionInsights(db))
 		authorized.POST("/memories/evolution/run", handleEvolutionRun(aiSvc, db))
+		authorized.GET("/memories/evolution/graph-reasoning", handleEvolutionGraphReasoning(db))
+		authorized.GET("/memories/evolution/centrality", handleEvolutionCentrality(db))
+		authorized.GET("/memories/evolution/communities", handleEvolutionCommunityDiscovery(db))
+		authorized.POST("/memories/evolution/communities-to-wiki", handleEvolutionCommunitiesToWiki(db))
 
 		aiGroup := authorized.Group("/ai")
 		{
@@ -241,6 +250,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 			aiGroup.POST("/wiki-generate", handleAIWikiGenerate(aiSvc))
 			aiGroup.POST("/compress", handleAICompress(aiSvc))
 			aiGroup.POST("/discover-relations", handleAIDiscoverRelations(aiSvc))
+			aiGroup.POST("/discover-projects", handleAIDiscoverProjects(aiSvc))
 			aiGroup.POST("/smart-route", handleAISmartRoute(aiSvc))
 			aiGroup.POST("/extract-facts", handleAIExtractFacts(aiSvc))
 			aiGroup.POST("/consolidate", handleAIConsolidate(aiSvc))
@@ -279,7 +289,7 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) {
 		external.POST("/conversations/batch", handleExternalBatchPushConversations(db))
 		external.POST("/sessions/track", handleExternalSessionTrack(db))
 		external.POST("/session-memories", handleExternalCreateSessionMemory(db))
-		external.POST("/reason", handleExternalReason(db))
+		external.POST("/reason", handleExternalReason(db, chatAdapter))
 		external.POST("/ai/nudge-reflect", handleExternalAINudgeReflect(aiSvc))
 		external.POST("/ai/process-conversation", handleExternalAIProcessConversation(aiSvc))
 		external.POST("/skills/actions", handleExternalSkillRecordAction(db))
@@ -310,4 +320,29 @@ func (a *aiEmbeddingAdapter) AIEmbed(ctx context.Context, userID uint, texts []s
 		return nil, fmt.Errorf("empty embedding response")
 	}
 	return resp.Vectors, nil
+}
+
+type aiChatAdapter struct {
+	router *ai.AIRouter
+}
+
+func (a *aiChatAdapter) Chat(ctx context.Context, userID uint, messages []services.AIChatMessage, opts services.AIChatOptions) (*services.AIChatResponse, error) {
+	aiMsgs := make([]ai.Message, len(messages))
+	for i, m := range messages {
+		aiMsgs[i] = ai.Message{Role: m.Role, Content: m.Content}
+	}
+
+	resp, err := a.router.Chat(ctx, userID, aiMsgs, ai.ChatOptions{
+		Temperature: opts.Temperature,
+		MaxTokens:   opts.MaxTokens,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &services.AIChatResponse{
+		Content:  resp.Content,
+		TokensIn: resp.TokensIn,
+		Model:    resp.Model,
+	}, nil
 }

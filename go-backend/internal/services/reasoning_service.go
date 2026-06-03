@@ -1,19 +1,34 @@
 package services
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
-	"strings"
-	"time"
 
 	"clawmemory/internal/models"
 
 	"gorm.io/gorm"
 )
+
+type AIChatProvider interface {
+	Chat(ctx context.Context, userID uint, messages []AIChatMessage, opts AIChatOptions) (*AIChatResponse, error)
+}
+
+type AIChatMessage struct {
+	Role    string
+	Content string
+}
+
+type AIChatOptions struct {
+	Temperature float64
+	MaxTokens   int
+}
+
+type AIChatResponse struct {
+	Content  string
+	TokensIn int
+	Model    string
+}
 
 var coldPrompt = `Who is this person based on their conversation history? What are their preferences, goals, and working style? Focus on facts that would help an AI assistant be immediately useful. Be concise and structured.`
 
@@ -31,11 +46,12 @@ type ReasoningResult struct {
 }
 
 type ReasoningService struct {
-	db *gorm.DB
+	db     *gorm.DB
+	aiChat AIChatProvider
 }
 
-func NewReasoningService(db *gorm.DB) *ReasoningService {
-	return &ReasoningService{db: db}
+func NewReasoningService(db *gorm.DB, aiChat AIChatProvider) *ReasoningService {
+	return &ReasoningService{db: db, aiChat: aiChat}
 }
 
 func (s *ReasoningService) GetConfig(userID uint) (*models.ReasoningConfig, error) {
@@ -107,60 +123,6 @@ func (s *ReasoningService) SetConfig(userID uint, data map[string]interface{}) (
 	return &config, nil
 }
 
-func (s *ReasoningService) buildLLMConfig(userID uint, rc *models.ReasoningConfig) (*models.ReasoningConfig, error) {
-	settingsSvc := NewSettingsService(s.db)
-
-	providerID, _ := settingsSvc.GetByKey(userID, "ai_provider_id")
-	if pid, ok := providerID.(string); ok && pid != "" {
-		rc.Provider = pid
-	}
-
-	if v, _ := settingsSvc.GetByKey(userID, "ai_provider_type"); v != nil {
-		if s, ok := v.(string); ok && s != "" {
-			rc.Provider = s
-		}
-	}
-
-	if v, _ := settingsSvc.GetByKey(userID, "ai_api_key"); v != nil {
-		if s, ok := v.(string); ok && s != "" {
-			rc.APIKey = s
-		}
-	}
-
-	if v, _ := settingsSvc.GetByKey(userID, "ai_base_url"); v != nil {
-		if s, ok := v.(string); ok && s != "" {
-			rc.BaseURL = s
-		}
-	}
-
-	if v, _ := settingsSvc.GetByKey(userID, "ai_model"); v != nil {
-		if s, ok := v.(string); ok && s != "" {
-			rc.Model = s
-		}
-	}
-
-	if rc.Provider == "" {
-		return nil, fmt.Errorf("no AI provider configured. Please configure one in Settings > AI Config")
-	}
-	if rc.APIKey == "" && rc.Provider != "ollama" {
-		return nil, fmt.Errorf("API key is not configured for provider %s", rc.Provider)
-	}
-	if rc.Model == "" {
-		switch rc.Provider {
-		case "openai":
-			rc.Model = "gpt-4o-mini"
-		case "deepseek":
-			rc.Model = "deepseek-chat"
-		case "ollama":
-			rc.Model = "llama3"
-		default:
-			rc.Model = "gpt-4o-mini"
-		}
-	}
-
-	return rc, nil
-}
-
 func (s *ReasoningService) TestConnection(userID uint) error {
 	config, err := s.GetConfig(userID)
 	if err != nil {
@@ -173,12 +135,7 @@ func (s *ReasoningService) TestConnection(userID uint) error {
 		return fmt.Errorf("reasoning is not enabled")
 	}
 
-	llmConfig, err := s.buildLLMConfig(userID, config)
-	if err != nil {
-		return fmt.Errorf("failed to load AI provider: %w", err)
-	}
-
-	_, err = callLLM(*llmConfig, "Reply with OK", "minimal")
+	_, err = s.callLLM(context.Background(), userID, "Reply with OK", "minimal", config.MaxTokens)
 	return err
 }
 
@@ -192,11 +149,6 @@ func (s *ReasoningService) Reason(userID uint, query string, depth int, level st
 	}
 	if !config.Enabled {
 		return "", fmt.Errorf("reasoning is not enabled. Please enable it in Settings > AI Config")
-	}
-
-	llmConfig, err := s.buildLLMConfig(userID, config)
-	if err != nil {
-		return "", fmt.Errorf("failed to load AI provider: %w", err)
 	}
 
 	if depth < 1 {
@@ -226,7 +178,7 @@ func (s *ReasoningService) Reason(userID uint, query string, depth int, level st
 
 	fullQuery := pass0Prompt + "\n\nConversation context:\n" + truncate(query, 10000)
 
-	pass0Result, err := callLLM(*llmConfig, fullQuery, level)
+	pass0Result, err := s.callLLM(context.Background(), userID, fullQuery, level, config.MaxTokens)
 	if err != nil {
 		return "", fmt.Errorf("pass 0 failed: %w", err)
 	}
@@ -234,7 +186,7 @@ func (s *ReasoningService) Reason(userID uint, query string, depth int, level st
 
 	if depth >= 2 && len(pass0Result.Content) > 300 {
 		auditQuery := auditPrompt + "\n\nPrevious assessment:\n" + pass0Result.Content
-		pass1Result, err := callLLM(*llmConfig, auditQuery, "low")
+		pass1Result, err := s.callLLM(context.Background(), userID, auditQuery, "low", config.MaxTokens)
 		if err == nil {
 			results = append(results, pass1Result)
 		}
@@ -242,7 +194,7 @@ func (s *ReasoningService) Reason(userID uint, query string, depth int, level st
 
 	if depth >= 3 && len(results) >= 2 {
 		reconcileQuery := reconcilePrompt + "\n\nAssessment 1:\n" + results[0].Content + "\n\nAssessment 2:\n" + results[1].Content
-		pass2Result, err := callLLM(*llmConfig, reconcileQuery, "low")
+		pass2Result, err := s.callLLM(context.Background(), userID, reconcileQuery, "low", config.MaxTokens)
 		if err == nil {
 			results = append(results, pass2Result)
 		}
@@ -253,8 +205,8 @@ func (s *ReasoningService) Reason(userID uint, query string, depth int, level st
 	_, err = memSvc.Create(userID, map[string]interface{}{
 		"key":         fmt.Sprintf("reasoning-%s-%d", level, userID),
 		"value":       finalResult,
-		"layer":       "semantic",
-		"source":      "dialectic-" + config.Provider,
+		"layer":       "context",
+		"source":      "dialectic-reasoning",
 		"memory_type": "knowledge",
 	})
 	if err != nil {
@@ -264,7 +216,7 @@ func (s *ReasoningService) Reason(userID uint, query string, depth int, level st
 	return finalResult, nil
 }
 
-func callLLM(config models.ReasoningConfig, prompt string, level string) (ReasoningResult, error) {
+func (s *ReasoningService) callLLM(ctx context.Context, userID uint, prompt string, level string, maxTokenLimit int) (ReasoningResult, error) {
 	maxTokens := 600
 	switch level {
 	case "minimal":
@@ -279,97 +231,25 @@ func callLLM(config models.ReasoningConfig, prompt string, level string) (Reason
 		maxTokens = 2000
 	}
 
-	if config.MaxTokens > 0 && maxTokens > config.MaxTokens {
-		maxTokens = config.MaxTokens
+	if maxTokenLimit > 0 && maxTokens > maxTokenLimit {
+		maxTokens = maxTokenLimit
 	}
 
-	body := map[string]interface{}{
-		"model":      config.Model,
-		"messages":   []map[string]string{{"role": "user", "content": prompt}},
-		"max_tokens": maxTokens,
-	}
-
-	jsonBody, _ := json.Marshal(body)
-
-	baseURL := config.BaseURL
-	if baseURL == "" {
-		switch config.Provider {
-		case "openai":
-			baseURL = "https://api.openai.com/v1"
-		case "anthropic":
-			baseURL = "https://api.anthropic.com/v1"
-		case "openrouter":
-			baseURL = "https://openrouter.ai/api/v1"
-		case "ollama":
-			baseURL = "http://localhost:11434/v1"
-		case "deepseek":
-			baseURL = "https://api.deepseek.com/v1"
-		}
-	}
-
-	url := strings.TrimRight(baseURL, "/") + "/chat/completions"
-
-	req, err := http.NewRequest("POST", url, bytes.NewReader(jsonBody))
+	resp, err := s.aiChat.Chat(ctx, userID, []AIChatMessage{
+		{Role: "user", Content: prompt},
+	}, AIChatOptions{
+		Temperature: 0.7,
+		MaxTokens:   maxTokens,
+	})
 	if err != nil {
-		return ReasoningResult{}, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+config.APIKey)
-	if config.Provider == "openrouter" {
-		req.Header.Set("HTTP-Referer", "https://clawmemory.dev")
-		req.Header.Set("X-Title", "ClawMemory Dialectic Reasoning")
-	}
-
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return ReasoningResult{}, fmt.Errorf("LLM request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return ReasoningResult{}, fmt.Errorf("failed to read LLM response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return ReasoningResult{}, fmt.Errorf("LLM API returned %d: %s", resp.StatusCode, string(respBody[:min(len(respBody), 500)]))
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return ReasoningResult{}, fmt.Errorf("failed to parse LLM response: %w", err)
-	}
-
-	choices, ok := result["choices"].([]interface{})
-	if !ok || len(choices) == 0 {
-		return ReasoningResult{}, fmt.Errorf("no choices in LLM response")
-	}
-
-	choice, ok := choices[0].(map[string]interface{})
-	if !ok {
-		return ReasoningResult{}, fmt.Errorf("invalid choice format in LLM response")
-	}
-
-	message, ok := choice["message"].(map[string]interface{})
-	if !ok {
-		return ReasoningResult{}, fmt.Errorf("invalid message format in LLM response")
-	}
-
-	content, _ := message["content"].(string)
-
-	tokensIn := 0
-	if usage, ok := result["usage"].(map[string]interface{}); ok {
-		if p, ok := usage["prompt_tokens"].(float64); ok {
-			tokensIn = int(p)
-		}
+		return ReasoningResult{}, err
 	}
 
 	return ReasoningResult{
-		Content:  content,
+		Content:  resp.Content,
 		Pass:     0,
-		Model:    config.Model,
-		TokensIn: tokensIn,
+		Model:    resp.Model,
+		TokensIn: resp.TokensIn,
 	}, nil
 }
 

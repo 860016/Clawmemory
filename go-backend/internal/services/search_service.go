@@ -355,7 +355,6 @@ func (s *SearchService) graphTraversalSearch(userID uint, query string, limit in
 		paths    []string
 	}
 
-	visited := make(map[uint]bool)
 	pathResults := make(map[uint]*pathResult)
 
 	for startID := range matchedEntityIDs {
@@ -366,6 +365,7 @@ func (s *SearchService) graphTraversalSearch(userID uint, query string, limit in
 			score   float64
 		}
 
+		visited := make(map[uint]bool)
 		queue := []bfsEntry{{
 			node:    startID,
 			depth:   0,
@@ -381,9 +381,14 @@ func (s *SearchService) graphTraversalSearch(userID uint, query string, limit in
 				continue
 			}
 
+			if visited[current.node] && current.depth > 0 {
+				continue
+			}
+			visited[current.node] = true
+
 			neighbors := adj[current.node]
 			for _, nb := range neighbors {
-				if visited[nb.target] && current.depth > 0 {
+				if visited[nb.target] {
 					continue
 				}
 
@@ -393,6 +398,8 @@ func (s *SearchService) graphTraversalSearch(userID uint, query string, limit in
 				if existing, ok := pathResults[nb.target]; ok {
 					if nextScore > existing.score {
 						existing.score = nextScore
+						existing.paths = append(existing.paths[:0], nextPath)
+					} else {
 						existing.paths = append(existing.paths, nextPath)
 					}
 				} else {
@@ -403,7 +410,6 @@ func (s *SearchService) graphTraversalSearch(userID uint, query string, limit in
 					}
 				}
 
-				visited[nb.target] = true
 				queue = append(queue, bfsEntry{
 					node:    nb.target,
 					depth:   current.depth + 1,
@@ -493,8 +499,6 @@ func (s *SearchService) graphTraversalSearch(userID uint, query string, limit in
 			paths = paths[:3]
 		}
 
-		_ = paths
-
 		results = append(results, internalSearchResult{
 			MemoryID:   m.ID,
 			Key:        m.Key,
@@ -505,6 +509,7 @@ func (s *SearchService) graphTraversalSearch(userID uint, query string, limit in
 			Tags:       m.Tags,
 			Status:     m.Status,
 			Score:      score,
+			Paths:      paths,
 			CreatedAt:  m.CreatedAt.Format("2006-01-02 15:04:05"),
 			UpdatedAt:  m.UpdatedAt.Format("2006-01-02 15:04:05"),
 		})

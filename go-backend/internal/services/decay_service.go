@@ -11,12 +11,62 @@ import (
 	"gorm.io/gorm"
 )
 
+type decayThresholds struct {
+	archive float64
+	trash   float64
+}
+
 type DecayService struct {
-	db *gorm.DB
+	db     *gorm.DB
+	config DecayDefaults
+}
+
+type DecayDefaults struct {
+	CoreHalfLife          float64
+	ContextHalfLife       float64
+	DetailHalfLife        float64
+	DefaultHalfLife       float64
+	ReinforceBonus        float64
+	CoreMinImportance     float64
+	GlobalMinImportance   float64
+	CoreYearlyDecayFactor float64
+	CoreReinforceMin      int
+	DecayAdjustThreshold  float64
+	PruneImportanceBelow  float64
+	BatchSize             int
+	CompressThresholds    map[string]float64
+	LayerThresholds       map[string]decayThresholds
+}
+
+var defaultDecayConfig = DecayDefaults{
+	CoreHalfLife:          3650.0,
+	ContextHalfLife:       60.0,
+	DetailHalfLife:        15.0,
+	DefaultHalfLife:       30.0,
+	ReinforceBonus:        10.0,
+	CoreMinImportance:     0.7,
+	GlobalMinImportance:   0.05,
+	CoreYearlyDecayFactor: 0.98,
+	CoreReinforceMin:      5,
+	DecayAdjustThreshold:  0.95,
+	PruneImportanceBelow:  0.2,
+	BatchSize:             200,
+	CompressThresholds: map[string]float64{
+		"light":   0.2,
+		"medium":  0.35,
+		"heavy":   0.5,
+		"default": 0.2,
+	},
+	LayerThresholds: map[string]decayThresholds{
+		"core":    {archive: 0.5, trash: 0.2},
+		"context": {archive: 0.3, trash: 0.1},
+		"detail":  {archive: 0.2, trash: 0.05},
+		"default": {archive: 0.3, trash: 0.1},
+	},
 }
 
 func NewDecayService(db *gorm.DB) *DecayService {
-	return &DecayService{db: db}
+	return &DecayService{db: db, config: defaultDecayConfig}
 }
 
 type DecayStatsResult struct {
@@ -38,7 +88,7 @@ func (s *DecayService) GetStats(userID uint) (*DecayStatsResult, error) {
 	s.db.Where("user_id = ? AND status = ?", userID, "active").Limit(5000).Find(&memories)
 	stats.PruneCandidates = []map[string]interface{}{}
 	for _, m := range memories {
-		if m.Importance < 0.2 {
+		if m.Importance < s.config.PruneImportanceBelow {
 			stats.PruneCandidates = append(stats.PruneCandidates, map[string]interface{}{
 				"id":         m.ID,
 				"key":        m.Key,
@@ -61,7 +111,7 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 	reinforced := 0
 	locked := 0
 
-	batchSize := 200
+	batchSize := s.config.BatchSize
 	var lastID uint
 	totalProcessed := 0
 
@@ -90,7 +140,7 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 			newStatus := m.Status
 			newDecayStage := m.DecayStage
 
-			if m.ReinforceCount >= 5 {
+			if m.ReinforceCount >= s.config.CoreReinforceMin {
 				reinforced++
 				continue
 			}
@@ -98,11 +148,11 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 			if m.Layer == "core" {
 				locked++
 				if daysSinceAccess > 365 {
-					newImportance = m.Importance * 0.98
+					newImportance = m.Importance * s.config.CoreYearlyDecayFactor
 					newDecayStage = 1
 					adjusted++
 				}
-				newImportance = math.Max(newImportance, 0.7)
+				newImportance = math.Max(newImportance, s.config.CoreMinImportance)
 				if newImportance != m.Importance || newDecayStage != m.DecayStage {
 					updates := map[string]interface{}{
 						"importance":  newImportance,
@@ -113,11 +163,11 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 				continue
 			}
 
-			halfLife := layerHalfLife(m.Layer, m.ReinforceCount)
+			halfLife := s.layerHalfLife(m.Layer, m.ReinforceCount)
 			decayFactor := math.Pow(0.5, daysSinceAccess/halfLife)
 			newImportance = m.Importance * decayFactor
 
-			thresholds := layerThresholds(m.Layer)
+			thresholds := s.layerThresholds(m.Layer)
 
 			if newImportance < thresholds.trash {
 				newStatus = "trashed"
@@ -129,12 +179,12 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 				newStatus = "archived"
 				newDecayStage = 2
 				archived++
-			} else if newImportance < m.Importance*0.95 {
+			} else if newImportance < m.Importance*s.config.DecayAdjustThreshold {
 				newDecayStage = 1
 				adjusted++
 			}
 
-			newImportance = math.Max(newImportance, 0.05)
+			newImportance = math.Max(newImportance, s.config.GlobalMinImportance)
 
 			if newImportance != m.Importance || newStatus != m.Status || newDecayStage != m.DecayStage {
 				updates := map[string]interface{}{
@@ -166,37 +216,24 @@ func (s *DecayService) ApplyDecay(userID uint) (map[string]interface{}, error) {
 	}, nil
 }
 
-type decayThresholds struct {
-	archive float64
-	trash   float64
-}
-
-func layerHalfLife(layer string, reinforceCount int) float64 {
-	base := 30.0
+func (s *DecayService) layerHalfLife(layer string, reinforceCount int) float64 {
+	base := s.config.DefaultHalfLife
 	switch layer {
 	case "core":
-		return 3650.0
+		return s.config.CoreHalfLife
 	case "context":
-		base = 60.0
+		base = s.config.ContextHalfLife
 	case "detail":
-		base = 15.0
-	default:
-		base = 30.0
+		base = s.config.DetailHalfLife
 	}
-	return base + float64(reinforceCount)*10.0
+	return base + float64(reinforceCount)*s.config.ReinforceBonus
 }
 
-func layerThresholds(layer string) decayThresholds {
-	switch layer {
-	case "core":
-		return decayThresholds{archive: 0.5, trash: 0.2}
-	case "context":
-		return decayThresholds{archive: 0.3, trash: 0.1}
-	case "detail":
-		return decayThresholds{archive: 0.2, trash: 0.05}
-	default:
-		return decayThresholds{archive: 0.3, trash: 0.1}
+func (s *DecayService) layerThresholds(layer string) decayThresholds {
+	if t, ok := s.config.LayerThresholds[layer]; ok {
+		return t
 	}
+	return s.config.LayerThresholds["default"]
 }
 
 func (s *DecayService) EmptyTrash(userID uint) (int64, error) {
@@ -257,16 +294,14 @@ func (s *DecayService) CompressPreview(userID uint, level string) (map[string]in
 	var memories []models.Memory
 	logDBErr("load memories for compress preview", s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error)
 
-	threshold := 0.3
-	switch level {
-	case "light":
-		threshold = 0.2
-	case "medium":
-		threshold = 0.35
-	case "heavy", "deep":
-		threshold = 0.5
-	default:
-		threshold = 0.2
+	threshold := s.config.CompressThresholds["default"]
+	if t, ok := s.config.CompressThresholds[level]; ok {
+		threshold = t
+	}
+	if level == "deep" {
+		if t, ok := s.config.CompressThresholds["heavy"]; ok {
+			threshold = t
+		}
 	}
 
 	preview := []map[string]interface{}{}

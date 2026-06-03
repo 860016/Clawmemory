@@ -1,16 +1,17 @@
 import api from './go-client'
+import type { ProjectCreateParams } from './types'
 
 export default {
-  list(params?: any) {
+  list(params?: { page?: number; size?: number; category?: string; status?: string }) {
     return api.get('/projects', { params })
   },
   get(id: number) {
     return api.get(`/projects/${id}`)
   },
-  create(data: any) {
+  create(data: ProjectCreateParams) {
     return api.post('/projects', data)
   },
-  update(id: number, data: any) {
+  update(id: number, data: Partial<ProjectCreateParams>) {
     return api.put(`/projects/${id}`, data)
   },
   delete(id: number) {
@@ -28,10 +29,10 @@ export default {
   getNotes(projectId: number) {
     return api.get(`/projects/${projectId}/notes`)
   },
-  addNote(projectId: number, data: any) {
+  addNote(projectId: number, data: { content: string }) {
     return api.post(`/projects/${projectId}/notes`, data)
   },
-  updateNote(noteId: number, data: any) {
+  updateNote(noteId: number, data: { content?: string }) {
     return api.put(`/projects/notes/${noteId}`, data)
   },
   deleteNote(noteId: number) {
@@ -39,5 +40,11 @@ export default {
   },
   extractMemories(projectId: number) {
     return api.post(`/projects/${projectId}/extract-memories`)
+  },
+  discover() {
+    return api.post('/projects/discover')
+  },
+  generateWiki(projectId: number) {
+    return api.post(`/projects/${projectId}/generate-wiki`)
   },
 }

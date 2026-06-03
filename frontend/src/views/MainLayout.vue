@@ -271,7 +271,8 @@ const navItems = [
 
 function isNavActive(path: string) {
   if (path === '/') return route.path === '/' || route.path === '/reports' || route.path === '/docs' || route.path === '/skills'
-  if (path === '/knowledge') return route.path.startsWith('/knowledge') || route.path === '/wiki'
+  if (path === '/knowledge') return route.path.startsWith('/knowledge')
+  if (path === '/projects') return route.path.startsWith('/projects') || route.path === '/wiki'
   if (path === '/memories') return route.path.startsWith('/memories') || route.path === '/sharing' || route.path === '/session-memories'
   return route.path.startsWith(path)
 }
@@ -304,7 +305,6 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
   '/knowledge': [
     { items: [
       { path: '/knowledge', label: 'nav.knowledge', icon: Connection },
-      { path: '/wiki', label: 'nav.wiki', icon: Document },
     ]}
   ],
   '/projects': [
@@ -312,6 +312,7 @@ const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: str
       { path: '/projects', label: 'project.allProjects', icon: Document },
       { path: '/projects?status=active', label: 'project.active', icon: CircleCheck },
       { path: '/projects?status=completed', label: 'project.completed', icon: SuccessFilled },
+      { path: '/wiki', label: 'nav.wiki', icon: Document },
     ]}
   ],
   '/advanced': [
@@ -344,7 +345,7 @@ const currentSubNav = computed(() => {
     return subNavMap['/'] || []
   }
   if (path === '/wiki') {
-    return subNavMap['/knowledge'] || []
+    return subNavMap['/projects'] || []
   }
   if (path === '/sharing' || path === '/session-memories') {
     return subNavMap['/memories'] || []
@@ -378,7 +379,7 @@ async function performSearch(q: string) {
   searchLoading.value = true
   try {
     const [memRes, wikiRes, projRes] = await Promise.allSettled([
-      memoryApi.search(q, 'keyword', 5),
+      memoryApi.search({ q, mode: 'keyword', limit: 5 }),
       wikiApi.search(q, 5),
       projectApi.search(q, 5),
     ])

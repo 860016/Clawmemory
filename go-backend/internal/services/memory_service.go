@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -52,7 +53,7 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 		return nil, fmt.Errorf("validation failed: %s", err.Error())
 	}
 
-	layer := getString(data, "layer", "episodic")
+	layer := getString(data, "layer", "context")
 
 	if layer == "core" {
 		var coreCount int64
@@ -98,7 +99,24 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 	if err := s.db.Create(memory).Error; err != nil {
 		return nil, err
 	}
+
+	go s.postCreate(memory)
+
 	return ToMemoryModel(memory), nil
+}
+
+func (s *MemoryService) postCreate(memory *models.Memory) {
+	shareSvc := NewMemoryShareService(s.db)
+	if err := shareSvc.ProcessAutoShareRules(memory.UserID, memory); err != nil {
+		log.Printf("[MemoryService] postCreate: auto share rules error for memory %d: %v", memory.ID, err)
+	}
+
+	chromaSvc := NewChromaDBService(s.db)
+	if chromaSvc.IsAvailable() {
+		if err := chromaSvc.IndexSingleMemory(memory); err != nil {
+			log.Printf("[MemoryService] postCreate: chromadb index error for memory %d: %v", memory.ID, err)
+		}
+	}
 }
 
 func (s *MemoryService) Get(userID, id uint) (*MemoryModel, error) {

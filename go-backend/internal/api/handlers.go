@@ -664,7 +664,7 @@ func handleMemoryEvolution(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func handleExternalReason(db *gorm.DB) gin.HandlerFunc {
+func handleExternalReason(db *gorm.DB, aiChat services.AIChatProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !middleware.HasAPIKeyPermission(c, "reason:execute") {
 			c.JSON(http.StatusForbidden, gin.H{"error": "API key lacks 'reason:execute' permission"})
@@ -683,7 +683,7 @@ func handleExternalReason(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		svc := services.NewReasoningService(db)
+		svc := services.NewReasoningService(db, aiChat)
 		result, err := svc.Reason(userID, req.Query, req.Depth, req.Level)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -700,11 +700,11 @@ func handleExternalReason(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func handleGetReasoningConfig(db *gorm.DB) gin.HandlerFunc {
+func handleGetReasoningConfig(db *gorm.DB, aiChat services.AIChatProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 
-		svc := services.NewReasoningService(db)
+		svc := services.NewReasoningService(db, aiChat)
 		config, err := svc.GetConfig(userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -729,7 +729,7 @@ func handleGetReasoningConfig(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func handleSetReasoningConfig(db *gorm.DB) gin.HandlerFunc {
+func handleSetReasoningConfig(db *gorm.DB, aiChat services.AIChatProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 
@@ -739,7 +739,7 @@ func handleSetReasoningConfig(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		svc := services.NewReasoningService(db)
+		svc := services.NewReasoningService(db, aiChat)
 		config, err := svc.SetConfig(userID, data)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -760,11 +760,11 @@ func handleSetReasoningConfig(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func handleTestReasoningConnection(db *gorm.DB) gin.HandlerFunc {
+func handleTestReasoningConnection(db *gorm.DB, aiChat services.AIChatProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 
-		svc := services.NewReasoningService(db)
+		svc := services.NewReasoningService(db, aiChat)
 		err := svc.TestConnection(userID)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "success": false})
@@ -775,7 +775,7 @@ func handleTestReasoningConnection(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-func handleReason(db *gorm.DB) gin.HandlerFunc {
+func handleReason(db *gorm.DB, aiChat services.AIChatProvider) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
 
@@ -789,7 +789,7 @@ func handleReason(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		svc := services.NewReasoningService(db)
+		svc := services.NewReasoningService(db, aiChat)
 		result, err := svc.Reason(userID, req.Query, req.Depth, req.Level)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -2837,7 +2837,7 @@ func handleSmartLoad(db *gorm.DB) gin.HandlerFunc {
 		loadLevel := c.DefaultQuery("load_level", "auto")
 
 		svc := services.NewSmartLoadService(db)
-		result, err := svc.SmartLoad(userID, query, tokenBudget, loadLevel)
+		result, err := svc.SmartLoad(userID, query, tokenBudget, loadLevel, "api", "")
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -3830,356 +3830,15 @@ func handleImportOpenClawMemories(db *gorm.DB) gin.HandlerFunc {
 func handleAutoImportMemories(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)
-		searchDirs := services.GetAllSearchDirs()
-
-		var imported, skipped, entitiesCreated int
-		var foundFiles []string
-		seenKeys := make(map[string]bool)
-
-		var existingKeys []string
-		db.Table("memories").Where("user_id = ? AND status != ?", userID, "trashed").Pluck("key", &existingKeys)
-		for _, k := range existingKeys {
-			seenKeys[k] = true
-		}
-
-		for _, dir := range searchDirs {
-			memFile := filepath.Join(dir, "MEMORY.md")
-			if data, err := os.ReadFile(memFile); err == nil && len(data) > 0 {
-				foundFiles = append(foundFiles, memFile)
-				importFromMarkdown(db, userID, memFile, string(data), seenKeys, &imported, &skipped, &entitiesCreated)
-			}
-
-			memoryDir := filepath.Join(dir, "memory")
-			if files, err := os.ReadDir(memoryDir); err == nil {
-				for _, f := range files {
-					if f.IsDir() {
-						continue
-					}
-					ext := strings.ToLower(filepath.Ext(f.Name()))
-					if ext != ".md" && ext != ".txt" {
-						continue
-					}
-					path := filepath.Join(memoryDir, f.Name())
-					data, err := os.ReadFile(path)
-					if err != nil || len(data) == 0 {
-						continue
-					}
-					foundFiles = append(foundFiles, path)
-					content := string(data)
-					if ext == ".md" {
-						importFromMarkdown(db, userID, path, content, seenKeys, &imported, &skipped, &entitiesCreated)
-					} else if ext == ".txt" {
-						importFromText(db, userID, path, content, seenKeys, &imported, &skipped, &entitiesCreated)
-					}
-				}
-			}
-		}
-
+		svc := services.NewImportService(db)
+		result := svc.AutoImport(userID)
 		c.JSON(http.StatusOK, gin.H{
-			"imported":         imported,
-			"skipped":          skipped,
-			"entities_created": entitiesCreated,
-			"files_found":      foundFiles,
-			"message":          fmt.Sprintf("imported %d memories, created %d entities, skipped %d", imported, entitiesCreated, skipped),
+			"imported":         result.Imported,
+			"skipped":          result.Skipped,
+			"entities_created": result.EntitiesCreated,
+			"files_found":      result.FoundFiles,
+			"message":          fmt.Sprintf("imported %d memories, created %d entities, skipped %d", result.Imported, result.EntitiesCreated, result.Skipped),
 		})
-	}
-}
-
-func importFromJSON(db *gorm.DB, userID uint, content string, seenKeys map[string]bool, imported, skipped, entitiesCreated *int) {
-	var memories []map[string]interface{}
-	if json.Unmarshal([]byte(content), &memories) != nil {
-		var single map[string]interface{}
-		if json.Unmarshal([]byte(content), &single) != nil {
-			return
-		}
-		memories = []map[string]interface{}{single}
-	}
-
-	for _, m := range memories {
-		key, _ := m["key"].(string)
-		contentStr, _ := m["content"].(string)
-		if key == "" {
-			if name, ok := m["name"].(string); ok {
-				key = name
-			} else if title, ok := m["title"].(string); ok {
-				key = title
-			}
-		}
-		if contentStr == "" {
-			contentStr, _ = m["value"].(string)
-			if contentStr == "" {
-				contentStr, _ = m["text"].(string)
-				if contentStr == "" {
-					contentStr, _ = m["description"].(string)
-				}
-			}
-		}
-		if key == "" || contentStr == "" {
-			*skipped++
-			continue
-		}
-
-		if seenKeys[key] {
-			*skipped++
-			continue
-		}
-
-		layer := classifyLayer(key, contentStr)
-		importance := 0.5
-		if imp, ok := m["importance"].(float64); ok {
-			importance = imp
-		}
-
-		tags := extractTags(m)
-
-		source := "auto_import"
-		if s, ok := m["source"].(string); ok && s != "" {
-			source = s
-		}
-
-		memSvc := services.NewMemoryService(db)
-		_, err := memSvc.Create(userID, map[string]interface{}{
-			"key":        key,
-			"value":      contentStr,
-			"layer":      layer,
-			"importance": importance,
-			"tags":       tags,
-			"source":     source,
-		})
-		if err != nil {
-			*skipped++
-			continue
-		}
-		seenKeys[key] = true
-		*imported++
-
-		tryCreateEntity(db, userID, key, contentStr, entitiesCreated)
-	}
-}
-
-func importFromMarkdown(db *gorm.DB, userID uint, filePath, content string, seenKeys map[string]bool, imported, skipped, entitiesCreated *int) {
-	sections := strings.Split(content, "\n## ")
-	for i, section := range sections {
-		var key, body string
-		if i == 0 {
-			lines := strings.SplitN(section, "\n", 2)
-			key = strings.TrimPrefix(strings.TrimSpace(lines[0]), "# ")
-			if len(lines) > 1 {
-				body = strings.TrimSpace(lines[1])
-			}
-		} else {
-			lines := strings.SplitN(section, "\n", 2)
-			key = strings.TrimSpace(lines[0])
-			if len(lines) > 1 {
-				body = strings.TrimSpace(lines[1])
-			}
-		}
-
-		if key == "" || body == "" {
-			continue
-		}
-
-		key = fmt.Sprintf("md:%s", key)
-		if seenKeys[key] {
-			*skipped++
-			continue
-		}
-
-		layer := classifyLayer(key, body)
-		importance := 0.6
-
-		source := "auto_import_md"
-		relPath := filePath
-		if len(relPath) > 100 {
-			relPath = "..." + relPath[len(relPath)-97:]
-		}
-
-		memSvc := services.NewMemoryService(db)
-		_, err := memSvc.Create(userID, map[string]interface{}{
-			"key":        key,
-			"value":      body,
-			"layer":      layer,
-			"importance": importance,
-			"tags":       "markdown",
-			"source":     source,
-		})
-		if err != nil {
-			*skipped++
-			continue
-		}
-		seenKeys[key] = true
-		*imported++
-
-		tryCreateEntity(db, userID, key, body, entitiesCreated)
-	}
-}
-
-func importFromText(db *gorm.DB, userID uint, filePath, content string, seenKeys map[string]bool, imported, skipped, entitiesCreated *int) {
-	lines := strings.Split(content, "\n")
-	var buffer []string
-	var currentKey string
-
-	flushBuffer := func() {
-		if currentKey != "" && len(buffer) > 0 {
-			body := strings.Join(buffer, "\n")
-			key := fmt.Sprintf("txt:%s", currentKey)
-
-			if !seenKeys[key] {
-				layer := classifyLayer(key, body)
-				memSvc := services.NewMemoryService(db)
-				_, err := memSvc.Create(userID, map[string]interface{}{
-					"key":        key,
-					"value":      body,
-					"layer":      layer,
-					"importance": 0.4,
-					"tags":       "text",
-					"source":     "auto_import_txt",
-				})
-				if err == nil {
-					seenKeys[key] = true
-					*imported++
-					tryCreateEntity(db, userID, key, body, entitiesCreated)
-				} else {
-					*skipped++
-				}
-			} else {
-				*skipped++
-			}
-		}
-		buffer = nil
-		currentKey = ""
-	}
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		if len(trimmed) < 80 && !strings.HasPrefix(trimmed, "-") && !strings.HasPrefix(trimmed, "*") && strings.HasSuffix(trimmed, ":") {
-			flushBuffer()
-			currentKey = strings.TrimSuffix(trimmed, ":")
-		} else if len(trimmed) < 60 && !strings.HasPrefix(trimmed, "-") && !strings.HasPrefix(trimmed, "*") && currentKey == "" {
-			flushBuffer()
-			currentKey = trimmed
-		} else {
-			buffer = append(buffer, trimmed)
-		}
-	}
-	flushBuffer()
-
-	if *imported == 0 && len(strings.Fields(content)) > 5 {
-		key := fmt.Sprintf("txt:%s", filepath.Base(filePath))
-		key = strings.TrimSuffix(key, filepath.Ext(key))
-		if !seenKeys[key] && len(content) > 10 {
-			layer := classifyLayer(key, content)
-			memSvc := services.NewMemoryService(db)
-			_, err := memSvc.Create(userID, map[string]interface{}{
-				"key":        key,
-				"value":      content,
-				"layer":      layer,
-				"importance": 0.3,
-				"tags":       "text",
-				"source":     "auto_import_txt",
-			})
-			if err == nil {
-				seenKeys[key] = true
-				*imported++
-				tryCreateEntity(db, userID, key, content, entitiesCreated)
-			}
-		}
-	}
-}
-
-func classifyLayer(key, content string) string {
-	lowerKey := strings.ToLower(key)
-	lowerContent := strings.ToLower(content)
-
-	if strings.Contains(lowerKey, "偏好") || strings.Contains(lowerKey, "preference") ||
-		strings.Contains(lowerContent, "我喜欢") || strings.Contains(lowerContent, "i prefer") ||
-		strings.Contains(lowerContent, "偏好") || strings.Contains(lowerContent, "preference") {
-		return "preference"
-	}
-	if strings.Contains(lowerKey, "临时") || strings.Contains(lowerKey, "temporary") ||
-		strings.Contains(lowerKey, "todo") || strings.Contains(lowerKey, "待办") ||
-		strings.Contains(lowerContent, "临时") || strings.Contains(lowerContent, "temporary") {
-		return "short_term"
-	}
-	if strings.Contains(lowerKey, "私密") || strings.Contains(lowerKey, "private") ||
-		strings.Contains(lowerKey, "密码") || strings.Contains(lowerKey, "password") ||
-		strings.Contains(lowerContent, "私密") || strings.Contains(lowerContent, "private") {
-		return "private"
-	}
-	if strings.Contains(lowerKey, "项目") || strings.Contains(lowerKey, "project") ||
-		strings.Contains(lowerContent, "项目") || strings.Contains(lowerContent, "project") {
-		return "knowledge"
-	}
-	if strings.Contains(lowerKey, "工具") || strings.Contains(lowerKey, "tool") ||
-		strings.Contains(lowerContent, "工具") || strings.Contains(lowerContent, "software") {
-		return "knowledge"
-	}
-	return "knowledge"
-}
-
-func extractTags(m map[string]interface{}) string {
-	if t, ok := m["tags"].([]interface{}); ok && len(t) > 0 {
-		tagStrs := make([]string, 0, len(t))
-		for _, tag := range t {
-			if s, ok := tag.(string); ok {
-				tagStrs = append(tagStrs, s)
-			}
-		}
-		return strings.Join(tagStrs, ",")
-	}
-	if t, ok := m["tags"].(string); ok {
-		return t
-	}
-	if cat, ok := m["category"].(string); ok {
-		return cat
-	}
-	return ""
-}
-
-func tryCreateEntity(db *gorm.DB, userID uint, key, content string, entitiesCreated *int) {
-	if len(content) < 10 || len(content) > 2000 {
-		return
-	}
-
-	entityType := "concept"
-	lowerContent := strings.ToLower(content)
-	if strings.Contains(lowerContent, "项目") || strings.Contains(lowerContent, "project") {
-		entityType = "organization"
-	} else if strings.Contains(lowerContent, "工具") || strings.Contains(lowerContent, "tool") || strings.Contains(lowerContent, "软件") || strings.Contains(lowerContent, "software") {
-		entityType = "technology"
-	} else if strings.Contains(lowerContent, "人") || strings.Contains(lowerContent, "person") || strings.Contains(lowerContent, "用户") {
-		entityType = "person"
-	} else if strings.Contains(lowerContent, "地点") || strings.Contains(lowerContent, "location") || strings.Contains(lowerContent, "城市") {
-		entityType = "location"
-	} else if strings.Contains(lowerContent, "事件") || strings.Contains(lowerContent, "event") {
-		entityType = "event"
-	}
-
-	name := key
-	if strings.HasPrefix(name, "md:") || strings.HasPrefix(name, "txt:") {
-		name = name[3:]
-	}
-	if len(name) > 50 {
-		name = name[:50]
-	}
-
-	var entityCount int64
-	logDBErr("count entities by name", db.Table("entities").Where("user_id = ? AND name = ?", userID, name).Count(&entityCount).Error)
-	if entityCount == 0 {
-		entity := models.Entity{
-			UserID:        userID,
-			Name:          name,
-			EntityType:    entityType,
-			Description:   content,
-			Confidence:    0.7,
-			ExtractMethod: "auto_import",
-		}
-		if db.Create(&entity).Error == nil {
-			*entitiesCreated++
-		}
 	}
 }
 
@@ -5676,5 +5335,87 @@ func handleExternalSearchMemories(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"items": memories})
+	}
+}
+
+func handleProjectDiscoverFromMemories(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewProjectService(db)
+		result, err := svc.DiscoverFromMemories(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"projects": result})
+	}
+}
+
+func handleProjectGenerateWiki(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		id, ok := parseIDParam(c, "id")
+		if !ok {
+			return
+		}
+		svc := services.NewProjectService(db)
+		count, err := svc.GenerateWikiFromMemories(userID, uint(id))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"wiki_entries_generated": count})
+	}
+}
+
+func handleEvolutionGraphReasoning(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewEvolutionService(db)
+		result, err := svc.GraphReasoning(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func handleEvolutionCentrality(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewEvolutionService(db)
+		result, err := svc.CentralityAnalysis(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func handleEvolutionCommunityDiscovery(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewEvolutionService(db)
+		result, err := svc.CommunityDiscovery(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, result)
+	}
+}
+
+func handleEvolutionCommunitiesToWiki(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+		svc := services.NewEvolutionService(db)
+		result, err := svc.CommunitiesToWiki(userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, result)
 	}
 }

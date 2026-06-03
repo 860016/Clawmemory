@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"log"
 	"strings"
 )
@@ -45,6 +46,23 @@ func truncateStr(s string, maxLen int) string {
 		return s
 	}
 	return string(runes[:maxLen]) + "..."
+}
+
+func parseMemoryTags(tags string) []string {
+	if tags == "" || tags == "[]" {
+		return nil
+	}
+	var result []string
+	if err := json.Unmarshal([]byte(tags), &result); err == nil {
+		return result
+	}
+	for _, t := range strings.Split(tags, ",") {
+		t = strings.TrimSpace(t)
+		if t != "" {
+			result = append(result, t)
+		}
+	}
+	return result
 }
 
 func tokenSimilarity(a, b []string) float64 {
