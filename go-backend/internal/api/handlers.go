@@ -551,6 +551,43 @@ func handleSearchMemories(db *gorm.DB) gin.HandlerFunc {
 				"engine": "graph_rag",
 				"mode":   "keyword+semantic+graph",
 			})
+		case "smart":
+			if q == "" {
+				svc := services.NewMemoryService(db)
+				memories, err := svc.SearchKeyword(userID, q, limit)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+				c.JSON(http.StatusOK, gin.H{"items": memories, "engine": "keyword"})
+				return
+			}
+			searchSvc := services.NewSearchService(db)
+			results, err := searchSvc.GraphRAGSearch(userID, q, limit)
+			if err != nil || len(results) == 0 {
+				chromaSvc := services.NewChromaDBService(db)
+				if chromaSvc.IsAvailable() {
+					chromaResults, chromaErr := chromaSvc.Search(userID, q, limit)
+					if chromaErr == nil && len(chromaResults) > 0 {
+						enriched := enrichChromaResults(db, userID, chromaResults, limit)
+						c.JSON(http.StatusOK, gin.H{"items": enriched, "engine": "chromadb"})
+						return
+					}
+				}
+				memSvc := services.NewMemoryService(db)
+				memories, kwErr := memSvc.SearchKeyword(userID, q, limit)
+				if kwErr != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": kwErr.Error()})
+					return
+				}
+				c.JSON(http.StatusOK, gin.H{"items": memories, "engine": "keyword"})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"items":  results,
+				"engine": "smart",
+				"mode":   "keyword+semantic+graph",
+			})
 		default:
 			svc := services.NewMemoryService(db)
 			memories, err := svc.SearchKeyword(userID, q, limit)

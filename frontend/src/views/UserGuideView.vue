@@ -70,7 +70,7 @@
                 </div>
                 <p class="layer-desc">{{ $t(layer.desc) }}</p>
                 <div class="layer-tags">
-                  <span class="layer-tag" v-for="tag in layer.tags" :key="tag">{{ tag }}</span>
+                  <span class="layer-tag" v-for="tag in layer.tags" :key="tag">{{ $t(tag) }}</span>
                 </div>
               </div>
             </div>
@@ -369,10 +369,10 @@ const startSteps = [
 ]
 
 const memoryLayers = [
-  { key: 'preference', icon: '⭐', label: 'memories.preference', desc: 'guide.layerPreferenceNew', tags: ['持久', '高优先'] },
-  { key: 'knowledge', icon: '📚', label: 'memories.knowledge', desc: 'guide.layerKnowledgeNew', tags: ['持久', '可搜索'] },
-  { key: 'short_term', icon: '⚡', label: 'memories.shortTerm', desc: 'guide.layerShortTermNew', tags: ['临时', '自动衰减'] },
-  { key: 'private', icon: '🔐', label: 'memories.private', desc: 'guide.layerPrivateNew', tags: ['加密', '仅自己可见'] },
+  { key: 'preference', icon: '⭐', label: 'memories.preference', desc: 'guide.layerPreferenceNew', tags: ['guide.tagPersistent', 'guide.tagHighPriority'] },
+  { key: 'knowledge', icon: '📚', label: 'memories.knowledge', desc: 'guide.layerKnowledgeNew', tags: ['guide.tagPersistent', 'guide.tagSearchable'] },
+  { key: 'short_term', icon: '⚡', label: 'memories.shortTerm', desc: 'guide.layerShortTermNew', tags: ['guide.tagTemporary', 'guide.tagAutoDecay'] },
+  { key: 'private', icon: '🔐', label: 'memories.private', desc: 'guide.layerPrivateNew', tags: ['guide.tagEncrypted', 'guide.tagPrivateOnly'] },
 ]
 
 const wikiFeatures = [

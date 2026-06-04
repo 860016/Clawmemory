@@ -39,6 +39,43 @@ Relation types: works_at, manages, depends_on, located_in, member_of, uses, crea
 
 CRITICAL: All entity names, descriptions, and relation types MUST be in the same language as the input memories. Never translate Chinese content to English.`,
 	},
+	"discover_projects": {
+		ID:          "discover_projects",
+		Name:        "Project Discovery",
+		Description: "Discover projects from memories using AI",
+		System: `You are a project analysis expert. Analyze the user's memory entries to discover distinct projects they are working on.
+IMPORTANT: You MUST output all text in the SAME LANGUAGE as the input content. If the input is in Chinese, all output must be in Chinese.
+Return ONLY valid JSON, no other text.`,
+		User: `Analyze these memories and discover distinct projects the user is working on:
+
+{{.Memories}}
+
+Existing projects (do NOT duplicate these):
+{{.ExistingProjects}}
+
+Return JSON format:
+{
+  "projects": [
+    {
+      "name": "项目名称",
+      "description": "项目描述，包括目标和技术栈",
+      "category": "分类（如：前端开发、后端开发、数据分析等）",
+      "status": "active|paused|completed",
+      "progress": 0-100,
+      "key_decisions": ["关键决策1", "关键决策2"],
+      "action_items": ["待办事项1", "待办事项2"],
+      "confidence": 0.0-1.0
+    }
+  ]
+}
+
+Rules:
+1. Only include REAL projects with clear evidence in the memories
+2. Do NOT duplicate existing projects
+3. Estimate progress based on completed vs pending items
+4. Extract key decisions and action items from the memories
+5. Set confidence based on how clearly the project is defined`,
+	},
 	"conflict_scan": {
 		ID:          "conflict_scan",
 		Name:        "Semantic Conflict Detection",

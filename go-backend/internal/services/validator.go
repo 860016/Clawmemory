@@ -105,11 +105,11 @@ func ValidateMemoryCreate(data map[string]interface{}) error {
 	v.Required("value", value).MaxLength("value", value, 50000)
 
 	if layer, ok := data["layer"].(string); ok && layer != "" {
-		v.OneOf("layer", layer, []string{"core", "context", "detail", "episodic", "semantic", "preference", "knowledge", "short_term", "private"})
+		v.OneOf("layer", layer, []string{"core", "context", "detail"})
 	}
 
 	if memoryType, ok := data["memory_type"].(string); ok && memoryType != "" {
-		v.OneOf("memory_type", memoryType, []string{"knowledge", "preference", "instruction", "context", "fact", "episodic", "conversation"})
+		v.OneOf("memory_type", memoryType, []string{"preference", "knowledge", "feedback", "project", "reference", "fact"})
 	}
 
 	if importance, ok := data["importance"].(float64); ok {

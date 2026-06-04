@@ -278,14 +278,14 @@
           <span>{{ $t('settings.connectedAgents') }}</span>
           <el-button size="small" @click="loadConnectedAgents" :loading="agentScanLoading">{{ $t('settings.refresh') }}</el-button>
         </div>
-        <div v-if="connectedAgents.length > 0" class="agent-list">
-          <div v-for="agent in connectedAgents" :key="agent.name" class="agent-item">
-            <div class="agent-item-header">
-              <span class="agent-name">{{ agent.display_name || agent.name }}</span>
+        <div v-if="connectedAgents.length > 0" class="agent-grid">
+          <div v-for="agent in connectedAgents" :key="agent.name" class="agent-card" @click="toggleAgentDetail(agent.name)">
+            <div class="agent-card-main">
+              <span class="agent-card-name">{{ agent.display_name || agent.name }}</span>
               <el-tag type="success" size="small">{{ $t('settings.agentConnected') }}</el-tag>
             </div>
-            <div v-if="agent.found_dirs && agent.found_dirs.length > 0" class="openclaw-paths">
-              <div v-for="p in agent.found_dirs" :key="p" class="openclaw-path-item">
+            <div v-if="expandedAgent === agent.name && agent.found_dirs?.length" class="agent-card-detail">
+              <div v-for="p in agent.found_dirs" :key="p" class="agent-path-item">
                 <code>{{ p }}</code>
               </div>
             </div>
@@ -390,8 +390,11 @@
             <span>{{ $t('settings.dedupRate') }}: {{ Math.round((dedupResult.dedup_rate || 0) * 100) }}%</span>
           </div>
           <div class="dedup-groups" v-if="dedupResult.duplicate_groups?.length">
-            <div class="dedup-group" v-for="(g, i) in dedupResult.duplicate_groups" :key="i">
-              <div class="dedup-group-header">{{ g.key }} ({{ $t('settings.similarity') }}: {{ Math.round(g.similarity * 100) }}%)</div>
+            <div class="dedup-group" v-for="(g, gi) in dedupResult.duplicate_groups" :key="gi">
+              <div class="dedup-group-header">
+                <span>{{ g.key }} ({{ $t('settings.similarity') }}: {{ Math.round(g.similarity * 100) }}%)</span>
+                <el-button size="small" type="warning" @click="mergeDedupGroup(g)" :loading="dedupMerging[gi]" plain style="margin-left:8px">{{ $t('settings.merge') }}</el-button>
+              </div>
               <div class="dedup-item" v-for="m in g.memories" :key="m.id">
                 <span class="dedup-id">#{{ m.id }}</span>
                 <span class="dedup-value">{{ m.value }}</span>
@@ -601,7 +604,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, reactive } from 'vue'
 import { useIsMobile } from '../composables/useIsMobile'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
@@ -614,7 +617,6 @@ import { settingsApi } from '../api/go-settings'
 import { riskSwitchApi } from '../api/go-sharing'
 import { memoryApi } from '../api/go-memories'
 import { authApi } from '../api/go-auth'
-import { agentApi } from '../api/go-agents'
 import { useAuthStore } from '../stores/auth'
 
 const { t } = useI18n()
@@ -665,6 +667,7 @@ const healthGrade = computed(() => {
 })
 
 const dedupResult = ref<any>(null)
+const dedupMerging = reactive<Record<number, boolean>>({})
 
 
 const governanceConfig = ref<any>({
@@ -866,6 +869,11 @@ function copyApiKey() {
 }
 
 const connectedAgents = ref<any[]>([])
+const expandedAgent = ref('')
+
+function toggleAgentDetail(name: string) {
+  expandedAgent.value = expandedAgent.value === name ? '' : name
+}
 const agentScanLoading = ref(false)
 const agentSyncStatus = ref<any>(null)
 const agentAutoSync = ref(true)
@@ -874,7 +882,7 @@ const agentSyncLoading = ref(false)
 async function loadConnectedAgents() {
   agentScanLoading.value = true
   try {
-    const { data } = await agentApi.getConnected()
+    const { data } = await memoryApi.getConnectedAgents()
     connectedAgents.value = data.agents || []
   } catch {
     connectedAgents.value = []
@@ -886,7 +894,7 @@ async function loadConnectedAgents() {
 async function loadAgentSyncStatus() {
   agentSyncLoading.value = true
   try {
-    const { data } = await agentApi.getSyncStatus()
+    const { data } = await memoryApi.getAgentSyncStatus()
     agentSyncStatus.value = data
     agentAutoSync.value = data.auto_sync_enabled
   } catch {
@@ -899,7 +907,7 @@ async function loadAgentSyncStatus() {
 async function toggleAgentSync() {
   agentSyncLoading.value = true
   try {
-    await agentApi.toggleSync(agentAutoSync.value)
+    await memoryApi.toggleAgentSync(agentAutoSync.value)
     ElMessage.success(t('common.success'))
   } catch (e: any) {
     agentAutoSync.value = !agentAutoSync.value
@@ -912,7 +920,7 @@ async function toggleAgentSync() {
 async function forceAgentSync() {
   agentSyncLoading.value = true
   try {
-    const { data } = await agentApi.forceSync()
+    const { data } = await memoryApi.forceAgentSync()
     ElMessage.success(t('settings.syncCompleted', { count: data.synced_count || 0 }))
     await loadAgentSyncStatus()
   } catch (e: any) {
@@ -1188,6 +1196,21 @@ async function scanDedup() {
   }
 }
 
+async function mergeDedupGroup(group: any) {
+  if (!group.memories || group.memories.length < 2) return
+  const target = group.memories[0]
+  const sources = group.memories.slice(1)
+  try {
+    for (const src of sources) {
+      await memoryApi.mergeDedup(src.id, target.id)
+    }
+    ElMessage.success(t('settings.mergeSuccess', { count: sources.length }))
+    scanDedup()
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.error || t('common.failed'))
+  }
+}
+
 async function loadAIConfig() {
   aiLoading.value = true
   try {
@@ -1342,7 +1365,7 @@ watch(showAIConfigDialog, async (v) => {
 async function loadAgentsMD() {
   agentsMdLoading.value = true
   try {
-    const { data } = await agentApi.getAgentsMD()
+    const { data } = await memoryApi.getAgentsMD()
     agentsMdContent.value = data.content || ''
   } catch {
     agentsMdContent.value = ''
@@ -1531,13 +1554,14 @@ watch(showAgentsMdPreview, async (v) => {
 .api-key-prefix { font-family: monospace; font-size: 12px; color: var(--cm-text-muted); }
 .api-key-perms { font-size: 12px; color: var(--cm-text-secondary); letter-spacing: 2px; }
 .api-key-time { font-size: 11px; color: var(--cm-text-muted); }
-.openclaw-paths { margin: 8px 0; padding: 8px; background: var(--cm-bg); border-radius: 6px; }
-.openclaw-path-item { font-size: 11px; color: var(--cm-text-muted); margin: 4px 0; word-break: break-all; }
-.openclaw-path-item code { font-size: 11px; }
-.agent-list { margin: 8px 0; }
-.agent-item { padding: 10px; margin-bottom: 8px; background: var(--cm-bg); border-radius: 6px; }
-.agent-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.agent-name { font-weight: 600; font-size: 13px; }
+.agent-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 8px 0; }
+.agent-card { padding: 10px 12px; background: var(--cm-bg); border-radius: 8px; cursor: pointer; transition: box-shadow .15s; }
+.agent-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.agent-card-main { display: flex; justify-content: space-between; align-items: center; }
+.agent-card-name { font-weight: 600; font-size: 13px; }
+.agent-card-detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--cm-border); }
+.agent-path-item { font-size: 11px; color: var(--cm-text-muted); margin: 4px 0; word-break: break-all; }
+.agent-path-item code { font-size: 11px; }
 .risk-category { margin-bottom: 12px; }
 .risk-category-title { font-weight: 600; font-size: 12px; color: var(--cm-text-muted); margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--cm-border); }
 </style>

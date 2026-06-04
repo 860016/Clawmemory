@@ -63,13 +63,20 @@ type SmartLoadResult struct {
 	Suggestions []string       `json:"suggestions,omitempty"`
 }
 
-func (s *SmartLoadService) SmartLoad(userID uint, query string, tokenBudget int, loadLevel string) (*SmartLoadResult, error) {
+func (s *SmartLoadService) SmartLoad(userID uint, query string, tokenBudget int, loadLevel string, sourceAgent string, workspace string) (*SmartLoadResult, error) {
 	if tokenBudget <= 0 {
 		tokenBudget = 2000
 	}
 
 	var memories []models.Memory
 	dbQuery := s.db.Where("user_id = ? AND status = ?", userID, "active")
+	if sourceAgent != "" {
+		dbQuery = dbQuery.Where("source_agent = ?", sourceAgent)
+	}
+	if workspace != "" {
+		escapedWS := EscapeLikeQuery(workspace)
+		dbQuery = dbQuery.Where("origin_chain LIKE ?", "%"+escapedWS+"%")
+	}
 	if query != "" {
 		escaped := EscapeLikeQuery(query)
 		dbQuery = dbQuery.Where("key LIKE ? OR value LIKE ? OR tags LIKE ?", "%"+escaped+"%", "%"+escaped+"%", "%"+escaped+"%")
@@ -129,12 +136,23 @@ func (s *SmartLoadService) computeRelevanceScore(m models.Memory, query string) 
 	score += reinforceBoost
 
 	layerWeights := map[string]float64{
-		"preference": 0.15,
-		"knowledge":  0.12,
-		"short_term": 0.05,
-		"private":    0.10,
+		"core":    0.15,
+		"context": 0.10,
+		"detail":  0.05,
 	}
 	if w, ok := layerWeights[m.Layer]; ok {
+		score += w
+	}
+
+	typeWeights := map[string]float64{
+		"preference": 0.12,
+		"feedback":   0.10,
+		"knowledge":  0.08,
+		"project":    0.08,
+		"reference":  0.05,
+		"fact":       0.03,
+	}
+	if w, ok := typeWeights[m.MemoryType]; ok {
 		score += w
 	}
 
@@ -206,7 +224,7 @@ func (s *SmartLoadService) allocateByBudget(scored []scoredMemory, tokenBudget i
 			Layer:               m.Layer,
 			MemoryType:          m.MemoryType,
 			Importance:          m.Importance,
-			Tags:                parseTagsSlice(m.Tags),
+			Tags:                parseMemoryTags(m.Tags),
 			Source:              m.Source,
 			Score:               math.Round(sm.Score*1000) / 1000,
 			LoadLevel:           level,
@@ -333,24 +351,6 @@ func estimateTokenCount(text string) int {
 		}
 	}
 	return cjk*2 + ascii/4 + 1
-}
-
-func parseTagsSlice(tags string) []string {
-	if tags == "" || tags == "[]" {
-		return []string{}
-	}
-	var result []string
-	cleaned := strings.Trim(tags, "[]\"")
-	for _, t := range strings.Split(cleaned, ",") {
-		t = strings.TrimSpace(strings.Trim(t, "\""))
-		if t != "" {
-			result = append(result, t)
-		}
-	}
-	if result == nil {
-		result = []string{}
-	}
-	return result
 }
 
 func (s *SmartLoadService) generateSuggestions(loaded []LoadedMemory, query string, budget int) []string {

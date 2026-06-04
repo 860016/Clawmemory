@@ -223,6 +223,59 @@ func (s *ChromaDBService) SyncMemories(userID uint) (int, error) {
 	return len(memories), nil
 }
 
+func (s *ChromaDBService) IndexSingleMemory(memory *models.Memory) error {
+	collectionID, err := s.ensureCollection()
+	if err != nil {
+		return err
+	}
+
+	document := memory.Key + ": " + memory.Value
+	var embedding []float64
+	embSvc := s.getEmbeddingService()
+	if embSvc != nil {
+		embedding = embSvc.GetEmbedding(document)
+	} else {
+		embedding = textToVector(document)
+	}
+
+	payload := map[string]interface{}{
+		"ids":        []string{fmt.Sprintf("mem_%d", memory.ID)},
+		"embeddings": [][]float64{embedding},
+		"documents":  []string{document},
+		"metadatas": []map[string]interface{}{
+			{
+				"user_id":    fmt.Sprintf("%d", memory.UserID),
+				"layer":      memory.Layer,
+				"importance": memory.Importance,
+				"source":     memory.Source,
+				"memory_id":  fmt.Sprintf("%d", memory.ID),
+			},
+		},
+	}
+
+	body, _ := json.Marshal(payload)
+	url := fmt.Sprintf("%s/collections/%s/add", s.baseURL, collectionID)
+
+	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to index memory %d: %w", memory.ID, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("ChromaDB single add failed (status %d): %s", resp.StatusCode, string(respBody))
+	}
+
+	return nil
+}
+
 func (s *ChromaDBService) Search(userID uint, query string, limit int) ([]map[string]interface{}, error) {
 	collectionID, err := s.ensureCollection()
 	if err != nil {
@@ -238,7 +291,7 @@ func (s *ChromaDBService) Search(userID uint, query string, limit int) ([]map[st
 	}
 
 	payload := map[string]interface{}{
-		"query_embeddings": [][][]float64{{queryEmbedding}},
+		"query_embeddings": [][]float64{queryEmbedding},
 		"n_results":        limit,
 		"where": map[string]interface{}{
 			"user_id": fmt.Sprintf("%d", userID),

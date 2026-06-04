@@ -50,7 +50,7 @@
     <div v-if="!sessions.length" class="cm-empty-state">
       <div class="cm-empty-icon">📋</div>
       <div class="cm-empty-title">{{ $t('sessionMemory.empty') }}</div>
-      <div class="cm-empty-desc">创建一个会话记忆来记录工作状态和上下文信息</div>
+      <div class="cm-empty-desc">{{ $t('sessionMemory.emptyDesc') }}</div>
       <div class="cm-empty-action">
         <el-button type="primary" @click="openAddDialog">
           <el-icon><Plus /></el-icon> {{ $t('sessionMemory.add') }}

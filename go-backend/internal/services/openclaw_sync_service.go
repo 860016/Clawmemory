@@ -672,9 +672,9 @@ func (s *OpenClawSyncService) PushConversation(userID uint, req ConversationPush
 				_, err := s.memService.Create(userID, map[string]interface{}{
 					"key":          key,
 					"value":        value,
-					"layer":        "episodic",
+					"layer":        "detail",
 					"source":       "conversation-" + req.AgentName,
-					"memory_type":  "episodic",
+					"memory_type":  "fact",
 					"platform":     platform,
 					"source_agent": req.AgentName,
 					"visibility":   visibility,
@@ -705,10 +705,10 @@ func (s *OpenClawSyncService) PushConversation(userID uint, req ConversationPush
 			value = value[:MaxMemoryContentLength]
 		}
 
-		layer := "episodic"
-		memoryType := "episodic"
+		layer := "detail"
+		memoryType := "fact"
 		if msg.Role == "assistant" {
-			layer = "semantic"
+			layer = "context"
 			memoryType = "knowledge"
 		}
 
@@ -991,17 +991,17 @@ func (s *OpenClawSyncService) classifyFilePath(path string) memoryCategory {
 func (s *OpenClawSyncService) categoryToLayerAndType(cat memoryCategory) (layer string, memType string, source string) {
 	switch cat {
 	case categoryLongTerm:
-		return "semantic", "knowledge", "openclaw-memory-md"
+		return "context", "knowledge", "openclaw-memory-md"
 	case categoryDailyLog:
-		return "episodic", "episodic", "openclaw-daily-log"
+		return "detail", "fact", "openclaw-daily-log"
 	case categorySessionLog:
-		return "episodic", "episodic", "openclaw-session-archive"
+		return "detail", "fact", "openclaw-session-archive"
 	case categoryConversation:
-		return "episodic", "episodic", "openclaw-conversation"
+		return "detail", "fact", "openclaw-conversation"
 	case categoryKnowledge:
-		return "semantic", "knowledge", "openclaw-knowledge"
+		return "context", "knowledge", "openclaw-knowledge"
 	default:
-		return "semantic", "knowledge", "openclaw-markdown"
+		return "context", "knowledge", "openclaw-markdown"
 	}
 }
 
@@ -1342,7 +1342,7 @@ func (s *OpenClawSyncService) parseJSONLFile(path string) []memoryPreview {
 		previews = append(previews, memoryPreview{
 			Key:       key,
 			Content:   text,
-			Layer:     "episodic",
+			Layer:     "detail",
 			Source:    "openclaw-session-jsonl",
 			FilePath:  path,
 			AgentName: agentName,
@@ -1362,7 +1362,7 @@ func (s *OpenClawSyncService) parseJSONLFile(path string) []memoryPreview {
 		previews = append(previews, memoryPreview{
 			Key:       key,
 			Content:   text,
-			Layer:     "semantic",
+			Layer:     "context",
 			Source:    "openclaw-session-jsonl",
 			FilePath:  path,
 			AgentName: agentName,
@@ -1435,9 +1435,9 @@ func (s *OpenClawSyncService) extractMessagesFromJSON(messages []interface{}, pa
 
 		chunkHash := sha256Hash(text)
 		key := "json:" + agentName + ":" + role + ":" + chunkHash[:12]
-		layer := "episodic"
+		layer := "detail"
 		if role == "assistant" {
-			layer = "semantic"
+			layer = "context"
 		}
 		previews = append(previews, memoryPreview{
 			Key:       key,
@@ -1615,7 +1615,7 @@ func (s *OpenClawSyncService) extractGitRepoMemories(repoPath string) []memoryPr
 		previews = append(previews, memoryPreview{
 			Key:       key,
 			Content:   content,
-			Layer:     "semantic",
+			Layer:     "context",
 			Source:    agentName + "-git-assistant",
 			FilePath:  repoPath,
 			AgentName: agentName,
@@ -1921,15 +1921,15 @@ func (s *OpenClawSyncService) extractOpenClawMemoryChunks(db *gorm.DB, dbPath st
 		}
 
 		cat := categoryKnowledge
-		layer := "semantic"
+		layer := "context"
 		memSource := "openclaw-index-chunk"
 		if ch.Source == "sessions" {
 			cat = categoryConversation
-			layer = "episodic"
+			layer = "detail"
 			memSource = "openclaw-index-session"
 		} else if strings.Contains(strings.ToLower(ch.Path), "memory/") && !strings.Contains(strings.ToLower(ch.Path), "memory.md") {
 			cat = categoryDailyLog
-			layer = "episodic"
+			layer = "detail"
 			memSource = "openclaw-index-daily"
 		}
 
@@ -2015,7 +2015,7 @@ func (s *OpenClawSyncService) extractVscdbMemories(dbPath string) []memoryPrevie
 			previews = append(previews, memoryPreview{
 				Key:       key,
 				Content:   input,
-				Layer:     "episodic",
+				Layer:     "detail",
 				Source:    agentName + "-chat",
 				FilePath:  dbPath,
 				AgentName: agentName,
@@ -2037,7 +2037,7 @@ func (s *OpenClawSyncService) extractVscdbMemories(dbPath string) []memoryPrevie
 		previews = append(previews, memoryPreview{
 			Key:       key,
 			Content:   sessionInfo,
-			Layer:     "episodic",
+			Layer:     "detail",
 			Source:    agentName + "-session",
 			FilePath:  dbPath,
 			AgentName: agentName,
@@ -2175,11 +2175,11 @@ func (s *OpenClawSyncService) extractChatStoreConversations(jsonStr string, dbPa
 			chunkHash := sha256Hash(content)
 			key := agentName + "-chatstore-" + role + ":" + chunkHash[:12]
 
-			layer := "episodic"
+			layer := "detail"
 			source := agentName + "-chat-user"
 			category := categoryConversation
 			if role == "assistant" {
-				layer = "semantic"
+				layer = "context"
 				source = agentName + "-chat-assistant"
 				category = categoryKnowledge
 			}
@@ -2476,16 +2476,16 @@ func (s *OpenClawSyncService) inferMemoryType(p memoryPreview) string {
 		case categoryLongTerm, categoryKnowledge:
 			return "knowledge"
 		case categoryDailyLog, categorySessionLog, categoryConversation:
-			return "episodic"
+			return "fact"
 		}
 	}
-	if p.Layer == "episodic" {
-		return "episodic"
+	if p.Layer == "detail" {
+		return "fact"
 	}
 	chatSources := []string{"-chat", "-session", "openclaw-session", "openclaw-session-jsonl", "openclaw-session-json", "openclaw-session-archive", "openclaw-daily-log"}
 	for _, cs := range chatSources {
 		if strings.Contains(p.Source, cs) {
-			return "episodic"
+			return "fact"
 		}
 	}
 	return "knowledge"
@@ -2587,7 +2587,7 @@ func (s *OpenClawSyncService) extractMemoryConversations() []memoryPreview {
 			previews = append(previews, memoryPreview{
 				Key:       key,
 				Content:   content,
-				Layer:     "semantic",
+				Layer:     "context",
 				Source:    agentName + "-chat-assistant",
 				FilePath:  "memory://" + item.SessionID,
 				AgentName: agentName,
@@ -2611,7 +2611,7 @@ func (s *OpenClawSyncService) extractMemoryConversations() []memoryPreview {
 			previews = append(previews, memoryPreview{
 				Key:       key,
 				Content:   content,
-				Layer:     "episodic",
+				Layer:     "detail",
 				Source:    platform + "-chat-user",
 				FilePath:  "memory://user-input",
 				AgentName: platform,
@@ -2635,7 +2635,7 @@ func (s *OpenClawSyncService) extractMemoryConversations() []memoryPreview {
 			previews = append(previews, memoryPreview{
 				Key:       key,
 				Content:   content,
-				Layer:     "episodic",
+				Layer:     "detail",
 				Source:    platform + "-session",
 				FilePath:  "memory://session/" + item.SessionID,
 				AgentName: platform,

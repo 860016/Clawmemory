@@ -105,8 +105,8 @@
           </div>
           <div v-if="!pages.length" class="cm-empty-state">
             <div class="cm-empty-icon">📖</div>
-            <div class="cm-empty-title">{{ $t('wiki.emptyTitle') || '还没有知识页面' }}</div>
-            <div class="cm-empty-desc">{{ $t('wiki.emptyDesc') || '创建知识页面来组织和管理你的知识库' }}</div>
+            <div class="cm-empty-title">{{ $t('wiki.emptyTitle') }}</div>
+            <div class="cm-empty-desc">{{ $t('wiki.emptyDesc') }}</div>
             <div class="cm-empty-action">
               <el-button type="primary" @click="openNewPage">
                 <el-icon><Plus /></el-icon> {{ $t('wiki.addPage') }}

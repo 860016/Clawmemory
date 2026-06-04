@@ -335,10 +335,10 @@
       <template v-else>
       <div v-if="!showOnboarding && stats.memoryCount === 0" class="cm-empty-state dashboard-empty">
         <div class="cm-empty-icon">🧠</div>
-        <div class="cm-empty-title">{{ $t('dashboard.emptyTitle') || '开始记录你的第一条记忆' }}</div>
-        <div class="cm-empty-desc">{{ $t('dashboard.emptyDesc') || '记忆是智能助手的核心，添加你的第一条记忆来开始使用' }}</div>
+        <div class="cm-empty-title">{{ $t('dashboard.emptyTitle') }}</div>
+        <div class="cm-empty-desc">{{ $t('dashboard.emptyDesc') }}</div>
         <div class="cm-empty-action">
-          <el-button type="primary" @click="$router.push('/memories')">{{ $t('dashboard.goMemories') || '添加记忆' }}</el-button>
+          <el-button type="primary" @click="$router.push('/memories')">{{ $t('dashboard.goMemories') }}</el-button>
           <el-button @click="$router.push('/settings')">{{ $t('dashboard.goSettings') }}</el-button>
         </div>
       </div>

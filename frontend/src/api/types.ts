@@ -21,7 +21,12 @@ export interface Memory {
   decay_stage: number
   memory_type: string
   source_agent: string
-  encrypted: boolean
+  is_encrypted: boolean
+  summary: string
+  access_count: number
+  platform: string
+  verify_count: number
+  validation_status: string
   created_at: string
   updated_at: string
   trashed_at?: string

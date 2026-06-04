@@ -51,9 +51,9 @@ func (s *ValidationService) Validate(memory *models.Memory) ValidationResult {
 		score -= 0.2
 	}
 
-	validLayers := map[string]bool{"episodic": true, "semantic": true, "procedural": true}
+	validLayers := map[string]bool{"core": true, "context": true, "detail": true}
 	if memory.Layer != "" && !validLayers[memory.Layer] {
-		warns = append(warns, "layer '"+memory.Layer+"' is not a standard layer (episodic/semantic/procedural)")
+		warns = append(warns, "layer '"+memory.Layer+"' is not a standard layer (core/context/detail)")
 		score -= 0.05
 	}
 

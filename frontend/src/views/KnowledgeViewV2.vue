@@ -119,6 +119,7 @@
                 <span class="rel-node">{{ getEntityName(r.source_id) }}</span>
                 <span class="rel-type">{{ r.relation_type }}</span>
                 <span class="rel-node">{{ getEntityName(r.target_id) }}</span>
+                <button class="rel-delete-btn" @click="deleteRelation(r.id)" :title="$t('knowledge.deleteRelation')">×</button>
               </div>
             </div>
           </div>
@@ -150,6 +151,7 @@
               <span class="rel-node">{{ getEntityName(r.source_id) }}</span>
               <span class="rel-type">{{ r.relation_type }}</span>
               <span class="rel-node">{{ getEntityName(r.target_id) }}</span>
+              <button class="rel-delete-btn" @click="deleteRelation(r.id)" :title="$t('knowledge.deleteRelation')">×</button>
             </div>
           </div>
         </div>
@@ -441,6 +443,15 @@ async function createRelation() {
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.createFailed')))
   }
+}
+
+async function deleteRelation(id: number) {
+  try {
+    await ElMessageBox.confirm(t('knowledge.confirmDeleteRelation'), t('common.confirm'), { type: 'warning' })
+    await knowledgeApi.deleteRelation(id)
+    relations.value = relations.value.filter(r => r.id !== id)
+    ElMessage.success(t('knowledge.relationDeleted'))
+  } catch {}
 }
 
 const typeColors: Record<string, string> = {
@@ -933,6 +944,25 @@ async function aiExtract() {
   background: var(--cm-bg, #fafafa);
   border-radius: 10px;
   font-size: 13px;
+}
+.rel-delete-btn {
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--cm-text-muted, #999);
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.rel-delete-btn:hover {
+  background: var(--cm-danger, #ef4444);
+  color: #fff;
 }
 .rel-node {
   padding: 3px 10px;

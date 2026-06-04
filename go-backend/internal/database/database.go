@@ -117,6 +117,45 @@ func runPreMigrations(db *gorm.DB) error {
 		}
 	}
 
+	if db.Migrator().HasTable(&models.Memory{}) {
+		layerMigrations := []struct {
+			oldLayer      string
+			newLayer      string
+			newMemoryType string
+			extraUpdates  string
+		}{
+			{"preference", "core", "preference", ""},
+			{"knowledge", "context", "knowledge", ""},
+			{"episodic", "detail", "fact", ""},
+			{"semantic", "context", "knowledge", ""},
+			{"procedural", "context", "knowledge", ""},
+			{"short_term", "detail", "fact", ""},
+			{"private", "core", "knowledge", ", visibility = 'private'"},
+		}
+		for _, lm := range layerMigrations {
+			var count int64
+			db.Model(&models.Memory{}).Where("layer = ?", lm.oldLayer).Count(&count)
+			if count > 0 {
+				sql := fmt.Sprintf("UPDATE memories SET layer = '%s', memory_type = '%s'%s WHERE layer = '%s'", lm.newLayer, lm.newMemoryType, lm.extraUpdates, lm.oldLayer)
+				result := db.Exec(sql)
+				if result.Error != nil {
+					fmt.Printf("[DB] layer migration '%s' → '%s' error: %v\n", lm.oldLayer, lm.newLayer, result.Error)
+				} else {
+					fmt.Printf("[DB] migrated %d memories: layer '%s' → '%s' (memory_type='%s')\n", result.RowsAffected, lm.oldLayer, lm.newLayer, lm.newMemoryType)
+				}
+			}
+		}
+
+		var noLayerCount int64
+		db.Model(&models.Memory{}).Where("layer = '' OR layer IS NULL").Count(&noLayerCount)
+		if noLayerCount > 0 {
+			result := db.Model(&models.Memory{}).Where("layer = '' OR layer IS NULL").Updates(map[string]interface{}{"layer": "context", "memory_type": "knowledge"})
+			if result.Error == nil {
+				fmt.Printf("[DB] assigned layer='context' to %d memories with missing layer\n", result.RowsAffected)
+			}
+		}
+	}
+
 	if db.Migrator().HasTable(&models.Setting{}) && db.Migrator().HasTable(&models.User{}) {
 		var orphanCount int64
 		db.Model(&models.Setting{}).

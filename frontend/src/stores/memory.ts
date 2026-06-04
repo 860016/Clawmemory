@@ -37,7 +37,7 @@ export const useMemoryStore = defineStore('memory', () => {
     await fetchMemories(currentLayer.value || undefined, 1, currentSourceAgent.value || undefined, currentVisibility.value || undefined)
   }
 
-  async function search(q: string, mode?: 'keyword' | 'semantic' | 'graphrag') {
+  async function search(q: string, mode?: 'keyword' | 'semantic' | 'graphrag' | 'graph-rag' | 'smart') {
     const resp = await memoryApi.search({ q, mode })
     const items = Array.isArray(resp.data) ? resp.data : (resp.data.items || [])
     memories.value = items

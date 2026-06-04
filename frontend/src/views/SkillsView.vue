@@ -157,7 +157,7 @@
         <div v-if="!globalSkills.length && !workspaceSkills.length" class="cm-empty-state">
           <div class="cm-empty-icon">📁</div>
           <div class="cm-empty-title">{{ $t('skills.noSkills') }}</div>
-          <div class="cm-empty-desc">点击上方按钮扫描项目中的技能文件</div>
+          <div class="cm-empty-desc">{{ $t('skills.scanEmptyDesc') }}</div>
         </div>
 
         <div class="total-bar" v-if="globalSkills.length || workspaceSkills.length">

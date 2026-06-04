@@ -239,6 +239,23 @@ func handleAISmartRoute(aiSvc *ai.AIService) gin.HandlerFunc {
 	}
 }
 
+func handleAIDiscoverProjects(aiSvc *ai.AIService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := middleware.GetUserID(c)
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 120*time.Second)
+		defer cancel()
+
+		result, err := aiSvc.DiscoverProjects(ctx, userID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, result)
+	}
+}
+
 func handleAIExtractFacts(aiSvc *ai.AIService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := middleware.GetUserID(c)

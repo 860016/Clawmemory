@@ -585,6 +585,88 @@ func (s *AIService) DiscoverRelations(ctx context.Context, userID uint) (map[str
 	}, nil
 }
 
+func (s *AIService) DiscoverProjects(ctx context.Context, userID uint) (map[string]interface{}, error) {
+	var memories []models.Memory
+	if err := s.db.Where("user_id = ? AND status != ?", userID, "trashed").Limit(5000).Find(&memories).Error; err != nil {
+		return nil, fmt.Errorf("failed to load memories: %w", err)
+	}
+
+	if len(memories) == 0 {
+		return map[string]interface{}{
+			"projects": []interface{}{},
+			"total":    0,
+			"mode":     "ai",
+		}, nil
+	}
+
+	memData := make([]map[string]interface{}, len(memories))
+	for i, m := range memories {
+		memData[i] = map[string]interface{}{
+			"id":         m.ID,
+			"key":        m.Key,
+			"value":      truncateStr(m.Value, 300),
+			"layer":      m.Layer,
+			"importance": m.Importance,
+		}
+	}
+
+	var existingProjects []models.Project
+	s.db.Where("user_id = ?", userID).Find(&existingProjects)
+	existingNames := make([]string, len(existingProjects))
+	for i, p := range existingProjects {
+		existingNames[i] = p.Name
+	}
+	existingStr := "None"
+	if len(existingNames) > 0 {
+		existingStr = strings.Join(existingNames, ", ")
+	}
+
+	content, err := s.chatWithTemplate(ctx, userID, "discover_projects", map[string]string{
+		"Memories":         FormatMemoriesForPrompt(memData),
+		"ExistingProjects": existingStr,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("AI project discovery failed: %w", err)
+	}
+
+	var result struct {
+		Projects []struct {
+			Name         string   `json:"name"`
+			Description  string   `json:"description"`
+			Category     string   `json:"category"`
+			Status       string   `json:"status"`
+			Progress     int      `json:"progress"`
+			KeyDecisions []string `json:"key_decisions"`
+			ActionItems  []string `json:"action_items"`
+			Confidence   float64  `json:"confidence"`
+		} `json:"projects"`
+	}
+
+	if err := ParseAIResponse(content, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse AI response: %w", err)
+	}
+
+	projects := make([]map[string]interface{}, len(result.Projects))
+	for i, p := range result.Projects {
+		projects[i] = map[string]interface{}{
+			"name":          p.Name,
+			"description":   p.Description,
+			"category":      p.Category,
+			"status":        p.Status,
+			"progress":      p.Progress,
+			"key_decisions": p.KeyDecisions,
+			"action_items":  p.ActionItems,
+			"confidence":    math.Round(p.Confidence*100) / 100,
+		}
+	}
+
+	return map[string]interface{}{
+		"projects": projects,
+		"total":    len(projects),
+		"mode":     "ai",
+	}, nil
+}
+
 func (s *AIService) SmartRoute(ctx context.Context, userID uint, text string) (map[string]interface{}, error) {
 	content, err := s.chatWithTemplate(ctx, userID, "smart_route", map[string]string{
 		"Text": text,

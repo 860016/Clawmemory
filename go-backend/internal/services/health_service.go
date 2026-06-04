@@ -120,7 +120,7 @@ func (s *HealthService) computeCoverageScore(memories []models.Memory) float64 {
 		layerCount[m.Layer]++
 	}
 
-	expectedLayers := []string{"preference", "knowledge", "short_term"}
+	expectedLayers := []string{"core", "context", "detail"}
 	covered := 0
 	for _, layer := range expectedLayers {
 		if layerCount[layer] > 0 {

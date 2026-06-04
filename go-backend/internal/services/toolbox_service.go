@@ -59,8 +59,7 @@ func (s *ToolboxService) ConflictScan(userID uint) (map[string]interface{}, erro
 		if m.Tags == "" {
 			continue
 		}
-		for _, tag := range strings.Split(m.Tags, ",") {
-			tag = strings.TrimSpace(tag)
+		for _, tag := range parseMemoryTags(m.Tags) {
 			if tag != "" {
 				tagMemories[tag] = append(tagMemories[tag], m)
 			}
@@ -206,7 +205,7 @@ func (s *ToolboxService) TokenRoute(message string, contextLength int) (map[stri
 	}
 
 	complexityLabel := "simple"
-	layer := "core"
+	layer := "context"
 	strategy := "direct"
 	switch score {
 	case 1:
@@ -219,11 +218,11 @@ func (s *ToolboxService) TokenRoute(message string, contextLength int) (map[stri
 		strategy = "keyword_priority"
 	case 3:
 		complexityLabel = "complex"
-		layer = "semantic"
+		layer = "context"
 		strategy = "semantic_priority"
 	case 4:
 		complexityLabel = "extreme"
-		layer = "summary"
+		layer = "detail"
 		strategy = "full_context"
 	}
 

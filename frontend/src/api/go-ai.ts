@@ -50,6 +50,10 @@ export const aiApi = {
     return api.post('/ai/discover-relations', {}, { timeout: 120000 })
   },
 
+  discoverProjects() {
+    return api.post('/ai/discover-projects', {}, { timeout: 120000 })
+  },
+
   smartRoute(text: string) {
     return api.post('/ai/smart-route', { text }, { timeout: 60000 })
   },

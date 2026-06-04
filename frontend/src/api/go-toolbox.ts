@@ -26,9 +26,4 @@ export const toolboxApi = {
   getCompressConfig: () => axios.get('/toolbox/compress/config'),
   setCompressConfig: (config: Record<string, any>) =>
     axios.put('/toolbox/compress/config', config),
-
-  getEvolutionInsights: () => axios.get('/memories/evolution/insights'),
-  discoverRelations: () => axios.post('/memories/evolution/run', { action: 'discover' }),
-  inferChains: () => axios.post('/memories/evolution/run', { action: 'infer' }),
-  getImportanceAdjustments: () => axios.post('/memories/evolution/run', { action: 'importance' }),
 }

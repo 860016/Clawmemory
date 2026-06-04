@@ -35,9 +35,9 @@
           <div class="decay-logic-box">
             <div class="logic-title">📐 {{ $t('advanced.decayLogicTitle') }}</div>
             <div class="logic-rules">
-              <div class="logic-rule"><span class="rule-action archive">Archive</span> importance &lt; 0.3 且 &gt;14天未更新</div>
-              <div class="logic-rule"><span class="rule-action trash">Trash</span> importance &lt; 0.1 且 &gt;30天未更新</div>
-              <div class="logic-rule"><span class="rule-action keep">Keep</span> 其他记忆保持活跃</div>
+              <div class="logic-rule"><span class="rule-action archive">Archive</span> {{ $t('advanced.decayRuleArchive') }}</div>
+              <div class="logic-rule"><span class="rule-action trash">Trash</span> {{ $t('advanced.decayRuleTrash') }}</div>
+              <div class="logic-rule"><span class="rule-action keep">Keep</span> {{ $t('advanced.decayRuleKeep') }}</div>
             </div>
           </div>
           <div class="stats-row" v-if="decayStats">
@@ -66,6 +66,43 @@
               <div v-for="s in decayStats.prune_candidates.slice(0, 10)" :key="s.id" class="prune-item">
                 <span class="prune-key">{{ s.key }}</span>
                 <span class="prune-imp">{{ s.importance?.toFixed(2) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="communitiesResult" class="evolution-insights">
+            <div class="sub-title">🏘️ Communities ({{ communitiesResult.total || 0 }})</div>
+            <div v-for="(c, i) in (communitiesResult.communities || []).slice(0, 8)" :key="i" class="insight-section" style="margin-bottom:8px">
+              <div class="insight-label" style="font-weight:600">{{ c.top_entity }} Domain ({{ c.size }} entities)</div>
+              <div class="insight-list">
+                <div v-for="(e, j) in (c.entities || []).slice(0, 6)" :key="j" class="insight-item">
+                  <span class="insight-label">{{ e.name }}</span>
+                  <el-tag size="small" type="info">{{ e.entity_type }}</el-tag>
+                  <span class="prune-imp">{{ Math.round((e.confidence || 0) * 100) }}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="communitiesToWikiResult" class="evolution-insights">
+            <div class="sub-title">📚 Wiki Generation Result</div>
+            <div class="stats-row">
+              <div class="stat-item">
+                <span class="stat-value">{{ communitiesToWikiResult.communities_found }}</span>
+                <span class="stat-label">Communities</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value success">{{ communitiesToWikiResult.wiki_pages_created }}</span>
+                <span class="stat-label">Pages Created</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value warn">{{ (communitiesToWikiResult.categories_created || []).length }}</span>
+                <span class="stat-label">New Categories</span>
+              </div>
+            </div>
+            <div v-if="(communitiesToWikiResult.categories_created || []).length" class="insight-section">
+              <div class="insight-list">
+                <el-tag v-for="cat in communitiesToWikiResult.categories_created" :key="cat" size="small" type="success" style="margin:2px">{{ cat }}</el-tag>
               </div>
             </div>
           </div>
@@ -498,6 +535,18 @@
             <el-button @click="runImportanceAdjust" :disabled="loading.importance" :loading="loading.importance">
               {{ $t('advanced.importanceAdjust') }}
             </el-button>
+            <el-button type="success" @click="runGraphReasoning" :disabled="loading.graphReasoning" :loading="loading.graphReasoning" plain>
+              🕸️ Graph Reasoning
+            </el-button>
+            <el-button type="warning" @click="runCentrality" :disabled="loading.centrality" :loading="loading.centrality" plain>
+              🎯 Centrality
+            </el-button>
+            <el-button type="info" @click="runCommunityDiscovery" :disabled="loading.communities" :loading="loading.communities" plain>
+              🏘️ Communities
+            </el-button>
+            <el-button type="success" @click="runCommunitiesToWiki" :disabled="loading.communitiesToWiki" :loading="loading.communitiesToWiki" plain>
+              📚 To Wiki
+            </el-button>
           </div>
           <div v-if="evolutionInsights" class="evolution-insights">
             <div class="stats-row">
@@ -561,6 +610,50 @@
               </div>
             </div>
           </div>
+          <div v-if="graphReasoningResult" class="discover-result">
+            <div class="sub-title">🕸️ Inferred Relations via Graph ({{ graphReasoningResult.total_inferred || 0 }})</div>
+            <div class="discover-list">
+              <div v-for="(r, i) in (graphReasoningResult.inferred_relations || []).slice(0, 10)" :key="i" class="discover-item">
+                <span class="discover-type">{{ r.source }}</span>
+                <span class="discover-arrow">→</span>
+                <span class="discover-type">{{ r.target }}</span>
+                <el-tag size="small" type="warning">{{ r.relation_type }}</el-tag>
+                <span class="prune-imp" style="margin-left:4px">via {{ r.via }}</span>
+                <el-tag size="small" type="info">{{ Math.round((r.confidence || 0) * 100) }}%</el-tag>
+              </div>
+            </div>
+          </div>
+          <div v-if="centralityResult" class="evolution-insights">
+            <div class="stats-row">
+              <div class="stat-item">
+                <span class="stat-value">{{ centralityResult.total_entities }}</span>
+                <span class="stat-label">Entities</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value success">{{ centralityResult.hub_count }}</span>
+                <span class="stat-label">Hubs</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value warn">{{ centralityResult.isolated_count }}</span>
+                <span class="stat-label">Isolated</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ (centralityResult.avg_degree || 0).toFixed(1) }}</span>
+                <span class="stat-label">Avg Degree</span>
+              </div>
+            </div>
+            <div v-if="centralityResult.top_entities && centralityResult.top_entities.length > 0" class="insight-section">
+              <div class="sub-title">🎯 Top Central Entities</div>
+              <div class="insight-list">
+                <div v-for="(e, i) in centralityResult.top_entities.slice(0, 10)" :key="i" class="insight-item">
+                  <span class="insight-label">{{ e.name }}</span>
+                  <el-tag size="small" type="info">{{ e.entity_type }}</el-tag>
+                  <span class="prune-imp">deg:{{ e.degree }}</span>
+                  <span class="prune-imp">{{ (e.score || 0).toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -612,6 +705,10 @@ const compressConfig = ref<any>({ auto_enabled: false, threshold: 1000, level: '
 const evolutionInsights = ref<any>(null)
 const discoverResult = ref<any>(null)
 const inferResult = ref<any>(null)
+const graphReasoningResult = ref<any>(null)
+const centralityResult = ref<any>(null)
+const communitiesResult = ref<any>(null)
+const communitiesToWikiResult = ref<any>(null)
 onMounted(async () => {
   loadDecayStats()
   loadTokenStats()
@@ -797,7 +894,7 @@ async function loadCompressConfig() {
 async function loadEvolutionInsights() {
   loading.value.insights = true
   try {
-    const { data } = await toolboxApi.getEvolutionInsights()
+    const { data } = await memoryApi.getEvolutionInsights()
     evolutionInsights.value = {
       total_memories: data.total,
       relations_count: data.relations_count || 0,
@@ -814,7 +911,7 @@ async function loadEvolutionInsights() {
 async function runDiscoverRelations() {
   loading.value.discover = true
   try {
-    const { data } = await toolboxApi.discoverRelations()
+    const { data } = await memoryApi.runEvolution('discover')
     discoverResult.value = data
     ElMessage.success(t('advanced.discoveredCount', { count: data.discoveries?.length || 0 }))
   } catch (e: any) {
@@ -825,7 +922,7 @@ async function runDiscoverRelations() {
 async function runInferChains() {
   loading.value.infer = true
   try {
-    const { data } = await toolboxApi.inferChains()
+    const { data } = await memoryApi.runEvolution('infer')
     inferResult.value = data
     ElMessage.success(t('advanced.inferredCount', { count: data.inferences?.length || 0 }))
   } catch (e: any) {
@@ -836,11 +933,55 @@ async function runInferChains() {
 async function runImportanceAdjust() {
   loading.value.importance = true
   try {
-    const { data } = await toolboxApi.getImportanceAdjustments()
+    const { data } = await memoryApi.runEvolution('importance')
     ElMessage.success(t('advanced.adjustedCount', { count: data.total || 0 }))
   } catch (e: any) {
     ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
   } finally { loading.value.importance = false }
+}
+
+async function runGraphReasoning() {
+  loading.value.graphReasoning = true
+  try {
+    const { data } = await memoryApi.getGraphReasoning()
+    graphReasoningResult.value = data
+    ElMessage.success(`Inferred ${data.total_inferred || 0} relations via graph reasoning`)
+  } catch (e: any) {
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } finally { loading.value.graphReasoning = false }
+}
+
+async function runCentrality() {
+  loading.value.centrality = true
+  try {
+    const { data } = await memoryApi.getCentrality()
+    centralityResult.value = data
+    ElMessage.success(`Analyzed ${data.total_entities || 0} entities, ${data.hub_count || 0} hubs`)
+  } catch (e: any) {
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } finally { loading.value.centrality = false }
+}
+
+async function runCommunityDiscovery() {
+  loading.value.communities = true
+  try {
+    const { data } = await memoryApi.getCommunities()
+    communitiesResult.value = data
+    ElMessage.success(`Found ${data.total || 0} communities`)
+  } catch (e: any) {
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } finally { loading.value.communities = false }
+}
+
+async function runCommunitiesToWiki() {
+  loading.value.communitiesToWiki = true
+  try {
+    const { data } = await memoryApi.communitiesToWiki()
+    communitiesToWikiResult.value = data
+    ElMessage.success(`Created ${data.wiki_pages_created || 0} wiki pages from ${data.communities_found || 0} communities`)
+  } catch (e: any) {
+    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } finally { loading.value.communitiesToWiki = false }
 }
 
 </script>

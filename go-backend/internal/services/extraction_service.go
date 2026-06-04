@@ -11,14 +11,14 @@ import (
 )
 
 type ExtractedMemory struct {
-	Key         string   `json:"key"`
-	Value       string   `json:"value"`
-	Layer       string   `json:"layer"`
-	MemoryType  string   `json:"memory_type"`
-	Importance  float64  `json:"importance"`
-	Tags        []string `json:"tags"`
-	Source      string   `json:"source"`
-	Reason      string   `json:"reason"`
+	Key        string   `json:"key"`
+	Value      string   `json:"value"`
+	Layer      string   `json:"layer"`
+	MemoryType string   `json:"memory_type"`
+	Importance float64  `json:"importance"`
+	Tags       []string `json:"tags"`
+	Source     string   `json:"source"`
+	Reason     string   `json:"reason"`
 }
 
 type ExtractionResult struct {
@@ -129,8 +129,8 @@ func (s *ExtractionService) classifyParagraph(para string) *ExtractedMemory {
 			return &ExtractedMemory{
 				Key:        extractKey(para),
 				Value:      para,
-				Layer:      "preference",
-				MemoryType: "user",
+				Layer:      "core",
+				MemoryType: "preference",
 				Importance: 0.7,
 				Tags:       []string{"auto-extracted", "preference"},
 				Source:     "extraction",
@@ -144,7 +144,7 @@ func (s *ExtractionService) classifyParagraph(para string) *ExtractedMemory {
 			return &ExtractedMemory{
 				Key:        extractKey(para),
 				Value:      para,
-				Layer:      "preference",
+				Layer:      "core",
 				MemoryType: "feedback",
 				Importance: 0.8,
 				Tags:       []string{"auto-extracted", "feedback"},

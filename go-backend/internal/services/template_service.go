@@ -42,7 +42,7 @@ var builtinTemplates = []MemoryTemplate{
 	{
 		Name:        "API Endpoint",
 		Description: "Record an API endpoint with its method, path, and parameters",
-		Layer:       "procedural",
+		Layer:       "context",
 		KeyPattern:  "api:{{method}}:{{path}}",
 		Category:    "development",
 		IsBuiltin:   true,
@@ -57,7 +57,7 @@ var builtinTemplates = []MemoryTemplate{
 	{
 		Name:        "Bug Fix",
 		Description: "Document a bug and its fix for future reference",
-		Layer:       "episodic",
+		Layer:       "detail",
 		KeyPattern:  "bugfix:{{component}}:{{summary}}",
 		Category:    "development",
 		IsBuiltin:   true,
@@ -73,7 +73,7 @@ var builtinTemplates = []MemoryTemplate{
 	{
 		Name:        "Design Decision",
 		Description: "Record an architectural or design decision with rationale",
-		Layer:       "semantic",
+		Layer:       "context",
 		KeyPattern:  "decision:{{domain}}:{{title}}",
 		Category:    "architecture",
 		IsBuiltin:   true,
@@ -89,7 +89,7 @@ var builtinTemplates = []MemoryTemplate{
 	{
 		Name:        "Environment Config",
 		Description: "Record environment configuration and setup details",
-		Layer:       "procedural",
+		Layer:       "context",
 		KeyPattern:  "env:{{project}}:{{name}}",
 		Category:    "operations",
 		IsBuiltin:   true,
@@ -104,7 +104,7 @@ var builtinTemplates = []MemoryTemplate{
 	{
 		Name:        "Learning Note",
 		Description: "Capture a learning insight or knowledge gained",
-		Layer:       "semantic",
+		Layer:       "context",
 		KeyPattern:  "learning:{{topic}}:{{title}}",
 		Category:    "knowledge",
 		IsBuiltin:   true,
@@ -119,7 +119,7 @@ var builtinTemplates = []MemoryTemplate{
 	{
 		Name:        "Command Reference",
 		Description: "Record a useful command or script for quick reference",
-		Layer:       "procedural",
+		Layer:       "context",
 		KeyPattern:  "cmd:{{category}}:{{name}}",
 		Category:    "operations",
 		IsBuiltin:   true,

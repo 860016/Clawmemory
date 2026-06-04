@@ -10,6 +10,9 @@
         </div>
       </div>
       <div class="header-actions">
+        <el-button @click="aiDiscoverProjects" :loading="aiDiscovering">
+          <el-icon><MagicStick /></el-icon> {{ $t('project.aiDiscoverProjects') }}
+        </el-button>
         <el-button type="primary" @click="openCreateDialog">
           <el-icon><Plus /></el-icon> {{ $t('project.create') }}
         </el-button>
@@ -39,7 +42,7 @@
     <div v-else-if="projects.length === 0" class="cm-empty-state">
       <div class="cm-empty-icon">📋</div>
       <div class="cm-empty-title">{{ $t('project.empty') }}</div>
-      <div class="cm-empty-desc">创建你的第一个项目，开始追踪工作进度</div>
+      <div class="cm-empty-desc">{{ $t('project.emptyDesc') }}</div>
       <div class="cm-empty-action">
         <el-button type="primary" @click="openCreateDialog">
           <el-icon><Plus /></el-icon> {{ $t('project.createFirst') }}
@@ -172,6 +175,36 @@
 
         <div class="detail-section">
           <div class="section-header">
+            <h4>📖 {{ $t('project.wikiPages') }} ({{ projectWikiPages.length }})</h4>
+            <div class="section-actions">
+              <el-button size="small" @click="generateWikiFromMemories" :loading="wikiGenerating">
+                <el-icon><MagicStick /></el-icon> {{ $t('project.generateWikiFromMemories') }}
+              </el-button>
+              <el-button size="small" type="primary" @click="showAddWikiPage = true">
+                <el-icon><Plus /></el-icon> {{ $t('project.addWikiPage') }}
+              </el-button>
+            </div>
+          </div>
+          <div v-if="wikiLoading" class="notes-loading">
+            <el-icon class="spin-icon"><Loading /></el-icon>
+          </div>
+          <div v-else-if="projectWikiPages.length === 0" class="notes-empty">
+            {{ $t('project.noWikiPages') }}
+          </div>
+          <div v-else class="wiki-page-list">
+            <div v-for="wp in projectWikiPages" :key="wp.id" class="wiki-page-item" @click="openWikiPage(wp)">
+              <div class="wiki-page-title">
+                <span>{{ wp.title }}</span>
+                <el-tag v-if="wp.status === 'completed'" size="small" type="success">{{ $t('project.wikiComplete') }}</el-tag>
+                <el-tag v-else-if="wp.status === 'in_progress'" size="small" type="warning">{{ $t('project.wikiInProgress') }}</el-tag>
+              </div>
+              <p v-if="wp.summary" class="wiki-page-summary">{{ wp.summary }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="section-header">
             <h4>🔗 {{ $t('project.openclawContext') }}</h4>
           </div>
           <p class="context-hint">{{ $t('project.contextHint') }}</p>
@@ -249,6 +282,71 @@
         <el-button type="primary" @click="submitNote" :loading="noteSubmitting">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="showAddWikiPage" :title="$t('project.addWikiPage')" width="600px" :fullscreen="isMobile" destroy-on-close>
+      <el-form :model="wikiForm" label-width="80px">
+        <el-form-item :label="$t('project.wikiTitle')">
+          <el-input v-model="wikiForm.title" :placeholder="$t('project.wikiTitlePlaceholder')" />
+        </el-form-item>
+        <el-form-item :label="$t('project.wikiContent')">
+          <el-input type="textarea" v-model="wikiForm.content" :rows="8" :placeholder="$t('project.wikiContentPlaceholder')" />
+        </el-form-item>
+        <el-form-item :label="$t('project.wikiTags')">
+          <el-input v-model="wikiForm.tags" :placeholder="$t('project.wikiTagsPlaceholder')" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddWikiPage = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="submitWikiPage" :loading="wikiSubmitting">{{ $t('common.save') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showWikiDetail" :title="currentWikiPage?.title || ''" width="700px" :fullscreen="isMobile" destroy-on-close>
+      <div v-if="currentWikiPage" class="wiki-detail-content">
+        <div v-if="currentWikiPage.summary" class="wiki-detail-summary">{{ currentWikiPage.summary }}</div>
+        <div class="wiki-detail-body" v-html="renderMarkdown(currentWikiPage.content)"></div>
+      </div>
+      <template #footer>
+        <el-button @click="showWikiDetail = false">{{ $t('common.close') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showAIDiscover" :title="$t('project.aiDiscoverProjects')" width="700px" :fullscreen="isMobile" destroy-on-close>
+      <div v-if="aiDiscovering" class="ai-discover-loading">
+        <el-icon class="spin-icon"><Loading /></el-icon>
+        <p>{{ $t('project.aiDiscovering') }}</p>
+      </div>
+      <div v-else-if="discoveredProjects.length === 0" class="notes-empty">
+        {{ $t('project.noProjectsFound') }}
+      </div>
+      <div v-else class="discovered-projects-list">
+        <div v-for="(p, idx) in discoveredProjects" :key="idx" class="discovered-project-item">
+          <div class="discovered-project-header">
+            <el-checkbox v-model="p.selected" />
+            <span class="discovered-project-name">{{ p.name }}</span>
+            <el-tag size="small" :type="p.status === 'active' ? 'success' : p.status === 'paused' ? 'warning' : 'info'">{{ p.status }}</el-tag>
+            <el-tag v-if="p.source" size="small" type="info">{{ p.source }}</el-tag>
+            <span class="discovered-confidence">{{ Math.round(p.confidence * 100) }}%</span>
+          </div>
+          <p class="discovered-project-desc">{{ p.description }}</p>
+          <div class="discovered-project-meta">
+            <span v-if="p.path" class="meta-item"><el-icon><FolderOpened /></el-icon> {{ p.path }}</span>
+            <span v-if="p.file_count" class="meta-item">{{ $t('project.fileCount', { count: p.file_count }) }}</span>
+            <span v-if="p.conversation_count" class="meta-item">{{ $t('project.conversationCount', { count: p.conversation_count }) }}</span>
+            <span v-if="p.memory_count" class="meta-item">{{ $t('project.memoryCount', { count: p.memory_count }) }}</span>
+          </div>
+          <div v-if="p.agents?.length" class="discovered-project-agents">
+            <el-tag v-for="a in p.agents" :key="a" size="small" type="info">{{ a }}</el-tag>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showAIDiscover = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="importDiscoveredProjects" :loading="importing" :disabled="selectedDiscoveredCount === 0">
+          {{ $t('project.importSelected') }} ({{ selectedDiscoveredCount }})
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -262,6 +360,8 @@ import {
   MagicStick, Loading, CopyDocument
 } from '@element-plus/icons-vue'
 import projectApi from '../api/project'
+import { wikiApi } from '../api/go-wiki'
+import { aiApi } from '../api/go-ai'
 
 const { t } = useI18n()
 
@@ -280,6 +380,19 @@ const notesLoading = ref(false)
 const extracting = ref(false)
 const submitting = ref(false)
 const noteSubmitting = ref(false)
+const projectWikiPages = ref<any[]>([])
+const wikiLoading = ref(false)
+const showAddWikiPage = ref(false)
+const wikiSubmitting = ref(false)
+const wikiForm = ref({ title: '', content: '', tags: '' })
+const showWikiDetail = ref(false)
+const currentWikiPage = ref<any>(null)
+const wikiGenerating = ref(false)
+const showAIDiscover = ref(false)
+const aiDiscovering = ref(false)
+const discoveredProjects = ref<any[]>([])
+const importing = ref(false)
+const selectedDiscoveredCount = computed(() => discoveredProjects.value.filter(p => p.selected).length)
 
 const stats = computed(() => {
   const s = { active: 0, paused: 0, completed: 0 }
@@ -372,7 +485,7 @@ async function handleSearch() {
 async function openProject(p: any) {
   currentProject.value = p
   showDetail.value = true
-  await loadNotes(p.id)
+  await Promise.all([loadNotes(p.id), loadProjectWiki(p.name)])
 }
 
 async function loadNotes(projectId: number) {
@@ -384,6 +497,139 @@ async function loadNotes(projectId: number) {
     notes.value = []
   } finally {
     notesLoading.value = false
+  }
+}
+
+async function loadProjectWiki(projectName: string) {
+  wikiLoading.value = true
+  try {
+    const { data } = await wikiApi.list({ category: projectName, size: 50 })
+    projectWikiPages.value = data.items || []
+  } catch {
+    projectWikiPages.value = []
+  } finally {
+    wikiLoading.value = false
+  }
+}
+
+function openWikiPage(wp: any) {
+  currentWikiPage.value = wp
+  showWikiDetail.value = true
+}
+
+async function submitWikiPage() {
+  if (!wikiForm.value.title || !wikiForm.value.content) {
+    ElMessage.warning(t('project.wikiTitleRequired'))
+    return
+  }
+  wikiSubmitting.value = true
+  try {
+    await wikiApi.create({
+      title: wikiForm.value.title,
+      content: wikiForm.value.content,
+      category: currentProject.value?.name || '',
+      tags: wikiForm.value.tags,
+      status: 'draft',
+    })
+    ElMessage.success(t('common.created'))
+    showAddWikiPage.value = false
+    wikiForm.value = { title: '', content: '', tags: '' }
+    loadProjectWiki(currentProject.value?.name || '')
+  } catch {
+    ElMessage.error(t('common.failed'))
+  } finally {
+    wikiSubmitting.value = false
+  }
+}
+
+async function generateWikiFromMemories() {
+  if (!currentProject.value) return
+  wikiGenerating.value = true
+  try {
+    const { data } = await projectApi.generateWiki(currentProject.value.id)
+    ElMessage.success(t('project.wikiGenerated', { count: data.created || 0 }))
+    loadProjectWiki(currentProject.value.name || '')
+  } catch {
+    ElMessage.error(t('project.wikiGenerateFailed'))
+  } finally {
+    wikiGenerating.value = false
+  }
+}
+
+function renderMarkdown(md: string) {
+  if (!md) return ''
+  return md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/### (.+)/g, '<h3>$1</h3>')
+    .replace(/## (.+)/g, '<h2>$1</h2>')
+    .replace(/# (.+)/g, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/\n/g, '<br/>')
+}
+
+async function aiDiscoverProjects() {
+  showAIDiscover.value = true
+  aiDiscovering.value = true
+  discoveredProjects.value = []
+  try {
+    const { data } = await projectApi.discover()
+    const heuristicProjects = (data.projects || []).map((p: any) => ({ ...p, selected: true, source: p.source || 'heuristic' }))
+    discoveredProjects.value = heuristicProjects
+    if (heuristicProjects.length === 0) {
+      try {
+        const { data: aiData } = await aiApi.discoverProjects()
+        const aiProjects = (aiData.projects || []).map((p: any) => ({ ...p, selected: true, source: 'ai' }))
+        discoveredProjects.value = aiProjects
+        if (aiProjects.length === 0) {
+          ElMessage.info(t('project.noProjectsFound'))
+        }
+      } catch {
+        ElMessage.info(t('project.noProjectsFound'))
+      }
+    }
+  } catch {
+    try {
+      const { data: aiData } = await aiApi.discoverProjects()
+      const aiProjects = (aiData.projects || []).map((p: any) => ({ ...p, selected: true, source: 'ai' }))
+      discoveredProjects.value = aiProjects
+      if (aiProjects.length === 0) {
+        ElMessage.info(t('project.noProjectsFound'))
+      }
+    } catch {
+      ElMessage.error(t('project.aiDiscoverFailed'))
+    }
+  } finally {
+    aiDiscovering.value = false
+  }
+}
+
+async function importDiscoveredProjects() {
+  const selected = discoveredProjects.value.filter(p => p.selected)
+  if (selected.length === 0) return
+  importing.value = true
+  let imported = 0
+  try {
+    for (const p of selected) {
+      await projectApi.create({
+        name: p.name,
+        description: p.path || p.description,
+        category: p.category,
+        status: p.status || 'active',
+        progress: p.progress || 0,
+        key_decisions: p.key_decisions || [],
+        action_items: p.action_items || [],
+        source_agent: (p.agents || []).join(',') || 'ai_discovery',
+      })
+      imported++
+    }
+    ElMessage.success(t('project.aiDiscovered', { count: imported }))
+    showAIDiscover.value = false
+    loadProjects()
+  } catch {
+    ElMessage.error(t('common.failed'))
+  } finally {
+    importing.value = false
   }
 }
 
@@ -911,4 +1157,26 @@ onMounted(loadProjects)
   .note-content { font-size: 13px; }
   .note-header { flex-wrap: wrap; gap: 4px; }
 }
+.wiki-page-list { display: flex; flex-direction: column; gap: 8px; }
+.wiki-page-item { padding: 10px 14px; background: var(--cm-bg, #fafafa); border-radius: 8px; cursor: pointer; transition: background .15s; }
+.wiki-page-item:hover { background: var(--cm-bg-primary, #fff); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.wiki-page-title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.wiki-page-summary { font-size: 13px; color: var(--cm-text-secondary); margin-top: 4px; }
+.wiki-detail-content { padding: 8px 0; }
+.wiki-detail-summary { font-size: 14px; color: var(--cm-text-secondary); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--cm-border); }
+.wiki-detail-body { font-size: 14px; line-height: 1.7; }
+.wiki-detail-body h1 { font-size: 20px; margin: 16px 0 8px; }
+.wiki-detail-body h2 { font-size: 17px; margin: 14px 0 6px; }
+.wiki-detail-body h3 { font-size: 15px; margin: 12px 0 4px; }
+.wiki-detail-body code { background: var(--cm-bg, #f5f5f5); padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+.ai-discover-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px 0; color: var(--cm-text-secondary); }
+.discovered-projects-list { display: flex; flex-direction: column; gap: 12px; }
+.discovered-project-item { padding: 12px 16px; background: var(--cm-bg, #fafafa); border-radius: 8px; }
+.discovered-project-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.discovered-project-name { font-weight: 600; font-size: 15px; }
+.discovered-confidence { font-size: 12px; color: var(--cm-text-secondary); margin-left: auto; }
+.discovered-project-desc { font-size: 13px; color: var(--cm-text-secondary); margin-bottom: 6px; }
+.discovered-project-meta { display: flex; gap: 12px; font-size: 12px; color: var(--cm-text-muted); margin-bottom: 6px; flex-wrap: wrap; }
+.discovered-project-meta .meta-item { display: inline-flex; align-items: center; gap: 3px; }
+.discovered-project-agents { display: flex; gap: 4px; flex-wrap: wrap; }
 </style>

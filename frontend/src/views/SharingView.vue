@@ -12,7 +12,7 @@
         <div v-else-if="pendingShares.length === 0" class="cm-empty-state">
           <div class="cm-empty-icon">🤝</div>
           <div class="cm-empty-title">{{ $t('sharing.noPendingShares') }}</div>
-          <div class="cm-empty-desc">暂无待处理的共享请求</div>
+          <div class="cm-empty-desc">{{ $t('sharing.noPendingDesc') }}</div>
         </div>
         <div v-else class="share-list">
           <div v-for="share in pendingShares" :key="share.id" class="share-card">
@@ -41,7 +41,7 @@
         <div v-else-if="outboundShares.length === 0" class="cm-empty-state">
           <div class="cm-empty-icon">📤</div>
           <div class="cm-empty-title">{{ $t('sharing.noOutboundShares') }}</div>
-          <div class="cm-empty-desc">暂无发出的共享记录</div>
+          <div class="cm-empty-desc">{{ $t('sharing.noOutboundDesc') }}</div>
         </div>
         <div v-else class="share-list">
           <div v-for="share in outboundShares" :key="share.id" class="share-card">
@@ -74,7 +74,7 @@
         <div v-else-if="shareRules.length === 0" class="cm-empty-state">
           <div class="cm-empty-icon">📜</div>
           <div class="cm-empty-title">{{ $t('sharing.noAutoRules') }}</div>
-          <div class="cm-empty-desc">创建自动共享规则来管理记忆分享</div>
+          <div class="cm-empty-desc">{{ $t('sharing.noAutoRulesDesc') }}</div>
           <div class="cm-empty-action">
             <el-button type="primary" size="small" @click="showRuleDialog = true">{{ $t('sharing.createRule') }}</el-button>
           </div>
@@ -107,9 +107,9 @@
         </el-form-item>
         <el-form-item :label="$t('sharing.ruleLayer')">
           <el-select v-model="ruleForm.layer" clearable style="width: 100%">
-            <el-option :label="$t('memories.knowledge')" value="knowledge" />
-            <el-option :label="$t('memories.preference')" value="preference" />
-            <el-option :label="$t('memories.shortTerm')" value="short_term" />
+            <el-option :label="$t('memories.core')" value="core" />
+            <el-option :label="$t('memories.context')" value="context" />
+            <el-option :label="$t('memories.detail')" value="detail" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('sharing.ruleVisibility')">
