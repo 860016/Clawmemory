@@ -1,4 +1,4 @@
-﻿﻿﻿﻿# ClawMemory Windows 安装脚本 v3.4 (完整版)
+﻿﻿﻿﻿﻿﻿# ClawMemory Windows 安装脚本 v3.5 (完整版)
 # 用法: powershell -ExecutionPolicy Bypass -File install.ps1
 # 特性: 自动检测依赖、构建前端、编译后端、创建统一目录、生成启动脚本
 param(
@@ -10,7 +10,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-try { $Host.UI.RawUI.WindowTitle = "ClawMemory 安装程序 v3.4" } catch {}
+try { $Host.UI.RawUI.WindowTitle = "ClawMemory 安装程序 v3.5" } catch {}
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 if ($InstallPath -eq "") {
@@ -52,7 +52,7 @@ function Write-Info($message) {
 
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║     ClawMemory 安装程序 v3.4 (Windows)   ║" -ForegroundColor Cyan
+Write-Host "║     ClawMemory 安装程序 v3.5 (Windows)   ║" -ForegroundColor Cyan
 Write-Host "╚══════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 Write-Info "安装目录: $InstallDir"
