@@ -35,7 +35,7 @@ server.tool(
   {
     key: z.string().describe("A short identifier for this memory (e.g., 'user-pref-dark-mode')"),
     value: z.string().describe("The memory content to save"),
-    layer: z.enum(["episodic", "semantic", "procedural"]).optional().describe("Memory layer. episodic=events, semantic=facts, procedural=how-to"),
+    layer: z.enum(["episodic", "semantic", "procedural", "core", "context", "detail"]).optional().describe("Memory layer. episodic/detail=events, semantic/context=facts, procedural/core=how-to"),
     memory_type: z.enum(["conversation", "knowledge", "preference", "decision"]).optional().describe("Type of memory"),
     visibility: z.enum(["private", "shared", "public"]).optional().describe("Memory visibility. private=only owner, shared=authorized agents, public=all agents"),
     source_agent: z.string().optional().describe("Name of the agent saving this memory (e.g., 'trae', 'cursor', 'claude')"),
@@ -146,7 +146,7 @@ server.tool(
       await client.saveMemory({
         key: `conclusion-${category}-${Date.now()}`,
         value: params.content,
-        layer: "semantic",
+        layer: "context",
         source: "mcp-conclusion",
         memory_type: "knowledge",
         visibility: params.visibility || "shared",

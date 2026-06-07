@@ -23,6 +23,19 @@ export interface ContextResult {
   system_prompt_addition: string;
 }
 
+// Map MCP layer names to backend layer names
+// episodic → detail, semantic → context, procedural → core
+// core/context/detail pass through unchanged
+function mapLayer(layer?: string): string | undefined {
+  if (!layer) return undefined;
+  const mapping: Record<string, string> = {
+    episodic: "detail",
+    semantic: "context",
+    procedural: "core",
+  };
+  return mapping[layer] || layer;
+}
+
 export class ClawMemoryClient {
   private baseUrl: string;
   private apiKey: string;
@@ -72,7 +85,7 @@ export class ClawMemoryClient {
     return this.request("POST", "/memories", {
       key: params.key,
       value: params.value,
-      layer: params.layer || "episodic",
+      layer: mapLayer(params.layer) || "detail",
       source: params.source || this.platform,
       memory_type: params.memory_type || "knowledge",
       visibility: params.visibility || "private",
@@ -95,7 +108,7 @@ export class ClawMemoryClient {
       memories: memories.map((m) => ({
         key: m.key,
         value: m.value,
-        layer: m.layer || "episodic",
+        layer: mapLayer(m.layer) || "detail",
         source: m.source || this.platform,
         memory_type: m.memory_type || "knowledge",
         visibility: m.visibility || "private",

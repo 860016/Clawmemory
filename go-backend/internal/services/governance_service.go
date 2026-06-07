@@ -152,6 +152,25 @@ func (s *GovernanceService) RunFullGovernance(userID uint) (*GovernanceResult, e
 		StepDurations: make(map[string]int64),
 	}
 
+	// Decay runs first so importance values are up-to-date before other steps read them.
+	// AutoFix only fixes structural issues (missing layer, untagged, duplicates) —
+	// it must NOT modify importance, otherwise it would overwrite decay adjustments.
+	if status.Config.AutoDecay {
+		stepStart := time.Now()
+		decaySvc := NewDecayService(s.db)
+		decayResult, err := decaySvc.ApplyDecay(userID)
+		result.StepDurations["auto_decay"] = time.Since(stepStart).Milliseconds()
+		if err != nil {
+			result.StepErrors["auto_decay"] = err.Error()
+			log.Printf("Governance: ApplyDecay error: %v", err)
+		} else {
+			archived, _ := decayResult["archived"].(int)
+			trashed, _ := decayResult["trashed"].(int)
+			adjusted, _ := decayResult["adjusted"].(int)
+			result.DecayApplied = archived + trashed + adjusted
+		}
+	}
+
 	if status.Config.AutoFix {
 		stepStart := time.Now()
 		healthSvc := NewHealthService(s.db)
@@ -188,22 +207,6 @@ func (s *GovernanceService) RunFullGovernance(userID uint) (*GovernanceResult, e
 			log.Printf("Governance: AutoMergeSimilar error: %v", err)
 		} else {
 			result.MergedGroups = merged
-		}
-	}
-
-	if status.Config.AutoDecay {
-		stepStart := time.Now()
-		decaySvc := NewDecayService(s.db)
-		decayResult, err := decaySvc.ApplyDecay(userID)
-		result.StepDurations["auto_decay"] = time.Since(stepStart).Milliseconds()
-		if err != nil {
-			result.StepErrors["auto_decay"] = err.Error()
-			log.Printf("Governance: ApplyDecay error: %v", err)
-		} else {
-			archived, _ := decayResult["archived"].(int)
-			trashed, _ := decayResult["trashed"].(int)
-			adjusted, _ := decayResult["adjusted"].(int)
-			result.DecayApplied = archived + trashed + adjusted
 		}
 	}
 

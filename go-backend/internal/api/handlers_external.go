@@ -17,6 +17,22 @@ import (
 	"gorm.io/gorm"
 )
 
+// normalizeLayer maps legacy MCP layer names (episodic/semantic/procedural)
+// to the backend's canonical layer names (core/context/detail).
+// Canonical names pass through unchanged.
+func normalizeLayer(layer string) string {
+	switch layer {
+	case "episodic":
+		return "detail"
+	case "semantic":
+		return "context"
+	case "procedural":
+		return "core"
+	default:
+		return layer
+	}
+}
+
 func handleExternalBatchPushConversations(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !middleware.HasAPIKeyPermission(c, "conversations:write") {
@@ -329,7 +345,7 @@ func handleExternalCreateMemory(db *gorm.DB) gin.HandlerFunc {
 		memory, err := svc.Create(userID, map[string]interface{}{
 			"key":          key,
 			"value":        value,
-			"layer":        getString(data, "layer", "episodic"),
+			"layer":        normalizeLayer(getString(data, "layer", "detail")),
 			"importance":   data["importance"],
 			"source":       source,
 			"memory_type":  getString(data, "memory_type", "knowledge"),
@@ -410,7 +426,7 @@ func handleExternalBatchCreateMemories(db *gorm.DB) gin.HandlerFunc {
 			_, err := svcTx.Create(userID, map[string]interface{}{
 				"key":          key,
 				"value":        value,
-				"layer":        getString(m, "layer", "episodic"),
+				"layer":        normalizeLayer(getString(m, "layer", "detail")),
 				"importance":   m["importance"],
 				"source":       source,
 				"memory_type":  getString(m, "memory_type", "knowledge"),

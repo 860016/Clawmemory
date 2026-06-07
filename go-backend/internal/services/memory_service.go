@@ -126,7 +126,12 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 		return nil, err
 	}
 
-	go s.postCreate(memory)
+	// postCreate runs synchronously so that errors are visible to the caller.
+	// The DB record is already committed at this point, so side-effects
+	// (auto-share, ChromaDB index) operate on persisted data.
+	// If postCreate fails it logs the error but does not roll back the memory
+	// creation — the memory itself is valid, only the side-effect failed.
+	s.postCreate(memory)
 
 	s.invalidateSearchCache(userID)
 
