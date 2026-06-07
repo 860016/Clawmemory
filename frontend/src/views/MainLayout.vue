@@ -72,7 +72,7 @@
           <div class="sidebar-section" v-for="group in currentSubNav" :key="group.label">
             <div class="sidebar-group-title" v-if="group.label && !sidebarCollapsed">{{ $t(group.label) }}</div>
             <router-link
-              v-for="item in group.items.filter((i: any) => !i.adminOnly || authStore.isFounder)"
+              v-for="item in group.items.filter((i) => !i.adminOnly || authStore.isFounder)"
               :key="item.path"
               :to="item.path"
               class="sidebar-item-v2"
@@ -191,7 +191,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, nextTick, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '../stores/theme'
@@ -284,7 +284,10 @@ function isSubNavActive(item: { path: string }) {
   return route.path === item.path && !Object.keys(route.query).length
 }
 
-const subNavMap: Record<string, Array<{ label?: string; items: Array<{ path: string; label: string; icon?: any; adminOnly?: boolean }> }>> = {
+type NavItem = { path: string; label: string; icon?: Component; adminOnly?: boolean }
+type NavGroup = { label?: string; items: NavItem[] }
+
+const subNavMap: Record<string, NavGroup[]> = {
   '/': [
     { items: [
       { path: '/', label: 'nav.overview', icon: HomeFilled },
@@ -354,7 +357,7 @@ const currentSubNav = computed(() => {
 })
 
 const currentSubNavItems = computed(() => {
-  const items: Array<{ path: string; label: string; icon?: any; adminOnly?: boolean }> = []
+  const items: NavItem[] = []
   currentSubNav.value.forEach(group => {
     items.push(...group.items)
   })
@@ -362,7 +365,7 @@ const currentSubNavItems = computed(() => {
 })
 
 const searchLoading = ref(false)
-const searchResults = ref<Array<{ category: string; label: string; items: Array<{ id: number; title: string; description: string; icon: any; path: string }> }>>([])
+const searchResults = ref<Array<{ category: string; label: string; items: Array<{ id: number; title: string; description: string; icon: Component; path: string }> }>>([])
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -388,7 +391,7 @@ async function performSearch(q: string) {
       results.push({
         category: 'memories',
         label: t('nav.memories'),
-        items: memRes.value.data.items.map((m: any) => ({
+        items: memRes.value.data.items.map((m: { id: number; key: string; value?: string }) => ({
           id: m.id, title: m.key, description: (m.value || '').substring(0, 80), icon: Collection, path: '/memories'
         }))
       })
@@ -397,7 +400,7 @@ async function performSearch(q: string) {
       results.push({
         category: 'wiki',
         label: t('nav.knowledge'),
-        items: wikiRes.value.data.items.map((w: any) => ({
+        items: wikiRes.value.data.items.map((w: { id: number; title: string; content?: string }) => ({
           id: w.id, title: w.title, description: (w.content || '').substring(0, 80), icon: Connection, path: '/knowledge'
         }))
       })
@@ -406,7 +409,7 @@ async function performSearch(q: string) {
       results.push({
         category: 'projects',
         label: t('nav.advancedjects'),
-        items: projRes.value.data.items.map((p: any) => ({
+        items: projRes.value.data.items.map((p: { id: number; name: string; description?: string }) => ({
           id: p.id, title: p.name, description: (p.description || '').substring(0, 80), icon: Document, path: '/projects'
         }))
       })
@@ -419,7 +422,7 @@ async function performSearch(q: string) {
   }
 }
 
-function navigateTo(item: any) {
+function navigateTo(item: { path: string }) {
   showSearch.value = false
   searchQuery.value = ''
   if (item.path) router.push(item.path)

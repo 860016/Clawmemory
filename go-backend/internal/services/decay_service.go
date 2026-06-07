@@ -1,7 +1,6 @@
 package services
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"time"
@@ -358,9 +357,4 @@ func (s *DecayService) CompressApply(userID uint, level string) (map[string]inte
 		"archived": archived,
 		"total":    len(previewItems),
 	}, nil
-}
-
-func init() {
-	_ = json.Marshal
-	_ = math.Max
 }

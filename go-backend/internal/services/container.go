@@ -2,6 +2,7 @@ package services
 
 import (
 	"sync"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -11,6 +12,9 @@ import (
 type AppContainer struct {
 	mu sync.RWMutex
 	db *gorm.DB
+
+	// shared search cache
+	searchCache *SearchCache
 
 	// lazily-initialized services
 	memorySvc      *MemoryService
@@ -42,7 +46,10 @@ type AppContainer struct {
 
 // NewAppContainer creates a new container with the given DB.
 func NewAppContainer(db *gorm.DB) *AppContainer {
-	return &AppContainer{db: db}
+	return &AppContainer{
+		db:          db,
+		searchCache: NewSearchCache(1*time.Minute, 200),
+	}
 }
 
 func (c *AppContainer) DB() *gorm.DB {
@@ -58,6 +65,7 @@ func (c *AppContainer) MemoryService() *MemoryService {
 	defer c.mu.Unlock()
 	if c.memorySvc == nil {
 		c.memorySvc = NewMemoryService(c.db)
+		c.memorySvc.SetSearchCache(c.searchCache)
 	}
 	return c.memorySvc
 }
@@ -67,8 +75,18 @@ func (c *AppContainer) SearchService() *SearchService {
 	defer c.mu.Unlock()
 	if c.searchSvc == nil {
 		c.searchSvc = NewSearchService(c.db)
+		c.searchSvc.SetCache(c.searchCache)
 	}
 	return c.searchSvc
+}
+
+// InvalidateSearchCache clears all cached search results for a user.
+func (c *AppContainer) InvalidateSearchCache(userID uint) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.searchCache != nil {
+		c.searchCache.Invalidate(userID)
+	}
 }
 
 func (c *AppContainer) EmbeddingService() *EmbeddingService {

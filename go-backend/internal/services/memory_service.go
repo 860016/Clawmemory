@@ -13,7 +13,19 @@ import (
 )
 
 type MemoryService struct {
-	db *gorm.DB
+	db          *gorm.DB
+	searchCache *SearchCache
+}
+
+// SetSearchCache injects the shared search cache for invalidation on writes.
+func (s *MemoryService) SetSearchCache(c *SearchCache) {
+	s.searchCache = c
+}
+
+func (s *MemoryService) invalidateSearchCache(userID uint) {
+	if s.searchCache != nil {
+		s.searchCache.Invalidate(userID)
+	}
 }
 
 // MemoryModel 用于返回的记忆模型
@@ -66,7 +78,8 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 	}
 
 	tags := "[]"
-	if t, ok := data["tags"].([]interface{}); ok {
+	switch t := data["tags"].(type) {
+	case []interface{}:
 		tagStrings := make([]string, 0, len(t))
 		for _, v := range t {
 			if s, ok := v.(string); ok {
@@ -75,6 +88,19 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 		}
 		b, _ := json.Marshal(tagStrings)
 		tags = string(b)
+	case string:
+		if t != "" {
+			tagStrings := strings.Split(t, ",")
+			filtered := make([]string, 0, len(tagStrings))
+			for _, s := range tagStrings {
+				s = strings.TrimSpace(s)
+				if s != "" {
+					filtered = append(filtered, s)
+				}
+			}
+			b, _ := json.Marshal(filtered)
+			tags = string(b)
+		}
 	}
 
 	memory := &models.Memory{
@@ -101,6 +127,8 @@ func (s *MemoryService) Create(userID uint, data map[string]interface{}) (*Memor
 	}
 
 	go s.postCreate(memory)
+
+	s.invalidateSearchCache(userID)
 
 	return ToMemoryModel(memory), nil
 }
@@ -208,15 +236,29 @@ func (s *MemoryService) Update(userID, id uint, data map[string]interface{}) (*M
 		updates["memory_type"] = v
 	}
 	if v, ok := data["tags"]; ok {
-		if tags, ok := v.([]interface{}); ok {
-			tagStrings := make([]string, 0, len(tags))
-			for _, t := range tags {
-				if s, ok := t.(string); ok {
+		switch t := v.(type) {
+		case []interface{}:
+			tagStrings := make([]string, 0, len(t))
+			for _, item := range t {
+				if s, ok := item.(string); ok {
 					tagStrings = append(tagStrings, s)
 				}
 			}
 			b, _ := json.Marshal(tagStrings)
 			updates["tags"] = string(b)
+		case string:
+			if t != "" {
+				tagStrings := strings.Split(t, ",")
+				filtered := make([]string, 0, len(tagStrings))
+				for _, s := range tagStrings {
+					s = strings.TrimSpace(s)
+					if s != "" {
+						filtered = append(filtered, s)
+					}
+				}
+				b, _ := json.Marshal(filtered)
+				updates["tags"] = string(b)
+			}
 		}
 	}
 	if v, ok := data["layer"]; ok {
@@ -235,15 +277,24 @@ func (s *MemoryService) Update(userID, id uint, data map[string]interface{}) (*M
 	if err := s.db.Model(&models.Memory{}).Where("user_id = ? AND id = ?", userID, id).Updates(updates).Error; err != nil {
 		return nil, err
 	}
+	s.invalidateSearchCache(userID)
 	return s.Get(userID, id)
 }
 
 func (s *MemoryService) Delete(userID, id uint) error {
-	return s.db.Model(&models.Memory{}).Where("user_id = ? AND id = ?", userID, id).Update("status", "trashed").Error
+	err := s.db.Model(&models.Memory{}).Where("user_id = ? AND id = ?", userID, id).Update("status", "trashed").Error
+	if err == nil {
+		s.invalidateSearchCache(userID)
+	}
+	return err
 }
 
 func (s *MemoryService) Restore(userID, id uint) error {
-	return s.db.Model(&models.Memory{}).Where("user_id = ? AND id = ?", userID, id).Update("status", "active").Error
+	err := s.db.Model(&models.Memory{}).Where("user_id = ? AND id = ?", userID, id).Update("status", "active").Error
+	if err == nil {
+		s.invalidateSearchCache(userID)
+	}
+	return err
 }
 
 func (s *MemoryService) SearchKeyword(userID uint, q string, limit int) ([]*MemoryModel, error) {

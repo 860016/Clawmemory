@@ -265,6 +265,7 @@ export default {
     engineTFIDF: 'TF-IDF Search',
     engineKeyword: 'Keyword Search',
     engineGraphRAG: 'GraphRAG Search',
+    searchDegraded: 'Search degraded: Semantic/vector search unavailable, using keyword mode. Install ChromaDB for better results.',
     smartLoadInfo: 'Smart loaded {count} memories, using {tokens}/{budget} tokens',
     summaryTag: 'Summary',
     reinforceTip: 'Reinforce this memory to prevent decay',

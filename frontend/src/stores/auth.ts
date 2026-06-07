@@ -21,14 +21,14 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function register(user: string, password: string, invitationCode?: string) {
-    const payload: any = { username: user, password }
+    const payload: { username: string; password: string; invitation_code?: string } = { username: user, password }
     if (invitationCode) payload.invitation_code = invitationCode
     await axios.post('/auth/register-with-invitation', payload)
     await login(user, password)
   }
 
   async function setPassword(password: string, user?: string) {
-    const payload: any = { password }
+    const payload: { password: string; username?: string } = { password }
     if (user) payload.username = user
     const { data } = await axios.post('/auth/set-password', payload)
     token.value = data.access_token
@@ -44,8 +44,9 @@ export const useAuthStore = defineStore('auth', () => {
       role.value = data.role || 'user'
       isFounder.value = data.is_founder || data.role === 'admin'
       localStorage.setItem('cm_username', username.value)
-    } catch (e: any) {
-      console.warn('[Auth] fetchMe failed:', e?.message || e)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn('[Auth] fetchMe failed:', msg)
     }
   }
 

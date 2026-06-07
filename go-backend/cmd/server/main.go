@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -155,6 +156,26 @@ func main() {
 	r.Use(gin.Recovery())
 	r.Use(middleware.CORS())
 	r.Use(middleware.Logger())
+
+	// Security: limit request body to 2MB to prevent OOM from malicious payloads
+	r.MaxMultipartMemory = 32 << 20
+	r.Use(func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 2<<20)
+		c.Next()
+	})
+
+	// Security: only trust the reverse proxy specified in TRUSTED_PROXIES env
+	if trustedProxies := os.Getenv("TRUSTED_PROXIES"); trustedProxies != "" {
+		proxies := strings.Split(trustedProxies, ",")
+		for i := range proxies {
+			proxies[i] = strings.TrimSpace(proxies[i])
+		}
+		if err := r.SetTrustedProxies(proxies); err != nil {
+			log.Printf("Warning: failed to set trusted proxies: %v", err)
+		}
+	} else {
+		r.SetTrustedProxies(nil) // trust no proxy by default
+	}
 
 	api.RegisterRoutes(r, db)
 

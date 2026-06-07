@@ -27,6 +27,10 @@ export interface Memory {
   platform: string
   verify_count: number
   validation_status: string
+  score?: number
+  score_detail?: Record<string, number>
+  load_level?: string
+  verified_at?: string
   created_at: string
   updated_at: string
   trashed_at?: string
@@ -38,10 +42,12 @@ export interface MemoryCreateParams {
   value: string
   layer?: MemoryLayer
   importance?: number
-  tags?: string
+  tags?: string[] | string
   source?: string
+  source_agent?: string
+  memory_type?: string
   visibility?: MemoryVisibility
-  encrypted?: boolean
+  is_encrypted?: boolean
 }
 
 export interface MemoryUpdateParams {
@@ -49,7 +55,7 @@ export interface MemoryUpdateParams {
   value?: string
   layer?: MemoryLayer
   importance?: number
-  tags?: string
+  tags?: string[] | string
   source?: string
   visibility?: MemoryVisibility
 }
@@ -332,11 +338,24 @@ export interface SessionMemory {
   id: number
   user_id: number
   session_id: string
+  title: string
+  current_state: string
+  task_spec: string
+  files_and_funcs: string
+  worklog: string
+  learnings: string
+  key_results: string
+  docs: string
+  errors: string
+  workflow: string
+  status: string
   key: string
   value: string
   layer: string
-  status: string
+  token_count: number
+  compressed_from: string
   created_at: string
+  updated_at: string
 }
 
 // --- Settings ---

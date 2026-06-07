@@ -5,6 +5,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	"clawmemory/internal/models"
@@ -13,11 +14,27 @@ import (
 )
 
 type SearchService struct {
-	db *gorm.DB
+	db    *gorm.DB
+	cache *SearchCache
 }
 
 func NewSearchService(db *gorm.DB) *SearchService {
-	return &SearchService{db: db}
+	return &SearchService{
+		db:    db,
+		cache: NewSearchCache(1*time.Minute, 200),
+	}
+}
+
+// SetCache allows AppContainer to inject a shared cache instance.
+func (s *SearchService) SetCache(c *SearchCache) {
+	s.cache = c
+}
+
+// InvalidateCache clears cached search results for a user.
+func (s *SearchService) InvalidateCache(userID uint) {
+	if s.cache != nil {
+		s.cache.Invalidate(userID)
+	}
 }
 
 type GraphRAGResult struct {
@@ -39,6 +56,13 @@ type GraphRAGResult struct {
 func (s *SearchService) GraphRAGSearch(userID uint, query string, limit int) ([]GraphRAGResult, error) {
 	if limit <= 0 {
 		limit = 20
+	}
+
+	// Check cache
+	if s.cache != nil {
+		if cached, ok := s.cache.Get(userID, query, limit); ok {
+			return cached, nil
+		}
 	}
 
 	keywordResults := s.keywordSearch(userID, query, limit*3)
@@ -135,7 +159,14 @@ func (s *SearchService) GraphRAGSearch(userID uint, query string, limit int) ([]
 		limit = len(all)
 	}
 
-	return all[:limit], nil
+	result := all[:limit]
+
+	// Write to cache
+	if s.cache != nil {
+		s.cache.Set(userID, query, limit, result)
+	}
+
+	return result, nil
 }
 
 type internalSearchResult struct {
@@ -603,45 +634,118 @@ func (s *SearchService) SemanticSearch(userID uint, query string, limit int) ([]
 func tokenize(text string) []string {
 	text = strings.ToLower(text)
 	var tokens []string
-	var current strings.Builder
+
+	var currentToken strings.Builder
+	var lastCharType int // 0=unknown, 1=cjk, 2=latin/digit, 3=separator
 
 	for _, r := range text {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			current.WriteRune(r)
-		} else {
-			if current.Len() > 1 {
-				tokens = append(tokens, current.String())
+		charType := 0
+		switch {
+		case isCJK(r):
+			charType = 1
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			charType = 2
+		default:
+			charType = 3
+		}
+
+		if charType != lastCharType && currentToken.Len() > 0 {
+			token := currentToken.String()
+			if lastCharType == 1 {
+				tokens = append(tokens, cjkBigram(token)...)
+			} else if lastCharType == 2 && len(token) > 1 && !isStopWord(token) {
+				tokens = append(tokens, token)
 			}
-			current.Reset()
+			currentToken.Reset()
 		}
-	}
-	if current.Len() > 1 {
-		tokens = append(tokens, current.String())
+
+		if charType == 3 {
+			lastCharType = charType
+			continue
+		}
+
+		currentToken.WriteRune(r)
+		lastCharType = charType
 	}
 
-	stopWords := map[string]bool{
-		"the": true, "a": true, "an": true, "is": true, "are": true,
-		"was": true, "were": true, "be": true, "been": true, "being": true,
-		"have": true, "has": true, "had": true, "do": true, "does": true,
-		"did": true, "will": true, "would": true, "could": true, "should": true,
-		"may": true, "might": true, "can": true, "shall": true, "must": true,
-		"of": true, "in": true, "to": true, "for": true, "with": true,
-		"on": true, "at": true, "from": true, "by": true, "about": true,
-		"as": true, "into": true, "through": true, "during": true, "before": true,
-		"after": true, "above": true, "below": true, "between": true, "and": true,
-		"or": true, "not": true, "but": true, "if": true, "then": true,
-		"de": true, "le": true, "la": true, "les": true, "un": true,
-		"une": true, "des": true, "du": true, "et": true, "en": true,
-	}
-
-	filtered := make([]string, 0, len(tokens))
-	for _, t := range tokens {
-		if !stopWords[t] {
-			filtered = append(filtered, t)
+	if currentToken.Len() > 0 {
+		token := currentToken.String()
+		if lastCharType == 1 {
+			tokens = append(tokens, cjkBigram(token)...)
+		} else if lastCharType == 2 && len(token) > 1 && !isStopWord(token) {
+			tokens = append(tokens, token)
 		}
 	}
 
-	return filtered
+	return tokens
+}
+
+// isCJK checks if a rune is a CJK ideograph (excludes punctuation ranges)
+func isCJK(r rune) bool {
+	return (r >= 0x4E00 && r <= 0x9FFF) || // CJK Unified Ideographs
+		(r >= 0x3400 && r <= 0x4DBF) || // CJK Extension A
+		(r >= 0x2E80 && r <= 0x2EFF) || // CJK Radicals Supplement
+		(r >= 0xF900 && r <= 0xFAFF) // CJK Compatibility Ideographs
+}
+
+// cjkBigram splits CJK text into bigram tokens for search
+// "编程语言" → ["编程", "程语", "语言"]
+// "语言" → ["语言"] (2 chars: output whole)
+// "语" → ["语"] (1 char: output as-is)
+func cjkBigram(s string) []string {
+	runes := []rune(s)
+	if len(runes) <= 2 {
+		return []string{s}
+	}
+
+	var tokens []string
+	for i := 0; i < len(runes)-1; i++ {
+		bigram := string(runes[i : i+2])
+		// skip bigrams containing stop words
+		if !isChineseStopWord(string(runes[i])) && !isChineseStopWord(string(runes[i+1])) {
+			tokens = append(tokens, bigram)
+		}
+	}
+
+	return tokens
+}
+
+func isStopWord(token string) bool {
+	return englishStopWords[token] || chineseStopWords[token]
+}
+
+func isChineseStopWord(char string) bool {
+	return chineseStopWords[char]
+}
+
+var englishStopWords = map[string]bool{
+	"the": true, "a": true, "an": true, "is": true, "are": true,
+	"was": true, "were": true, "be": true, "been": true, "being": true,
+	"have": true, "has": true, "had": true, "do": true, "does": true,
+	"did": true, "will": true, "would": true, "could": true, "should": true,
+	"may": true, "might": true, "can": true, "shall": true, "must": true,
+	"of": true, "in": true, "to": true, "for": true, "with": true,
+	"on": true, "at": true, "from": true, "by": true, "about": true,
+	"as": true, "into": true, "through": true, "during": true, "before": true,
+	"after": true, "above": true, "below": true, "between": true, "and": true,
+	"or": true, "not": true, "but": true, "if": true, "then": true,
+	"de": true, "le": true, "la": true, "les": true, "un": true,
+	"une": true, "des": true, "du": true, "et": true, "en": true,
+}
+
+var chineseStopWords = map[string]bool{
+	"的": true, "了": true, "在": true, "是": true, "我": true,
+	"有": true, "和": true, "就": true, "不": true, "人": true,
+	"都": true, "一": true, "上": true, "也": true,
+	"很": true, "到": true, "说": true, "要": true, "去": true,
+	"你": true, "会": true, "着": true, "看": true,
+	"好": true, "这": true, "那": true, "他": true, "她": true,
+	"它": true, "们": true, "把": true, "被": true, "从": true,
+	"让": true, "给": true, "向": true, "比": true, "对": true,
+	"与": true, "或": true, "而": true, "但": true, "却": true,
+	"又": true, "还": true, "已": true, "所": true, "其": true,
+	"此": true, "之": true, "等": true, "能": true, "得": true,
+	"地": true, "吗": true, "吧": true, "呢": true, "啊": true,
 }
 
 func computeTF(doc []string, queryTokens []string) map[string]float64 {

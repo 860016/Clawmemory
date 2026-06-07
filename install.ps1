@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿# ClawMemory Windows 安装脚本 v3.5 (完整版)
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿# ClawMemory Windows 安装脚本 v3.5 (完整版)
 # 用法: powershell -ExecutionPolicy Bypass -File install.ps1
 # 特性: 自动检测依赖、构建前端、编译后端、创建统一目录、生成启动脚本
 param(

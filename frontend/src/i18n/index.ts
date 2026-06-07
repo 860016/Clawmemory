@@ -29,3 +29,11 @@ export function translateError(error: string, fallback: string = ''): string {
   if (mapped) return mapped
   return fallback || error
 }
+
+// extractApiError extracts an error message from an unknown catch value
+// (typically an Axios error) and translates it.
+export function extractApiError(e: unknown, fallback: string = ''): string {
+  const err = e as { response?: { data?: { error?: string; detail?: string } }; message?: string }
+  const raw = err?.response?.data?.error || err?.response?.data?.detail || err?.message || ''
+  return translateError(raw, fallback)
+}

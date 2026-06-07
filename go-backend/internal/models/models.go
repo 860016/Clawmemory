@@ -182,16 +182,19 @@ type Backup struct {
 
 // APIKey API 密钥 - 供外部应用（如 OpenClaw）调用
 type APIKey struct {
-	ID          uint       `gorm:"primarykey" json:"id"`
-	UserID      uint       `gorm:"index;not null" json:"user_id"`
-	Name        string     `gorm:"size:100;not null" json:"name"`
-	KeyHash     string     `gorm:"size:64;not null;uniqueIndex" json:"-"`
-	KeyPrefix   string     `gorm:"size:8;not null" json:"key_prefix"`
-	Permissions string     `gorm:"size:200;default:memories:read,memories:write,conversations:write,sessions:write,reason:execute,ai:execute" json:"permissions"`
-	AgentName   string     `gorm:"size:50;index" json:"agent_name"`
-	LastUsedAt  *time.Time `json:"last_used_at"`
-	ExpiresAt   *time.Time `json:"expires_at"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID              uint       `gorm:"primarykey" json:"id"`
+	UserID          uint       `gorm:"index;not null" json:"user_id"`
+	Name            string     `gorm:"size:100;not null" json:"name"`
+	KeyHash         string     `gorm:"size:60;not null;uniqueIndex" json:"-"`
+	KeyPrefix       string     `gorm:"size:8;not null" json:"key_prefix"`
+	Permissions     string     `gorm:"size:200;default:memories:read,memories:write,conversations:write,sessions:write,reason:execute,ai:execute" json:"permissions"`
+	AgentName       string     `gorm:"size:50;index" json:"agent_name"`
+	IsEnabled       bool       `gorm:"default:true" json:"is_enabled"`
+	FailedAttempts  int        `gorm:"default:0" json:"failed_attempts"`
+	LockedUntil     *time.Time `json:"locked_until"`
+	LastUsedAt      *time.Time `json:"last_used_at"`
+	ExpiresAt       *time.Time `json:"expires_at"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
 type AuditLog struct {

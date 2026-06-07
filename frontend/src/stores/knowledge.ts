@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { knowledgeApi } from '../api/go-knowledge'
+import type { Entity, Relation, GraphData, EntityCreateParams, EntityUpdateParams, RelationCreateParams } from '../api/types'
 
 export const useKnowledgeStore = defineStore('knowledge', () => {
-  const entities = ref<any[]>([])
-  const relations = ref<any[]>([])
-  const graphData = ref<{ nodes: any[]; edges: any[] }>({ nodes: [], edges: [] })
+  const entities = ref<Entity[]>([])
+  const relations = ref<Relation[]>([])
+  const graphData = ref<GraphData>({ nodes: [], edges: [] })
   const entityTotal = ref(0)
   const relationTotal = ref(0)
 
@@ -15,13 +16,13 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     entityTotal.value = resp.data.total ?? entities.value.length
   }
 
-  async function createEntity(data: { name: string; entity_type: string; properties?: Record<string, any> }) {
+  async function createEntity(data: EntityCreateParams) {
     const resp = await knowledgeApi.createEntity(data)
     entities.value.unshift(resp.data)
     return resp.data
   }
 
-  async function updateEntity(id: number, data: { name?: string; entity_type?: string; properties?: Record<string, any> }) {
+  async function updateEntity(id: number, data: EntityUpdateParams) {
     const resp = await knowledgeApi.updateEntity(id, data)
     const idx = entities.value.findIndex(e => e.id === id)
     if (idx >= 0) entities.value[idx] = resp.data
@@ -41,7 +42,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     relationTotal.value = items.length
   }
 
-  async function createRelation(data: { source_id: number; target_id: number; relation_type: string; properties?: Record<string, any> }) {
+  async function createRelation(data: RelationCreateParams) {
     const resp = await knowledgeApi.createRelation(data)
     relations.value.unshift(resp.data)
     return resp.data
@@ -52,7 +53,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     relations.value = relations.value.filter(r => r.id !== id)
   }
 
-  async function fetchGraphData(depth?: number) {
+  async function fetchGraphData(_depth?: number) {
     const resp = await knowledgeApi.getGraph()
     graphData.value = resp.data
   }

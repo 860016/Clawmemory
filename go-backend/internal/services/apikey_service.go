@@ -10,6 +10,7 @@ import (
 
 	"clawmemory/internal/models"
 
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -17,6 +18,7 @@ const (
 	MaxAPIKeysPerUser = 5
 	APIKeyLength      = 50
 	APIKeyPrefix      = "cm"
+	bcryptCost        = 10
 )
 
 var ValidPermissions = map[string]bool{
@@ -74,14 +76,16 @@ func (s *APIKeyService) CreateWithPermissions(userID uint, name, permissions, ag
 		return nil, "", err
 	}
 
-	hash := sha256.Sum256([]byte(rawKey))
-	keyHash := hex.EncodeToString(hash[:])
+	keyHash, err := bcrypt.GenerateFromPassword([]byte(rawKey), bcryptCost)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to hash API key: %w", err)
+	}
 	prefix := rawKey[:8]
 
 	apiKey := &models.APIKey{
 		UserID:      userID,
 		Name:        name,
-		KeyHash:     keyHash,
+		KeyHash:     string(keyHash),
 		KeyPrefix:   prefix,
 		Permissions: permissions,
 		AgentName:   agentName,
@@ -113,22 +117,76 @@ func (s *APIKeyService) Validate(rawKey string) (*models.APIKey, error) {
 		return nil, fmt.Errorf("invalid API key format")
 	}
 
-	hash := sha256.Sum256([]byte(rawKey))
-	keyHash := hex.EncodeToString(hash[:])
-
+	// Look up by prefix first to avoid full-table scan
+	prefix := rawKey[:8]
 	var apiKey models.APIKey
-	if err := s.db.Where("key_hash = ?", keyHash).First(&apiKey).Error; err != nil {
+	if err := s.db.Where("key_prefix = ?", prefix).First(&apiKey).Error; err != nil {
 		return nil, fmt.Errorf("invalid API key")
 	}
 
+	// Verify key hash: try bcrypt first, fall back to legacy SHA-256
+	matched := false
+	if err := bcrypt.CompareHashAndPassword([]byte(apiKey.KeyHash), []byte(rawKey)); err == nil {
+		matched = true
+	} else {
+		// Legacy SHA-256 fallback
+		hash := sha256.Sum256([]byte(rawKey))
+		shaHash := hex.EncodeToString(hash[:])
+		if apiKey.KeyHash == shaHash {
+			matched = true
+			// Auto-upgrade: re-hash with bcrypt
+			if newHash, err := bcrypt.GenerateFromPassword([]byte(rawKey), bcryptCost); err == nil {
+				s.db.Model(&apiKey).Update("key_hash", string(newHash))
+			}
+		}
+	}
+
+	if !matched {
+		return nil, fmt.Errorf("invalid API key")
+	}
+
+	// Expiry check
 	if apiKey.ExpiresAt != nil && apiKey.ExpiresAt.Before(time.Now()) {
 		return nil, fmt.Errorf("API key expired")
 	}
 
+	// Enabled check
+	if !apiKey.IsEnabled {
+		return nil, fmt.Errorf("API key is disabled")
+	}
+
+	// Lock check
+	if apiKey.LockedUntil != nil && apiKey.LockedUntil.After(time.Now()) {
+		return nil, fmt.Errorf("API key is temporarily locked, try again after %s", apiKey.LockedUntil.Format(time.RFC3339))
+	}
+
+	// Failed attempts threshold
+	if apiKey.FailedAttempts >= 10 {
+		lockedUntil := time.Now().Add(30 * time.Minute)
+		s.db.Model(&apiKey).Updates(map[string]interface{}{
+			"locked_until":    lockedUntil,
+			"failed_attempts": 0,
+		})
+		return nil, fmt.Errorf("API key locked due to too many failed attempts")
+	}
+
 	now := time.Now()
-	s.db.Model(&apiKey).Update("last_used_at", now)
+	s.db.Model(&apiKey).Updates(map[string]interface{}{
+		"last_used_at":    now,
+		"failed_attempts": 0,
+	})
 
 	return &apiKey, nil
+}
+
+// IncrementFailedAttempts increases the failed attempt counter for an API key
+func (s *APIKeyService) IncrementFailedAttempts(rawKey string) {
+	if !strings.HasPrefix(rawKey, APIKeyPrefix) || len(rawKey) != APIKeyLength {
+		return
+	}
+	prefix := rawKey[:8]
+	s.db.Model(&models.APIKey{}).Where("key_prefix = ?", prefix).
+		UpdateColumn("failed_attempts", gorm.Expr("failed_attempts + 1"))
 }
 
 func (s *APIKeyService) Count(userID uint) int64 {

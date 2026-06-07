@@ -43,6 +43,7 @@ func isOriginAllowed(origin string) bool {
 		return true
 	}
 
+	// If CORS_ALLOWED_ORIGINS is set, only those origins are allowed.
 	if customOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); customOrigins != "" {
 		for _, allowed := range strings.Split(customOrigins, ",") {
 			allowed = strings.TrimSpace(allowed)
@@ -53,6 +54,8 @@ func isOriginAllowed(origin string) bool {
 		return false
 	}
 
+	// Without explicit whitelist, only allow localhost origins.
+	// This is safe for development and prevents accidental exposure in production.
 	allowedLocalhosts := []string{
 		"http://localhost",
 		"http://127.0.0.1",
@@ -65,25 +68,30 @@ func isOriginAllowed(origin string) bool {
 			return true
 		}
 	}
-	if strings.HasPrefix(origin, "http://192.168.") || strings.HasPrefix(origin, "https://192.168.") {
-		return true
-	}
-	if strings.HasPrefix(origin, "http://10.") || strings.HasPrefix(origin, "https://10.") {
-		return true
-	}
-	if strings.HasPrefix(origin, "http://172.") || strings.HasPrefix(origin, "https://172.") {
-		trimmed := origin
-		if strings.HasPrefix(trimmed, "https://") {
-			trimmed = "http://" + strings.TrimPrefix(trimmed, "https://")
+
+	// Allow private network origins only in development mode.
+	if os.Getenv("GIN_MODE") != "release" {
+		if strings.HasPrefix(origin, "http://192.168.") || strings.HasPrefix(origin, "https://192.168.") {
+			return true
 		}
-		parts := strings.SplitN(strings.TrimPrefix(trimmed, "http://172."), ".", 2)
-		if len(parts) > 0 {
-			var second int
-			if _, err := fmt.Sscanf(parts[0], "%d", &second); err == nil && second >= 16 && second <= 31 {
-				return true
+		if strings.HasPrefix(origin, "http://10.") || strings.HasPrefix(origin, "https://10.") {
+			return true
+		}
+		if strings.HasPrefix(origin, "http://172.") || strings.HasPrefix(origin, "https://172.") {
+			trimmed := origin
+			if strings.HasPrefix(trimmed, "https://") {
+				trimmed = "http://" + strings.TrimPrefix(trimmed, "https://")
+			}
+			parts := strings.SplitN(strings.TrimPrefix(trimmed, "http://172."), ".", 2)
+			if len(parts) > 0 {
+				var second int
+				if _, err := fmt.Sscanf(parts[0], "%d", &second); err == nil && second >= 16 && second <= 31 {
+					return true
+				}
 			}
 		}
 	}
+
 	return false
 }
 
@@ -165,6 +173,10 @@ func APIKeyAuth(db *gorm.DB) gin.HandlerFunc {
 		svc := services.NewAPIKeyService(db)
 		apiKey, err := svc.Validate(apiKeyHeader)
 		if err != nil {
+			// Increment failed attempts for valid-format keys
+			if strings.HasPrefix(apiKeyHeader, services.APIKeyPrefix) {
+				svc.IncrementFailedAttempts(apiKeyHeader)
+			}
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}

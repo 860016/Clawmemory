@@ -243,15 +243,16 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, ArrowLeft, MagicStick } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import { wikiApi } from '../api/go-wiki'
-import { translateError } from '../i18n'
+import { translateError, extractApiError } from '../i18n'
+import type { Wiki, WikiCreateParams, WikiStatus } from '../api/types'
 
 const { t } = useI18n()
 const route = useRoute()
-const pages = ref<any[]>([])
+const pages = ref<Wiki[]>([])
 const { isMobile } = useIsMobile()
-const allPages = ref<any[]>([])
+const allPages = ref<Wiki[]>([])
 const categories = ref<string[]>([])
-const searchResults = ref<any[]>([])
+const searchResults = ref<Wiki[]>([])
 const searchQuery = ref('')
 const selectedCategory = ref('')
 const selectedStatus = ref('')
@@ -259,7 +260,7 @@ const showEditor = ref(false)
 const showExtractDialog = ref(false)
 const isEditing = ref(false)
 const currentPageId = ref<number | null>(null)
-const viewingPage = ref<any>(null)
+const viewingPage = ref<Wiki | null>(null)
 const saving = ref(false)
 const extracting = ref(false)
 const llmAvailable = ref(false)
@@ -283,7 +284,7 @@ const extractForm = ref({
 
 const pinnedPages = computed(() => pages.value.filter(p => p.is_pinned))
 
-function parseTags(tags: any): string[] {
+function parseTags(tags: string | string[] | null): string[] {
   if (!tags) return []
   if (Array.isArray(tags)) return tags
   if (typeof tags === 'string') {
@@ -307,7 +308,7 @@ watch(() => route.query.tab, (tab) => {
 
 async function loadPages() {
   try {
-    const params: any = {}
+    const params: Record<string, unknown> = {}
     if (selectedCategory.value) params.category = selectedCategory.value
     if (selectedStatus.value) params.status = selectedStatus.value
     const { data } = await wikiApi.list(params)
@@ -368,7 +369,7 @@ async function viewPage(id: number) {
   try {
     const { data } = await wikiApi.get(id)
     viewingPage.value = data
-  } catch (e: any) {
+  } catch (e: unknown) {
     ElMessage.error(t('common.failed'))
   }
 }
@@ -380,7 +381,7 @@ function editCurrentPage() {
   currentPageId.value = p.id
   pageForm.value = {
     title: p.title, content: p.content || '', category: p.category || '',
-    tagsStr: parseTags(p.tags).join(', '), parent_id: p.parent_id, is_pinned: p.is_pinned,
+    tagsStr: parseTags(p.tags).join(', '), parent_id: p.parent_id ?? null, is_pinned: p.is_pinned,
     status: p.status || 'draft',
   }
   loadAllPages()
@@ -391,12 +392,12 @@ async function savePage() {
   if (!pageForm.value.title) { ElMessage.warning(t('wiki.fillTitle')); return }
   saving.value = true
   try {
-    const payload: any = {
+    const payload: WikiCreateParams = {
       title: pageForm.value.title, content: pageForm.value.content,
-      category: pageForm.value.category || null,
-      tags: pageForm.value.tagsStr ? pageForm.value.tagsStr.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
-      parent_id: pageForm.value.parent_id, is_pinned: pageForm.value.is_pinned,
-      status: pageForm.value.status,
+      category: pageForm.value.category || undefined,
+      tags: pageForm.value.tagsStr ? pageForm.value.tagsStr.split(',').map((s: string) => s.trim()).filter(Boolean).join(',') : '',
+      parent_id: pageForm.value.parent_id ?? undefined,
+      status: pageForm.value.status as WikiStatus | undefined,
     }
     if (isEditing.value && currentPageId.value) {
       await wikiApi.update(currentPageId.value, payload)
@@ -410,7 +411,7 @@ async function savePage() {
     if (viewingPage.value && currentPageId.value === viewingPage.value.id) {
       await viewPage(viewingPage.value.id)
     }
-  } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
+  } catch (e: unknown) { ElMessage.error(extractApiError(e, t('common.failed'))) }
   finally { saving.value = false }
 }
 
@@ -424,14 +425,15 @@ async function deleteCurrentPage() {
     viewingPage.value = null
     searchResults.value = []
     await Promise.all([loadPages(), loadCategories(), loadStats()])
-  } catch (e: any) {
-    if (e !== 'cancel' && e?.message !== 'cancel') {
-      ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : ''
+    if (msg !== 'cancel') {
+      ElMessage.error(extractApiError(e, t('common.failed')))
     }
   }
 }
 
-async function markComplete(page: any) {
+async function markComplete(page: Wiki) {
   try {
     await wikiApi.markComplete(page.id)
     ElMessage.success(t('wiki.markedComplete'))
@@ -439,10 +441,10 @@ async function markComplete(page: any) {
     if (viewingPage.value?.id === page.id) {
       await viewPage(page.id)
     }
-  } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
+  } catch (e: unknown) { ElMessage.error(extractApiError(e, t('common.failed'))) }
 }
 
-async function refinePage(page: any) {
+async function refinePage(page: Wiki) {
   try {
     const { data } = await wikiApi.refine(page.id, {})
     if (data.message && !data.content) {
@@ -454,7 +456,7 @@ async function refinePage(page: any) {
     if (viewingPage.value?.id === page.id) {
       await viewPage(page.id)
     }
-  } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
+  } catch (e: unknown) { ElMessage.error(extractApiError(e, t('common.failed'))) }
 }
 
 async function extractKnowledge() {
@@ -472,7 +474,7 @@ async function extractKnowledge() {
     }
     showExtractDialog.value = false
     await Promise.all([loadPages(), loadStats()])
-  } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
+  } catch (e: unknown) { ElMessage.error(extractApiError(e, t('common.failed'))) }
   finally { extracting.value = false }
 }
 

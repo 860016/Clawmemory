@@ -106,7 +106,7 @@ func (s *ExtractionService) ExtractFromConversation(content string) *ExtractionR
 			continue
 		}
 
-		dedupKey := mem.Key + "|" + truncateString(mem.Value, 50)
+		dedupKey := mem.Key + "|" + truncateStr(mem.Value, 50)
 		if seen[dedupKey] {
 			continue
 		}

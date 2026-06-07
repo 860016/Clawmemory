@@ -669,7 +669,7 @@ import { ElMessage } from 'element-plus'
 import { ElMessageBox } from 'element-plus'
 import { toolboxApi } from '../api/go-toolbox'
 import { memoryApi } from '../api/go-memories'
-import { translateError } from '../i18n'
+import { translateError, extractApiError } from '../i18n'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -739,8 +739,8 @@ async function loadDecayStats() {
   try {
     const { data } = await memoryApi.getDecayStats()
     decayStats.value = data
-  } catch (e: any) {
-    if (e.response?.status !== 403) ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    if ((e as { response?: { status?: number } })?.response?.status !== 403) ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.decay = false }
 }
 
@@ -755,8 +755,8 @@ async function scanConflicts() {
     conflicts.value = data.conflicts
     conflictMode.value = data.mode || 'local'
     conflictSummary.value = { total: data.total, auto_resolvable: data.auto_resolvable || 0, needs_review: data.needs_review || data.total }
-  } catch (e: any) {
-    if (e.response?.status !== 403) ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    if ((e as { response?: { status?: number } })?.response?.status !== 403) ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.conflicts = false }
 }
 
@@ -765,8 +765,8 @@ async function resolveConflict(index: number, strategy: string) {
     await toolboxApi.resolveConflict(index, strategy)
     ElMessage.success(t('advanced.conflictResolved'))
     scanConflicts()
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   }
 }
 
@@ -786,8 +786,8 @@ async function loadTokenStats() {
         relation_count: data.relation_count || 0,
       }
     }
-  } catch (e: any) {
-    if (e.response?.status !== 403) ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    if ((e as { response?: { status?: number } })?.response?.status !== 403) ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.tokenStats = false }
 }
 
@@ -797,8 +797,8 @@ async function testRoute() {
   try {
     const { data } = await toolboxApi.routeModel(testMessage.value)
     routeResult.value = { selected_model: data.recommended_layer || data.strategy, complexity: data.complexity || 'simple' }
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.route = false }
 }
 
@@ -810,8 +810,8 @@ async function runAiExtract() {
     const entityCount = data.entities?.length || data.extracted || 0
     const relationCount = data.relations?.length || 0
     ElMessage.success(t('advanced.extractDone', { entities: entityCount, relations: relationCount }))
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.extract = false }
 }
 
@@ -826,8 +826,8 @@ async function assessQuality() {
     } else {
       ElMessage.success(t('advanced.qualityNoIssues'))
     }
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.quality = false }
 }
 
@@ -837,8 +837,8 @@ async function autoFix() {
     const { data } = await memoryApi.autoFix()
     autoFixResult.value = data
     ElMessage.success(t('advanced.autoFixDone', { fixed: data.fixed || 0 }))
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.autoFix = false }
 }
 
@@ -848,8 +848,8 @@ async function runAutoGraph(overwrite: boolean) {
     const { data } = await toolboxApi.autoGraph(overwrite)
     graphResult.value = data
     ElMessage.success(t('advanced.graphDone', { entities: data.total_pairs || data.total || 0, relations: data.created || 0 }))
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.graph = false }
 }
 
@@ -858,8 +858,8 @@ async function previewCompress() {
   try {
     const { data } = await toolboxApi.compressPreview(compressLevel.value)
     compressPreviewData.value = data
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.compressPreview = false }
 }
 
@@ -869,8 +869,8 @@ async function applyCompress() {
     const { data } = await toolboxApi.compressApply(compressLevel.value)
     ElMessage.success(t('advanced.compressDone', { count: data.archived, ratio: data.total > 0 ? Math.round(data.archived / data.total * 100) : 0 }))
     compressPreviewData.value = null
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.compressApply = false }
 }
 
@@ -878,8 +878,8 @@ async function saveCompressConfig() {
   try {
     await toolboxApi.setCompressConfig(compressConfig.value)
     ElMessage.success(t('common.success'))
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   }
 }
 
@@ -903,8 +903,8 @@ async function loadEvolutionInsights() {
       layer_stats: data.layer_stats || {},
       source_stats: data.source_stats || {},
     }
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.insights = false }
 }
 
@@ -914,8 +914,8 @@ async function runDiscoverRelations() {
     const { data } = await memoryApi.runEvolution('discover')
     discoverResult.value = data
     ElMessage.success(t('advanced.discoveredCount', { count: data.discoveries?.length || 0 }))
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.discover = false }
 }
 
@@ -925,8 +925,8 @@ async function runInferChains() {
     const { data } = await memoryApi.runEvolution('infer')
     inferResult.value = data
     ElMessage.success(t('advanced.inferredCount', { count: data.inferences?.length || 0 }))
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.infer = false }
 }
 
@@ -935,8 +935,8 @@ async function runImportanceAdjust() {
   try {
     const { data } = await memoryApi.runEvolution('importance')
     ElMessage.success(t('advanced.adjustedCount', { count: data.total || 0 }))
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.importance = false }
 }
 
@@ -946,8 +946,8 @@ async function runGraphReasoning() {
     const { data } = await memoryApi.getGraphReasoning()
     graphReasoningResult.value = data
     ElMessage.success(`Inferred ${data.total_inferred || 0} relations via graph reasoning`)
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.graphReasoning = false }
 }
 
@@ -957,8 +957,8 @@ async function runCentrality() {
     const { data } = await memoryApi.getCentrality()
     centralityResult.value = data
     ElMessage.success(`Analyzed ${data.total_entities || 0} entities, ${data.hub_count || 0} hubs`)
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.centrality = false }
 }
 
@@ -968,8 +968,8 @@ async function runCommunityDiscovery() {
     const { data } = await memoryApi.getCommunities()
     communitiesResult.value = data
     ElMessage.success(`Found ${data.total || 0} communities`)
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.communities = false }
 }
 
@@ -979,8 +979,8 @@ async function runCommunitiesToWiki() {
     const { data } = await memoryApi.communitiesToWiki()
     communitiesToWikiResult.value = data
     ElMessage.success(`Created ${data.wiki_pages_created || 0} wiki pages from ${data.communities_found || 0} communities`)
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally { loading.value.communitiesToWiki = false }
 }
 

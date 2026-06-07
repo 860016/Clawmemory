@@ -21,7 +21,7 @@ export const skillsApi = {
     actions: Array<{
       action_type: string
       action_name: string
-      parameters?: any
+      parameters?: Record<string, unknown>
       result?: string
       duration?: number
     }>
@@ -33,7 +33,7 @@ export const skillsApi = {
     return api.get('/skills/detect')
   },
 
-  createSkill(data: { use_ai?: boolean; patterns?: any[] }) {
+  createSkill(data: { use_ai?: boolean; patterns?: Array<{ pattern: string; category?: string }> }) {
     return api.post('/skills/create', data, { timeout: 120000 })
   },
 

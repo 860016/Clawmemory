@@ -137,6 +137,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import { sharingApi } from '../api/go-sharing'
+import type { ShareRule } from '../api/types'
 
 const { t } = useI18n()
 
@@ -245,13 +246,13 @@ async function revokeShare(id: number) {
   }
 }
 
-function editRule(rule: any) {
+function editRule(rule: ShareRule) {
   editingRule.value = rule
   ruleForm.value = {
-    from_agent: rule.from_agent || '',
-    to_agent: rule.to_agent || '',
+    from_agent: rule.source_agent || '',
+    to_agent: rule.target_agent || '',
     layer: rule.layer || '',
-    target_visibility: rule.target_visibility || 'shared',
+    target_visibility: 'shared',
     enabled: rule.enabled !== false,
   }
   showRuleDialog.value = true

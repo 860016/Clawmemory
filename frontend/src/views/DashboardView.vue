@@ -477,7 +477,10 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Close, ArrowRight } from '@element-plus/icons-vue'
-import { translateError } from '../i18n'
+import { translateError, extractApiError } from '../i18n'
+
+interface DailyTrendItem { date: string; count: number }
+interface TokenTrendItem { date: string; tokens: number; cumulative: number }
 import { statsApi } from '../api/go-stats'
 import { chromadbApi } from '../api/go-chromadb'
 import { openClawSkillsApi } from '../api/go-openclaw-skills'
@@ -594,8 +597,8 @@ async function checkChromaDB() {
     } else {
       ElMessage.warning(data.reason || t('dashboard.chromadbNotInstalled'))
     }
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('dashboard.installFailed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('dashboard.installFailed')))
   } finally {
     installing.value = false
   }
@@ -607,8 +610,8 @@ async function syncChromaDB() {
     const { data } = await chromadbApi.sync()
     chromadbMemoryCount.value = data.synced || 0
     ElMessage.success(t('dashboard.syncSuccess', { count: data.synced }))
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('dashboard.syncFailed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('dashboard.syncFailed')))
   } finally {
     syncing.value = false
   }
@@ -622,7 +625,7 @@ function copyText(text: string) {
   })
 }
 
-async function showSkillDetail(skill: any) {
+async function showSkillDetail(skill: Record<string, unknown>) {
   try {
     const { data } = await openClawSkillsApi.getDetail({
       skill_dir: skill.skill_dir,
@@ -646,13 +649,13 @@ async function loadUsageStats() {
 const maxDailyCount = computed(() => {
   const trend = usageStats.value.dailyTrend || []
   if (!trend.length) return 1
-  return Math.max(...trend.map((d: any) => d.count), 1)
+  return Math.max(...trend.map((d: DailyTrendItem) => d.count), 1)
 })
 
 const maxTokenCount = computed(() => {
   const trend = usageStats.value.dailyTokenTrend || []
   if (!trend.length) return 1
-  return Math.max(...trend.map((d: any) => d.tokens), 1)
+  return Math.max(...trend.map((d: TokenTrendItem) => d.tokens), 1)
 })
 
 const xLabelInterval = computed(() => {
@@ -669,7 +672,7 @@ const dailyTrendPoints = computed(() => {
   const plotW = chartWidth - chartPadding.left - chartPadding.right
   const plotH = chartHeight - chartPadding.top - chartPadding.bottom
   const max = maxDailyCount.value
-  return trend.map((d: any, i: number) => ({
+  return trend.map((d: DailyTrendItem, i: number) => ({
     x: chartPadding.left + (i / Math.max(trend.length - 1, 1)) * plotW,
     y: chartPadding.top + plotH - (d.count / max) * plotH,
     label: d.date.slice(5), // MM-DD
@@ -700,7 +703,7 @@ const tokenBarPoints = computed(() => {
   const max = maxTokenCount.value
   const barW = Math.max(plotW / trend.length - 2, 2)
   const colors = ['#10b981', '#34d399', '#059669', '#0ea5e9', '#10b981']
-  return trend.map((d: any, i: number) => ({
+  return trend.map((d: TokenTrendItem, i: number) => ({
     x: chartPadding.left + (i / trend.length) * plotW + 1,
     y: chartPadding.top + plotH - (d.tokens / max) * plotH,
     w: barW,
@@ -716,8 +719,8 @@ const cumulativeLinePath = computed(() => {
   if (!trend.length) return ''
   const plotW = chartWidth - chartPadding.left - chartPadding.right
   const plotH = chartHeight - chartPadding.top - chartPadding.bottom
-  const maxCum = Math.max(...trend.map((d: any) => d.cumulative), 1)
-  return trend.map((d: any, i: number) => {
+  const maxCum = Math.max(...trend.map((d: TokenTrendItem) => d.cumulative), 1)
+  return trend.map((d: TokenTrendItem, i: number) => {
     const x = chartPadding.left + (i / Math.max(trend.length - 1, 1)) * plotW
     const y = chartPadding.top + plotH - (d.cumulative / maxCum) * plotH
     return `${i === 0 ? 'M' : 'L'}${x},${y}`

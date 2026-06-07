@@ -265,6 +265,7 @@ import { ElMessage } from 'element-plus'
 import { skillsApi } from '../api/go-skills'
 import { openClawSkillsApi } from '../api/go-openclaw-skills'
 import { useI18n } from 'vue-i18n'
+import { extractApiError } from '../i18n'
 
 const { t } = useI18n()
 
@@ -321,7 +322,7 @@ async function scanSkills() {
   }
 }
 
-async function showDetail(skill: any) {
+async function showDetail(skill: Record<string, unknown>) {
   try {
     const { data } = await openClawSkillsApi.getDetail({
       skill_dir: skill.skill_dir,
@@ -376,8 +377,8 @@ async function autoCreateSkill() {
       ElMessage.success(t('skills.skillsCreated', { count: data.skills_created }))
       loadLearnedSkills()
     }
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('skills.createFailed'))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('skills.createFailed')))
   } finally {
     creating.value = false
   }
@@ -419,7 +420,7 @@ function openImport(url: string) {
   window.open(url, '_blank')
 }
 
-async function showLearnedDetail(skill: any) {
+async function showLearnedDetail(skill: Record<string, unknown>) {
   learnedDetailSkill.value = skill
   learnedDetailVisible.value = true
 }
@@ -435,8 +436,8 @@ async function improveSkill(id: number) {
       ElMessage.success(t('skills.skillImproved') + ' v' + data.skill?.version)
       loadLearnedSkills()
     }
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('skills.improveFailed'))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('skills.improveFailed')))
   } finally {
     improving.value = false
   }

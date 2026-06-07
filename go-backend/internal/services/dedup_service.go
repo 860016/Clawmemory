@@ -74,7 +74,7 @@ func (s *DedupService) Scan(userID uint) (map[string]interface{}, error) {
 						similarMemories = append(similarMemories, DuplicateMemory{
 							ID:         mi.ID,
 							Key:        mi.Key,
-							Value:      truncateString(mi.Value, 100),
+							Value:      truncateStr(mi.Value, 100),
 							Layer:      mi.Layer,
 							Importance: mi.Importance,
 							Source:     mi.Source,
@@ -84,7 +84,7 @@ func (s *DedupService) Scan(userID uint) (map[string]interface{}, error) {
 					similarMemories = append(similarMemories, DuplicateMemory{
 						ID:         mj.ID,
 						Key:        mj.Key,
-						Value:      truncateString(mj.Value, 100),
+						Value:      truncateStr(mj.Value, 100),
 						Layer:      mj.Layer,
 						Importance: mj.Importance,
 						Source:     mj.Source,
@@ -287,16 +287,4 @@ func keyPrefix(key string) string {
 		p = p[:4]
 	}
 	return p
-}
-
-func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
-}
-
-func init() {
-	_ = strings.NewReader
-	_ = math.Max
 }

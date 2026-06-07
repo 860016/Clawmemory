@@ -74,7 +74,7 @@ export const aiApi = {
     return api.post('/ai/extract-facts', { messages }, { timeout: 120000 })
   },
 
-  consolidate(newFacts: any[]) {
+  consolidate(newFacts: Array<{ key: string; value: string; layer?: string; importance?: number }>) {
     return api.post('/ai/consolidate', { facts: newFacts }, { timeout: 120000 })
   },
 

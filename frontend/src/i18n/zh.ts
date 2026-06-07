@@ -265,6 +265,7 @@ export default {
     engineTFIDF: 'TF-IDF搜索',
     engineKeyword: '关键词搜索',
     engineGraphRAG: '图谱融合搜索',
+    searchDegraded: '搜索已降级：语义/向量搜索不可用，当前使用关键词模式。安装 ChromaDB 可获得更好的搜索效果。',
     smartLoadInfo: '智能加载 {count} 条记忆，使用 {tokens}/{budget} tokens',
     summaryTag: '摘要',
     reinforceTip: '强化此记忆，防止衰减',

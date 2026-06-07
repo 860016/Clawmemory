@@ -79,7 +79,7 @@
       </div>
       <template #footer>
         <el-button @click="showDetailDialog = false">{{ $t('common.close') }}</el-button>
-        <el-button type="primary" @click="editSession(detailSession); showDetailDialog = false">{{ $t('common.edit') }}</el-button>
+        <el-button type="primary" @click="detailSession && editSession(detailSession); showDetailDialog = false">{{ $t('common.edit') }}</el-button>
       </template>
     </el-dialog>
 
@@ -134,18 +134,19 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import { sessionMemoryApi } from '../api/go-memories'
-import { translateError } from '../i18n'
+import { translateError, extractApiError } from '../i18n'
+import type { SessionMemory } from '../api/types'
 
 const { t } = useI18n()
-const sessions = ref<any[]>([])
+const sessions = ref<SessionMemory[]>([])
 const { isMobile } = useIsMobile()
 const loading = ref(true)
 const filterSessionId = ref('')
 const filterStatus = ref('')
 const showDetailDialog = ref(false)
-const detailSession = ref<any>(null)
+const detailSession = ref<SessionMemory | null>(null)
 const showAddDialog = ref(false)
-const editingSession = ref<any>(null)
+const editingSession = ref<SessionMemory | null>(null)
 const saving = ref(false)
 
 const emptyForm = () => ({
@@ -159,7 +160,7 @@ onMounted(() => { loadSessions() })
 
 async function loadSessions() {
   try {
-    const params: any = {}
+    const params: Record<string, unknown> = {}
     if (filterSessionId.value) params.session_id = filterSessionId.value
     if (filterStatus.value) params.status = filterStatus.value
     const { data } = await sessionMemoryApi.list(params)
@@ -168,7 +169,7 @@ async function loadSessions() {
   finally { loading.value = false }
 }
 
-function openDetail(s: any) {
+function openDetail(s: SessionMemory) {
   detailSession.value = s
   showDetailDialog.value = true
 }
@@ -179,7 +180,7 @@ function openAddDialog() {
   showAddDialog.value = true
 }
 
-function editSession(s: any) {
+function editSession(s: SessionMemory) {
   editingSession.value = s
   sessionForm.value = {
     session_id: s.session_id || '',
@@ -208,8 +209,8 @@ async function saveSession() {
     ElMessage.success(t('common.success'))
     showAddDialog.value = false
     await loadSessions()
-  } catch (e: any) {
-    ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally {
     saving.value = false
   }
@@ -224,7 +225,7 @@ async function deleteSession(id: number) {
   } catch { /* user cancelled or delete failed */ }
 }
 
-function getPreview(s: any) {
+function getPreview(s: SessionMemory) {
   const parts = [s.current_state, s.task_spec, s.key_results].filter(Boolean)
   const text = parts.join(' · ')
   return text.length > 120 ? text.slice(0, 120) + '...' : text

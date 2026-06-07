@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { memoryApi } from '../api/go-memories'
+import type { Memory, MemoryCreateParams, MemoryUpdateParams, MemorySearchParams } from '../api/types'
 
 export const useMemoryStore = defineStore('memory', () => {
-  const memories = ref<any[]>([])
+  const memories = ref<Memory[]>([])
   const total = ref(0)
   const currentLayer = ref('')
   const currentSourceAgent = ref('')
@@ -22,12 +23,12 @@ export const useMemoryStore = defineStore('memory', () => {
     total.value = resp.data.total
   }
 
-  async function createMemory(data: any) {
+  async function createMemory(data: MemoryCreateParams) {
     await memoryApi.create(data)
     await fetchMemories(currentLayer.value || undefined, 1, currentSourceAgent.value || undefined, currentVisibility.value || undefined)
   }
 
-  async function updateMemory(id: number, data: any) {
+  async function updateMemory(id: number, data: MemoryUpdateParams) {
     await memoryApi.update(id, data)
     await fetchMemories(currentLayer.value || undefined, 1, currentSourceAgent.value || undefined, currentVisibility.value || undefined)
   }
@@ -37,7 +38,7 @@ export const useMemoryStore = defineStore('memory', () => {
     await fetchMemories(currentLayer.value || undefined, 1, currentSourceAgent.value || undefined, currentVisibility.value || undefined)
   }
 
-  async function search(q: string, mode?: 'keyword' | 'semantic' | 'graphrag' | 'graph-rag' | 'smart') {
+  async function search(q: string, mode?: MemorySearchParams['mode']) {
     const resp = await memoryApi.search({ q, mode })
     const items = Array.isArray(resp.data) ? resp.data : (resp.data.items || [])
     memories.value = items

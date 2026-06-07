@@ -85,6 +85,9 @@
         {{ $t('memories.searchResults') }} ({{ searchResults.length }})
         <el-tag v-if="searchEngine" size="small" type="info" style="margin-left: 8px">{{ searchEngineLabel }}</el-tag>
       </div>
+      <el-alert v-if="isSearchDegraded" type="warning" show-icon :closable="true" style="margin-bottom: 12px">
+        <template #title>{{ $t('memories.searchDegraded') }}</template>
+      </el-alert>
       <div class="memory-card" v-for="m in searchResults" :key="'s'+m.id" :class="{ 'smart-summary': m.load_level === 'summary', 'smart-full': m.load_level === 'full' }">
         <div class="card-top">
           <span class="layer-tag" :class="m.layer">{{ layerLabels[m.layer] || m.layer }}</span>
@@ -160,8 +163,8 @@
         </div>
         <div class="card-value" v-else>{{ truncate(m.value, 200) }}</div>
         <div class="card-summary-line" v-if="!m.is_encrypted && m.summary && m.summary !== m.value">💡 {{ m.summary }}</div>
-        <div class="card-tags" v-if="m.tags && m.tags.length">
-          <span class="tag" v-for="t in m.tags" :key="t">{{ t }}</span>
+        <div class="card-tags" v-if="m.tags && parseTagsToArray(m.tags).length">
+          <span class="tag" v-for="t in parseTagsToArray(m.tags)" :key="t">{{ t }}</span>
         </div>
         <div class="card-freshness" v-if="getFreshness(m)">
           <span class="freshness-tag" :class="getFreshness(m!)!.level">{{ getFreshness(m!)!.label }}</span>
@@ -354,14 +357,15 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Upload, Loading, MagicStick, Warning } from '@element-plus/icons-vue'
-import { translateError } from '../i18n'
+import { translateError, extractApiError } from '../i18n'
 import { memoryApi } from '../api/go-memories'
 import { aiApi } from '../api/go-ai'
+import type { Memory, MemoryCreateParams, MemoryLayer, MemoryVisibility } from '../api/types'
 
 const { t } = useI18n()
 const route = useRoute()
-const memories = ref<any[]>([])
-const searchResults = ref<any[]>([])
+const memories = ref<Memory[]>([])
+const searchResults = ref<Memory[]>([])
 const searchQuery = ref('')
 const searchMode = ref<'keyword' | 'semantic' | 'graphrag' | 'graph-rag' | 'smart'>('keyword')
 const searchEngine = ref('')
@@ -373,6 +377,16 @@ const searchEngineLabel = computed(() => {
     graph_rag: t('memories.engineGraphRAG'),
   }
   return map[searchEngine.value] || searchEngine.value
+})
+const isSearchDegraded = computed(() => {
+  if (!searchEngine.value || !searchResults.value.length) return false
+  const mode = searchMode.value
+  const engine = searchEngine.value
+  // User requested semantic/graph-rag/smart but got keyword fallback
+  if ((mode === 'semantic' || mode === 'graph-rag' || mode === 'smart') && engine === 'keyword') return true
+  // User requested semantic but got TF-IDF (no vector DB)
+  if (mode === 'semantic' && engine === 'tfidf') return true
+  return false
 })
 const smartLoadResult = ref<any>(null)
 const currentLayer = ref('')
@@ -453,7 +467,7 @@ function openAddDialog() {
 async function loadMemories() {
   loadingList.value = true
   try {
-    const params: any = { page: currentPage.value, size: pageSize }
+    const params: Record<string, unknown> = { page: currentPage.value, size: pageSize }
     if (currentLayer.value) params.layer = currentLayer.value
     if (currentMemoryType.value) params.memory_type = currentMemoryType.value
     if (currentSourceAgent.value) params.source_agent = currentSourceAgent.value
@@ -475,7 +489,7 @@ async function handleSearch() {
       const { data } = await memoryApi.smartLoad({ q: searchQuery.value, token_budget: 2000, load_level: 'auto' })
       smartLoadResult.value = data
       searchEngine.value = data.engine || 'smart_v1'
-      searchResults.value = (data.memories || []).map((m: any) => ({
+      searchResults.value = (data.memories || []).map((m: Record<string, unknown>) => ({
         ...m,
         importance: m.importance || 0.5,
         tags: m.tags || [],
@@ -496,7 +510,7 @@ async function handleSearch() {
     const { data } = await memoryApi.search({ q: searchQuery.value, mode: searchMode.value, limit: 20 })
     const results = data.items || data || []
     searchEngine.value = data.engine || (searchMode.value === 'semantic' ? 'tfidf' : searchMode.value === 'graph-rag' ? 'graph_rag' : 'keyword')
-    searchResults.value = results.map((m: any) => ({
+    searchResults.value = results.map((m: Record<string, unknown>) => ({
       ...m,
       importance: m.importance || 0.5,
       tags: m.tags || [],
@@ -523,9 +537,9 @@ async function reinforceMemory(id: number) {
   }
 }
 
-function editMemory(m: any) {
+function editMemory(m: Memory) {
   editingMemory.value = m
-  form.value = { layer: m.layer, key: m.key, value: m.value, importance: Math.round(m.importance * 100), tagsStr: (m.tags || []).join(', '), memory_type: m.memory_type || 'knowledge', visibility: m.visibility || 'private', source_agent: m.source_agent || '' }
+  form.value = { layer: m.layer, key: m.key, value: m.value, importance: Math.round(m.importance * 100), tagsStr: parseTagsToString(m.tags), memory_type: m.memory_type || 'knowledge', visibility: m.visibility || 'private', source_agent: m.source_agent || '' }
   showAddDialog.value = true
 }
 
@@ -533,7 +547,7 @@ async function saveMemory() {
   if (!form.value.key || !form.value.value) { ElMessage.warning(t('memories.fillRequired')); return }
   saving.value = true
   try {
-    const payload: any = { layer: form.value.layer, key: form.value.key, value: form.value.value, importance: form.value.importance / 100, tags: form.value.tagsStr ? form.value.tagsStr.split(',').map((s: string) => s.trim()).filter(Boolean) : [], memory_type: form.value.memory_type, visibility: form.value.visibility || 'private' }
+    const payload: MemoryCreateParams = { key: form.value.key, value: form.value.value, layer: form.value.layer as MemoryLayer, importance: form.value.importance / 100, tags: form.value.tagsStr ? form.value.tagsStr.split(',').map((s: string) => s.trim()).filter(Boolean) : undefined, visibility: (form.value.visibility || 'private') as MemoryVisibility }
     if (form.value.source_agent) payload.source_agent = form.value.source_agent
     try {
       const { data: scanResult } = await memoryApi.scanSecrets(form.value.key + ' ' + form.value.value)
@@ -546,7 +560,7 @@ async function saveMemory() {
       }
     } catch {}
     await doSaveMemory(payload)
-  } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
+  } catch (e: unknown) { ElMessage.error(extractApiError(e, t('common.failed'))) }
   finally { saving.value = false }
 }
 
@@ -563,9 +577,8 @@ async function aiConflictScan() {
     } else {
       ElMessage.warning(t('memories.aiConflictsFound', { count: conflicts }))
     }
-  } catch (e: any) {
-    const errMsg = e.response?.data?.error || ''
-    ElMessage.error(translateError(errMsg, t('common.failed')))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   } finally {
     aiScanning.value = false
   }
@@ -578,22 +591,23 @@ async function deleteMemory(id: number) {
     ElMessage.success(t('memories.deleted'))
     searchResults.value = []
     await loadMemories()
-  } catch (e: any) {
-    if (e !== 'cancel' && e?.message !== 'cancel') {
-      ElMessage.error(translateError(e.response?.data?.error, t('common.failed')))
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : ''
+    if (msg !== 'cancel') {
+      ElMessage.error(extractApiError(e, t('common.failed')))
     }
   }
 }
 
-async function decryptMemory(m: any) {
+async function decryptMemory(m: Memory) {
   try {
     const { data } = await memoryApi.get(m.id)
     if (data.encrypted) {
       m.value = data.value
       m.is_encrypted = false
     }
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.error || t('common.failed'))
+  } catch (e: unknown) {
+    ElMessage.error(extractApiError(e, t('common.failed')))
   }
 }
 
@@ -619,8 +633,8 @@ async function handleScan() {
   try {
     const { data } = await memoryApi.scanAgentMemories()
     scanResult.value = data
-  } catch (e: any) {
-    scanError.value = translateError(e.response?.data?.error || e.response?.data?.detail, t('memories.scanFailed'))
+  } catch (e: unknown) {
+    scanError.value = extractApiError(e, t('memories.scanFailed'))
   } finally {
     scanning.value = false
   }
@@ -703,7 +717,30 @@ async function handleExtractAndSave() {
   }
 }
 
-function getFreshness(m: any): { level: string; label: string } | null {
+function parseTagsToString(tags: string): string {
+  if (!tags) return ''
+  try {
+    const parsed = JSON.parse(tags)
+    if (Array.isArray(parsed)) return parsed.join(', ')
+  } catch {
+    return tags
+  }
+  return tags
+}
+
+function parseTagsToArray(tags: string): string[] {
+  if (!tags) return []
+  try {
+    const parsed = JSON.parse(tags)
+    if (Array.isArray(parsed)) return parsed
+  } catch {
+    // fallback: treat as comma-separated
+    return tags.split(',').map((s: string) => s.trim()).filter(Boolean)
+  }
+  return []
+}
+
+function getFreshness(m: Memory): { level: string; label: string } | null {
   if (!m.updated_at) return null
   const days = (Date.now() - new Date(m.updated_at).getTime()) / (1000 * 60 * 60 * 24)
   if (days <= 1) return { level: 'fresh', label: t('memories.freshnessFresh') }
@@ -720,7 +757,7 @@ function forceSaveWithSecret() {
   }
 }
 
-async function doSaveMemory(payload: any) {
+async function doSaveMemory(payload: MemoryCreateParams) {
   saving.value = true
   try {
     if (editingMemory.value) await memoryApi.update(editingMemory.value.id, payload)
@@ -730,7 +767,7 @@ async function doSaveMemory(payload: any) {
     editingMemory.value = null
     searchResults.value = []
     await loadMemories()
-  } catch (e: any) { ElMessage.error(translateError(e.response?.data?.error || e.response?.data?.detail, t('common.failed'))) }
+  } catch (e: unknown) { ElMessage.error(extractApiError(e, t('common.failed'))) }
   finally { saving.value = false }
 }
 </script>
